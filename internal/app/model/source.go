@@ -1,0 +1,240 @@
+package model
+
+import (
+	"fmt"
+
+	"github.com/bytedance/sonic"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/dal/schema"
+	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
+)
+
+type SourceKind string
+
+const (
+	SourceKindText SourceKind = "text"
+	SourceKindUrl  SourceKind = "url"
+	SourceKindFile SourceKind = "file"
+)
+
+func (s SourceKind) IsFile() bool {
+	return s == SourceKindFile
+}
+
+func (s SourceKind) IsText() bool {
+	return s == SourceKindText
+}
+
+func (s SourceKind) IsUrl() bool {
+	return s == SourceKindUrl
+}
+
+func (s SourceKind) String() string {
+	return string(s)
+}
+
+type SourceStatus string
+
+func (s SourceStatus) String() string {
+	return string(s)
+}
+
+const (
+	SourceStatusInited    SourceStatus = "inited"
+	SourceStatusUploading SourceStatus = "uploading"
+	SourceStatusPreparing SourceStatus = "preparing"
+	SourceStatusReady     SourceStatus = "ready"
+	SourceStatusFailed    SourceStatus = "failed"
+)
+
+func (s SourceKind) Supported() bool {
+	switch s {
+	case SourceKindText, SourceKindUrl, SourceKindFile:
+		return true
+	}
+
+	return false
+}
+
+type Source struct {
+	Id          uuid.UUID    `json:"id"`
+	NotebookId  uuid.UUID    `json:"notebook_id"`
+	Kind        SourceKind   `json:"kind"`
+	Status      SourceStatus `json:"status"`
+	DisplayName string       `json:"display_name"`
+	Content     []byte       `json:"content"`
+	OwnerId     string       `json:"owner_id"`
+	UpdatedAt   int64        `json:"updated_at"`
+}
+
+func (s *Source) KindText() bool {
+	if s != nil {
+		return s.Kind == SourceKindText
+	}
+	return false
+}
+
+func (s *Source) KindUrl() bool {
+	if s != nil {
+		return s.Kind == SourceKindUrl
+	}
+	return false
+}
+
+func (s *Source) KindFile() bool {
+	if s != nil {
+		return s.Kind == SourceKindFile
+	}
+	return false
+}
+
+func (s *Source) StatusInited() bool {
+	if s != nil {
+		return s.Status == SourceStatusInited
+	}
+	return false
+}
+
+func (s *Source) StatusUploading() bool {
+	if s != nil {
+		return s.Status == SourceStatusUploading
+	}
+	return false
+}
+
+func (s *Source) StatusPreparing() bool {
+	if s != nil {
+		return s.Status == SourceStatusPreparing
+	}
+	return false
+}
+
+func (s *Source) StatusReady() bool {
+	if s != nil {
+		return s.Status == SourceStatusReady
+	}
+	return false
+}
+
+func (s *Source) StatusFailed() bool {
+	if s != nil {
+		return s.Status == SourceStatusFailed
+	}
+	return false
+}
+
+func (s *Source) To() *schema.Source {
+	return &schema.Source{
+		Id:          s.Id,
+		NotebookId:  s.NotebookId,
+		Kind:        string(s.Kind),
+		Status:      s.Status.String(),
+		DisplayName: s.DisplayName,
+		Content:     s.Content,
+		OwnerId:     s.OwnerId,
+		UpdatedAt:   s.UpdatedAt,
+	}
+}
+
+func NewSourceFrom(s *schema.Source) *Source {
+	source := &Source{
+		Id:          s.Id,
+		NotebookId:  s.NotebookId,
+		Kind:        SourceKind(s.Kind),
+		Status:      SourceStatus(s.Status),
+		DisplayName: s.DisplayName,
+		Content:     s.Content,
+		OwnerId:     s.OwnerId,
+		UpdatedAt:   s.UpdatedAt,
+	}
+
+	return source
+}
+
+type TextSourceContent struct {
+	Text string `json:"text"`
+}
+
+func (t *TextSourceContent) From(b []byte) error {
+	return sonic.Unmarshal(b, t)
+}
+
+type UrlSourceContent struct {
+	Url string `json:"url"`
+}
+
+func (u *UrlSourceContent) From(b []byte) error {
+	return sonic.Unmarshal(b, u)
+}
+
+type FileSourceContent struct {
+	StoreKey string `json:"store_key"`
+	Filename string `json:"filename"`
+	Md5      string `json:"md5"`
+	Size     int64  `json:"size"`
+	Format   string `json:"format"`
+
+	Url string `json:"-"` // output usage
+}
+
+func (f *FileSourceContent) From(b []byte) error {
+	return sonic.Unmarshal(b, f)
+}
+
+// Supported source file mime types
+const (
+	MimeTypePDF      = "application/pdf"
+	MimeTypeText     = "text/plain"
+	MimeTypeMarkdown = "text/markdown"
+	MimeTypeEPUB     = "application/epub+zip"
+	MimeTypeWord     = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+)
+
+func SupportedFileMimeType(mimeType string) bool {
+	switch mimeType {
+	case MimeTypePDF, MimeTypeText, MimeTypeMarkdown, MimeTypeEPUB, MimeTypeWord:
+		return true
+	}
+	return false
+}
+
+type SourceWithContent struct {
+	*Source
+
+	ContentText *TextSourceContent `json:"content_text,omitempty"`
+	ContentUrl  *UrlSourceContent  `json:"content_url,omitempty"`
+	ContentFile *FileSourceContent `json:"content_file,omitempty"`
+}
+
+func NewSourceWithContent(s *Source) (*SourceWithContent, error) {
+	var (
+		err error
+		sc  = SourceWithContent{Source: s}
+	)
+	switch s.Kind {
+	case SourceKindText:
+		tc := TextSourceContent{}
+		err = tc.From(s.Content)
+		if err == nil {
+			sc.ContentText = &tc
+		}
+	case SourceKindUrl:
+		uc := UrlSourceContent{}
+		err = uc.From(s.Content)
+		if err == nil {
+			sc.ContentUrl = &uc
+		}
+	case SourceKindFile:
+		var fc FileSourceContent
+		err = fc.From(s.Content)
+		if err == nil {
+			sc.ContentFile = &fc
+		}
+	default:
+		err = fmt.Errorf("unsupported source kind, source_id=%s", s.Id)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &sc, nil
+}

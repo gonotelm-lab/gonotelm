@@ -21,14 +21,14 @@ func TestChatMessageStoreCreateListDeleteByChatId(t *testing.T) {
 		msgOld := &schema.ChatMessage{
 			ChatId:  chatID,
 			UserId:  userID,
-			Role:    "user",
+			MsgType: int8(0),
 			Content: json.RawMessage(`{"text":"hello"}`),
 			SeqNo:   1000,
 		}
 		msgNew := &schema.ChatMessage{
 			ChatId:  chatID,
 			UserId:  userID,
-			Role:    "assistant",
+			MsgType: int8(1),
 			Content: json.RawMessage(`{"text":"world"}`),
 			SeqNo:   2000,
 		}
@@ -39,15 +39,26 @@ func TestChatMessageStoreCreateListDeleteByChatId(t *testing.T) {
 			_ = testDB.WithContext(ctx).Exec(`DELETE FROM chat_messages WHERE chat_id = ?`, chatID).Error
 		})
 
+		gotByID, err := store.GetById(ctx, msgNew.Id)
+		So(err, ShouldBeNil)
+		So(gotByID.Id, ShouldEqual, msgNew.Id)
+		So(gotByID.MsgType, ShouldEqual, msgNew.MsgType)
+		So(gotByID.SeqNo, ShouldEqual, msgNew.SeqNo)
+
+		gotByIDAndChatID, err := store.GetByIdAndChatId(ctx, msgNew.Id, chatID)
+		So(err, ShouldBeNil)
+		So(gotByIDAndChatID.Id, ShouldEqual, msgNew.Id)
+		So(gotByIDAndChatID.ChatId, ShouldEqual, chatID)
+
 		listed, err := store.ListByChatId(ctx, chatID, 10, 0)
 		So(err, ShouldBeNil)
 		So(len(listed), ShouldEqual, 2)
-		So(listed[0].SeqNo, ShouldEqual, msgOld.SeqNo)
-		So(listed[0].Role, ShouldEqual, msgOld.Role)
-		So(compactJSON(listed[0].Content), ShouldEqual, compactJSON(msgOld.Content))
-		So(listed[1].SeqNo, ShouldEqual, msgNew.SeqNo)
-		So(listed[1].Role, ShouldEqual, msgNew.Role)
-		So(compactJSON(listed[1].Content), ShouldEqual, compactJSON(msgNew.Content))
+		So(listed[0].SeqNo, ShouldEqual, msgNew.SeqNo)
+		So(listed[0].MsgType, ShouldEqual, msgNew.MsgType)
+		So(compactJSON(listed[0].Content), ShouldEqual, compactJSON(msgNew.Content))
+		So(listed[1].SeqNo, ShouldEqual, msgOld.SeqNo)
+		So(listed[1].MsgType, ShouldEqual, msgOld.MsgType)
+		So(compactJSON(listed[1].Content), ShouldEqual, compactJSON(msgOld.Content))
 
 		err = store.DeleteByChatId(ctx, chatID)
 		So(err, ShouldBeNil)
@@ -84,14 +95,14 @@ func TestChatMessageStoreListByChatIdPagination(t *testing.T) {
 		msgOld := &schema.ChatMessage{
 			ChatId:  chatID,
 			UserId:  userID,
-			Role:    "user",
+			MsgType: int8(0),
 			Content: json.RawMessage(`{"text":"old"}`),
 			SeqNo:   1000,
 		}
 		msgNew := &schema.ChatMessage{
 			ChatId:  chatID,
 			UserId:  userID,
-			Role:    "assistant",
+			MsgType: int8(1),
 			Content: json.RawMessage(`{"text":"new"}`),
 			SeqNo:   2000,
 		}
@@ -105,12 +116,14 @@ func TestChatMessageStoreListByChatIdPagination(t *testing.T) {
 		firstPage, err := store.ListByChatId(ctx, chatID, 1, 0)
 		So(err, ShouldBeNil)
 		So(len(firstPage), ShouldEqual, 1)
-		So(firstPage[0].SeqNo, ShouldEqual, msgOld.SeqNo)
+		So(firstPage[0].SeqNo, ShouldEqual, msgNew.SeqNo)
+		So(firstPage[0].MsgType, ShouldEqual, msgNew.MsgType)
 
 		secondPage, err := store.ListByChatId(ctx, chatID, 1, 1)
 		So(err, ShouldBeNil)
 		So(len(secondPage), ShouldEqual, 1)
-		So(secondPage[0].SeqNo, ShouldEqual, msgNew.SeqNo)
+		So(secondPage[0].SeqNo, ShouldEqual, msgOld.SeqNo)
+		So(secondPage[0].MsgType, ShouldEqual, msgOld.MsgType)
 	})
 }
 
@@ -127,5 +140,23 @@ func TestChatMessageStoreListByChatIdInvalidPagination(t *testing.T) {
 		_, err = store.ListByChatId(ctx, chatID, 1, -1)
 		So(err, ShouldNotBeNil)
 		So(strings.Contains(err.Error(), "invalid pagination params"), ShouldBeTrue)
+	})
+}
+
+func TestChatMessageStoreGetByIdNotExist(t *testing.T) {
+	Convey("ChatMessageStore get by id not exist", t, func() {
+		store := testChatMessageStore
+		ctx := t.Context()
+		_, err := store.GetById(ctx, uuid.NewV7())
+		So(err, ShouldNotBeNil)
+	})
+}
+
+func TestChatMessageStoreGetByIdAndChatIdNotExist(t *testing.T) {
+	Convey("ChatMessageStore get by id and chat id not exist", t, func() {
+		store := testChatMessageStore
+		ctx := t.Context()
+		_, err := store.GetByIdAndChatId(ctx, uuid.NewV7(), uuid.NewV7())
+		So(err, ShouldNotBeNil)
 	})
 }

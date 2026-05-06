@@ -6,6 +6,7 @@ import (
 	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
@@ -34,10 +35,12 @@ func (l *NotebookLogic) CreateNotebook(
 	ctx context.Context,
 	params *CreateNotebookParams,
 ) (*model.Notebook, error) {
+	userId := pkgcontext.GetUserId(ctx)
 	notebook, err := l.notebookBiz.CreateNotebook(
 		ctx, &biznotebook.CreateNotebookCommand{
-			Name: params.Name,
-			Desc: params.Desc,
+			Name:    params.Name,
+			OwnerId: userId,
+			Desc:    params.Desc,
 		})
 	if err != nil {
 		return nil, errors.WithMessage(err, "create notebook failed")
@@ -86,11 +89,13 @@ func (l *NotebookLogic) ListNotebooks(
 	ctx context.Context,
 	params *ListNotebooksParams,
 ) (*ListNotebooksResult, error) {
+	userId := pkgcontext.GetUserId(ctx)
 	result, err := l.notebookBiz.ListNotebooks(
 		ctx,
 		&biznotebook.ListNotebooksQuery{
-			Limit:  params.Limit,
-			Offset: params.Offset,
+			Limit:   params.Limit,
+			OwnerId: userId,
+			Offset:  params.Offset,
 		},
 	)
 	if err != nil {

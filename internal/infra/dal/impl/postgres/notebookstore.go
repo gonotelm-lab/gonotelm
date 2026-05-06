@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal/schema"
@@ -66,14 +67,22 @@ func (s *NotebookStoreImpl) GetByNameAndOwnerId(
 func (s *NotebookStoreImpl) ListByOwnerId(
 	ctx context.Context,
 	ownerId string,
-	limit, offset int,
+	limit, offset, orderBy int,
 ) ([]*schema.Notebook, error) {
 	if limit <= 0 || offset < 0 {
 		return nil, xerror.ErrParams.Msgf("invalid pagination params: limit=%d offset=%d", limit, offset)
 	}
 
+	var orderByClause string
+	if orderBy == 0 {
+		orderByClause = "id ASC"
+	} else {
+		orderByClause = "updated_at DESC"
+	}
+	
+	sqlClause := fmt.Sprintf("ORDER BY %s LIMIT ? OFFSET ?", orderByClause)
 	rows, err := gorm.G[*schema.Notebook](s.db).
-		Raw("SELECT id, name, description, owner_id, updated_at FROM notebooks WHERE owner_id = ? ORDER BY updated_at DESC LIMIT ? OFFSET ?",
+		Raw("SELECT id, name, description, owner_id, updated_at FROM notebooks WHERE owner_id = ? "+sqlClause,
 			ownerId, limit, offset).
 		Find(ctx)
 	if err != nil {

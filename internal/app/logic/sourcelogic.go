@@ -7,14 +7,16 @@ import (
 	"net/url"
 	"path/filepath"
 
-	"github.com/bytedance/sonic"
 	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/mq"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
+
+	"github.com/bytedance/sonic"
 )
 
 // mq topic names
@@ -72,12 +74,12 @@ func MustNewSourceLogic(
 		sourceBiz:     sourceBiz,
 	}
 
-	sl.initMsgQueue()
+	sl.mustInitMsgQueue()
 
 	return sl
 }
 
-func (l *SourceLogic) initMsgQueue() {
+func (l *SourceLogic) mustInitMsgQueue() {
 	// producer
 	l.prepProducer = mustNewMsgQueueProducer()
 	// consumer
@@ -96,6 +98,7 @@ func (l *SourceLogic) CreateSource(
 	ctx context.Context,
 	params *CreateSourceParams,
 ) (*model.Source, error) {
+	userId := pkgcontext.GetUserId(ctx)
 	// check if notebook exists
 	_, err := l.notebookBiz.GetNotebook(ctx, params.NotebookId)
 	if err != nil {
@@ -109,6 +112,7 @@ func (l *SourceLogic) CreateSource(
 	source, err := l.sourceBiz.CreateSource(
 		ctx, &bizsource.CreateSourceCommand{
 			NotebookId:  params.NotebookId,
+			OwnerId:     userId,
 			Kind:        params.Kind,
 			TextContent: params.Text,
 			UrlContent:  params.Url,
@@ -424,7 +428,7 @@ func (l *SourceLogic) handleSourceEventMessage(
 		return errors.Wrap(err, "handle prep message unmarshal failed")
 	}
 
-	err = l.sourceBiz.PrepareSource(ctx, source.Id)
+	err = l.sourceBiz.PrepareSourceIndices(ctx, source.Id)
 	if err != nil {
 		// mark failure
 		err2 := l.sourceBiz.UpdateStatus(ctx, source.Id, model.SourceStatusFailed)

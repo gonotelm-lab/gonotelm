@@ -92,12 +92,12 @@ func TestNotebookStoreListByOwnerId(t *testing.T) {
 			_ = testDB.WithContext(ctx).Exec(`DELETE FROM notebooks WHERE owner_id = ?`, ownerID).Error
 		})
 
-		firstPage, err := store.ListByOwnerId(ctx, ownerID, 1, 0)
+		firstPage, err := store.ListByOwnerId(ctx, ownerID, 1, 0, 1)
 		So(err, ShouldBeNil)
 		So(len(firstPage), ShouldEqual, 1)
 		So(firstPage[0].Id, ShouldEqual, nbNew.Id)
 
-		secondPage, err := store.ListByOwnerId(ctx, ownerID, 1, 1)
+		secondPage, err := store.ListByOwnerId(ctx, ownerID, 1, 1, 1)
 		So(err, ShouldBeNil)
 		So(len(secondPage), ShouldEqual, 1)
 		So(secondPage[0].Id, ShouldEqual, nbOld.Id)
@@ -110,11 +110,11 @@ func TestNotebookStoreListByOwnerIdInvalidPagination(t *testing.T) {
 		ctx := t.Context()
 		ownerID := "owner_" + uuid.NewV7().String()
 
-		_, err := store.ListByOwnerId(ctx, ownerID, 0, 0)
+		_, err := store.ListByOwnerId(ctx, ownerID, 0, 0, 1)
 		So(err, ShouldNotBeNil)
 		So(strings.Contains(err.Error(), "invalid pagination params"), ShouldBeTrue)
 
-		_, err = store.ListByOwnerId(ctx, ownerID, 1, -1)
+		_, err = store.ListByOwnerId(ctx, ownerID, 1, -1, 1)
 		So(err, ShouldNotBeNil)
 		So(strings.Contains(err.Error(), "invalid pagination params"), ShouldBeTrue)
 	})

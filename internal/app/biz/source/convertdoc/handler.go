@@ -26,20 +26,23 @@ type HandlerConfig struct {
 }
 
 // parsing + chunking
-type handlerPipeline struct {
+type commonHandler struct {
 	name         string
 	parser       parser.Parser // 最好统一parse成markdown格式
 	transformers []document.Transformer
 }
 
-func (p *handlerPipeline) pipe(
+func (p *commonHandler) doHandle(
 	ctx context.Context,
 	source *model.Source,
 	r io.Reader,
 	parseOpts ...parser.Option,
 ) ([]*schema.Document, error) {
-	var docs []*schema.Document
-	var err error
+	var (
+		docs []*schema.Document
+		err  error
+	)
+
 	docs, err = p.parser.Parse(ctx, r, append(parseOpts, withParseSource(source))...) // 此处统一注入source
 	if err != nil {
 		return nil, errors.Wrapf(err, "parse document failed, id=%s, pipeline=%s", source.Id, p.name)
@@ -97,14 +100,14 @@ var (
 )
 
 type TextHandler struct {
-	pipe *handlerPipeline
+	impl *commonHandler
 }
 
 func NewTextHandler(c HandlerConfig) *TextHandler {
 	parser := parser.TextParser{}
 
 	return &TextHandler{
-		pipe: &handlerPipeline{
+		impl: &commonHandler{
 			name:         "text-pipe",
 			parser:       parser,
 			transformers: defaultDocTransformer(c),
@@ -119,7 +122,7 @@ func (e *TextHandler) Handle(ctx context.Context, s *model.Source) (*HandleResul
 		return nil, errors.Wrap(errors.ErrSerde, "unmarshal text source content failed")
 	}
 
-	docs, err := e.pipe.pipe(ctx, s, strings.NewReader(ts.Text))
+	docs, err := e.impl.doHandle(ctx, s, strings.NewReader(ts.Text))
 	if err != nil {
 		return nil, errors.Wrap(err, "handle text source failed")
 	}
@@ -128,14 +131,14 @@ func (e *TextHandler) Handle(ctx context.Context, s *model.Source) (*HandleResul
 }
 
 type UrlHandler struct {
-	pipe *handlerPipeline
+	impl *commonHandler
 }
 
 func NewUrlHandler(c HandlerConfig) *UrlHandler {
 	parser := parser.TextParser{}
 	// TODO
 	return &UrlHandler{
-		pipe: &handlerPipeline{
+		impl: &commonHandler{
 			name:         "url-pipe",
 			parser:       parser,
 			transformers: defaultDocTransformer(c),
@@ -155,13 +158,13 @@ func (e *UrlHandler) Handle(ctx context.Context, s *model.Source) (*HandleResult
 
 type FileObjectHandler struct {
 	objectStorage storage.Storage
-	pipe          *handlerPipeline
+	impl          *commonHandler
 }
 
 func NewFileObjectHandler(c HandlerConfig, objectStorage storage.Storage) *FileObjectHandler {
 	return &FileObjectHandler{
 		objectStorage: objectStorage,
-		pipe: &handlerPipeline{
+		impl: &commonHandler{
 			name:         "file-object-pipe",
 			parser:       &fileObjectParser{},
 			transformers: defaultDocTransformer(c),
@@ -190,7 +193,8 @@ func (e *FileObjectHandler) Handle(ctx context.Context, s *model.Source) (*Handl
 	}
 
 	reader := bytes.NewReader(obj.Body)
-	docs, err := e.pipe.pipe(ctx, s, reader,
+	docs, err := e.impl.doHandle(
+		ctx, s, reader,
 		withParseFileMime(fs.Format),
 		withParseFileExt(filepath.Ext(fs.Filename)),
 	)

@@ -15,7 +15,8 @@ type NotebookStore interface {
 	Create(ctx context.Context, notebook *schema.Notebook) error
 	GetById(ctx context.Context, id Id) (*schema.Notebook, error)
 	GetByNameAndOwnerId(ctx context.Context, name, ownerId string) (*schema.Notebook, error)
-	ListByOwnerId(ctx context.Context, ownerId string, limit, offset int) ([]*schema.Notebook, error)
+	// orderBy=0 -> default order; orderBy=1 -> order by updated_at
+	ListByOwnerId(ctx context.Context, ownerId string, limit, offset, orderBy int) ([]*schema.Notebook, error)
 	Update(ctx context.Context, notebook *schema.Notebook) error
 	DeleteById(ctx context.Context, id Id) error
 	UpdateName(ctx context.Context, id Id, name string) error
@@ -37,6 +38,9 @@ type SourceStore interface {
 
 type ChatMessageStore interface {
 	Create(ctx context.Context, message *schema.ChatMessage) error
+	GetById(ctx context.Context, id Id) (*schema.ChatMessage, error)
+	GetByIdAndChatId(ctx context.Context, id Id, chatId Id) (*schema.ChatMessage, error)
+	// 按照seqno从大到小排序
 	ListByChatId(ctx context.Context, chatId Id, limit, offset int) ([]*schema.ChatMessage, error)
 	DeleteByChatId(ctx context.Context, chatId Id) error
 }

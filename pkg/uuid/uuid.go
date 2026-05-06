@@ -60,6 +60,10 @@ func ParseString(s string) (UUID, error) {
 	return UUID{u}, nil
 }
 
+func MustParseString(s string) UUID {
+	return UUID{googl.MustParse(s)}
+}
+
 func NewV7() UUID {
 	return UUID{googl.Must(googl.NewV7())}
 }

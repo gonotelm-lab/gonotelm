@@ -1,8 +1,8 @@
 package schema
 
 import (
-	"github.com/mitchellh/mapstructure"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
+	"github.com/mitchellh/mapstructure"
 )
 
 type Id = uuid.UUID
@@ -25,6 +25,9 @@ type SourceDoc struct {
 	Content    string    `mapstructure:"content"`
 	Owner      string    `mapstructure:"owner"`
 	Embedding  []float32 `mapstructure:"embedding"`
+
+	// 搜索返回的分数
+	Score float32 `mapstructure:"-"`
 }
 
 func (s *SourceDoc) AsMap() map[string]any {
@@ -43,7 +46,7 @@ type SourceDocQueryParams struct {
 	NotebookId string
 
 	// Target source ids
-	SourceId []string
+	SourceIds []string
 
 	// Target queried text
 	Target string

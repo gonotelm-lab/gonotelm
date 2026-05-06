@@ -33,3 +33,12 @@ func AsMapF[T any, K comparable](slice []T, fn func(T) K) map[K]T {
 
 	return out
 }
+
+func Map[T any, R any](ss []T, fn func(T) R) []R {
+	out := make([]R, len(ss))
+	for i, v := range ss {
+		out[i] = fn(v)
+	}
+
+	return out
+}

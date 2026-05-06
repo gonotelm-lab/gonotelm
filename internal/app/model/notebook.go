@@ -2,11 +2,10 @@ package model
 
 import (
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal/schema"
-	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 
 type Notebook struct {
-	Id          uuid.UUID
+	Id          Id
 	Name        string
 	Description string
 	OwnerId     string

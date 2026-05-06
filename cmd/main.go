@@ -3,17 +3,13 @@ package main
 import (
 	"context"
 	"flag"
-	"log/slog"
 
 	"github.com/gonotelm-lab/gonotelm/internal/api"
 	"github.com/gonotelm-lab/gonotelm/internal/app/logic"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/dal"
-	dalimpl "github.com/gonotelm-lab/gonotelm/internal/infra/dal/impl"
+	"github.com/gonotelm-lab/gonotelm/internal/infra"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
 	storageimpl "github.com/gonotelm-lab/gonotelm/internal/infra/storage/impl"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/vectordal"
-	vectordalimpl "github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/impl"
 	pkglog "github.com/gonotelm-lab/gonotelm/pkg/log"
 )
 
@@ -68,48 +64,23 @@ func initObjectStorage() storage.Storage {
 	return s
 }
 
-func initDal() *dal.DAL {
-	cfg := conf.Global()
-	d, err := dalimpl.New(dalimpl.Type(cfg.Database.Type), cfg.SQLConfig())
-	if err != nil {
-		panic(err)
-	}
-
-	slog.Info("initialized dal", "type", cfg.Database.Type)
-
-	return d
-}
-
-func initVectorDal() *vectordal.DAL {
-	cfg := conf.Global()
-	vd, err := vectordalimpl.New(&cfg.VectorDB)
-	if err != nil {
-		panic(err)
-	}
-
-	slog.Info("initialized vector dal", "type", cfg.VectorDB.Type)
-
-	return vd
-}
-
 func run() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	dal := initDal()
-	vdal := initVectorDal()
+	infras := infra.MustInit(conf.Global())
 	objectStorage := initObjectStorage()
-	app := logic.NewLogic(ctx, dal, vdal, objectStorage)
-	
+	app := logic.MustNewLogic(
+		ctx,
+		infras.Dal,
+		infras.VectorDal,
+		objectStorage,
+	)
+
 	defer func() {
 		// Close MQ consumers/producers before databases to avoid shutdown writes on closed DB.
 		app.Close(ctx)
-		if err := vdal.Close(ctx); err != nil {
-			slog.ErrorContext(ctx, "close vector dal failed", slog.Any("err", err))
-		}
-		if err := dal.Close(ctx); err != nil {
-			slog.ErrorContext(ctx, "close dal failed", slog.Any("err", err))
-		}
+		infra.Close(ctx)
 	}()
 
 	api.NewServer(app).Run()

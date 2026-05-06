@@ -8,6 +8,8 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/a8m/envsubst"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/cache"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
 	embedimpl "github.com/gonotelm-lab/gonotelm/internal/infra/llm/embedding"
 	mqimpl "github.com/gonotelm-lab/gonotelm/internal/infra/mq/impl"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
@@ -24,14 +26,18 @@ var (
 type Config struct {
 	DeployEnv string `toml:"deployEnv"`
 
-	Api       ApiConfig        `toml:"api"`
-	Database  DatabaseConfig   `toml:"database"`
-	VectorDB  vecimpl.Config   `toml:"vectorDb"`
-	Storage   StorageConfig    `toml:"storage"`
-	MsgQueue  MsgQueueConfig   `toml:"msgQueue"`
-	Embedding embedimpl.Config `toml:"embedding"`
-	Logging   LoggingConfig    `toml:"logging"`
-	Chunking  ChunkingConfig   `toml:"chunking"`
+	Logic LogicConfig `toml:"logic"`
+
+	Api       ApiConfig              `toml:"api"`
+	Database  DatabaseConfig         `toml:"database"`
+	Redis     cache.RedisCacheConfig `toml:"redis"`
+	VectorDB  vecimpl.Config         `toml:"vectorDb"`
+	Storage   StorageConfig          `toml:"storage"`
+	MsgQueue  MsgQueueConfig         `toml:"msgQueue"`
+	Embedding embedimpl.Config       `toml:"embedding"`
+	Logging   LoggingConfig          `toml:"logging"`
+	Chunking  ChunkingConfig         `toml:"chunking"`
+	ChatModel chat.Config            `toml:"chatModel"`
 }
 
 func (c *Config) IsDev() bool {

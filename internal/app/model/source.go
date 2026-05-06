@@ -5,7 +5,6 @@ import (
 
 	"github.com/bytedance/sonic"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal/schema"
-	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 
 type SourceKind string
@@ -56,8 +55,8 @@ func (s SourceKind) Supported() bool {
 }
 
 type Source struct {
-	Id          uuid.UUID    `json:"id"`
-	NotebookId  uuid.UUID    `json:"notebook_id"`
+	Id          Id    `json:"id"`
+	NotebookId  Id    `json:"notebook_id"`
 	Kind        SourceKind   `json:"kind"`
 	Status      SourceStatus `json:"status"`
 	DisplayName string       `json:"display_name"`

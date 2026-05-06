@@ -217,7 +217,7 @@ func (s *SourceDocStoreImpl) Query(
 	if notebookID == "" {
 		return nil, errors.ErrParams.Msg("notebook id is empty")
 	}
-	sourceIDs := normalizeSourceIDs(params.SourceId)
+	sourceIDs := normalizeSourceIDs(params.SourceIds)
 	target := strings.TrimSpace(params.Target)
 	if target == "" {
 		return nil, errors.ErrParams.Msg("target is empty")

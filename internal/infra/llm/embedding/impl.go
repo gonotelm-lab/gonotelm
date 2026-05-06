@@ -1,46 +1,58 @@
-package impl
+package embedding
 
 import (
 	"context"
+	"crypto/md5"
 	"fmt"
 	"strings"
 
-	llmembedding "github.com/gonotelm-lab/gonotelm/internal/infra/llm/embedding"
-
 	"github.com/cloudwego/eino-ext/components/embedding/ark"
+	"github.com/cloudwego/eino-ext/components/embedding/cache"
+	embedredis "github.com/cloudwego/eino-ext/components/embedding/cache/redis"
 	"github.com/cloudwego/eino-ext/components/embedding/dashscope"
 	"github.com/cloudwego/eino-ext/components/embedding/gemini"
 	"github.com/cloudwego/eino-ext/components/embedding/ollama"
 	"github.com/cloudwego/eino-ext/components/embedding/openai"
 	"github.com/cloudwego/eino-ext/components/embedding/qianfan"
 	"github.com/cloudwego/eino-ext/components/embedding/tencentcloud"
-	einoembedding "github.com/cloudwego/eino/components/embedding"
+	"github.com/cloudwego/eino/components/embedding"
+	"github.com/redis/go-redis/v9"
 	"google.golang.org/genai"
 )
 
-func New(ctx context.Context, t llmembedding.Type, cfg *llmembedding.Config) (einoembedding.Embedder, error) {
+func New(
+	ctx context.Context,
+	cfg *Config,
+	cacher cache.Cacher,
+) (embedding.Embedder, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("embedding config must not be nil")
 	}
 
-	switch t {
-	case llmembedding.Ark:
-		arkCfg, err := buildArkConfig(cfg.Ark)
+	var (
+		embedder embedding.Embedder
+		err      error
+	)
+
+	switch cfg.Type {
+	case Ark:
+		var arkCfg *ark.EmbeddingConfig
+		arkCfg, err = buildArkConfig(cfg.Ark)
 		if err != nil {
 			return nil, err
 		}
-		return ark.NewEmbedder(ctx, arkCfg)
-	case llmembedding.DashScope:
-		return dashscope.NewEmbedder(ctx, &dashscope.EmbeddingConfig{
+		embedder, err = ark.NewEmbedder(ctx, arkCfg)
+	case DashScope:
+		embedder, err = dashscope.NewEmbedder(ctx, &dashscope.EmbeddingConfig{
 			APIKey:     cfg.DashScope.APIKey,
 			Timeout:    cfg.DashScope.Timeout,
 			Model:      cfg.DashScope.Model,
 			Dimensions: cfg.DashScope.Dimensions,
 		})
-	case llmembedding.Gemini:
-		return newGeminiEmbedder(ctx, cfg.Gemini)
-	case llmembedding.Ollama:
-		return ollama.NewEmbedder(ctx, &ollama.EmbeddingConfig{
+	case Gemini:
+		embedder, err = newGeminiEmbedder(ctx, cfg.Gemini)
+	case Ollama:
+		embedder, err = ollama.NewEmbedder(ctx, &ollama.EmbeddingConfig{
 			Timeout:   cfg.Ollama.Timeout,
 			BaseURL:   cfg.Ollama.BaseURL,
 			Model:     cfg.Ollama.Model,
@@ -48,26 +60,43 @@ func New(ctx context.Context, t llmembedding.Type, cfg *llmembedding.Config) (ei
 			KeepAlive: cfg.Ollama.KeepAlive,
 			Options:   cfg.Ollama.Options,
 		})
-	case llmembedding.OpenAI:
-		openaiCfg, err := buildOpenAIConfig(cfg.OpenAI)
+	case OpenAI:
+		var openaiCfg *openai.EmbeddingConfig
+		openaiCfg, err = buildOpenAIConfig(cfg.OpenAI)
 		if err != nil {
 			return nil, err
 		}
-		return openai.NewEmbedder(ctx, openaiCfg)
-	case llmembedding.Qianfan:
-		return newQianfanEmbedder(ctx, cfg.Qianfan)
-	case llmembedding.TencentCloud:
-		return tencentcloud.NewEmbedder(ctx, &tencentcloud.EmbeddingConfig{
+		embedder, err = openai.NewEmbedder(ctx, openaiCfg)
+	case Qianfan:
+		embedder, err = newQianfanEmbedder(ctx, cfg.Qianfan)
+	case TencentCloud:
+		embedder, err = tencentcloud.NewEmbedder(ctx, &tencentcloud.EmbeddingConfig{
 			SecretID:  cfg.TencentCloud.SecretID,
 			SecretKey: cfg.TencentCloud.SecretKey,
 			Region:    cfg.TencentCloud.Region,
 		})
 	default:
-		return nil, fmt.Errorf("embedding type %q is not supported", t)
+		err = fmt.Errorf("type %q is not supported", cfg.Type)
 	}
+	if err != nil {
+		return nil, err
+	}
+
+	if cacher != nil {
+		embedder, err = cache.NewEmbedder(embedder,
+			cache.WithCacher(cacher),
+			cache.WithExpiration(0), // TODO never expire
+			cache.WithGenerator(cache.NewHashGenerator(md5.New())),
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return embedder, nil
 }
 
-func buildArkConfig(cfg llmembedding.ArkConfig) (*ark.EmbeddingConfig, error) {
+func buildArkConfig(cfg ArkConfig) (*ark.EmbeddingConfig, error) {
 	var apiType *ark.APIType
 	if strings.TrimSpace(cfg.APIType) != "" {
 		parsed, err := parseArkAPIType(cfg.APIType)
@@ -102,7 +131,7 @@ func parseArkAPIType(raw string) (ark.APIType, error) {
 	}
 }
 
-func newGeminiEmbedder(ctx context.Context, cfg llmembedding.GeminiConfig) (einoembedding.Embedder, error) {
+func newGeminiEmbedder(ctx context.Context, cfg GeminiConfig) (embedding.Embedder, error) {
 	backend, err := parseGeminiBackend(cfg.Backend)
 	if err != nil {
 		return nil, err
@@ -144,7 +173,7 @@ func parseGeminiBackend(raw string) (genai.Backend, error) {
 	}
 }
 
-func buildOpenAIConfig(cfg llmembedding.OpenAIConfig) (*openai.EmbeddingConfig, error) {
+func buildOpenAIConfig(cfg OpenAIConfig) (*openai.EmbeddingConfig, error) {
 	var (
 		encodingFormat *openai.EmbeddingEncodingFormat
 		userPtr        *string
@@ -186,7 +215,7 @@ func parseOpenAIEncodingFormat(raw string) (openai.EmbeddingEncodingFormat, erro
 	}
 }
 
-func newQianfanEmbedder(ctx context.Context, cfg llmembedding.QianfanConfig) (einoembedding.Embedder, error) {
+func newQianfanEmbedder(ctx context.Context, cfg QianfanConfig) (embedding.Embedder, error) {
 	qcfg := qianfan.GetQianfanSingletonConfig()
 
 	if cfg.AK != "" {
@@ -214,4 +243,8 @@ func newQianfanEmbedder(ctx context.Context, cfg llmembedding.QianfanConfig) (ei
 		LLMRetryTimeout:       cfg.LLMRetryTimeout,
 		LLMRetryBackoffFactor: cfg.LLMRetryBackoffFactor,
 	})
+}
+
+func NewRedisCacher(rdb redis.UniversalClient) cache.Cacher {
+	return embedredis.NewCacher(rdb, embedredis.WithPrefix("gonotelm:embed:"))
 }

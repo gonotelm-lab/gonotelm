@@ -6,7 +6,6 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal"
-	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
@@ -38,8 +37,9 @@ func (b *Biz) GetNotebook(ctx context.Context, id uuid.UUID) (*model.Notebook, e
 }
 
 type ListNotebooksQuery struct {
-	Limit  int
-	Offset int
+	Limit   int
+	Offset  int
+	OwnerId string
 }
 
 type ListNotebooksResult struct {
@@ -51,9 +51,14 @@ func (b *Biz) ListNotebooks(
 	ctx context.Context,
 	query *ListNotebooksQuery,
 ) (*ListNotebooksResult, error) {
-	ownerId := pkgcontext.GetUserId(ctx)
 	fetchLimit := query.Limit + 1
-	rows, err := b.notebookStore.ListByOwnerId(ctx, ownerId, fetchLimit, query.Offset)
+	rows, err := b.notebookStore.ListByOwnerId(
+		ctx,
+		query.OwnerId,
+		fetchLimit,
+		query.Offset,
+		0,
+	)
 	if err != nil {
 		return nil, errors.WithMessage(err, "store list notebooks failed")
 	}
@@ -76,13 +81,13 @@ func (b *Biz) ListNotebooks(
 }
 
 type CreateNotebookCommand struct {
-	Name string
-	Desc string
+	OwnerId string
+	Name    string
+	Desc    string
 }
 
 func (b *Biz) CreateNotebook(ctx context.Context, cmd *CreateNotebookCommand) (*model.Notebook, error) {
 	notebookId := uuid.NewV7()
-	ownerId := pkgcontext.GetUserId(ctx)
 
 	if cmd.Name == "" {
 		cmd.Name = untitledNotebookName
@@ -91,7 +96,7 @@ func (b *Biz) CreateNotebook(ctx context.Context, cmd *CreateNotebookCommand) (*
 		Id:          notebookId,
 		Name:        cmd.Name,
 		Description: cmd.Desc,
-		OwnerId:     ownerId,
+		OwnerId:     cmd.OwnerId,
 		UpdatedAt:   time.Now().UnixMilli(),
 	}
 

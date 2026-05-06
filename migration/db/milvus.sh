@@ -19,6 +19,7 @@ echo "\n"
 # create source docs collection
 export collectionSchema='{
     "autoId": false,
+    "enableDynamicField": true,
     "fields": [
         {
             "fieldName": "id",

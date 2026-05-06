@@ -9,19 +9,18 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/app/biz/source/convertdoc"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/cache"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal/schema"
-	embedimpl "github.com/gonotelm-lab/gonotelm/internal/infra/llm/embedding/impl"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/embedding"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/vectordal"
-	vschema "github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/schema"
+	vecschema "github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/batch"
-	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
-	pslices "github.com/gonotelm-lab/gonotelm/pkg/slices"
+	"github.com/gonotelm-lab/gonotelm/pkg/slices"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 
-	"github.com/bytedance/sonic"
 	einoembed "github.com/cloudwego/eino/components/embedding"
 )
 
@@ -36,21 +35,21 @@ type Biz struct {
 	embedBatchSize      int
 	embedMaxConcurrency int
 
-	docHandlers map[model.SourceKind]convertdoc.Handler
+	docConverters map[model.SourceKind]convertdoc.Handler
 }
 
 func New(
 	objectStorage storage.Storage,
 	sourceStore dal.SourceStore,
 	sourceDocStore vectordal.SourceDocStore,
-) *Biz {
-	embedder, err := embedimpl.New(
+) (*Biz, error) {
+	embedder, err := embedding.New(
 		context.Background(),
-		conf.Global().Embedding.Type,
 		&conf.Global().Embedding,
+		embedding.NewRedisCacher(cache.GetRedis()),
 	)
 	if err != nil {
-		panic(err)
+		return nil, errors.WithMessage(err, "new embedder failed")
 	}
 
 	hc := convertdoc.HandlerConfig{
@@ -68,14 +67,14 @@ func New(
 		embedder:            embedder,
 		embedBatchSize:      conf.Global().Embedding.BatchSize,
 		embedMaxConcurrency: conf.Global().Embedding.MaxConcurrency,
-		docHandlers: map[model.SourceKind]convertdoc.Handler{
+		docConverters: map[model.SourceKind]convertdoc.Handler{
 			model.SourceKindText: convertdoc.NewTextHandler(hc),
 			model.SourceKindUrl:  convertdoc.NewUrlHandler(hc),
 			model.SourceKindFile: convertdoc.NewFileObjectHandler(hc, objectStorage),
 		},
 	}
 
-	return b
+	return b, nil
 }
 
 func (b *Biz) GetSource(ctx context.Context, id uuid.UUID) (*model.Source, error) {
@@ -148,19 +147,9 @@ func (b *Biz) ListSourcesByNotebook(
 	return sourcesWithContents, nil
 }
 
-func previewResponseContentType(mimeType string) string {
-	switch mimeType {
-	case model.MimeTypeText:
-		return "text/plain; charset=utf-8"
-	case model.MimeTypeMarkdown:
-		return "text/markdown; charset=utf-8"
-	default:
-		return mimeType
-	}
-}
-
 type CreateSourceCommand struct {
 	NotebookId  uuid.UUID
+	OwnerId     string
 	Kind        model.SourceKind
 	TextContent string
 	UrlContent  *url.URL
@@ -220,7 +209,7 @@ func (b *Biz) DeleteSource(ctx context.Context, sourceId uuid.UUID) error {
 		return errors.WithMessagef(err, "store delete source failed, id=%s", sourceId)
 	}
 
-	err = b.sourceDocStore.BatchDelete(ctx, &vschema.SourceDocBatchDeleteParams{
+	err = b.sourceDocStore.BatchDelete(ctx, &vecschema.SourceDocBatchDeleteParams{
 		NotebookId: source.NotebookId.String(),
 		SourceId:   []string{source.Id.String()},
 	})
@@ -266,8 +255,9 @@ func (b *Biz) UpdateContent(ctx context.Context, cmd *UpdateContentCommand) erro
 	return nil
 }
 
-// prepare source
-func (b *Biz) PrepareSource(ctx context.Context, sourceId uuid.UUID) error {
+// 准备数据源
+// 包含chunk + embedding的索引过程
+func (b *Biz) PrepareSourceIndices(ctx context.Context, sourceId uuid.UUID) error {
 	source, err := b.GetSource(ctx, sourceId)
 	if err != nil {
 		if errors.Is(err, ErrSourceNotFound) {
@@ -282,12 +272,12 @@ func (b *Biz) PrepareSource(ctx context.Context, sourceId uuid.UUID) error {
 		sourceIdStr   = sourceId.String()
 	)
 
-	handler, ok := b.docHandlers[source.Kind]
+	docConverter, ok := b.docConverters[source.Kind]
 	if !ok {
-		return errors.ErrParams.Msgf("can not embed source for kind %s", source.Kind)
+		return errors.ErrParams.Msgf("can not convert source for kind %s", source.Kind)
 	}
 
-	result, err := handler.Handle(ctx, source)
+	result, err := docConverter.Handle(ctx, source)
 	if err != nil {
 		return errors.WithMessagef(err, "embed source failed")
 	}
@@ -324,14 +314,14 @@ func (b *Biz) PrepareSource(ctx context.Context, sourceId uuid.UUID) error {
 		)
 	}
 
-	docs := make([]*vschema.SourceDoc, len(result.Docs))
+	docs := make([]*vecschema.SourceDoc, len(result.Docs))
 	for i, doc := range result.Docs {
 		embedding := embeddings[i]
 		embedding32 := make([]float32, len(embedding))
 		for j, v := range embedding {
 			embedding32[j] = float32(v)
 		}
-		docs[i] = &vschema.SourceDoc{
+		docs[i] = &vecschema.SourceDoc{
 			Id:         doc.ID,
 			NotebookId: notebookIdStr,
 			SourceId:   sourceIdStr,
@@ -359,7 +349,7 @@ func (b *Biz) CheckSourceIds(
 	ctx context.Context,
 	query *CheckSourceIdsQuery,
 ) ([]uuid.UUID, error) {
-	qids := pslices.Unique(query.SourceIds)
+	qids := slices.Unique(query.SourceIds)
 	rows, err := b.sourceStore.ListByNotebookIdAndIds(
 		ctx,
 		query.NotebookId,
@@ -378,52 +368,67 @@ func (b *Biz) CheckSourceIds(
 	return existSourceIds, nil
 }
 
-func buildNewSource(ctx context.Context, cmd *CreateSourceCommand) (*model.Source, error) {
-	var (
-		sourceId = uuid.NewV7()
-		ownerId  = pkgcontext.GetUserId(ctx)
-		source   = &model.Source{
-			Id:         sourceId,
-			NotebookId: cmd.NotebookId,
-			Kind:       cmd.Kind,
-			Status:     model.SourceStatusInited, // all new sources are inited
-			OwnerId:    ownerId,
-			UpdatedAt:  time.Now().UnixMilli(),
-		}
-
-		err error
-	)
-
-	switch cmd.Kind {
-	case model.SourceKindText:
-		ts := model.TextSourceContent{Text: cmd.TextContent}
-		source.Content, err = sonic.Marshal(&ts)
-		source.DisplayName = truncateRunes(cmd.TextContent, 32)
-	case model.SourceKindUrl:
-		us := model.UrlSourceContent{Url: cmd.UrlContent.String()}
-		source.Content, err = sonic.Marshal(&us)
-		source.DisplayName = us.Url
-	case model.SourceKindFile:
-		// file source inited with empty content
-		source.Content = nil
-		source.DisplayName = ""
-	default:
-		return nil, errors.ErrParams.Msgf("invalid source kind: %s", cmd.Kind)
-	}
-	if err != nil {
-		return nil, errors.Wrapf(err, "marshal source failed, kind=%s, source_id=%s", cmd.Kind, sourceId)
-	}
-
-	return source, err
+type RetrieveSourceDocsQuery struct {
+	NotebookId uuid.UUID
+	Query      string
+	SourceIds  []uuid.UUID
+	Count      int
 }
 
-func truncateRunes(input string, max int) string {
-	if max <= 0 {
-		return ""
+// 召回来源片段
+func (b *Biz) RetrieveSourceDocs(
+	ctx context.Context,
+	query *RetrieveSourceDocsQuery,
+) ([]*model.SourceDoc, error) {
+	var (
+		notebookId = query.NotebookId.String()
+		sourceIds  = slices.Map(
+			slices.Unique(query.SourceIds),
+			func(id uuid.UUID) string { return id.String() },
+		)
+	)
+
+	queryEmbeddings, err := b.embedder.EmbedStrings(ctx, []string{query.Query})
+	if err != nil {
+		return nil, errors.Wrapf(errors.ErrEmbed,
+			"query embedding failed, query=%s, notebook_id=%s",
+			query.Query, notebookId)
 	}
-	runes := []rune(input)
-	if len(runes) <= max {
-		return input
+
+	if len(queryEmbeddings) == 0 {
+		return nil, errors.Wrapf(errors.ErrEmbed,
+			"query embedding result is empty, query=%s, notebook_id=%s",
+			query.Query, query.NotebookId)
 	}
-	return string(runes[:max])
+
+	queryEmbedding := float64ToFloat32(queryEmbeddings[0])
+	docs, err := b.sourceDocStore.Query(ctx,
+		&vecschema.SourceDocQueryParams{
+			NotebookId: notebookId,
+			SourceIds:  sourceIds,
+			Embedding:  queryEmbedding,
+			Target:     query.Query,
+			Limit:      query.Count,
+		})
+	if err != nil {
+		return nil, errors.WithMessage(err, "query source docs failed")
+	}
+	if len(docs) == 0 {
+		return []*model.SourceDoc{}, nil
+	}
+
+	queriedDocs := make([]*model.SourceDoc, 0, len(docs))
+	for _, doc := range docs {
+		queriedDoc, err := model.NewSourceDoc(doc)
+		if err != nil {
+			slog.ErrorContext(ctx,
+				"new source doc failed",
+				slog.Any("err", err),
+				slog.String("doc_id", doc.Id))
+			continue
+		}
+		queriedDocs = append(queriedDocs, queriedDoc)
+	}
+
+	return queriedDocs, nil
 }

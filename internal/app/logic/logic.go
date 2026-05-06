@@ -21,18 +21,26 @@ type Logic struct {
 	ChatLogic     *ChatLogic
 }
 
-func NewLogic(
+func MustNewLogic(
 	ctx context.Context,
-	d *dal.DAL,
-	vd *vectordal.DAL,
+	dalImpl *dal.DAL,
+	vectorDalImpl *vectordal.DAL,
 	objectStorage storage.Storage,
 ) *Logic {
 	// biz instances initialization
 	var (
-		notebookBiz    = biznotebook.New(d.NotebookStore)
-		sourceBiz      = bizsource.New(objectStorage, d.SourceStore, vd.SourceDocStore)
-		chatMessageBiz = bizchat.NewChatMessageBiz(d.ChatMessageStore)
+		notebookBiz = biznotebook.New(dalImpl.NotebookStore)
+		chatBiz     = bizchat.New(dalImpl.ChatMessageStore)
 	)
+
+	sourceBiz, err := bizsource.New(
+		objectStorage,
+		dalImpl.SourceStore,
+		vectorDalImpl.SourceDocStore,
+	)
+	if err != nil {
+		panic(err)
+	}
 
 	notebookLogic := NewNotebookLogic(
 		notebookBiz,
@@ -49,7 +57,7 @@ func NewLogic(
 	chatLogic := NewChatLogic(
 		notebookBiz,
 		sourceBiz,
-		chatMessageBiz,
+		chatBiz,
 	)
 
 	return &Logic{
@@ -61,6 +69,7 @@ func NewLogic(
 
 func (l *Logic) Close(ctx context.Context) {
 	l.SourceLogic.Close(ctx)
+	l.ChatLogic.Close(ctx)
 }
 
 func mustNewMsgQueueProducer() mq.Producer {

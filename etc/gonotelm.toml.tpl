@@ -12,6 +12,11 @@ user = "${ENV_GONOTELM_DB_USER:-postgres}"
 password = "${ENV_GONOTELM_DB_PASSWORD:-postgres}"
 dbName = "${ENV_GONOTELM_DB_NAME:-gonotelm}"
 
+[redis]
+addrs = ${ENV_GONOTELM_REDIS_ADDRS:-['127.0.0.1:7542']}
+username = "${ENV_GONOTELM_REDIS_USERNAME:-}"
+password = "${ENV_GONOTELM_REDIS_PASSWORD:-}"
+
 [vectorDb]
 type = "milvus"
 
@@ -116,3 +121,16 @@ model = "${ENV_GONOTELM_QIANFAN_MODEL:-Embedding-V1}"
 secretId = "${ENV_GONOTELM_TENCENTCLOUD_SECRET_ID:-}"
 secretKey = "${ENV_GONOTELM_TENCENTCLOUD_SECRET_KEY:-}"
 region = "${ENV_GONOTELM_TENCENTCLOUD_REGION:-ap-guangzhou}"
+
+[chatModel]
+type = "openai"
+
+[chatModel.deepseek]
+apiKey = "${ENV_GONOTELM_DEEPSEEK_API_KEY}"
+timeout = "${ENV_GONOTELM_DEEPSEEK_TIMEOUT:-5m}"
+baseUrl = "${ENV_GONOTELM_DEEPSEEK_BASE_URL:-https://api.deepseek.com}"
+model = "${ENV_GONOTELM_DEEPSEEK_MODEL:-deepseek-v4-flash}"
+maxTokens = ${ENV_GONOTELM_DEEPSEEK_MAX_TOKENS:-8192}
+thinkingEnabled = true
+
+[chatModel.openai]

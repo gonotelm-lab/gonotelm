@@ -28,19 +28,53 @@ func (s *ChatMessageStoreImpl) Create(ctx context.Context, message *schema.ChatM
 	}
 
 	tx := s.db.WithContext(ctx).Exec(
-		"INSERT INTO chat_messages (id, chat_id, user_id, role, content, seq_no) VALUES (?, ?, ?, ?, ?, ?)",
+		"INSERT INTO chat_messages (id, chat_id, user_id, msg_type, content, seq_no, extra) VALUES (?, ?, ?, ?, ?, ?, ?)",
 		message.Id,
 		message.ChatId,
 		message.UserId,
-		message.Role,
+		message.MsgType,
 		message.Content,
 		message.SeqNo,
+		message.Extra,
 	)
 	if tx.Error != nil {
 		return sql.WrapErr(tx.Error)
 	}
 
 	return nil
+}
+
+func (s *ChatMessageStoreImpl) GetById(ctx context.Context, id dal.Id) (*schema.ChatMessage, error) {
+	row, err := gorm.G[*schema.ChatMessage](s.db).
+		Raw(
+			"SELECT id, chat_id, user_id, msg_type, content, seq_no, extra FROM chat_messages WHERE id = ? LIMIT 1",
+			id,
+		).
+		First(ctx)
+	if err != nil {
+		return nil, sql.WrapErr(err)
+	}
+
+	return row, nil
+}
+
+func (s *ChatMessageStoreImpl) GetByIdAndChatId(
+	ctx context.Context,
+	id dal.Id,
+	chatId dal.Id,
+) (*schema.ChatMessage, error) {
+	row, err := gorm.G[*schema.ChatMessage](s.db).
+		Raw(
+			"SELECT id, chat_id, user_id, msg_type, content, seq_no, extra FROM chat_messages WHERE id = ? AND chat_id = ? LIMIT 1",
+			id,
+			chatId,
+		).
+		First(ctx)
+	if err != nil {
+		return nil, sql.WrapErr(err)
+	}
+
+	return row, nil
 }
 
 func (s *ChatMessageStoreImpl) ListByChatId(
@@ -54,7 +88,7 @@ func (s *ChatMessageStoreImpl) ListByChatId(
 
 	rows, err := gorm.G[*schema.ChatMessage](s.db).
 		Raw(
-			"SELECT id, chat_id, user_id, role, content, seq_no FROM chat_messages WHERE chat_id = ? ORDER BY seq_no ASC LIMIT ? OFFSET ?",
+			"SELECT id, chat_id, user_id, msg_type, content, seq_no, extra FROM chat_messages WHERE chat_id = ? ORDER BY seq_no DESC LIMIT ? OFFSET ?",
 			chatId,
 			limit,
 			offset,

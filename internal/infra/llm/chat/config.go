@@ -37,17 +37,16 @@ type OpenaiConfig struct {
 
 func (c *OpenaiConfig) ToEino() *openai.ChatModelConfig {
 	return &openai.ChatModelConfig{
-		APIKey:           c.ApiKey,
-		Timeout:          c.Timeout,
-		BaseURL:          c.BaseUrl,
-		Model:            c.Model,
-		MaxTokens:        c.MaxTokens,
-		Temperature:      c.Temperature,
-		TopP:             c.TopP,
-		PresencePenalty:  c.PresencePenalty,
-		Seed:             c.Seed,
-		FrequencyPenalty: c.FrequencyPenalty,
-		ReasoningEffort:  openai.ReasoningEffortLevel(c.ReasoningEffort),
+		APIKey:              c.ApiKey,
+		Timeout:             c.Timeout,
+		BaseURL:             c.BaseUrl,
+		Model:               c.Model,
+		MaxCompletionTokens: c.MaxTokens,
+		Temperature:         c.Temperature,      // 1.0 by default
+		TopP:                c.TopP,             // 1.0 by default
+		PresencePenalty:     c.PresencePenalty,  // 0.0 by default
+		FrequencyPenalty:    c.FrequencyPenalty, // 0.0 by default
+		ReasoningEffort:     openai.ReasoningEffortLevel(c.ReasoningEffort),
 	}
 }
 

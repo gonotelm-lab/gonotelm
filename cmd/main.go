@@ -72,8 +72,7 @@ func run() {
 	objectStorage := initObjectStorage()
 	app := logic.MustNewLogic(
 		ctx,
-		infras.Dal,
-		infras.VectorDal,
+		infras,
 		objectStorage,
 	)
 

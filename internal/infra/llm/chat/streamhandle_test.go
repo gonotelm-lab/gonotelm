@@ -32,7 +32,7 @@ func buildTestMessages(extraSystemPrompt string) []*schema.Message {
 func mustNewTestModelWithTools(t *testing.T) einomodel.ToolCallingChatModel {
 	t.Helper()
 
-	model, err := New(t.Context(), Openai, &Config{
+	model, err := New(t.Context(), &Config{
 		Type: Openai,
 		Openai: OpenaiConfig{
 			ApiKey:  os.Getenv("ENV_GONOTELM_OPENAI_API_KEY"),

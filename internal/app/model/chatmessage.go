@@ -6,22 +6,29 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
-type ChatMessageRole string
-
-func (r ChatMessageRole) String() string {
-	return string(r)
-}
+type ChatMessageRole int8
 
 const (
-	ChatMessageRoleUser      ChatMessageRole = "user"
-	ChatMessageRoleAssistant ChatMessageRole = "assistant"
+	ChatMessageRoleUser      ChatMessageRole = 0
+	ChatMessageRoleAssistant ChatMessageRole = 1
 )
+
+func (r ChatMessageRole) String() string {
+	switch r {
+	case ChatMessageRoleUser:
+		return "user"
+	case ChatMessageRoleAssistant:
+		return "assistant"
+	default:
+		return "unknown"
+	}
+}
 
 type ChatMessageType int8
 
 const (
-	ChatMessageTypeUser      ChatMessageType = 0
-	ChatMessageTypeAssistant ChatMessageType = 1
+	ChatMessageTypeNormal ChatMessageType = 0
+	ChatMessageTypeSystem ChatMessageType = 1
 )
 
 type ChatMessageContentKind string
@@ -38,6 +45,7 @@ type ChatMessage struct {
 	Id      Id
 	ChatId  Id
 	UserId  string
+	MsgRole ChatMessageRole
 	MsgType ChatMessageType
 	Content *ChatMessageContent
 	SeqNo   int64
@@ -55,6 +63,7 @@ func NewChatMessage(smsg *schema.ChatMessage) (*ChatMessage, error) {
 		Id:      smsg.Id,
 		ChatId:  smsg.ChatId,
 		UserId:  smsg.UserId,
+		MsgRole: ChatMessageRole(smsg.MsgRole),
 		MsgType: ChatMessageType(smsg.MsgType),
 		Content: &content,
 		SeqNo:   smsg.SeqNo,
@@ -72,7 +81,7 @@ type ChatMessageContent struct {
 }
 
 type ChatMessageReasoningContent struct {
-	Text string `json:"text"`
+	Content string `json:"content"`
 }
 
 type IBaseChatMessageContent interface {
@@ -84,7 +93,7 @@ type IChatMessageContent interface {
 	IBaseChatMessageContent
 
 	Kind() ChatMessageContentKind
-	Content() *ChatMessageContent
+	GetChatMessageContent() *ChatMessageContent
 }
 
 type BaseChatMessageContent struct {
@@ -103,23 +112,27 @@ func (c *BaseChatMessageContent) WithReasoningContent(reasoningContent *ChatMess
 var _ IChatMessageContent = &ChatMessageContentText{}
 
 type ChatMessageContentText struct {
-	*BaseChatMessageContent
-	Text string
+	*BaseChatMessageContent `json:"-"`
+
+	Content string `json:"content"`
 }
 
 func NewChatMessageContentText(text string) *ChatMessageContentText {
-	return &ChatMessageContentText{Text: text}
+	return &ChatMessageContentText{
+		BaseChatMessageContent: &BaseChatMessageContent{},
+		Content:                text,
+	}
 }
 
 func (c *ChatMessageContentText) Kind() ChatMessageContentKind {
 	return ChatMessageContentKindText
 }
 
-func (c *ChatMessageContentText) Content() *ChatMessageContent {
+func (c *ChatMessageContentText) GetChatMessageContent() *ChatMessageContent {
 	return &ChatMessageContent{
 		Role:             c.role.String(),
 		ReasoningContent: c.reasoningContent,
 		Kind:             c.Kind().String(),
-		Text:             &ChatMessageContentText{Text: c.Text},
+		Text:             &ChatMessageContentText{Content: c.Content},
 	}
 }

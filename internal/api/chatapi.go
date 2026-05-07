@@ -17,7 +17,7 @@ func (s *Server) registerChatRoutes(g *route.RouterGroup) {
 type ChatCreateMessageRequest struct {
 	NotebookId uuid.UUID   `json:"notebook_id,required"`
 	Prompt     string      `json:"prompt,required"`
-	SourceIds  []uuid.UUID `json:"source_ids,required"`
+	SourceIds  []uuid.UUID `json:"source_ids"`
 }
 
 type ChatCreateMessageResponse struct {

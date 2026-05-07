@@ -21,6 +21,7 @@ func NewServer(logic *logic.Logic) *Server {
 		server.WithCustomBinder(http.NewCanonicalBinder()),
 		server.WithHostPorts(conf.Global().Api.HostPort()),
 		server.WithExitWaitTime(conf.Global().Api.ExitWaitTimeout),
+		server.WithDisablePrintRoute(true),
 	)
 	hz.Use(middleware.LogRequest(
 		middleware.WithLogAllError(conf.Global().IsDev()),

@@ -134,3 +134,10 @@ maxTokens = ${ENV_GONOTELM_DEEPSEEK_MAX_TOKENS:-8192}
 thinkingEnabled = true
 
 [chatModel.openai]
+apiKey = "${ENV_GONOTELM_OPENAI_API_KEY:-}"
+baseUrl = "${ENV_GONOTELM_OPENAI_BASE_URL:-https://api.openai.com/v1}"
+model = "${ENV_GONOTELM_OPENAI_MODEL:-gpt-4o-mini}"
+timeout = "${ENV_GONOTELM_OPENAI_TIMEOUT:-5m}"
+maxTokens = ${ENV_GONOTELM_OPENAI_MAX_TOKENS:-8192}
+temperature = ${ENV_GONOTELM_OPENAI_TEMPERATURE:-1.0}
+reasoningEffort = "${ENV_GONOTELM_OPENAI_REASONING_EFFORT:-medium}"

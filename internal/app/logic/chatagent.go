@@ -2,15 +2,11 @@ package logic
 
 import (
 	"context"
-	stderr "errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"sync"
 
-	bizchat "github.com/gonotelm-lab/gonotelm/internal/app/biz/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
-	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 
@@ -20,92 +16,118 @@ import (
 )
 
 const (
-	defaultChatAgentRound = 30
+	defaultChatAgentRound = 20
 )
 
-type ChatAgentConfig struct {
-	MaxRound int
+type chatAgentConfig struct {
+	maxRound int
 
 	// 带工具的大模型
-	LLM eino.ToolCallingChatModel
+	llm eino.ToolCallingChatModel
 
 	// 一般可以在此hook中注入系统提示词等操作 如果超过上下文还可以进行上下文压缩等操作
-	BeforeChat ChatAgentBeforeChatHook
+	beforeChat chatAgentBeforeChatHook
 
-	Tools map[string]einotool.InvokableTool
+	tools map[string]einotool.InvokableTool
+
+	msgAppender func(ctx context.Context, chatId uuid.UUID, newMsgs []*einoschema.Message)
 }
 
-type ChatAgentBeforeChatHook func(
+type chatAgentBeforeChatHook func(
 	ctx context.Context, chatId uuid.UUID, msgs []*einoschema.Message,
 ) ([]*einoschema.Message, error)
 
-// ChatAgent for chat logic
-type ChatAgent struct {
-	c       ChatAgentConfig
-	chatBiz *bizchat.Biz
+// chatAgent for chat logic
+type chatAgent struct {
+	cfg chatAgentConfig
 }
 
-func NewChatAgent(c ChatAgentConfig, llm eino.ToolCallingChatModel) *ChatAgent {
-	if c.MaxRound <= 0 {
-		c.MaxRound = defaultChatAgentRound
+func newChatAgent(cfg chatAgentConfig) *chatAgent {
+	if cfg.maxRound <= 0 {
+		cfg.maxRound = defaultChatAgentRound
 	}
 
-	return &ChatAgent{
-		c: c,
-	}
+	return &chatAgent{cfg: cfg}
 }
 
-func (a *ChatAgent) Do(ctx context.Context, chatId uuid.UUID, msgs []*einoschema.Message) error {
-	userId := pkgcontext.GetUserId(ctx)
-	if a.c.BeforeChat != nil {
-		newMsgs, err := a.c.BeforeChat(ctx, chatId, msgs)
-		if err != nil {
-			return errors.WithMessage(err, "before chat hook failed")
-		}
-
-		msgs = newMsgs
-	}
-
+func (a *chatAgent) produceAnswer(
+	ctx context.Context,
+	chatId uuid.UUID,
+	msgs []*einoschema.Message,
+) (*einoschema.Message, error) {
 	if len(msgs) == 0 {
-		return errors.ErrParams.Msg("no messages to chat")
+		return nil, errors.ErrParams.Msg("no messages to chat")
 	}
 
-	for round := range a.c.MaxRound {
-		stream, err := a.c.LLM.Stream(ctx, msgs)
+	for range a.cfg.maxRound {
+		stream, err := a.cfg.llm.Stream(ctx, msgs)
 		if err != nil {
-			return errors.WithMessage(err, "stream chat failed")
+			return nil, errors.WithMessage(err, "stream chat failed")
 		}
 		defer stream.Close()
 
-		streamProcess := chat.HandleStream(ctx, stream)
-		msgs, err = a.doLoop(ctx, round, userId, chatId, streamProcess, msgs)
-		if err != nil {
-			if stderr.Is(err, io.EOF) {
-				return nil
-			}
+		// stream handling state
+		var (
+			finishErr error
+			finished    bool
+			finishedMsg *einoschema.Message
+		)
 
-			return errors.WithMessage(err, "chat loop failed")
+		chat.HandleStreamWithCallback(ctx, stream, &chat.Callbacks{
+			OnReasoning: func(msg *einoschema.Message) {
+				slog.InfoContext(ctx, "reasoning", slog.Any("msg", msg))
+			},
+			OnReasoningEnd: func(msg *einoschema.Message) {
+				slog.InfoContext(ctx, "reasoning end", slog.Any("msg", msg))
+			},
+			OnContent: func(msg *einoschema.Message) {
+				slog.InfoContext(ctx, "content", slog.Any("msg", msg))
+			},
+			OnError: func(err error) {
+				finishErr = err
+			},
+			OnEnd: func(msg *einoschema.Message) {
+				slog.InfoContext(ctx, "end", slog.Any("msg", msg))
+				if msg.ResponseMeta.FinishReason == chat.FinishReasonToolCalls {
+					// 需要处理工具调用
+					toolMsgs := a.handleToolCalls(ctx, msg.ToolCalls)
+					newMsgs := make([]*einoschema.Message, 1+len(toolMsgs))
+					newMsgs[0] = msg
+					copy(newMsgs[1:], toolMsgs)
+
+					a.cfg.msgAppender(ctx, chatId, newMsgs)
+				} else {
+					// 认为已经结束
+					slog.DebugContext(ctx,
+						fmt.Sprintf("chat agent for chat %s ended, reason=%s", chatId.String(),
+							msg.ResponseMeta.FinishReason,
+						),
+					)
+
+					a.cfg.msgAppender(ctx, chatId, []*einoschema.Message{msg})
+
+					finished = true
+					finishedMsg = msg
+				}
+			},
+		})
+
+		if finishErr != nil {
+			return nil, finishErr
+		}
+
+		if finished {
+			// 已经得到结果了
+			return finishedMsg, nil
 		}
 	}
 
-	return errors.ErrParams.Msgf("chat round exceeded max rounds=%d", a.c.MaxRound)
+	return nil, errors.ErrParams.Msgf("chat round exceeded max rounds=%d", a.cfg.maxRound)
 }
 
-func (a *ChatAgent) doLoop(
+// 处理工具调用 并且以message的格式返回工具调用的结果
+func (a *chatAgent) handleToolCalls(
 	ctx context.Context,
-	round int,
-	userId string,
-	chatId uuid.UUID,
-	streamProcess *chat.HandleStreamResult,
-	msgs []*einoschema.Message,
-) ([]*einoschema.Message, error) {
-
-	return nil, nil
-}
-
-func (a *ChatAgent) handleToolCalls(
-	ctx context.Context,
-	chatId uuid.UUID,
 	toolCalls []einoschema.ToolCall,
 ) []*einoschema.Message {
 	var (
@@ -135,7 +157,7 @@ func (a *ChatAgent) handleToolCalls(
 				}
 			}()
 
-			if invokable, ok := a.c.Tools[tc.Function.Name]; !ok {
+			if invokable, ok := a.cfg.tools[tc.Function.Name]; !ok {
 				results[idx].Content = fmt.Sprintf("tool %s not found", tc.Function.Name)
 			} else {
 				result, err := invokable.InvokableRun(ctx, tc.Function.Arguments)

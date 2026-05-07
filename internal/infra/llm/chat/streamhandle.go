@@ -117,25 +117,30 @@ const (
 )
 
 type Callbacks struct {
-	// OnReasoning 在接收到 reasoning 内容 chunk 时触发（每个 chunk 都回调）。
+	// OnReasoning 在接收到 reasoning 内容时触发
 	OnReasoning func(msg *schema.Message)
+
 	// OnReasoningEnd 在 reasoning 阶段结束时触发（例如切换到 tooling/content）。
 	OnReasoningEnd func(msg *schema.Message)
-	// OnTooling 在接收到 tool_calls chunk 时触发（每个 chunk 都回调）。
+
+	// OnTooling 在接收到 tool_calls 时触发
 	OnTooling func(msg *schema.Message)
-	// OnContent 在接收到正文 content chunk 时触发（每个 chunk 都回调）。
+
+	// OnContent 在接收到正文 content 时触发
 	OnContent func(msg *schema.Message)
+
 	// OnError 在流处理期间发生错误时触发；该回调可能在 OnEnd 之前触发。
 	OnError func(err error)
-	// OnEnd 在函数退出前触发一次，msg 为最终合并结果（失败时为 nil）。
+
+	// OnEnd 在流式输出结束时触发，msg 为最终合并结果（失败时为 nil）。
 	OnEnd func(msg *schema.Message)
 }
 
 // HandleStreamWithCallback 通过回调处理流式输出，并在当前 goroutine 内同步执行直到流结束。
 //
 // 行为说明：
-//   - 持续调用 stream.Recv() 读取增量消息，并交给内部 tracker 推进状态机。
-//   - OnReasoning / OnTooling / OnContent 在接收到对应内容 chunk 时触发（chunk 级回调）。
+//   - 持续调用 stream.Recv() 读取增量消息，并推进状态机。
+//   - OnReasoning / OnTooling / OnContent 在接收到对应内容 chunk 时触发
 //   - OnReasoningEnd 在 reasoning 阶段结束时触发（切换到 content/tooling，或 finish_reason/流结束兜底）。
 //   - OnEnd 始终在函数退出前触发，参数为最终合并消息；若合并失败则为 nil。
 //   - 接收失败、拼接失败、ctx 取消等错误通过 OnError 回调上报。

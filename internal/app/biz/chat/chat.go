@@ -6,12 +6,15 @@ import (
 	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/cache"
+	cacheschema "github.com/gonotelm-lab/gonotelm/internal/infra/cache/schema"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal"
 	dalschema "github.com/gonotelm-lab/gonotelm/internal/infra/dal/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 
 	"github.com/bytedance/sonic"
+	einoschema "github.com/cloudwego/eino/schema"
 )
 
 type Id = uuid.UUID
@@ -19,12 +22,17 @@ type Id = uuid.UUID
 var ErrChatMessageNotFound = errors.New("chat message not found")
 
 type Biz struct {
-	messageStore dal.ChatMessageStore // chat message store
+	messageStore dal.ChatMessageStore          // chat message store
+	contextStore cache.ChatContextMessageCache // chat context message cache store
 }
 
-func New(messageStore dal.ChatMessageStore) *Biz {
+func New(
+	messageStore dal.ChatMessageStore,
+	contextStore cache.ChatContextMessageCache,
+) *Biz {
 	return &Biz{
 		messageStore: messageStore,
+		contextStore: contextStore,
 	}
 }
 
@@ -32,6 +40,7 @@ func (b *Biz) createMessage(
 	ctx context.Context,
 	chatId Id,
 	userId string,
+	msgRole int8,
 	msgType int8,
 	content model.IChatMessageContent,
 ) (Id, error) {
@@ -39,7 +48,7 @@ func (b *Biz) createMessage(
 	createdAt := time.Now().UnixMilli()
 	seqNo := time.Now().UnixNano()
 
-	messageContent := content.Content()
+	messageContent := content.GetChatMessageContent()
 	messageContent.CreatedAt = createdAt
 
 	contentBytes, err := sonic.Marshal(messageContent)
@@ -51,6 +60,7 @@ func (b *Biz) createMessage(
 		Id:      msgId,
 		ChatId:  chatId,
 		UserId:  userId,
+		MsgRole: msgRole,
 		MsgType: msgType,
 		Content: contentBytes,
 		SeqNo:   seqNo,
@@ -79,7 +89,8 @@ func (b *Biz) createUserMessage(
 		ctx,
 		chatId,
 		userId,
-		int8(model.ChatMessageTypeUser),
+		int8(model.ChatMessageRoleUser),
+		int8(model.ChatMessageTypeNormal),
 		content,
 	)
 	if err != nil {
@@ -100,7 +111,8 @@ func (b *Biz) createAssistantMessage(
 		ctx,
 		chatId,
 		userId,
-		int8(model.ChatMessageTypeAssistant),
+		int8(model.ChatMessageRoleAssistant),
+		int8(model.ChatMessageTypeNormal),
 		content,
 	)
 	if err != nil {
@@ -150,7 +162,7 @@ func (b *Biz) AddAssistantMessage(
 	content := model.NewChatMessageContentText(cmd.Content)
 	content.WithRole(model.ChatMessageRoleAssistant)
 	if cmd.ReasoningContent != "" {
-		content.WithReasoningContent(&model.ChatMessageReasoningContent{Text: cmd.ReasoningContent})
+		content.WithReasoningContent(&model.ChatMessageReasoningContent{Content: cmd.ReasoningContent})
 	}
 
 	msgId, err := b.createAssistantMessage(
@@ -161,6 +173,34 @@ func (b *Biz) AddAssistantMessage(
 	)
 	if err != nil {
 		return msgId, errors.WithMessage(err, "create assistant message failed")
+	}
+
+	return msgId, nil
+}
+
+type AddAssistantSystemMessageCommand struct {
+	ChatId  Id
+	UserId  string
+	Content string
+}
+
+func (b *Biz) AddAssistantSystemMessage(
+	ctx context.Context,
+	cmd *AddAssistantSystemMessageCommand,
+) (Id, error) {
+	content := model.NewChatMessageContentText(cmd.Content)
+	content.WithRole(model.ChatMessageRoleAssistant)
+
+	msgId, err := b.createMessage(
+		ctx,
+		cmd.ChatId,
+		cmd.UserId,
+		int8(model.ChatMessageRoleAssistant),
+		int8(model.ChatMessageTypeSystem),
+		content,
+	)
+	if err != nil {
+		return msgId, errors.WithMessage(err, "create assistant system message failed")
 	}
 
 	return msgId, nil
@@ -221,4 +261,58 @@ func (b *Biz) ListMessages(
 	}
 
 	return chatMsgs, nil
+}
+
+func (b *Biz) AppendContextMessage(
+	ctx context.Context,
+	chatId Id,
+	messages []*einoschema.Message,
+) error {
+	if len(messages) == 0 {
+		return nil
+	}
+
+	now := time.Now().UnixMilli()
+	ctxMsgs := make([]*cacheschema.ChatContextMessage, 0, len(messages))
+	for _, msg := range messages {
+		raw, err := sonic.Marshal(msg)
+		if err != nil {
+			return errors.Wrap(errors.ErrSerde, err.Error())
+		}
+
+		ctxMsgs = append(ctxMsgs, &cacheschema.ChatContextMessage{
+			Id:        uuid.NewV7().String(),
+			CreatedAt: now,
+			Message:   raw,
+		})
+	}
+
+	err := b.contextStore.Append(ctx, chatId.String(), ctxMsgs)
+	if err != nil {
+		return errors.WithMessage(err, "append context message failed")
+	}
+
+	return nil
+}
+
+func (b *Biz) ListContextMessages(
+	ctx context.Context,
+	chatId Id,
+) ([]*einoschema.Message, error) {
+	ctxMsgs, err := b.contextStore.ListAll(ctx, chatId.String())
+	if err != nil {
+		return nil, errors.WithMessage(err, "list context messages failed")
+	}
+
+	einoMsgs := make([]*einoschema.Message, 0, len(ctxMsgs))
+	for _, ctxMsg := range ctxMsgs {
+		einoMsg, err := ctxMsg.ToEino()
+		if err != nil {
+			return nil, errors.Wrap(errors.ErrSerde, err.Error())
+		}
+
+		einoMsgs = append(einoMsgs, einoMsg)
+	}
+
+	return einoMsgs, nil
 }

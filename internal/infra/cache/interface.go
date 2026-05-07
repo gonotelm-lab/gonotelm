@@ -15,3 +15,18 @@ type ChatContextMessageCache interface {
 	// del + set all messages
 	Override(ctx context.Context, chatId string, messages []*schema.ChatContextMessage) error
 }
+
+// 会话流式输出任务缓存 + 流式输出事件缓存
+type ChatMessageTaskCache interface {
+	// 返回任务id
+	CreateTask(ctx context.Context, task *schema.ChatMessageTask) (string, error)
+
+	// 获取流式输出任务
+	GetTask(ctx context.Context, taskId string) (*schema.ChatMessageTask, error)
+
+	DeleteTask(ctx context.Context, taskId string) error
+
+	AppendEvent(ctx context.Context, taskId string, event *schema.ChatMessageTaskEvent) (string, error)
+
+	DeleteEventStream(ctx context.Context, taskId string) error
+}

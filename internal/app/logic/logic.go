@@ -7,12 +7,12 @@ import (
 	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/dal"
+	"github.com/gonotelm-lab/gonotelm/internal/infra"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/mq"
 	mqimpl "github.com/gonotelm-lab/gonotelm/internal/infra/mq/impl"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/mq/impl/kafka"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/vectordal"
 )
 
 type Logic struct {
@@ -23,20 +23,19 @@ type Logic struct {
 
 func MustNewLogic(
 	ctx context.Context,
-	dalImpl *dal.DAL,
-	vectorDalImpl *vectordal.DAL,
+	infrastructures *infra.Instances,
 	objectStorage storage.Storage,
 ) *Logic {
 	// biz instances initialization
 	var (
-		notebookBiz = biznotebook.New(dalImpl.NotebookStore)
-		chatBiz     = bizchat.New(dalImpl.ChatMessageStore)
+		notebookBiz = biznotebook.New(infrastructures.Dal.NotebookStore)
+		chatBiz     = bizchat.New(infrastructures.Dal.ChatMessageStore, infrastructures.Cache.ChatMessageContextCache)
 	)
 
 	sourceBiz, err := bizsource.New(
 		objectStorage,
-		dalImpl.SourceStore,
-		vectorDalImpl.SourceDocStore,
+		infrastructures.Dal.SourceStore,
+		infrastructures.VectorDal.SourceDocStore,
 	)
 	if err != nil {
 		panic(err)
@@ -54,7 +53,13 @@ func MustNewLogic(
 		sourceBiz,
 	)
 
+	llm, err := chat.New(ctx, &conf.Global().ChatModel)
+	if err != nil {
+		panic(err)
+	}
+
 	chatLogic := NewChatLogic(
+		llm,
 		notebookBiz,
 		sourceBiz,
 		chatBiz,

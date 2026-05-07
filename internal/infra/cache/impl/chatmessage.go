@@ -8,6 +8,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infra/cache/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 
+	"github.com/golang/snappy"
 	"github.com/redis/go-redis/v9"
 	"github.com/vmihailenco/msgpack/v5"
 )
@@ -40,21 +41,12 @@ func (c *ChatMessageContextCacheImpl) Append(
 		return nil
 	}
 
-	encMsgs := make([]any, 0, len(messages))
-	for idx, msg := range messages {
-		if msg == nil {
-			return errors.ErrParams.Msgf("chat context message at idx=%d is nil", idx)
-		}
-
-		encMsg, err := msgpack.Marshal(msg)
-		if err != nil {
-			return errors.Wrapf(errors.ErrSerde,
-				"marshal chat context message at idx=%d failed: %s", idx, err.Error())
-		}
-		encMsgs = append(encMsgs, encMsg)
+	encMsgs, err := encodeChatContextMessages(messages)
+	if err != nil {
+		return err
 	}
 
-	err := c.rd.RPush(ctx, c.keyGenerator(chatId), encMsgs...).Err()
+	err = c.rd.RPush(ctx, c.keyGenerator(chatId), encMsgs...).Err()
 	if err != nil {
 		return errors.Wrapf(errors.ErrCache,
 			"append chat context message failed: %s", err.Error())
@@ -86,13 +78,13 @@ func (c *ChatMessageContextCacheImpl) ListAll(
 
 	results := make([]*schema.ChatContextMessage, 0, len(list))
 	for _, item := range list {
-		var message schema.ChatContextMessage
-		err := msgpack.Unmarshal([]byte(item), &message)
+		// snappy 解压 + msgpack 反序列化
+		message, err := decodeChatContextMessage([]byte(item))
 		if err != nil {
 			return nil, errors.Wrapf(errors.ErrSerde,
-				"unmarshal chat context message err: %s", err.Error())
+				"decode chat context message err: %s", err.Error())
 		}
-		results = append(results, &message)
+		results = append(results, message)
 	}
 
 	return results, nil
@@ -105,17 +97,12 @@ func (c *ChatMessageContextCacheImpl) Override(
 ) error {
 	key := c.keyGenerator(chatId)
 
-	encMsgs := make([]any, 0, len(messages))
-	for idx, message := range messages {
-		data, err := msgpack.Marshal(message)
-		if err != nil {
-			return errors.Wrapf(errors.ErrSerde,
-				"marshal chat context message at idx=%d failed: %s", idx, err.Error())
-		}
-		encMsgs = append(encMsgs, data)
+	encMsgs, err := encodeChatContextMessages(messages)
+	if err != nil {
+		return err
 	}
 
-	_, err := c.rd.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
+	_, err = c.rd.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
 		pipe.Del(ctx, key)
 		if len(encMsgs) > 0 {
 			pipe.RPush(ctx, key, encMsgs...)
@@ -123,9 +110,53 @@ func (c *ChatMessageContextCacheImpl) Override(
 		return nil
 	})
 	if err != nil {
-		return errors.Wrapf(errors.ErrCache,
-			"override chat context message failed: %s", err.Error())
+		return errors.Wrapf(errors.ErrCache, "override chat context message failed: %s", err.Error())
 	}
 
 	return nil
+}
+
+// encodeChatContextMessages 批量编码消息（msgpack + snappy）
+func encodeChatContextMessages(messages []*schema.ChatContextMessage) ([]any, error) {
+	encMsgs := make([]any, 0, len(messages))
+	for idx, msg := range messages {
+		if msg == nil {
+			return nil, errors.ErrParams.Msgf("chat context message at idx=%d is nil", idx)
+		}
+
+		encMsg, err := encodeChatContextMessage(msg)
+		if err != nil {
+			return nil, errors.Wrapf(errors.ErrSerde,
+				"encode chat context message at idx=%d failed: %s", idx, err.Error())
+		}
+		encMsgs = append(encMsgs, encMsg)
+	}
+	return encMsgs, nil
+}
+
+// encodeChatContextMessage msgpack 序列化 + snappy 压缩
+func encodeChatContextMessage(msg *schema.ChatContextMessage) ([]byte, error) {
+	data, err := msgpack.Marshal(msg)
+	if err != nil {
+		return nil, err
+	}
+
+	compressed := snappy.Encode(nil, data)
+	return compressed, nil
+}
+
+// decodeChatContextMessage snappy 解压 + msgpack 反序列化
+func decodeChatContextMessage(data []byte) (*schema.ChatContextMessage, error) {
+	decompressed, err := snappy.Decode(nil, data)
+	if err != nil {
+		return nil, err
+	}
+
+	var msg schema.ChatContextMessage
+	err = msgpack.Unmarshal(decompressed, &msg)
+	if err != nil {
+		return nil, err
+	}
+
+	return &msg, nil
 }

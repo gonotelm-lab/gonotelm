@@ -44,7 +44,8 @@ CREATE TABLE chat_messages (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   chat_id UUID NOT NULL DEFAULT uuidv7(),
   user_id VARCHAR(255) NOT NULL DEFAULT '',
-  msg_type TINYINT NOT NULL DEFAULT 0,
+  msg_role SMALLINT NOT NULL DEFAULT 0,
+  msg_type SMALLINT NOT NULL DEFAULT 0,
   content JSONB,
   seq_no BIGINT NOT NULL DEFAULT 0,
   extra JSONB
@@ -56,18 +57,8 @@ COMMENT ON TABLE chat_messages IS 'notebook chat messages history';
 COMMENT ON COLUMN chat_messages.id IS 'primary key';
 COMMENT ON COLUMN chat_messages.chat_id IS 'chat id, which is a notebook id';
 COMMENT ON COLUMN chat_messages.user_id IS 'user id';
-COMMENT ON COLUMN chat_messages.msg_type IS 'message type: 0-user, 1-assistant';
+COMMENT ON COLUMN chat_messages.msg_role IS 'message role: 0-user, 1-assistant';
+COMMENT ON COLUMN chat_messages.msg_type IS 'message type: 0-normal, 1-system';
 COMMENT ON COLUMN chat_messages.content IS 'message content';
 COMMENT ON COLUMN chat_messages.seq_no IS 'message sequence number(unix nano)';
 COMMENT ON COLUMN chat_messages.extra IS 'message extra information';
-
-CREATE TABLE chat_contexts (
-  chat_id UUID PRIMARY KEY DEFAULT uuidv7(),
-  content JSONB,
-  seq_no BIGINT NOT NULL DEFAULT 0
-);
-
-COMMENT ON TABLE chat_contexts IS 'notebook chat context';
-COMMENT ON COLUMN chat_contexts.chat_id IS 'chat id, primary key';
-COMMENT ON COLUMN chat_contexts.content IS 'chat context content';
-COMMENT ON COLUMN chat_contexts.seq_no IS 'chat context sequence number(unix nano)';

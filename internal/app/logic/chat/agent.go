@@ -26,8 +26,8 @@ type agentConfig[T any] struct {
 	llm eino.ToolCallingChatModel
 
 	// 一般可以在此hook中注入系统提示词等操作 如果超过上下文还可以进行上下文压缩等操作
-	beforeChat  agentBeforeChatHook
-	beforeRound agentBeforeRoundHook
+	beforeChat  agentBeforeChatHook[T]
+	beforeRound agentBeforeRoundHook[T]
 
 	tools map[string]einotool.InvokableTool
 
@@ -39,12 +39,12 @@ type agentConfig[T any] struct {
 	// onToolsCalled  func(ctx context.Context, chatId uuid.UUID, toolCalls []einoschema.ToolCall)
 }
 
-type agentBeforeChatHook func(
-	ctx context.Context, chatId uuid.UUID, msgs []*einoschema.Message,
+type agentBeforeChatHook[T any] func(
+	ctx context.Context,  state T, msgs []*einoschema.Message,
 ) ([]*einoschema.Message, error)
 
-type agentBeforeRoundHook func(
-	ctx context.Context, chatId uuid.UUID, round int, msgs []*einoschema.Message,
+type agentBeforeRoundHook[T any] func(
+	ctx context.Context, round int, state T, msgs []*einoschema.Message,
 ) ([]*einoschema.Message, error)
 
 type agentStreamingHook[T any] func(
@@ -79,7 +79,7 @@ func (a *agent[T]) produceAnswer(
 	}
 
 	if a.cfg.beforeChat != nil {
-		newMsgs, err := a.cfg.beforeChat(ctx, chatId, msgs)
+		newMsgs, err := a.cfg.beforeChat(ctx, a.state, msgs)
 		if err != nil {
 			return nil, errors.WithMessage(err, "before chat failed")
 		}
@@ -88,7 +88,7 @@ func (a *agent[T]) produceAnswer(
 
 	for round := range a.cfg.maxRound {
 		if a.cfg.beforeRound != nil {
-			newMsgs, err := a.cfg.beforeRound(ctx, chatId, round, msgs)
+			newMsgs, err := a.cfg.beforeRound(ctx, round, a.state, msgs)
 			if err != nil {
 				return nil, errors.WithMessagef(err, "before round %d failed", round)
 			}

@@ -60,7 +60,7 @@ func MustNewLogic(
 		panic(err)
 	}
 
-	chatLogic := chatlogic.NewLogic(
+	chatLogic := chatlogic.MustNewLogic(
 		llm,
 		notebookBiz,
 		sourceBiz,

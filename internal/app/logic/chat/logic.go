@@ -6,12 +6,14 @@ import (
 	"log/slog"
 	"math"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"time"
 
 	bizchat "github.com/gonotelm-lab/gonotelm/internal/app/biz/chat"
 	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
+	"github.com/gonotelm-lab/gonotelm/internal/app/logic/prompts"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	chatmodel "github.com/gonotelm-lab/gonotelm/internal/app/model/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
@@ -23,6 +25,8 @@ import (
 	einoschema "github.com/cloudwego/eino/schema"
 )
 
+const defaultPromptLang = "zh"
+
 type Logic struct {
 	wg           sync.WaitGroup
 	notebookBiz  *biznotebook.Biz
@@ -30,23 +34,68 @@ type Logic struct {
 	chatBiz      *bizchat.Biz
 	eventManager *bizchat.ChatEventManager
 
-	llm einomodel.ToolCallingChatModel
+	llm             einomodel.ToolCallingChatModel
+	chatTemplateMu  sync.RWMutex
+	chatTemplateMap map[string]*prompts.ChatTemplate
 }
 
-func NewLogic(
+func MustNewLogic(
 	llm einomodel.ToolCallingChatModel,
 	notebookBiz *biznotebook.Biz,
 	sourceBiz *bizsource.Biz,
 	chatBiz *bizchat.Biz,
 	eventManager *bizchat.ChatEventManager,
 ) *Logic {
-	return &Logic{
-		notebookBiz:  notebookBiz,
-		sourceBiz:    sourceBiz,
-		chatBiz:      chatBiz,
-		eventManager: eventManager,
-		llm:          llm,
+	chatTemplate, err := prompts.NewChatTemplate(defaultPromptLang)
+	if err != nil {
+		panic(fmt.Errorf("init default chat prompt template failed: %w", err))
 	}
+
+	chatTemplateMap := map[string]*prompts.ChatTemplate{
+		defaultPromptLang: chatTemplate,
+	}
+
+	return &Logic{
+		notebookBiz:     notebookBiz,
+		sourceBiz:       sourceBiz,
+		chatBiz:         chatBiz,
+		eventManager:    eventManager,
+		llm:             llm,
+		chatTemplateMap: chatTemplateMap,
+	}
+}
+
+func (l *Logic) getChatTemplate(lang string) *prompts.ChatTemplate {
+	normalizedLang := strings.TrimSpace(lang)
+	if normalizedLang == "" {
+		normalizedLang = defaultPromptLang
+	}
+
+	l.chatTemplateMu.RLock()
+	if tmpl, ok := l.chatTemplateMap[normalizedLang]; ok {
+		l.chatTemplateMu.RUnlock()
+		return tmpl
+	}
+	l.chatTemplateMu.RUnlock()
+
+	l.chatTemplateMu.Lock()
+	defer l.chatTemplateMu.Unlock()
+	if tmpl, ok := l.chatTemplateMap[normalizedLang]; ok {
+		return tmpl
+	}
+
+	defaultTemplate := l.chatTemplateMap[defaultPromptLang]
+	tmpl, err := prompts.NewChatTemplate(normalizedLang)
+	if err != nil {
+		slog.Warn("load chat prompt template failed, fallback to default",
+			slog.String("lang", normalizedLang),
+			slog.Any("err", err),
+		)
+		return defaultTemplate
+	}
+
+	l.chatTemplateMap[normalizedLang] = tmpl
+	return tmpl
 }
 
 func (l *Logic) Close(ctx context.Context) {
@@ -267,7 +316,7 @@ func (l *Logic) processUserMessageTask(
 	if len(params.SourceIds) > 0 {
 		l.emitRetrievingStreamEvent(ctx, sessionState)
 	}
-	_, ok := l.processCheckSourceDocs(
+	selectedSourcDocs, ok := l.processCheckSourceDocs(
 		ctx,
 		params.NotebookId,
 		params.Prompt,
@@ -277,6 +326,7 @@ func (l *Logic) processUserMessageTask(
 	if !ok {
 		return
 	}
+	sessionState.sourceDocs = selectedSourcDocs
 
 	contextMsgs, ok := l.processCheckGetMessageContext(ctx, chatId)
 	if !ok {
@@ -553,14 +603,28 @@ func (l *Logic) agentOnContentHook(
 
 func (l *Logic) agentBeforeChatHook(
 	ctx context.Context,
-	chatId uuid.UUID,
+	state *chatSessionState,
 	msgs []*einoschema.Message) (
 	[]*einoschema.Message, error,
 ) {
-	// 注入system prompt
-	systemPrompt := &einoschema.Message{
-		Role:    einoschema.System,
-		Content: `你是一个有用的助手，请根据用户的问题和上下文，给出详细的回答。`,
+	chatTemplate := l.getChatTemplate(state.userLang)
+
+	templateVars := prompts.ChatTemplateVars{}
+	for _, sourceDoc := range state.sourceDocs {
+		if sourceDoc == nil {
+			continue
+		}
+		templateVars.SelectedSourceDocs = append(templateVars.SelectedSourceDocs,
+			prompts.ChatSelectedSourceDoc{
+				DocID:   sourceDoc.Id,
+				Content: sourceDoc.Content,
+				Score:   sourceDoc.Score,
+			})
+	}
+
+	systemPrompt, err := chatTemplate.Message(ctx, templateVars)
+	if err != nil {
+		return nil, errors.WithMessage(err, "render chat prompt template failed")
 	}
 
 	newMsgs := make([]*einoschema.Message, 0, len(msgs)+1)
@@ -572,8 +636,8 @@ func (l *Logic) agentBeforeChatHook(
 
 func (l *Logic) agentBeforeRoundHook(
 	ctx context.Context,
-	chatId uuid.UUID,
 	round int,
+	state *chatSessionState,
 	msgs []*einoschema.Message,
 ) ([]*einoschema.Message, error) {
 	// TODO 如果只剩下最后一轮 要求模型马上输出最终结果

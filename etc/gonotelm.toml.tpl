@@ -130,7 +130,7 @@ apiKey = "${ENV_GONOTELM_DEEPSEEK_API_KEY}"
 timeout = "${ENV_GONOTELM_DEEPSEEK_TIMEOUT:-5m}"
 baseUrl = "${ENV_GONOTELM_DEEPSEEK_BASE_URL:-https://api.deepseek.com}"
 model = "${ENV_GONOTELM_DEEPSEEK_MODEL:-deepseek-v4-flash}"
-maxTokens = ${ENV_GONOTELM_DEEPSEEK_MAX_TOKENS:-8192}
+maxTokens = ${ENV_GONOTELM_DEEPSEEK_MAX_TOKENS:-16384}
 thinkingEnabled = true
 
 [chatModel.openai]
@@ -138,7 +138,7 @@ apiKey = "${ENV_GONOTELM_OPENAI_API_KEY:-}"
 baseUrl = "${ENV_GONOTELM_OPENAI_BASE_URL:-https://api.openai.com/v1}"
 model = "${ENV_GONOTELM_OPENAI_MODEL:-gpt-4o-mini}"
 timeout = "${ENV_GONOTELM_OPENAI_TIMEOUT:-5m}"
-maxTokens = ${ENV_GONOTELM_OPENAI_MAX_TOKENS:-8192}
+maxTokens = ${ENV_GONOTELM_OPENAI_MAX_TOKENS:-16384}
 temperature = ${ENV_GONOTELM_OPENAI_TEMPERATURE:-1.0}
 reasoningEffort = "${ENV_GONOTELM_OPENAI_REASONING_EFFORT:-medium}"
 
@@ -147,7 +147,7 @@ apiKey = "${ENV_GONOTELM_DASHSCOPE_API_KEY:-}"
 baseUrl = "${ENV_GONOTELM_QWEN_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}"
 model = "${ENV_GONOTELM_QWEN_MODEL:-qwen3.6-plus}"
 timeout = "${ENV_GONOTELM_QWEN_TIMEOUT:-5m}"
-maxTokens = ${ENV_GONOTELM_QWEN_MAX_TOKENS:-8192}
+maxTokens = ${ENV_GONOTELM_QWEN_MAX_TOKENS:-16384}
 temperature = ${ENV_GONOTELM_QWEN_TEMPERATURE:-1.0}
 topP = ${ENV_GONOTELM_QWEN_TOP_P:-1.0}
 enableThinking = ${ENV_GONOTELM_QWEN_ENABLE_THINKING:-true}

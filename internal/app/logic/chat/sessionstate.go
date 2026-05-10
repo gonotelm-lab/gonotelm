@@ -3,13 +3,17 @@ package chat
 import (
 	"context"
 
+	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 
 type chatSessionState struct {
-	taskId string
-	chatId uuid.UUID
-	userId string
+	taskId   string
+	chatId   uuid.UUID
+	userId   string
+	userLang string // TODO i18n
+
+	sourceDocs []*model.SourceDoc
 
 	// transient state
 	id          int64 // accumulated id

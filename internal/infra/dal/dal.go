@@ -42,6 +42,8 @@ type ChatMessageStore interface {
 	GetByIdAndChatId(ctx context.Context, id Id, chatId Id) (*schema.ChatMessage, error)
 	// 按照seqno从大到小排序
 	ListByChatId(ctx context.Context, chatId Id, limit, offset int) ([]*schema.ChatMessage, error)
+	// 按照seqno从大到小排序, 查询seq_no < beforeSeqNo的消息
+	ListByChatIdBeforeSeqNo(ctx context.Context, chatId Id, beforeSeqNo int64, limit int) ([]*schema.ChatMessage, error)
 	DeleteByChatId(ctx context.Context, chatId Id) error
 }
 

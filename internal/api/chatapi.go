@@ -3,12 +3,17 @@ package api
 import (
 	"context"
 	"log/slog"
+	"math"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/bytedance/sonic"
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/route"
 	chatlogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/chat"
+	chatmodel "github.com/gonotelm-lab/gonotelm/internal/app/model/chat"
+	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 	"github.com/gonotelm-lab/gonotelm/pkg/http/middleware"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
@@ -17,6 +22,7 @@ import (
 )
 
 func (s *Server) registerChatRoutes(g *route.RouterGroup) {
+	g.GET("/chat/message/list", s.ListChatMessages)
 	g.POST("/chat/message/create", s.ChatCreateMessage)
 	g.POST("/chat/stream/abort", s.ChatAbortStream)
 	g.GET("/chat/stream", middleware.SlowRequestThreshold(60*time.Second), s.GetChatStream) // sse api
@@ -38,6 +44,11 @@ func (s *Server) ChatCreateMessage(ctx context.Context, c *app.RequestContext) {
 	err := c.BindAndValidate(&req)
 	if err != nil {
 		http.ErrResp(c, err)
+		return
+	}
+	req.Prompt = strings.TrimRightFunc(req.Prompt, unicode.IsSpace)
+	if req.Prompt == "" {
+		http.ErrResp(c, errors.ErrParams.Msg("prompt is required"))
 		return
 	}
 
@@ -150,4 +161,104 @@ consumeLoop:
 	}
 
 	writer.Close()
+}
+
+type ListChatMessagesRequest struct {
+	ChatId uuid.UUID `query:"chat_id,required"`
+	Cursor int64     `query:"cursor" validate:"min=0"`
+	Limit  int       `query:"limit"  validate:"omitempty,min=1,max=100"`
+}
+
+const (
+	defaultChatMessagesListLimit = 20
+)
+
+func (r *ListChatMessagesRequest) Validate() error {
+	if r.Limit == 0 {
+		r.Limit = defaultChatMessagesListLimit
+	}
+	if r.Cursor == 0 {
+		r.Cursor = math.MaxInt64
+	}
+
+	return nil
+}
+
+type ListChatMessageItemResponse struct {
+	Id      string                          `json:"id"`
+	ChatId  string                          `json:"chat_id"`
+	Role    string                          `json:"role"`
+	Content *ListChatMessageContentResponse `json:"content,omitempty"`
+}
+
+type ListChatMessageContentResponse struct {
+	CreatedAt int64                        `json:"created_at"`
+	Kind      string                       `json:"kind"`
+	Text      *ListChatMessageTextResponse `json:"text,omitempty"`
+}
+
+type ListChatMessageTextResponse struct {
+	Content string `json:"content"`
+}
+
+type ListChatMessagesResponse struct {
+	Messages   []*ListChatMessageItemResponse `json:"messages"`
+	Limit      int                            `json:"limit"`
+	HasMore    bool                           `json:"has_more"`
+	NextCursor int64                          `json:"next_cursor"`
+}
+
+func (s *Server) ListChatMessages(ctx context.Context, c *app.RequestContext) {
+	var req ListChatMessagesRequest
+	err := c.BindAndValidate(&req)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	result, err := s.chatLogic.ListMessages(ctx,
+		&chatlogic.ListMessagesParams{
+			ChatId: req.ChatId,
+			Cursor: req.Cursor,
+			Limit:  req.Limit,
+		})
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	http.OkResp(c, ListChatMessagesResponse{
+		Messages:   toListChatMessageItemResponses(result.Messages),
+		Limit:      req.Limit,
+		HasMore:    result.HasMore,
+		NextCursor: result.NextCursor,
+	})
+}
+
+func toListChatMessageItemResponses(messages []*chatmodel.Message) []*ListChatMessageItemResponse {
+	resp := make([]*ListChatMessageItemResponse, 0, len(messages))
+	for _, msg := range messages {
+		var content *ListChatMessageContentResponse
+		if msg.Content != nil {
+			content = &ListChatMessageContentResponse{
+				CreatedAt: msg.Content.CreatedAt,
+				Kind:      msg.Content.Kind,
+			}
+
+			if msg.Content.Text != nil {
+				content.Text = &ListChatMessageTextResponse{
+					Content: msg.Content.Text.Content,
+				}
+			}
+		}
+
+		resp = append(resp, &ListChatMessageItemResponse{
+			Id:      msg.Id.String(),
+			ChatId:  msg.ChatId.String(),
+			Role:    msg.MsgRole.String(),
+			Content: content,
+		})
+	}
+
+	return resp
 }

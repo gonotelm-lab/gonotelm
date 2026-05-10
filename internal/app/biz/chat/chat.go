@@ -151,7 +151,7 @@ func (b *Biz) AddUserMessage(
 type AddAssistantMessageCommand struct {
 	ChatId           Id
 	UserId           string
-	Content          string // assistant response text
+	Content          string                             // assistant response text
 	ReasoningContent *chatmodel.MessageReasoningContent // assistant reasoning content
 }
 
@@ -245,6 +245,34 @@ func (b *Biz) ListMessages(
 		return nil, errors.WithMessage(err, "store list chat messages failed")
 	}
 
+	return toChatMessages(ctx, msgs), nil
+}
+
+type ListMessagesByCursorQuery struct {
+	ChatId Id
+	UserId string
+	Cursor int64
+	Limit  int
+}
+
+func (b *Biz) ListMessagesByCursor(
+	ctx context.Context,
+	query *ListMessagesByCursorQuery,
+) ([]*chatmodel.Message, error) {
+	msgs, err := b.messageStore.ListByChatIdBeforeSeqNo(
+		ctx,
+		query.ChatId,
+		query.Cursor,
+		query.Limit,
+	)
+	if err != nil {
+		return nil, errors.WithMessage(err, "store list chat messages by cursor failed")
+	}
+
+	return toChatMessages(ctx, msgs), nil
+}
+
+func toChatMessages(ctx context.Context, msgs []*dalschema.ChatMessage) []*chatmodel.Message {
 	var chatMsgs []*chatmodel.Message = make([]*chatmodel.Message, 0, len(msgs))
 	for _, msg := range msgs {
 		chatMsg, err := chatmodel.NewMessage(msg)
@@ -260,7 +288,7 @@ func (b *Biz) ListMessages(
 		chatMsgs = append(chatMsgs, chatMsg)
 	}
 
-	return chatMsgs, nil
+	return chatMsgs
 }
 
 func (b *Biz) AppendContextMessage(

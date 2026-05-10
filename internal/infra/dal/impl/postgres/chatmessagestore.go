@@ -102,6 +102,34 @@ func (s *ChatMessageStoreImpl) ListByChatId(
 	return rows, nil
 }
 
+func (s *ChatMessageStoreImpl) ListByChatIdBeforeSeqNo(
+	ctx context.Context,
+	chatId dal.Id,
+	beforeSeqNo int64,
+	limit int,
+) ([]*schema.ChatMessage, error) {
+	if limit <= 0 {
+		return nil, xerror.ErrParams.Msgf("invalid pagination params: limit=%d", limit)
+	}
+	if beforeSeqNo <= 0 {
+		return nil, xerror.ErrParams.Msgf("invalid cursor params: before_seq_no=%d", beforeSeqNo)
+	}
+
+	rows, err := gorm.G[*schema.ChatMessage](s.db).
+		Raw(
+			"SELECT id, chat_id, user_id, msg_role, msg_type, content, seq_no, extra FROM chat_messages WHERE chat_id = ? AND seq_no < ? ORDER BY seq_no DESC LIMIT ?",
+			chatId,
+			beforeSeqNo,
+			limit,
+		).
+		Find(ctx)
+	if err != nil {
+		return nil, sql.WrapErr(err)
+	}
+
+	return rows, nil
+}
+
 func (s *ChatMessageStoreImpl) DeleteByChatId(ctx context.Context, chatId dal.Id) error {
 	tx := s.db.WithContext(ctx).Exec("DELETE FROM chat_messages WHERE chat_id = ?", chatId)
 	if tx.Error != nil {

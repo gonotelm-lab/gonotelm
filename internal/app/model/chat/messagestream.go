@@ -12,6 +12,8 @@ const (
 
 type MessageStreamPhaseStatus string
 
+// 数据流转阶段 一般都是 typing -> finished
+// finished之后跳转到下一个phase 比如从thinking -> answer
 const (
 	MessageStreamTyping   MessageStreamPhaseStatus = "typing"   // 正在处理中
 	MessageStreamFinished MessageStreamPhaseStatus = "finished" // 输出完成
@@ -38,7 +40,7 @@ type MessageStreamEvent struct {
 	Id           int64                    `json:"id"`
 	Heartbeat    string                   `json:"heartbeat,omitempty"` // heartbeat frame
 	Phase        *MessageStreamPhaseData  `json:"phase,omitempty"`
-	Finished     bool                     `json:"finished,omitempty"`
+	Finished     bool                     `json:"finished,omitempty"` // 流式输出是否完成 最后一条消息时为true
 	FinishReason FinishReason             `json:"finish_reason,omitempty"`
 	Timestamp    int64                    `json:"timestamp"` // unix timestamp
 	Extra        *MessageStreamEventExtra `json:"extra,omitempty"`

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math"
 	"runtime/debug"
 	"sync"
 	"time"
@@ -131,6 +132,62 @@ func (l *Logic) CreateUserMessage(
 	return &CreateUserMessageResult{
 		MsgId:  userMsgId,
 		TaskId: streamTask.Id,
+	}, nil
+}
+
+type ListMessagesParams struct {
+	ChatId uuid.UUID
+	Cursor int64
+	Limit  int
+}
+
+type ListMessagesResult struct {
+	Messages   []*chatmodel.Message
+	HasMore    bool
+	NextCursor int64
+}
+
+func (l *Logic) ListMessages(
+	ctx context.Context,
+	params *ListMessagesParams,
+) (*ListMessagesResult, error) {
+	cursor := params.Cursor
+	if cursor == 0 {
+		cursor = math.MaxInt64
+	}
+	if cursor < 0 {
+		return nil, errors.ErrParams.Msgf("invalid cursor, cursor=%d", cursor)
+	}
+
+	fetchLimit := params.Limit + 1
+	userId := pkgcontext.GetUserId(ctx)
+	msgs, err := l.chatBiz.ListMessagesByCursor(
+		ctx,
+		&bizchat.ListMessagesByCursorQuery{
+			ChatId: params.ChatId,
+			UserId: userId,
+			Cursor: cursor,
+			Limit:  fetchLimit,
+		},
+	)
+	if err != nil {
+		return nil, errors.WithMessage(err, "list chat messages failed")
+	}
+
+	hasMore := len(msgs) > params.Limit
+	if hasMore {
+		msgs = msgs[:params.Limit]
+	}
+
+	nextCursor := int64(0)
+	if hasMore && len(msgs) > 0 {
+		nextCursor = msgs[len(msgs)-1].SeqNo
+	}
+
+	return &ListMessagesResult{
+		Messages:   msgs,
+		HasMore:    hasMore,
+		NextCursor: nextCursor,
 	}, nil
 }
 

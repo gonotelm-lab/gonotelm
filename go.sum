@@ -106,6 +106,8 @@ github.com/cloudwego/eino-ext/components/model/deepseek v0.1.5 h1:Efal3LNfEIoj3/
 github.com/cloudwego/eino-ext/components/model/deepseek v0.1.5/go.mod h1:YVjkAAxwLqk/dyA7AfVksaxPMG7snikx0hjje8iIZBE=
 github.com/cloudwego/eino-ext/components/model/openai v0.1.13 h1:5XHRTiTD5bt9KQrMHcfvuWNklEC3tpm3XHejdozt9vM=
 github.com/cloudwego/eino-ext/components/model/openai v0.1.13/go.mod h1:mgIoqYYOc0eECCqvLbEYpOJrQNTNxkwXzSJzFU+v5sQ=
+github.com/cloudwego/eino-ext/components/model/qwen v0.1.9 h1:xCz/mp43JeWqupjPR3zLRArmwC6P29/6lTwbwh1yzYM=
+github.com/cloudwego/eino-ext/components/model/qwen v0.1.9/go.mod h1:slTGTuhzkzhNavf+1UtUg1FvUSA31iNAF+rq1mT4SnI=
 github.com/cloudwego/eino-ext/libs/acl/openai v0.1.17 h1:EeVcR1TslRA2IdNW1h/2LaGbPlffwGhQm99jM3zWZiI=
 github.com/cloudwego/eino-ext/libs/acl/openai v0.1.17/go.mod h1:Zkcx6DPTR2NfWmtSXbhItswGw6hqUezNPhNcke0pOG8=
 github.com/cloudwego/gopkg v0.1.4 h1:EoQiCG4sTonTPHxOGE0VlQs+sQR+Hsi2uN0qqwu8O50=

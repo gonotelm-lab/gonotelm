@@ -23,6 +23,7 @@ require (
 	github.com/cloudwego/eino-ext/components/embedding/tencentcloud v0.0.0-20260424065505-3b3b8b5db0d0
 	github.com/cloudwego/eino-ext/components/model/deepseek v0.1.5
 	github.com/cloudwego/eino-ext/components/model/openai v0.1.13
+	github.com/cloudwego/eino-ext/components/model/qwen v0.1.9
 	github.com/cloudwego/hertz v0.10.4
 	github.com/go-playground/validator/v10 v10.30.2
 	github.com/golang/snappy v1.0.0

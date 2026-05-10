@@ -3,6 +3,7 @@ package api
 import (
 	"github.com/cloudwego/hertz/pkg/app/server"
 	"github.com/gonotelm-lab/gonotelm/internal/app/logic"
+	chatlogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 	"github.com/gonotelm-lab/gonotelm/pkg/http/middleware"
@@ -13,7 +14,7 @@ type Server struct {
 
 	notebookLogic *logic.NotebookLogic
 	sourceLogic   *logic.SourceLogic
-	chatLogic     *logic.ChatLogic
+	chatLogic     *chatlogic.Logic
 }
 
 func NewServer(logic *logic.Logic) *Server {

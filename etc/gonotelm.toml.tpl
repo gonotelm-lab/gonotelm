@@ -74,7 +74,7 @@ retryTimes = ${ENV_GONOTELM_ARK_RETRY_TIMES:-2}
 maxConcurrentRequests = ${ENV_GONOTELM_ARK_MAX_CONCURRENT_REQUESTS:-5}
 
 [embedding.dashscope]
-apiKey = "${ENV_GONOTELM_DASHSCOPE_APIKEY:-}"
+apiKey = "${ENV_GONOTELM_DASHSCOPE_API_KEY:-}"
 model = "${ENV_GONOTELM_DASHSCOPE_MODEL:-text-embedding-v4}"
 timeout = "${ENV_GONOTELM_DASHSCOPE_TIMEOUT:-30s}"
 dimensions = ${ENV_GONOTELM_DASHSCOPE_DIMENSIONS:-1024}
@@ -123,7 +123,7 @@ secretKey = "${ENV_GONOTELM_TENCENTCLOUD_SECRET_KEY:-}"
 region = "${ENV_GONOTELM_TENCENTCLOUD_REGION:-ap-guangzhou}"
 
 [chatModel]
-type = "openai"
+type = "qwen"
 
 [chatModel.deepseek]
 apiKey = "${ENV_GONOTELM_DEEPSEEK_API_KEY}"
@@ -141,3 +141,13 @@ timeout = "${ENV_GONOTELM_OPENAI_TIMEOUT:-5m}"
 maxTokens = ${ENV_GONOTELM_OPENAI_MAX_TOKENS:-8192}
 temperature = ${ENV_GONOTELM_OPENAI_TEMPERATURE:-1.0}
 reasoningEffort = "${ENV_GONOTELM_OPENAI_REASONING_EFFORT:-medium}"
+
+[chatModel.qwen]
+apiKey = "${ENV_GONOTELM_DASHSCOPE_API_KEY:-}"
+baseUrl = "${ENV_GONOTELM_QWEN_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}"
+model = "${ENV_GONOTELM_QWEN_MODEL:-qwen3.6-plus}"
+timeout = "${ENV_GONOTELM_QWEN_TIMEOUT:-5m}"
+maxTokens = ${ENV_GONOTELM_QWEN_MAX_TOKENS:-8192}
+temperature = ${ENV_GONOTELM_QWEN_TEMPERATURE:-1.0}
+topP = ${ENV_GONOTELM_QWEN_TOP_P:-1.0}
+enableThinking = ${ENV_GONOTELM_QWEN_ENABLE_THINKING:-true}

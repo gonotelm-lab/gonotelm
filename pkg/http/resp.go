@@ -9,8 +9,10 @@ import (
 )
 
 const (
-	RequestContextInnerErrKey = "gonotelm/hertz/inner/err"
-	RequestContextRawErrKey   = "gonotelm/hertz/raw/err"
+	RequestContextInnerErrKey      = "gonotelm/inner/err"
+	RequestContextRawErrKey        = "gonotelm/raw/err"
+	RequestContextSlowLogThreshold = "gonotelm/slow/log/threshold"
+	RequestContextSlowLogSkip      = "gonotelm/slow/log/skip"
 )
 
 func OkResp(c *app.RequestContext, data any) {

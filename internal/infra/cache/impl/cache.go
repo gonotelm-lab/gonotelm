@@ -7,7 +7,7 @@ import (
 
 type Cache struct {
 	ChatMessageContextCache cache.ChatContextMessageCache
-	ChatMessageTaskCache    cache.ChatMessageTaskCache
+	ChatMessageStreamCache  cache.ChatMessageStreamCache
 }
 
 func NewCache(
@@ -15,6 +15,6 @@ func NewCache(
 ) *Cache {
 	return &Cache{
 		ChatMessageContextCache: NewChatMessageContextCacheImpl(redis),
-		ChatMessageTaskCache:    NewChatMessageTaskCacheImpl(redis),
+		ChatMessageStreamCache:  NewChatMessageStreamCacheImpl(redis),
 	}
 }

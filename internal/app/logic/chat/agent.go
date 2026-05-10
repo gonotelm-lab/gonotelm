@@ -1,4 +1,4 @@
-package logic
+package chat
 
 import (
 	"context"
@@ -16,41 +16,60 @@ import (
 )
 
 const (
-	defaultChatAgentRound = 20
+	defaultAgentRound = 20
 )
 
-type chatAgentConfig struct {
+type agentConfig[T any] struct {
 	maxRound int
 
 	// 带工具的大模型
 	llm eino.ToolCallingChatModel
 
 	// 一般可以在此hook中注入系统提示词等操作 如果超过上下文还可以进行上下文压缩等操作
-	beforeChat chatAgentBeforeChatHook
+	beforeChat  agentBeforeChatHook
+	beforeRound agentBeforeRoundHook
 
 	tools map[string]einotool.InvokableTool
 
 	msgAppender func(ctx context.Context, chatId uuid.UUID, newMsgs []*einoschema.Message)
+
+	onReasoning    agentStreamingHook[T]
+	onReasoningEnd agentStreamingHook[T]
+	onContent      agentStreamingHook[T]
+	// onToolsCalled  func(ctx context.Context, chatId uuid.UUID, toolCalls []einoschema.ToolCall)
 }
 
-type chatAgentBeforeChatHook func(
+type agentBeforeChatHook func(
 	ctx context.Context, chatId uuid.UUID, msgs []*einoschema.Message,
 ) ([]*einoschema.Message, error)
 
-// chatAgent for chat logic
-type chatAgent struct {
-	cfg chatAgentConfig
+type agentBeforeRoundHook func(
+	ctx context.Context, chatId uuid.UUID, round int, msgs []*einoschema.Message,
+) ([]*einoschema.Message, error)
+
+type agentStreamingHook[T any] func(
+	ctx context.Context,
+	round int,
+	chatId uuid.UUID,
+	msg *einoschema.Message,
+	state T,
+) error
+
+// agent for chat logic
+type agent[T any] struct {
+	cfg   agentConfig[T]
+	state T
 }
 
-func newChatAgent(cfg chatAgentConfig) *chatAgent {
+func newAgent[T any](cfg agentConfig[T], state T) *agent[T] {
 	if cfg.maxRound <= 0 {
-		cfg.maxRound = defaultChatAgentRound
+		cfg.maxRound = defaultAgentRound
 	}
 
-	return &chatAgent{cfg: cfg}
+	return &agent[T]{cfg: cfg, state: state}
 }
 
-func (a *chatAgent) produceAnswer(
+func (a *agent[T]) produceAnswer(
 	ctx context.Context,
 	chatId uuid.UUID,
 	msgs []*einoschema.Message,
@@ -59,7 +78,23 @@ func (a *chatAgent) produceAnswer(
 		return nil, errors.ErrParams.Msg("no messages to chat")
 	}
 
-	for range a.cfg.maxRound {
+	if a.cfg.beforeChat != nil {
+		newMsgs, err := a.cfg.beforeChat(ctx, chatId, msgs)
+		if err != nil {
+			return nil, errors.WithMessage(err, "before chat failed")
+		}
+		msgs = newMsgs
+	}
+
+	for round := range a.cfg.maxRound {
+		if a.cfg.beforeRound != nil {
+			newMsgs, err := a.cfg.beforeRound(ctx, chatId, round, msgs)
+			if err != nil {
+				return nil, errors.WithMessagef(err, "before round %d failed", round)
+			}
+			msgs = newMsgs
+		}
+
 		stream, err := a.cfg.llm.Stream(ctx, msgs)
 		if err != nil {
 			return nil, errors.WithMessage(err, "stream chat failed")
@@ -68,44 +103,45 @@ func (a *chatAgent) produceAnswer(
 
 		// stream handling state
 		var (
-			finishErr error
+			finishErr   error
 			finished    bool
 			finishedMsg *einoschema.Message
 		)
 
 		chat.HandleStreamWithCallback(ctx, stream, &chat.Callbacks{
 			OnReasoning: func(msg *einoschema.Message) {
-				slog.InfoContext(ctx, "reasoning", slog.Any("msg", msg))
+				if a.cfg.onReasoning != nil {
+					a.cfg.onReasoning(ctx, round, chatId, msg, a.state)
+				}
 			},
 			OnReasoningEnd: func(msg *einoschema.Message) {
-				slog.InfoContext(ctx, "reasoning end", slog.Any("msg", msg))
+				if a.cfg.onReasoningEnd != nil {
+					a.cfg.onReasoningEnd(ctx, round, chatId, msg, a.state)
+				}
 			},
 			OnContent: func(msg *einoschema.Message) {
-				slog.InfoContext(ctx, "content", slog.Any("msg", msg))
+				if a.cfg.onContent != nil {
+					a.cfg.onContent(ctx, round, chatId, msg, a.state)
+				}
 			},
 			OnError: func(err error) {
 				finishErr = err
 			},
 			OnEnd: func(msg *einoschema.Message) {
-				slog.InfoContext(ctx, "end", slog.Any("msg", msg))
 				if msg.ResponseMeta.FinishReason == chat.FinishReasonToolCalls {
 					// 需要处理工具调用
 					toolMsgs := a.handleToolCalls(ctx, msg.ToolCalls)
-					newMsgs := make([]*einoschema.Message, 1+len(toolMsgs))
-					newMsgs[0] = msg
-					copy(newMsgs[1:], toolMsgs)
-
+					newMsgs := make([]*einoschema.Message, 0, 1+len(toolMsgs))
+					newMsgs = append(newMsgs, msg)
+					newMsgs = append(newMsgs, toolMsgs...)
 					a.cfg.msgAppender(ctx, chatId, newMsgs)
 				} else {
 					// 认为已经结束
-					slog.DebugContext(ctx,
-						fmt.Sprintf("chat agent for chat %s ended, reason=%s", chatId.String(),
-							msg.ResponseMeta.FinishReason,
-						),
-					)
+					debugStr := fmt.Sprintf("chat agent for chat %s ended, reason=%s", chatId.String(),
+						msg.ResponseMeta.FinishReason)
+					slog.DebugContext(ctx, debugStr)
 
 					a.cfg.msgAppender(ctx, chatId, []*einoschema.Message{msg})
-
 					finished = true
 					finishedMsg = msg
 				}
@@ -126,7 +162,7 @@ func (a *chatAgent) produceAnswer(
 }
 
 // 处理工具调用 并且以message的格式返回工具调用的结果
-func (a *chatAgent) handleToolCalls(
+func (a *agent[T]) handleToolCalls(
 	ctx context.Context,
 	toolCalls []einoschema.ToolCall,
 ) []*einoschema.Message {

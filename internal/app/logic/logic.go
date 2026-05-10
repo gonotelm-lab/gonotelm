@@ -6,6 +6,7 @@ import (
 	bizchat "github.com/gonotelm-lab/gonotelm/internal/app/biz/chat"
 	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
+	chatlogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infra"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
@@ -18,7 +19,7 @@ import (
 type Logic struct {
 	NotebookLogic *NotebookLogic
 	SourceLogic   *SourceLogic
-	ChatLogic     *ChatLogic
+	ChatLogic     *chatlogic.Logic
 }
 
 func MustNewLogic(
@@ -28,8 +29,9 @@ func MustNewLogic(
 ) *Logic {
 	// biz instances initialization
 	var (
-		notebookBiz = biznotebook.New(infrastructures.Dal.NotebookStore)
-		chatBiz     = bizchat.New(infrastructures.Dal.ChatMessageStore, infrastructures.Cache.ChatMessageContextCache)
+		notebookBiz      = biznotebook.New(infrastructures.Dal.NotebookStore)
+		chatBiz          = bizchat.New(infrastructures.Dal.ChatMessageStore, infrastructures.Cache.ChatMessageContextCache)
+		chatEventManager = bizchat.NewChatEventManager(infrastructures.Cache.ChatMessageStreamCache)
 	)
 
 	sourceBiz, err := bizsource.New(
@@ -58,11 +60,12 @@ func MustNewLogic(
 		panic(err)
 	}
 
-	chatLogic := NewChatLogic(
+	chatLogic := chatlogic.NewLogic(
 		llm,
 		notebookBiz,
 		sourceBiz,
 		chatBiz,
+		chatEventManager,
 	)
 
 	return &Logic{

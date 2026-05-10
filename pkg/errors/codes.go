@@ -10,6 +10,7 @@ const (
 
 const (
 	CodeUnauthorized = 2000
+	CodePermission   = 2001
 )
 
 const (
@@ -21,27 +22,48 @@ const (
 	CodeUnknownErr  = -999
 )
 
+const (
+	MsgInvalidParams = "invalid parameters"
+	MsgNoRecord      = "no record found"
+	MsgEmbedErr      = "embedding error"
+)
+
 // Errors that should return 200 status code
 var (
 	statusOk = http.StatusOK
 
-	ErrParams   = NewInnerError(statusOk, CodeInvalidParams, "invalid parameters")
-	ErrNoRecord = NewInnerError(statusOk, CodeNoRecord, "no record found")
-	ErrEmbed    = NewInnerError(statusOk, CodeEmbedErr, "embedding error")
+	ErrParams   = NewInnerError(statusOk, CodeInvalidParams, MsgInvalidParams)
+	ErrNoRecord = NewInnerError(statusOk, CodeNoRecord, MsgNoRecord)
+	ErrEmbed    = NewInnerError(statusOk, CodeEmbedErr, MsgEmbedErr)
 )
 
-// TODO Errors that should return 4xx status code, like unauthorized, etc.
+const (
+	MsgUnauthorized = "unauthorized"
+	MsgPermission   = "permission denied"
+)
+
 var (
-	ErrUnauthorized = NewInnerError(http.StatusUnauthorized, CodeUnauthorized, "unauthorized")
+	ErrUnauthorized = NewInnerError(http.StatusUnauthorized, CodeUnauthorized, MsgUnauthorized)
+	ErrPermission   = NewInnerError(http.StatusForbidden, CodePermission, MsgPermission)
+)
+
+const (
+	MsgDatabaseErr = "database error"
+	MsgSerdeErr    = "serde error"
+	MsgStorageErr  = "storage error"
+	MsgMsgQueueErr = "message queue error"
+	MsgCacheErr    = "cache error"
+	MsgUnknownErr  = "unknown error"
 )
 
 // Internal errors that should return 5xx status code
 var (
 	statusInternal = http.StatusInternalServerError
 
-	ErrDatabase = NewInnerError(statusInternal, CodeDatabaseErr, "database error")
-	ErrSerde    = NewInnerError(statusInternal, CodeSerdeErr, "serde error")
-	ErrStorage  = NewInnerError(statusInternal, CodeStorageErr, "storage error")
-	ErrMsgQueue = NewInnerError(statusInternal, CodeMsgQueueErr, "message queue error")
-	ErrCache    = NewInnerError(statusInternal, CodeCacheErr, "cache error")
+	ErrDatabase = NewInnerError(statusInternal, CodeDatabaseErr, MsgDatabaseErr)
+	ErrSerde    = NewInnerError(statusInternal, CodeSerdeErr, MsgSerdeErr)
+	ErrStorage  = NewInnerError(statusInternal, CodeStorageErr, MsgStorageErr)
+	ErrMsgQueue = NewInnerError(statusInternal, CodeMsgQueueErr, MsgMsgQueueErr)
+	ErrCache    = NewInnerError(statusInternal, CodeCacheErr, MsgCacheErr)
+	ErrUnknown  = NewInnerError(statusInternal, CodeUnknownErr, MsgUnknownErr)
 )

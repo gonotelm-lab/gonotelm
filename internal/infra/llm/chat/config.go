@@ -5,6 +5,7 @@ import (
 
 	"github.com/cloudwego/eino-ext/components/model/deepseek"
 	"github.com/cloudwego/eino-ext/components/model/openai"
+	"github.com/cloudwego/eino-ext/components/model/qwen"
 )
 
 type Type string
@@ -12,6 +13,7 @@ type Type string
 const (
 	Openai   Type = "openai"
 	DeepSeek Type = "deepseek"
+	Qwen     Type = "qwen"
 )
 
 type Config struct {
@@ -19,6 +21,7 @@ type Config struct {
 
 	Openai   OpenaiConfig   `toml:"openai"`
 	DeepSeek DeepSeekConfig `toml:"deepseek"`
+	Qwen     QwenConfig     `toml:"qwen"`
 }
 
 type OpenaiConfig struct {
@@ -47,6 +50,36 @@ func (c *OpenaiConfig) ToEino() *openai.ChatModelConfig {
 		PresencePenalty:     c.PresencePenalty,  // 0.0 by default
 		FrequencyPenalty:    c.FrequencyPenalty, // 0.0 by default
 		ReasoningEffort:     openai.ReasoningEffortLevel(c.ReasoningEffort),
+	}
+}
+
+type QwenConfig struct {
+	ApiKey           string        `toml:"apiKey"`
+	Timeout          time.Duration `toml:"timeout"`
+	BaseUrl          string        `toml:"baseUrl"`
+	Model            string        `toml:"model"`
+	MaxTokens        *int          `toml:"maxTokens"`
+	Temperature      *float32      `toml:"temperature"`
+	TopP             *float32      `toml:"topP"`
+	PresencePenalty  *float32      `toml:"presencePenalty"`
+	Seed             *int          `toml:"seed"`
+	FrequencyPenalty *float32      `toml:"frequencyPenalty"`
+	EnableThinking   *bool         `toml:"enableThinking"`
+}
+
+func (c *QwenConfig) ToEino() *qwen.ChatModelConfig {
+	return &qwen.ChatModelConfig{
+		APIKey:           c.ApiKey,
+		Timeout:          c.Timeout,
+		BaseURL:          c.BaseUrl,
+		Model:            c.Model,
+		MaxTokens:        c.MaxTokens,
+		Temperature:      c.Temperature,
+		TopP:             c.TopP,
+		PresencePenalty:  c.PresencePenalty,
+		Seed:             c.Seed,
+		FrequencyPenalty: c.FrequencyPenalty,
+		EnableThinking:   c.EnableThinking,
 	}
 }
 

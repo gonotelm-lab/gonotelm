@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/gonotelm-lab/gonotelm/internal/app/model"
+	chatmodel "github.com/gonotelm-lab/gonotelm/internal/app/model/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/cache"
 	cacheschema "github.com/gonotelm-lab/gonotelm/internal/infra/cache/schema"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal"
@@ -42,13 +42,13 @@ func (b *Biz) createMessage(
 	userId string,
 	msgRole int8,
 	msgType int8,
-	content model.IChatMessageContent,
+	content chatmodel.IMessageContent,
 ) (Id, error) {
 	msgId := uuid.NewV7()
 	createdAt := time.Now().UnixMilli()
 	seqNo := time.Now().UnixNano()
 
-	messageContent := content.GetChatMessageContent()
+	messageContent := content.GetMessageContent()
 	messageContent.CreatedAt = createdAt
 
 	contentBytes, err := sonic.Marshal(messageContent)
@@ -75,22 +75,22 @@ func (b *Biz) createMessage(
 type CreateMessageCommand struct {
 	NotebookId Id
 	UserId     string
-	Content    model.IChatMessageContent
+	Content    chatmodel.IMessageContent
 }
 
 func (b *Biz) createUserMessage(
 	ctx context.Context,
 	chatId Id,
 	userId string,
-	content model.IChatMessageContent,
+	content chatmodel.IMessageContent,
 ) (Id, error) {
-	content.WithRole(model.ChatMessageRoleUser)
+	content.WithRole(chatmodel.MessageRoleUser)
 	msgId, err := b.createMessage(
 		ctx,
 		chatId,
 		userId,
-		int8(model.ChatMessageRoleUser),
-		int8(model.ChatMessageTypeNormal),
+		int8(chatmodel.MessageRoleUser),
+		int8(chatmodel.MessageTypeNormal),
 		content,
 	)
 	if err != nil {
@@ -104,15 +104,15 @@ func (b *Biz) createAssistantMessage(
 	ctx context.Context,
 	chatId Id,
 	userId string,
-	content model.IChatMessageContent,
+	content chatmodel.IMessageContent,
 ) (Id, error) {
-	content.WithRole(model.ChatMessageRoleAssistant)
+	content.WithRole(chatmodel.MessageRoleAssistant)
 	msgId, err := b.createMessage(
 		ctx,
 		chatId,
 		userId,
-		int8(model.ChatMessageRoleAssistant),
-		int8(model.ChatMessageTypeNormal),
+		int8(chatmodel.MessageRoleAssistant),
+		int8(chatmodel.MessageTypeNormal),
 		content,
 	)
 	if err != nil {
@@ -133,8 +133,8 @@ func (b *Biz) AddUserMessage(
 	ctx context.Context,
 	cmd *AddUserMessageCommand,
 ) (Id, error) {
-	content := model.NewChatMessageContentText(cmd.Content)
-	content.WithRole(model.ChatMessageRoleUser)
+	content := chatmodel.NewMessageContentText(cmd.Content)
+	content.WithRole(chatmodel.MessageRoleUser)
 	msgId, err := b.createUserMessage(
 		ctx,
 		cmd.ChatId,
@@ -152,17 +152,17 @@ type AddAssistantMessageCommand struct {
 	ChatId           Id
 	UserId           string
 	Content          string // assistant response text
-	ReasoningContent string // assistant reasoning content
+	ReasoningContent *chatmodel.MessageReasoningContent // assistant reasoning content
 }
 
 func (b *Biz) AddAssistantMessage(
 	ctx context.Context,
 	cmd *AddAssistantMessageCommand,
 ) (Id, error) {
-	content := model.NewChatMessageContentText(cmd.Content)
-	content.WithRole(model.ChatMessageRoleAssistant)
-	if cmd.ReasoningContent != "" {
-		content.WithReasoningContent(&model.ChatMessageReasoningContent{Content: cmd.ReasoningContent})
+	content := chatmodel.NewMessageContentText(cmd.Content)
+	content.WithRole(chatmodel.MessageRoleAssistant)
+	if cmd.ReasoningContent != nil {
+		content.WithReasoningContent(cmd.ReasoningContent)
 	}
 
 	msgId, err := b.createAssistantMessage(
@@ -188,15 +188,15 @@ func (b *Biz) AddAssistantSystemMessage(
 	ctx context.Context,
 	cmd *AddAssistantSystemMessageCommand,
 ) (Id, error) {
-	content := model.NewChatMessageContentText(cmd.Content)
-	content.WithRole(model.ChatMessageRoleAssistant)
+	content := chatmodel.NewMessageContentText(cmd.Content)
+	content.WithRole(chatmodel.MessageRoleAssistant)
 
 	msgId, err := b.createMessage(
 		ctx,
 		cmd.ChatId,
 		cmd.UserId,
-		int8(model.ChatMessageRoleAssistant),
-		int8(model.ChatMessageTypeSystem),
+		int8(chatmodel.MessageRoleAssistant),
+		int8(chatmodel.MessageTypeSystem),
 		content,
 	)
 	if err != nil {
@@ -210,7 +210,7 @@ func (b *Biz) GetMessage(
 	ctx context.Context,
 	msgId Id,
 	chatId Id,
-) (*model.ChatMessage, error) {
+) (*chatmodel.Message, error) {
 	msg, err := b.messageStore.GetByIdAndChatId(ctx, msgId, chatId)
 	if err != nil {
 		if errors.Is(err, errors.ErrNoRecord) {
@@ -219,7 +219,7 @@ func (b *Biz) GetMessage(
 		return nil, errors.WithMessage(err, "store get chat message by chat id failed")
 	}
 
-	chatMsg, err := model.NewChatMessage(msg)
+	chatMsg, err := chatmodel.NewMessage(msg)
 	if err != nil {
 		return nil, errors.WithMessage(err, "new chat message failed")
 	}
@@ -237,7 +237,7 @@ type ListMessagesQuery struct {
 func (b *Biz) ListMessages(
 	ctx context.Context,
 	query *ListMessagesQuery,
-) ([]*model.ChatMessage, error) {
+) ([]*chatmodel.Message, error) {
 	msgs, err := b.messageStore.ListByChatId(
 		ctx, query.ChatId, query.Limit, query.Offset,
 	)
@@ -245,9 +245,9 @@ func (b *Biz) ListMessages(
 		return nil, errors.WithMessage(err, "store list chat messages failed")
 	}
 
-	var chatMsgs []*model.ChatMessage = make([]*model.ChatMessage, 0, len(msgs))
+	var chatMsgs []*chatmodel.Message = make([]*chatmodel.Message, 0, len(msgs))
 	for _, msg := range msgs {
-		chatMsg, err := model.NewChatMessage(msg)
+		chatMsg, err := chatmodel.NewMessage(msg)
 		if err != nil {
 			slog.ErrorContext(ctx,
 				"new chat message failed",

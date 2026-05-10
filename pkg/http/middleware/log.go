@@ -74,8 +74,14 @@ func LogRequest(opts ...LogRequestOption) app.HandlerFunc {
 				logFn(ctx, basicMsg, "err", errMsg)
 			}
 		} else {
+			skip := c.GetBool(pkghttp.RequestContextSlowLogSkip)
+			duration := o.slowThreshold
+			if d := c.GetDuration(pkghttp.RequestContextSlowLogThreshold); d > 0 {
+				duration = d
+			}
+
 			// not error check slow request
-			if elapsed > o.slowThreshold {
+			if elapsed > duration && !skip {
 				basicMsg := fmt.Sprintf("[SLOW HTTP][%d](%dms) %s:%s", status, elapsed.Milliseconds(), method, path)
 				slog.WarnContext(ctx, basicMsg)
 			}

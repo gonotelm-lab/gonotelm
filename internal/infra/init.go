@@ -56,13 +56,13 @@ func MustInit(c *conf.Config) *Instances {
 }
 
 func Close(ctx context.Context) {
-	if err := gInstances.Dal.Close(ctx); err != nil {
-		slog.ErrorContext(ctx, "close dal failed", slog.Any("err", err))
-	}
 	if err := gInstances.VectorDal.Close(ctx); err != nil {
 		slog.ErrorContext(ctx, "close vector dal failed", slog.Any("err", err))
 	}
 	if err := gInstances.redis.Close(); err != nil {
 		slog.ErrorContext(ctx, "close redis cache failed", slog.Any("err", err))
+	}
+	if err := gInstances.Dal.Close(ctx); err != nil {
+		slog.ErrorContext(ctx, "close dal failed", slog.Any("err", err))
 	}
 }

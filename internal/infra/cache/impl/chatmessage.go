@@ -78,7 +78,6 @@ func (c *ChatMessageContextCacheImpl) ListAll(
 
 	results := make([]*schema.ChatContextMessage, 0, len(list))
 	for _, item := range list {
-		// snappy 解压 + msgpack 反序列化
 		message, err := decodeChatContextMessage([]byte(item))
 		if err != nil {
 			return nil, errors.Wrapf(errors.ErrSerde,
@@ -116,7 +115,6 @@ func (c *ChatMessageContextCacheImpl) Override(
 	return nil
 }
 
-// encodeChatContextMessages 批量编码消息（msgpack + snappy）
 func encodeChatContextMessages(messages []*schema.ChatContextMessage) ([]any, error) {
 	encMsgs := make([]any, 0, len(messages))
 	for idx, msg := range messages {
@@ -134,7 +132,6 @@ func encodeChatContextMessages(messages []*schema.ChatContextMessage) ([]any, er
 	return encMsgs, nil
 }
 
-// encodeChatContextMessage msgpack 序列化 + snappy 压缩
 func encodeChatContextMessage(msg *schema.ChatContextMessage) ([]byte, error) {
 	data, err := msgpack.Marshal(msg)
 	if err != nil {
@@ -145,7 +142,6 @@ func encodeChatContextMessage(msg *schema.ChatContextMessage) ([]byte, error) {
 	return compressed, nil
 }
 
-// decodeChatContextMessage snappy 解压 + msgpack 反序列化
 func decodeChatContextMessage(data []byte) (*schema.ChatContextMessage, error) {
 	decompressed, err := snappy.Decode(nil, data)
 	if err != nil {

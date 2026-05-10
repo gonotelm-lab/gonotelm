@@ -22,10 +22,11 @@ type RedisCacheConfig struct {
 func Init(cfg *RedisCacheConfig) error {
 	once.Do(func() {
 		gRedis = redis.NewUniversalClient(&redis.UniversalOptions{
-			Addrs:      cfg.Addrs,
-			ClientName: "gonotelm-redis-v9",
-			Username:   cfg.Username,
-			Password:   cfg.Password,
+			Addrs:                 cfg.Addrs,
+			ContextTimeoutEnabled: true,
+			ClientName:            "gonotelm-redis-v9",
+			Username:              cfg.Username,
+			Password:              cfg.Password,
 			OnConnect: func(ctx context.Context, cn *redis.Conn) error {
 				slog.InfoContext(ctx, "redis connected", "addr", cfg.Addrs)
 				return nil

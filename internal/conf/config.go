@@ -119,6 +119,9 @@ func Load(path string) (*Config, error) {
 	if cfg.Embedding.Type == "" {
 		cfg.Embedding.Type = embedimpl.DashScope
 	}
+	if cfg.ChatModel.Type == "" {
+		cfg.ChatModel.Type = chat.Openai
+	}
 	if cfg.Embedding.BatchSize <= 0 {
 		cfg.Embedding.BatchSize = 10
 	}

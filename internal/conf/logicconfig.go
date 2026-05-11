@@ -3,7 +3,7 @@ package conf
 import "time"
 
 const (
-	DefaultSourceDocsRecallCount = 50
+	DefaultSourceDocsRecallCount = 30
 	DefaultTaskTimeout           = 5 * time.Minute
 )
 

@@ -13,7 +13,7 @@ type chatSessionState struct {
 	userId   string
 	userLang string // TODO i18n
 
-	sourceDocs []*model.SourceDoc
+	sourceDocs []*model.SourceDoc // 本地对话选中的文档
 
 	// transient state
 	id          int64 // accumulated id

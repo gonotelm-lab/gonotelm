@@ -52,7 +52,15 @@ type Message struct {
 	MsgType MessageType
 	Content *MessageContent
 	SeqNo   int64
-	Extra   []byte
+	Extra   *MessageExtra
+}
+
+type MessageExtra struct {
+	Citation *MessageExtraCitation `json:"citation,omitempty"`
+}
+
+type MessageExtraCitation struct {
+	DocIds []string `json:"doc_ids,omitempty"`
 }
 
 func NewMessage(smsg *schema.ChatMessage) (*Message, error) {
@@ -60,6 +68,14 @@ func NewMessage(smsg *schema.ChatMessage) (*Message, error) {
 	err := sonic.Unmarshal(smsg.Content, &content)
 	if err != nil {
 		return nil, errors.Wrap(errors.ErrSerde, err.Error())
+	}
+
+	var extra *MessageExtra
+	if smsg.Extra != nil {
+		err = sonic.Unmarshal(smsg.Extra, extra)
+		if err != nil {
+			return nil, errors.Wrap(errors.ErrSerde, err.Error())
+		}
 	}
 
 	return &Message{
@@ -70,7 +86,7 @@ func NewMessage(smsg *schema.ChatMessage) (*Message, error) {
 		MsgType: MessageType(smsg.MsgType),
 		Content: &content,
 		SeqNo:   smsg.SeqNo,
-		Extra:   smsg.Extra,
+		Extra:   extra,
 	}, nil
 }
 

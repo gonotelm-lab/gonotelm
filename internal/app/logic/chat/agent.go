@@ -50,7 +50,6 @@ type agentBeforeRoundHook[T any] func(
 type agentStreamingHook[T any] func(
 	ctx context.Context,
 	round int,
-	chatId uuid.UUID,
 	msg *einoschema.Message,
 	state T,
 ) error
@@ -111,17 +110,17 @@ func (a *agent[T]) produceAnswer(
 		chat.HandleStreamWithCallback(ctx, stream, &chat.Callbacks{
 			OnReasoning: func(msg *einoschema.Message) {
 				if a.cfg.onReasoning != nil {
-					a.cfg.onReasoning(ctx, round, chatId, msg, a.state)
+					a.cfg.onReasoning(ctx, round, msg, a.state)
 				}
 			},
 			OnReasoningEnd: func(msg *einoschema.Message) {
 				if a.cfg.onReasoningEnd != nil {
-					a.cfg.onReasoningEnd(ctx, round, chatId, msg, a.state)
+					a.cfg.onReasoningEnd(ctx, round, msg, a.state)
 				}
 			},
 			OnContent: func(msg *einoschema.Message) {
 				if a.cfg.onContent != nil {
-					a.cfg.onContent(ctx, round, chatId, msg, a.state)
+					a.cfg.onContent(ctx, round, msg, a.state)
 				}
 			},
 			OnError: func(err error) {

@@ -28,7 +28,7 @@ func Init(cfg *RedisCacheConfig) error {
 			Username:              cfg.Username,
 			Password:              cfg.Password,
 			OnConnect: func(ctx context.Context, cn *redis.Conn) error {
-				slog.InfoContext(ctx, "redis connected", "addr", cfg.Addrs)
+				slog.InfoContext(ctx, "created new redis connection", "addr", cfg.Addrs)
 				return nil
 			},
 		})

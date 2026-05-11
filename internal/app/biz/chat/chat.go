@@ -43,6 +43,7 @@ func (b *Biz) createMessage(
 	msgRole int8,
 	msgType int8,
 	content chatmodel.IMessageContent,
+	extras []byte,
 ) (Id, error) {
 	msgId := uuid.NewV7()
 	createdAt := time.Now().UnixMilli()
@@ -64,6 +65,7 @@ func (b *Biz) createMessage(
 		MsgType: msgType,
 		Content: contentBytes,
 		SeqNo:   seqNo,
+		Extra:   extras,
 	})
 	if err != nil {
 		return msgId, errors.WithMessage(err, "create chat message failed")
@@ -92,6 +94,7 @@ func (b *Biz) createUserMessage(
 		int8(chatmodel.MessageRoleUser),
 		int8(chatmodel.MessageTypeNormal),
 		content,
+		nil,
 	)
 	if err != nil {
 		return msgId, errors.WithMessage(err, "create message failed")
@@ -105,8 +108,19 @@ func (b *Biz) createAssistantMessage(
 	chatId Id,
 	userId string,
 	content chatmodel.IMessageContent,
+	extra *chatmodel.MessageExtra,
 ) (Id, error) {
 	content.WithRole(chatmodel.MessageRoleAssistant)
+
+	var extraBytes []byte
+	if extra != nil {
+		var err error
+		extraBytes, err = sonic.Marshal(extra)
+		if err != nil {
+			return uuid.EmptyUUID(), errors.Wrap(errors.ErrSerde, err.Error())
+		}
+	}
+
 	msgId, err := b.createMessage(
 		ctx,
 		chatId,
@@ -114,6 +128,7 @@ func (b *Biz) createAssistantMessage(
 		int8(chatmodel.MessageRoleAssistant),
 		int8(chatmodel.MessageTypeNormal),
 		content,
+		extraBytes,
 	)
 	if err != nil {
 		return msgId, errors.WithMessage(err, "create message failed")
@@ -153,6 +168,8 @@ type AddAssistantMessageCommand struct {
 	UserId           string
 	Content          string                             // assistant response text
 	ReasoningContent *chatmodel.MessageReasoningContent // assistant reasoning content
+
+	Extra *chatmodel.MessageExtra
 }
 
 func (b *Biz) AddAssistantMessage(
@@ -170,6 +187,7 @@ func (b *Biz) AddAssistantMessage(
 		cmd.ChatId,
 		cmd.UserId,
 		content,
+		cmd.Extra,
 	)
 	if err != nil {
 		return msgId, errors.WithMessage(err, "create assistant message failed")
@@ -198,6 +216,7 @@ func (b *Biz) AddAssistantSystemMessage(
 		int8(chatmodel.MessageRoleAssistant),
 		int8(chatmodel.MessageTypeSystem),
 		content,
+		nil,
 	)
 	if err != nil {
 		return msgId, errors.WithMessage(err, "create assistant system message failed")

@@ -32,30 +32,6 @@ type Template[T TemplateVars] struct {
 	tmpl prompt.ChatTemplate
 }
 
-type ChatTemplateVars struct {
-	Notebook           string
-	SelectedSourceDocs []ChatSelectedSourceDoc
-}
-
-type ChatSelectedSourceDoc struct {
-	DocID   string
-	Content string
-	Score   float32
-}
-
-func (v ChatTemplateVars) PromptVars() map[string]any {
-	return map[string]any{
-		"notebook":           v.Notebook,
-		"SelectedSourceDocs": v.SelectedSourceDocs,
-	}
-}
-
-type ChatTemplate = Template[ChatTemplateVars]
-
-func NewChatTemplate(lang string) (*ChatTemplate, error) {
-	return NewTemplate[ChatTemplateVars](TemplateNameChat, lang)
-}
-
 func NewTemplate[T TemplateVars](name, lang string) (*Template[T], error) {
 	normalizedName := strings.TrimSpace(name)
 	if normalizedName == "" {

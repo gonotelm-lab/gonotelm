@@ -23,6 +23,31 @@ type MessageStreamPhaseData struct {
 	Type    MessageStreamPhaseType   `json:"type"`
 	Status  MessageStreamPhaseStatus `json:"status"`
 	Content string                   `json:"content,omitempty"`
+
+	Citation *PhaseCitation `json:"citation,omitempty"` // 对应retrieving阶段的引用文档信息
+}
+
+type PhaseCitation struct {
+	Items []*PhaseCitationItem `json:"items,omitempty"`
+}
+
+type PhaseCitationItem struct {
+	SourceId string                    `json:"source_id,omitempty"` // 来源id
+	DocId    string                    `json:"doc_id,omitempty"`    // 文档id
+	Position *PhaseCitationDocPosition `json:"position,omitempty"`
+}
+
+type PhaseCitationDocPosition struct {
+	// TODO 引用的文档片段在source中的定位位置 方便前端预览时跳转
+	Start int `json:"start"`
+	End   int `json:"end"`
+}
+
+func (p *MessageStreamPhaseData) AppendCitationItem(item *PhaseCitationItem) {
+	if p.Citation == nil {
+		p.Citation = &PhaseCitation{}
+	}
+	p.Citation.Items = append(p.Citation.Items, item)
 }
 
 type FinishReason string

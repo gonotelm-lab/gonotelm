@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"math"
 	"runtime/debug"
-	"strings"
 	"sync"
 	"time"
 
@@ -34,9 +33,8 @@ type Logic struct {
 	chatBiz      *bizchat.Biz
 	eventManager *bizchat.ChatEventManager
 
-	llm             einomodel.ToolCallingChatModel
-	chatTemplateMu  sync.RWMutex
-	chatTemplateMap map[string]*prompts.ChatTemplate
+	llm                 einomodel.ToolCallingChatModel
+	chatTemplateManager *prompts.ChatTemplateManager
 }
 
 func MustNewLogic(
@@ -46,56 +44,19 @@ func MustNewLogic(
 	chatBiz *bizchat.Biz,
 	eventManager *bizchat.ChatEventManager,
 ) *Logic {
-	chatTemplate, err := prompts.NewChatTemplate(defaultPromptLang)
+	chatTemplateManager, err := prompts.NewChatTemplateManager(defaultPromptLang)
 	if err != nil {
-		panic(fmt.Errorf("init default chat prompt template failed: %w", err))
-	}
-
-	chatTemplateMap := map[string]*prompts.ChatTemplate{
-		defaultPromptLang: chatTemplate,
+		panic(err)
 	}
 
 	return &Logic{
-		notebookBiz:     notebookBiz,
-		sourceBiz:       sourceBiz,
-		chatBiz:         chatBiz,
-		eventManager:    eventManager,
-		llm:             llm,
-		chatTemplateMap: chatTemplateMap,
+		notebookBiz:         notebookBiz,
+		sourceBiz:           sourceBiz,
+		chatBiz:             chatBiz,
+		eventManager:        eventManager,
+		llm:                 llm,
+		chatTemplateManager: chatTemplateManager,
 	}
-}
-
-func (l *Logic) getChatTemplate(lang string) *prompts.ChatTemplate {
-	normalizedLang := strings.TrimSpace(lang)
-	if normalizedLang == "" {
-		normalizedLang = defaultPromptLang
-	}
-
-	l.chatTemplateMu.RLock()
-	if tmpl, ok := l.chatTemplateMap[normalizedLang]; ok {
-		l.chatTemplateMu.RUnlock()
-		return tmpl
-	}
-	l.chatTemplateMu.RUnlock()
-
-	l.chatTemplateMu.Lock()
-	defer l.chatTemplateMu.Unlock()
-	if tmpl, ok := l.chatTemplateMap[normalizedLang]; ok {
-		return tmpl
-	}
-
-	defaultTemplate := l.chatTemplateMap[defaultPromptLang]
-	tmpl, err := prompts.NewChatTemplate(normalizedLang)
-	if err != nil {
-		slog.Warn("load chat prompt template failed, fallback to default",
-			slog.String("lang", normalizedLang),
-			slog.Any("err", err),
-		)
-		return defaultTemplate
-	}
-
-	l.chatTemplateMap[normalizedLang] = tmpl
-	return tmpl
 }
 
 func (l *Logic) Close(ctx context.Context) {
@@ -327,6 +288,9 @@ func (l *Logic) processUserMessageTask(
 		return
 	}
 	sessionState.sourceDocs = selectedSourcDocs
+	if len(selectedSourcDocs) > 0 {
+		l.emitRetrievingStreamEvent(ctx, sessionState)
+	}
 
 	contextMsgs, ok := l.processCheckGetMessageContext(ctx, chatId)
 	if !ok {
@@ -478,6 +442,21 @@ func (l *Logic) finalizingProcess(
 		return nil
 	}
 
+	var extra *chatmodel.MessageExtra
+	if len(state.sourceDocs) > 0 {
+		extra = &chatmodel.MessageExtra{
+			Citation: &chatmodel.MessageExtraCitation{
+				DocIds: make([]string, len(state.sourceDocs)),
+			},
+		}
+		for idx, sourceDoc := range state.sourceDocs {
+			if sourceDoc == nil {
+				continue
+			}
+			extra.Citation.DocIds[idx] = sourceDoc.Id
+		}
+	}
+
 	// 拿出全部结果 整合成最终结果后落库
 	// 最终的结果落库
 	_, err := l.chatBiz.AddAssistantMessage(ctx,
@@ -488,6 +467,7 @@ func (l *Logic) finalizingProcess(
 			ReasoningContent: &chatmodel.MessageReasoningContent{
 				Content: answerMsg.ReasoningContent,
 			},
+			Extra: extra,
 		})
 	if err != nil {
 		slog.ErrorContext(ctx,
@@ -568,7 +548,6 @@ func (l *Logic) agentMessageAppender(
 func (l *Logic) agentOnReasoningHook(
 	ctx context.Context,
 	round int,
-	chatId uuid.UUID,
 	msg *einoschema.Message,
 	state *chatSessionState,
 ) error {
@@ -580,7 +559,6 @@ func (l *Logic) agentOnReasoningHook(
 func (l *Logic) agentOnReasoningEndHook(
 	ctx context.Context,
 	round int,
-	chatId uuid.UUID,
 	msg *einoschema.Message,
 	state *chatSessionState,
 ) error {
@@ -592,7 +570,6 @@ func (l *Logic) agentOnReasoningEndHook(
 func (l *Logic) agentOnContentHook(
 	ctx context.Context,
 	round int,
-	chatId uuid.UUID,
 	msg *einoschema.Message,
 	state *chatSessionState,
 ) error {
@@ -607,15 +584,16 @@ func (l *Logic) agentBeforeChatHook(
 	msgs []*einoschema.Message) (
 	[]*einoschema.Message, error,
 ) {
-	chatTemplate := l.getChatTemplate(state.userLang)
-
+	chatTemplate := l.chatTemplateManager.Get(state.userLang)
 	templateVars := prompts.ChatTemplateVars{}
-	for _, sourceDoc := range state.sourceDocs {
+
+	for idx, sourceDoc := range state.sourceDocs {
 		if sourceDoc == nil {
 			continue
 		}
 		templateVars.SelectedSourceDocs = append(templateVars.SelectedSourceDocs,
 			prompts.ChatSelectedSourceDoc{
+				Index:   int64(idx),
 				DocID:   sourceDoc.Id,
 				Content: sourceDoc.Content,
 				Score:   sourceDoc.Score,
@@ -694,6 +672,26 @@ func (l *Logic) emitRetrievingStreamEvent(
 			Type:   chatmodel.MessageStreamPhaseRetrieving,
 			Status: chatmodel.MessageStreamTyping,
 		},
+	}
+
+	if len(state.sourceDocs) > 0 {
+		for _, sd := range state.sourceDocs {
+			if sd == nil {
+				continue
+			}
+
+			event.Phase.AppendCitationItem(&chatmodel.PhaseCitationItem{
+				SourceId: sd.SourceId.String(),
+				DocId:    sd.Id,
+				Position: &chatmodel.PhaseCitationDocPosition{
+					// TODO 等文档记录了位置信息后这里需要重新填入
+					Start: 0,
+					End:   0,
+				},
+			})
+		}
+
+		event.Phase.Status = chatmodel.MessageStreamFinished
 	}
 
 	l.emitStreamEvent(ctx, state, event)

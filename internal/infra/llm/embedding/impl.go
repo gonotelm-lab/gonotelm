@@ -2,7 +2,6 @@ package embedding
 
 import (
 	"context"
-	"crypto/md5"
 	"fmt"
 	"strings"
 
@@ -86,7 +85,7 @@ func New(
 		embedder, err = cache.NewEmbedder(embedder,
 			cache.WithCacher(cacher),
 			cache.WithExpiration(0), // TODO never expire
-			cache.WithGenerator(cache.NewHashGenerator(md5.New())),
+			cache.WithGenerator(newEmbedKeyGenerator()),
 		)
 		if err != nil {
 			return nil, err

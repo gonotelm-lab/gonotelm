@@ -8,21 +8,27 @@ import (
 )
 
 type ChatTemplateVars struct {
-	Notebook           string
-	SelectedSourceDocs []ChatSelectedSourceDoc
+	Notebook        string
+	SelectedSources []ChatSelectedSourceGroup
+}
+
+type ChatSelectedSourceGroup struct {
+	SourceIndex int64
+	SourceID    string
+	Docs        []ChatSelectedSourceDoc
 }
 
 type ChatSelectedSourceDoc struct {
-	Index   int64
-	DocID   string
-	Content string
-	Score   float32
+	DocIndex int64
+	DocID    string
+	Content  string
+	Score    float32
 }
 
 func (v ChatTemplateVars) PromptVars() map[string]any {
 	return map[string]any{
-		"Notebook":           v.Notebook,
-		"SelectedSourceDocs": v.SelectedSourceDocs,
+		"Notebook":        v.Notebook,
+		"SelectedSources": v.SelectedSources,
 	}
 }
 

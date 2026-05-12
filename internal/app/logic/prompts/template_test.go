@@ -16,11 +16,16 @@ func TestTemplateMessage(t *testing.T) {
 
 	msg, err := tmpl.Message(context.Background(), ChatTemplateVars{
 		Notebook: "项目笔记",
-		SelectedSourceDocs: []ChatSelectedSourceDoc{
+		SelectedSources: []ChatSelectedSourceGroup{
 			{
-				DocID:   "doc:1",
-				Content: "文档片段",
-				Score:   0.98,
+				SourceID: "source:1",
+				Docs: []ChatSelectedSourceDoc{
+					{
+						DocID:   "doc:1",
+						Content: "文档片段",
+						Score:   0.98,
+					},
+				},
 			},
 		},
 	})

@@ -3,6 +3,7 @@ package postgres
 import (
 	"bytes"
 	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -90,6 +91,19 @@ func compactJSON(raw json.RawMessage) string {
 	return buf.String()
 }
 
+func jsonEqual(left, right json.RawMessage) bool {
+	var leftVal any
+	var rightVal any
+	if err := json.Unmarshal(left, &leftVal); err != nil {
+		return false
+	}
+	if err := json.Unmarshal(right, &rightVal); err != nil {
+		return false
+	}
+
+	return reflect.DeepEqual(leftVal, rightVal)
+}
+
 func TestChatMessageStoreListByChatIdPagination(t *testing.T) {
 	Convey("ChatMessageStore list by chat id pagination", t, func() {
 		store := testChatMessageStore
@@ -133,6 +147,54 @@ func TestChatMessageStoreListByChatIdPagination(t *testing.T) {
 		So(secondPage[0].SeqNo, ShouldEqual, msgOld.SeqNo)
 		So(secondPage[0].MsgRole, ShouldEqual, msgOld.MsgRole)
 		So(secondPage[0].MsgType, ShouldEqual, msgOld.MsgType)
+	})
+}
+
+func TestChatMessageStoreListByChatIdBeforeSeqNoIncludesExtra(t *testing.T) {
+	Convey("ChatMessageStore list by chat id before seq no includes extra", t, func() {
+		store := testChatMessageStore
+		ctx := t.Context()
+		chatID := createNotebookForSourceTest(t, testDB)
+		userID := "user_" + uuid.NewV7().String()
+
+		msgOld := &schema.ChatMessage{
+			ChatId:  chatID,
+			UserId:  userID,
+			MsgRole: int8(0),
+			MsgType: int8(0),
+			Content: json.RawMessage(`{"text":"old"}`),
+			SeqNo:   1000,
+		}
+		msgNew := &schema.ChatMessage{
+			ChatId:  chatID,
+			UserId:  userID,
+			MsgRole: int8(1),
+			MsgType: int8(0),
+			Content: json.RawMessage(`{"text":"new"}`),
+			SeqNo:   2000,
+			Extra:   json.RawMessage(`{"citation":{"citations":[{"source_id":"source-1","doc_ids":["doc-1"]}]}}`),
+		}
+
+		So(store.Create(ctx, msgOld), ShouldBeNil)
+		So(store.Create(ctx, msgNew), ShouldBeNil)
+		t.Cleanup(func() {
+			_ = testDB.WithContext(ctx).Exec(`DELETE FROM chat_messages WHERE chat_id = ?`, chatID).Error
+		})
+
+		rows, err := store.ListByChatIdBeforeSeqNo(ctx, chatID, 3000, 10)
+		So(err, ShouldBeNil)
+		So(len(rows), ShouldEqual, 2)
+
+		var newRow *schema.ChatMessage
+		for _, row := range rows {
+			if row.Id == msgNew.Id {
+				newRow = row
+				break
+			}
+		}
+		So(newRow, ShouldNotBeNil)
+		So(newRow.SeqNo, ShouldEqual, msgNew.SeqNo)
+		So(jsonEqual(newRow.Extra, msgNew.Extra), ShouldBeTrue)
 	})
 }
 

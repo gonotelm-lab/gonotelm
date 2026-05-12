@@ -56,11 +56,13 @@ type Message struct {
 }
 
 type MessageExtra struct {
-	Citation *MessageExtraCitation `json:"citation,omitempty"`
+	Citation []*Citation `json:"citation,omitempty"`
 }
 
-type MessageExtraCitation struct {
-	DocIds []string `json:"doc_ids,omitempty"`
+type Citation struct {
+	// 按照sourceId分组
+	SourceId string   `json:"source_id"`
+	DocIds   []string `json:"doc_ids,omitempty"`
 }
 
 func NewMessage(smsg *schema.ChatMessage) (*Message, error) {
@@ -71,7 +73,8 @@ func NewMessage(smsg *schema.ChatMessage) (*Message, error) {
 	}
 
 	var extra *MessageExtra
-	if smsg.Extra != nil {
+	if len(smsg.Extra) > 0 {
+		extra = &MessageExtra{}
 		err = sonic.Unmarshal(smsg.Extra, extra)
 		if err != nil {
 			return nil, errors.Wrap(errors.ErrSerde, err.Error())

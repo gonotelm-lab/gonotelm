@@ -16,6 +16,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	chatmodel "github.com/gonotelm-lab/gonotelm/internal/app/model/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
+	llmchat "github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
@@ -65,9 +66,10 @@ func (l *Logic) Close(ctx context.Context) {
 }
 
 type CreateUserMessageParams struct {
-	NotebookId uuid.UUID
-	Prompt     string
-	SourceIds  []uuid.UUID
+	NotebookId     uuid.UUID
+	Prompt         string
+	SourceIds      []uuid.UUID
+	EnableThinking bool
 }
 
 type CreateUserMessageResult struct {
@@ -267,10 +269,11 @@ func (l *Logic) processUserMessageTask(
 
 	userId := pkgcontext.GetUserId(ctx)
 	sessionState := &chatSessionState{
-		id:     0, // accumulated id
-		taskId: taskId,
-		chatId: chatId,
-		userId: userId,
+		id:             0, // accumulated id
+		taskId:         taskId,
+		chatId:         chatId,
+		userId:         userId,
+		enableThinking: params.EnableThinking,
 	}
 	ctx, sessionState.cancel = context.WithCancel(ctx)
 
@@ -442,20 +445,7 @@ func (l *Logic) finalizingProcess(
 		return nil
 	}
 
-	var extra *chatmodel.MessageExtra
-	if len(state.sourceDocs) > 0 {
-		extra = &chatmodel.MessageExtra{
-			Citation: &chatmodel.MessageExtraCitation{
-				DocIds: make([]string, len(state.sourceDocs)),
-			},
-		}
-		for idx, sourceDoc := range state.sourceDocs {
-			if sourceDoc == nil {
-				continue
-			}
-			extra.Citation.DocIds[idx] = sourceDoc.Id
-		}
-	}
+	extra := buildMessageExtraFromSourceDocs(state.sourceDocs)
 
 	// 拿出全部结果 整合成最终结果后落库
 	// 最终的结果落库
@@ -515,6 +505,7 @@ func (l *Logic) buildNewChatAgent(sessionState *chatSessionState) *agent[*chatSe
 		agentConfig = agentConfig[*chatSessionState]{
 			maxRound:       maxRound,
 			llm:            l.llm,
+			options:        llmchat.BuildThinkingOptions(&conf.Global().ChatModel, sessionState.enableThinking),
 			beforeChat:     l.agentBeforeChatHook,
 			beforeRound:    l.agentBeforeRoundHook,
 			msgAppender:    l.agentMessageAppender,
@@ -585,20 +576,7 @@ func (l *Logic) agentBeforeChatHook(
 	[]*einoschema.Message, error,
 ) {
 	chatTemplate := l.chatTemplateManager.Get(state.userLang)
-	templateVars := prompts.ChatTemplateVars{}
-
-	for idx, sourceDoc := range state.sourceDocs {
-		if sourceDoc == nil {
-			continue
-		}
-		templateVars.SelectedSourceDocs = append(templateVars.SelectedSourceDocs,
-			prompts.ChatSelectedSourceDoc{
-				Index:   int64(idx),
-				DocID:   sourceDoc.Id,
-				Content: sourceDoc.Content,
-				Score:   sourceDoc.Score,
-			})
-	}
+	templateVars := buildChatTemplateVars(state.sourceDocs)
 
 	systemPrompt, err := chatTemplate.Message(ctx, templateVars)
 	if err != nil {
@@ -674,23 +652,8 @@ func (l *Logic) emitRetrievingStreamEvent(
 		},
 	}
 
-	if len(state.sourceDocs) > 0 {
-		for _, sd := range state.sourceDocs {
-			if sd == nil {
-				continue
-			}
-
-			event.Phase.AppendCitationItem(&chatmodel.PhaseCitationItem{
-				SourceId: sd.SourceId.String(),
-				DocId:    sd.Id,
-				Position: &chatmodel.PhaseCitationDocPosition{
-					// TODO 等文档记录了位置信息后这里需要重新填入
-					Start: 0,
-					End:   0,
-				},
-			})
-		}
-
+	event.Phase.Citation = buildPhaseCitationFromSourceDocs(state.sourceDocs)
+	if event.Phase.Citation != nil {
 		event.Phase.Status = chatmodel.MessageStreamFinished
 	}
 
@@ -759,4 +722,129 @@ func (l *Logic) emitFinishStreamEvent(
 	}
 
 	l.emitStreamEvent(ctx, state, event)
+}
+
+type groupedSourceDocCitation struct {
+	SourceId string
+	DocIds   []string
+}
+
+func groupSourceDocsForCitation(sourceDocs []*model.SourceDoc) []*groupedSourceDocCitation {
+	if len(sourceDocs) == 0 {
+		return nil
+	}
+
+	groups := make([]*groupedSourceDocCitation, 0, len(sourceDocs))
+	for _, sourceDoc := range sourceDocs {
+		if sourceDoc == nil {
+			continue
+		}
+
+		sourceID := sourceDoc.SourceId.String()
+		groupIdx := -1
+		for idx, group := range groups {
+			if group.SourceId == sourceID {
+				groupIdx = idx
+				break
+			}
+		}
+		if groupIdx < 0 {
+			groups = append(groups, &groupedSourceDocCitation{
+				SourceId: sourceID,
+				DocIds:   make([]string, 0, 1),
+			})
+			groupIdx = len(groups) - 1
+		}
+
+		if sourceDoc.Id != "" {
+			groups[groupIdx].DocIds = append(groups[groupIdx].DocIds, sourceDoc.Id)
+		}
+	}
+
+	return groups
+}
+
+func buildMessageExtraFromSourceDocs(sourceDocs []*model.SourceDoc) *chatmodel.MessageExtra {
+	groupedSourceDocs := groupSourceDocsForCitation(sourceDocs)
+	if len(groupedSourceDocs) == 0 {
+		return nil
+	}
+
+	citations := make([]*chatmodel.Citation, 0, len(groupedSourceDocs))
+	for _, grouped := range groupedSourceDocs {
+		citations = append(citations, &chatmodel.Citation{
+			SourceId: grouped.SourceId,
+			DocIds:   grouped.DocIds,
+		})
+	}
+
+	return &chatmodel.MessageExtra{
+		Citation: citations,
+	}
+}
+
+func buildPhaseCitationFromSourceDocs(sourceDocs []*model.SourceDoc) []*chatmodel.PhaseCitationItem {
+	groupedSourceDocs := groupSourceDocsForCitation(sourceDocs)
+	if len(groupedSourceDocs) == 0 {
+		return nil
+	}
+
+	items := make([]*chatmodel.PhaseCitationItem, 0, len(groupedSourceDocs))
+	for _, grouped := range groupedSourceDocs {
+		item := &chatmodel.PhaseCitationItem{
+			SourceId: grouped.SourceId,
+			Docs:     make([]*chatmodel.PhaseCitationDoc, 0, len(grouped.DocIds)),
+		}
+		for _, docID := range grouped.DocIds {
+			item.Docs = append(item.Docs, &chatmodel.PhaseCitationDoc{
+				Id: docID,
+				Position: &chatmodel.PhaseCitationDocPosition{
+					// TODO 等文档记录了位置信息后这里需要重新填入
+					Start: 0,
+					End:   0,
+				},
+			})
+		}
+		items = append(items, item)
+	}
+
+	return items
+}
+
+func buildChatTemplateVars(sourceDocs []*model.SourceDoc) prompts.ChatTemplateVars {
+	templateVars := prompts.ChatTemplateVars{}
+	for _, sourceDoc := range sourceDocs {
+		if sourceDoc == nil {
+			continue
+		}
+
+		sourceID := sourceDoc.SourceId.String()
+		groupIdx := -1
+		for idx, group := range templateVars.SelectedSources {
+			if group.SourceID == sourceID {
+				groupIdx = idx
+				break
+			}
+		}
+		if groupIdx < 0 {
+			templateVars.SelectedSources = append(templateVars.SelectedSources, prompts.ChatSelectedSourceGroup{
+				SourceIndex: int64(len(templateVars.SelectedSources)),
+				SourceID:    sourceID,
+			})
+			groupIdx = len(templateVars.SelectedSources) - 1
+		}
+		docIndex := int64(len(templateVars.SelectedSources[groupIdx].Docs))
+
+		templateVars.SelectedSources[groupIdx].Docs = append(
+			templateVars.SelectedSources[groupIdx].Docs,
+			prompts.ChatSelectedSourceDoc{
+				DocIndex: docIndex,
+				DocID:    sourceDoc.Id,
+				Content:  sourceDoc.Content,
+				Score:    sourceDoc.Score,
+			},
+		)
+	}
+
+	return templateVars
 }

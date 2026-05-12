@@ -24,6 +24,8 @@ type agentConfig[T any] struct {
 
 	// 带工具的大模型
 	llm eino.ToolCallingChatModel
+	// 每次向模型发起请求时附带的动态参数（如是否开启思考）
+	options []eino.Option
 
 	// 一般可以在此hook中注入系统提示词等操作 如果超过上下文还可以进行上下文压缩等操作
 	beforeChat  agentBeforeChatHook[T]
@@ -40,7 +42,7 @@ type agentConfig[T any] struct {
 }
 
 type agentBeforeChatHook[T any] func(
-	ctx context.Context,  state T, msgs []*einoschema.Message,
+	ctx context.Context, state T, msgs []*einoschema.Message,
 ) ([]*einoschema.Message, error)
 
 type agentBeforeRoundHook[T any] func(
@@ -94,7 +96,7 @@ func (a *agent[T]) produceAnswer(
 			msgs = newMsgs
 		}
 
-		stream, err := a.cfg.llm.Stream(ctx, msgs)
+		stream, err := a.cfg.llm.Stream(ctx, msgs, a.cfg.options...)
 		if err != nil {
 			return nil, errors.WithMessage(err, "stream chat failed")
 		}

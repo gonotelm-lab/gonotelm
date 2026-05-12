@@ -29,9 +29,10 @@ func (s *Server) registerChatRoutes(g *route.RouterGroup) {
 }
 
 type ChatCreateMessageRequest struct {
-	NotebookId uuid.UUID   `json:"notebook_id,required"`
-	Prompt     string      `json:"prompt,required"`
-	SourceIds  []uuid.UUID `json:"source_ids"`
+	NotebookId     uuid.UUID   `json:"notebook_id,required"`
+	Prompt         string      `json:"prompt,required"`
+	SourceIds      []uuid.UUID `json:"source_ids"`
+	EnableThinking bool        `json:"enable_thinking"`
 }
 
 type ChatCreateMessageResponse struct {
@@ -54,9 +55,10 @@ func (s *Server) ChatCreateMessage(ctx context.Context, c *app.RequestContext) {
 
 	result, err := s.chatLogic.CreateUserMessage(ctx,
 		&chatlogic.CreateUserMessageParams{
-			NotebookId: req.NotebookId,
-			Prompt:     req.Prompt,
-			SourceIds:  req.SourceIds,
+			NotebookId:     req.NotebookId,
+			Prompt:         req.Prompt,
+			SourceIds:      req.SourceIds,
+			EnableThinking: req.EnableThinking,
 		})
 	if err != nil {
 		http.ErrResp(c, err)
@@ -185,10 +187,11 @@ func (r *ListChatMessagesRequest) Validate() error {
 }
 
 type ListChatMessageItemResponse struct {
-	Id      string                          `json:"id"`
-	ChatId  string                          `json:"chat_id"`
-	Role    string                          `json:"role"`
-	Content *ListChatMessageContentResponse `json:"content,omitempty"`
+	Id       string                                 `json:"id"`
+	ChatId   string                                 `json:"chat_id"`
+	Role     string                                 `json:"role"`
+	Content  *ListChatMessageContentResponse        `json:"content,omitempty"`
+	Citation []*ListChatMessageCitationItemResponse `json:"citation,omitempty"`
 }
 
 type ListChatMessageContentResponse struct {
@@ -199,6 +202,11 @@ type ListChatMessageContentResponse struct {
 
 type ListChatMessageTextResponse struct {
 	Content string `json:"content"`
+}
+
+type ListChatMessageCitationItemResponse struct {
+	SourceId string   `json:"source_id"`
+	DocIds   []string `json:"doc_ids,omitempty"`
 }
 
 type ListChatMessagesResponse struct {
@@ -252,13 +260,50 @@ func toListChatMessageItemResponses(messages []*chatmodel.Message) []*ListChatMe
 			}
 		}
 
+		var citation []*ListChatMessageCitationItemResponse
+		if msg.Extra != nil {
+			citation = toListChatMessageCitationResponse(msg.Extra.Citation)
+		}
+
 		resp = append(resp, &ListChatMessageItemResponse{
-			Id:      msg.Id.String(),
-			ChatId:  msg.ChatId.String(),
-			Role:    msg.MsgRole.String(),
-			Content: content,
+			Id:       msg.Id.String(),
+			ChatId:   msg.ChatId.String(),
+			Role:     msg.MsgRole.String(),
+			Content:  content,
+			Citation: citation,
 		})
 	}
 
 	return resp
+}
+
+func toListChatMessageCitationResponse(citation []*chatmodel.Citation) []*ListChatMessageCitationItemResponse {
+	if len(citation) == 0 {
+		return nil
+	}
+
+	items := make([]*ListChatMessageCitationItemResponse, 0, len(citation))
+	for _, citationItem := range citation {
+		if citationItem == nil {
+			continue
+		}
+
+		docIDs := make([]string, 0, len(citationItem.DocIds))
+		for _, docID := range citationItem.DocIds {
+			if strings.TrimSpace(docID) == "" {
+				continue
+			}
+			docIDs = append(docIDs, docID)
+		}
+
+		items = append(items, &ListChatMessageCitationItemResponse{
+			SourceId: citationItem.SourceId,
+			DocIds:   docIDs,
+		})
+	}
+	if len(items) == 0 {
+		return nil
+	}
+
+	return items
 }

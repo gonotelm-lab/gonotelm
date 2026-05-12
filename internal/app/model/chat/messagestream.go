@@ -24,16 +24,16 @@ type MessageStreamPhaseData struct {
 	Status  MessageStreamPhaseStatus `json:"status"`
 	Content string                   `json:"content,omitempty"`
 
-	Citation *PhaseCitation `json:"citation,omitempty"` // 对应retrieving阶段的引用文档信息
-}
-
-type PhaseCitation struct {
-	Items []*PhaseCitationItem `json:"items,omitempty"`
+	Citation []*PhaseCitationItem `json:"citation,omitempty"` // 对应retrieving阶段的引用文档信息
 }
 
 type PhaseCitationItem struct {
-	SourceId string                    `json:"source_id,omitempty"` // 来源id
-	DocId    string                    `json:"doc_id,omitempty"`    // 文档id
+	SourceId string              `json:"source_id,omitempty"` // 来源id
+	Docs     []*PhaseCitationDoc `json:"docs,omitempty"`      // 文档列表
+}
+
+type PhaseCitationDoc struct {
+	Id       string                    `json:"id,omitempty"`
 	Position *PhaseCitationDocPosition `json:"position,omitempty"`
 }
 
@@ -44,10 +44,7 @@ type PhaseCitationDocPosition struct {
 }
 
 func (p *MessageStreamPhaseData) AppendCitationItem(item *PhaseCitationItem) {
-	if p.Citation == nil {
-		p.Citation = &PhaseCitation{}
-	}
-	p.Citation.Items = append(p.Citation.Items, item)
+	p.Citation = append(p.Citation, item)
 }
 
 type FinishReason string

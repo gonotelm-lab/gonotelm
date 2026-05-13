@@ -4,6 +4,11 @@ deployEnv = "dev"
 port = 7099
 exitWaitTimeout = "${ENV_GONOTELM_API_EXIT_WAIT_TIMEOUT:-10s}"
 
+[logic]
+
+[logic.chat]
+modelProvider = "qwen"
+
 [database]
 type = "postgres"
 host = "${ENV_GONOTELM_DB_HOST:-127.0.0.1}"
@@ -122,10 +127,9 @@ secretId = "${ENV_GONOTELM_TENCENTCLOUD_SECRET_ID:-}"
 secretKey = "${ENV_GONOTELM_TENCENTCLOUD_SECRET_KEY:-}"
 region = "${ENV_GONOTELM_TENCENTCLOUD_REGION:-ap-guangzhou}"
 
-[chatModel]
-type = "qwen"
+[provider]
 
-[chatModel.deepseek]
+[provider.deepseek]
 apiKey = "${ENV_GONOTELM_DEEPSEEK_API_KEY}"
 timeout = "${ENV_GONOTELM_DEEPSEEK_TIMEOUT:-5m}"
 baseUrl = "${ENV_GONOTELM_DEEPSEEK_BASE_URL:-https://api.deepseek.com}"
@@ -133,7 +137,7 @@ model = "${ENV_GONOTELM_DEEPSEEK_MODEL:-deepseek-v4-flash}"
 maxTokens = ${ENV_GONOTELM_DEEPSEEK_MAX_TOKENS:-16384}
 thinkingEnabled = false
 
-[chatModel.openai]
+[provider.openai]
 apiKey = "${ENV_GONOTELM_OPENAI_API_KEY:-}"
 baseUrl = "${ENV_GONOTELM_OPENAI_BASE_URL:-https://api.openai.com/v1}"
 model = "${ENV_GONOTELM_OPENAI_MODEL:-gpt-4o-mini}"
@@ -142,7 +146,7 @@ maxTokens = ${ENV_GONOTELM_OPENAI_MAX_TOKENS:-16384}
 temperature = ${ENV_GONOTELM_OPENAI_TEMPERATURE:-1.0}
 reasoningEffort = "${ENV_GONOTELM_OPENAI_REASONING_EFFORT:-}"
 
-[chatModel.qwen]
+[provider.qwen]
 apiKey = "${ENV_GONOTELM_DASHSCOPE_API_KEY:-}"
 baseUrl = "${ENV_GONOTELM_QWEN_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}"
 model = "${ENV_GONOTELM_QWEN_MODEL:-glm-5.1}"

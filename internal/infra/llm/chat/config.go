@@ -10,15 +10,17 @@ import (
 
 type Type string
 
+func (t Type) String() string {
+	return string(t)
+}
+
 const (
 	Openai   Type = "openai"
 	DeepSeek Type = "deepseek"
 	Qwen     Type = "qwen"
 )
 
-type Config struct {
-	Type Type `toml:"type"`
-
+type ProviderConfig struct {
 	Openai   OpenaiConfig   `toml:"openai"`
 	DeepSeek DeepSeekConfig `toml:"deepseek"`
 	Qwen     QwenConfig     `toml:"qwen"`

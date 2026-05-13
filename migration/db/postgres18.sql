@@ -40,6 +40,21 @@ COMMENT ON COLUMN sources.content IS 'source content payload (file source stores
 COMMENT ON COLUMN sources.owner_id IS 'source owner id';
 COMMENT ON COLUMN sources.updated_at IS 'source updated time (unix ms)';
 
+CREATE TABLE chats (
+  id UUID PRIMARY KEY DEFAULT uuidv7(),
+  notebook_id UUID NOT NULL DEFAULT uuidv7(),
+  owner_id VARCHAR(255) NOT NULL DEFAULT '',
+  updated_at BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE UNIQUE INDEX uk_notebook_id_owner_id ON chats (notebook_id, owner_id);
+
+COMMENT ON TABLE chats IS 'chats table';
+COMMENT ON COLUMN chats.id IS 'chat id, primary key';
+COMMENT ON COLUMN chats.notebook_id IS 'associated notebook id';
+COMMENT ON COLUMN chats.owner_id IS 'chat owner id';
+COMMENT ON COLUMN chats.updated_at IS 'chat updated time (unix ms)';
+
 CREATE TABLE chat_messages (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   chat_id UUID NOT NULL DEFAULT uuidv7(),

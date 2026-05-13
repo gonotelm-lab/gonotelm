@@ -36,6 +36,15 @@ type SourceStore interface {
 	ListByNotebookIdAndIds(ctx context.Context, notebookId Id, ids []Id) ([]*schema.Source, error)
 }
 
+type ChatStore interface {
+	Create(ctx context.Context, chat *schema.Chat) error
+	GetById(ctx context.Context, id Id) (*schema.Chat, error)
+	GetByNotebookIdAndOwnerId(ctx context.Context, notebookId Id, ownerId string) (*schema.Chat, error)
+	ListByOwnerId(ctx context.Context, ownerId string, limit, offset int) ([]*schema.Chat, error)
+	DeleteById(ctx context.Context, id Id) error
+	DeleteByNotebookId(ctx context.Context, notebookId Id) error
+}
+
 type ChatMessageStore interface {
 	Create(ctx context.Context, message *schema.ChatMessage) error
 	GetById(ctx context.Context, id Id) (*schema.ChatMessage, error)
@@ -52,6 +61,7 @@ type DAL struct {
 
 	NotebookStore    NotebookStore
 	SourceStore      SourceStore
+	ChatStore        ChatStore
 	ChatMessageStore ChatMessageStore
 }
 

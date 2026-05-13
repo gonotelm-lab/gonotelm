@@ -1,6 +1,10 @@
 package conf
 
-import "time"
+import (
+	"time"
+
+	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
+)
 
 const (
 	DefaultSourceDocsRecallCount = 30
@@ -12,6 +16,7 @@ type LogicConfig struct {
 }
 
 type ChatLogicConfig struct {
+	ModelProvider         chat.Type     `toml:"modelProvider"`
 	SourceDocsRecallCount int           `toml:"sourceDocsRecallCount"`
 	TaskTimeout           time.Duration `toml:"taskTimeout"` // 流式任务超时时间
 }
@@ -28,6 +33,6 @@ func (c *ChatLogicConfig) GetTaskTimeout() time.Duration {
 	if c.TaskTimeout == 0 {
 		return DefaultTaskTimeout
 	}
-	
+
 	return c.TaskTimeout
 }

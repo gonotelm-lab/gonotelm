@@ -37,7 +37,7 @@ type Config struct {
 	Embedding embedimpl.Config       `toml:"embedding"`
 	Logging   LoggingConfig          `toml:"logging"`
 	Chunking  ChunkingConfig         `toml:"chunking"`
-	ChatModel chat.Config            `toml:"chatModel"`
+	Provider  chat.ProviderConfig    `toml:"provider"`
 }
 
 func (c *Config) IsDev() bool {
@@ -118,9 +118,6 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Embedding.Type == "" {
 		cfg.Embedding.Type = embedimpl.DashScope
-	}
-	if cfg.ChatModel.Type == "" {
-		cfg.ChatModel.Type = chat.Openai
 	}
 	if cfg.Embedding.BatchSize <= 0 {
 		cfg.Embedding.BatchSize = 10

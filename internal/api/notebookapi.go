@@ -18,6 +18,7 @@ func (s *Server) registerNotebooksRoutes(g *route.RouterGroup) {
 	g.GET("/notebook/list", s.ListNotebooks)
 	g.PUT("/notebook/:id/name", s.UpdateNotebookName)
 	g.PUT("/notebook/:id/desc", s.UpdateNotebookDesc)
+	g.POST("/notebook/:id/chat", s.GetOrCreateNotebookChat)
 }
 
 type CreateNotebookRequest struct {
@@ -305,4 +306,35 @@ func (s *Server) UpdateNotebookDesc(ctx context.Context, c *app.RequestContext) 
 	}
 
 	http.OkResp(c, nil)
+}
+
+type GetNotebookChatRequest struct {
+	Id uuid.UUID `path:"id,required"`
+}
+
+func (r *GetNotebookChatRequest) Validate() error {
+	return nil
+}
+
+type GetNotebookChatResponse struct {
+	ChatId string `json:"chat_id"`
+}
+
+func (s *Server) GetOrCreateNotebookChat(ctx context.Context, c *app.RequestContext) {
+	var req GetNotebookChatRequest
+	err := c.BindAndValidate(&req)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	chat, err := s.notebookLogic.GetOrCreateNotebookChat(ctx, req.Id)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	http.OkResp(c, GetNotebookChatResponse{
+		ChatId: chat.Id.String(),
+	})
 }

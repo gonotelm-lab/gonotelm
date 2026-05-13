@@ -19,10 +19,19 @@ const (
 	MessageStreamFinished MessageStreamPhaseStatus = "finished" // 输出完成
 )
 
+// 内容是继续输出还是覆盖输出
+type MessageStreamPhaseContentAction string
+
+const (
+	MessageStreamPhaseContentActionContinue MessageStreamPhaseContentAction = "continue" // 继续输出
+	MessageStreamPhaseContentActionOverride MessageStreamPhaseContentAction = "override" // 覆盖输出
+)
+
 type MessageStreamPhaseData struct {
-	Type    MessageStreamPhaseType   `json:"type"`
-	Status  MessageStreamPhaseStatus `json:"status"`
-	Content string                   `json:"content,omitempty"`
+	Type    MessageStreamPhaseType          `json:"type"`
+	Status  MessageStreamPhaseStatus        `json:"status"`
+	Content string                          `json:"content,omitempty"`
+	Action  MessageStreamPhaseContentAction `json:"action,omitempty"` // 为空或者continue时继续输出
 
 	Citation []*PhaseCitationItem `json:"citation,omitempty"` // 对应retrieving阶段的引用文档信息
 }

@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	bizagent "github.com/gonotelm-lab/gonotelm/internal/app/biz/agent"
 	bizchat "github.com/gonotelm-lab/gonotelm/internal/app/biz/chat"
 	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
@@ -17,6 +18,7 @@ import (
 	chatmodel "github.com/gonotelm-lab/gonotelm/internal/app/model/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
@@ -34,12 +36,12 @@ type Logic struct {
 	chatBiz      *bizchat.Biz
 	eventManager *bizchat.ChatEventManager
 
-	llm                 einomodel.ToolCallingChatModel
+	llmGateway          *gateway.Gateway
 	chatTemplateManager *prompts.ChatTemplateManager
 }
 
 func MustNewLogic(
-	llm einomodel.ToolCallingChatModel,
+	llmGateway *gateway.Gateway,
 	notebookBiz *biznotebook.Biz,
 	sourceBiz *bizsource.Biz,
 	chatBiz *bizchat.Biz,
@@ -55,7 +57,7 @@ func MustNewLogic(
 		sourceBiz:           sourceBiz,
 		chatBiz:             chatBiz,
 		eventManager:        eventManager,
-		llm:                 llm,
+		llmGateway:          llmGateway,
 		chatTemplateManager: chatTemplateManager,
 	}
 }
@@ -66,7 +68,7 @@ func (l *Logic) Close(ctx context.Context) {
 }
 
 type CreateUserMessageParams struct {
-	NotebookId     uuid.UUID
+	ChatId         uuid.UUID
 	Prompt         string
 	SourceIds      []uuid.UUID
 	EnableThinking bool
@@ -81,11 +83,26 @@ func (l *Logic) CreateUserMessage(
 	ctx context.Context,
 	params *CreateUserMessageParams,
 ) (*CreateUserMessageResult, error) {
+	targetChat, err := l.chatBiz.GetChat(ctx, params.ChatId)
+	if err != nil {
+		if errors.Is(err, bizchat.ErrChatNotFound) {
+			return nil, errors.ErrParams.Msgf("chat not found, chat_id=%s", params.ChatId)
+		}
+
+		return nil, errors.WithMessage(err, "get chat failed")
+	}
+
+	userId := pkgcontext.GetUserId(ctx)
+
+	if targetChat.OwnerId != userId {
+		return nil, errors.ErrParams.Msgf("chat not belong to user, chat_id=%s, user_id=%s", params.ChatId, userId)
+	}
+
 	// check notebook
-	_, err := l.notebookBiz.GetNotebook(ctx, params.NotebookId)
+	_, err = l.notebookBiz.GetNotebook(ctx, targetChat.NotebookId)
 	if err != nil {
 		if errors.Is(err, biznotebook.ErrNotebookNotFound) {
-			return nil, errors.ErrParams.Msgf("notebook not found, notebook_id=%s", params.NotebookId)
+			return nil, errors.ErrParams.Msgf("notebook not found, notebook_id=%s", targetChat.NotebookId)
 		}
 		return nil, errors.WithMessage(err, "get notebook failed")
 	}
@@ -93,7 +110,7 @@ func (l *Logic) CreateUserMessage(
 	// 粗略检查source ids是否存在且属于notebookid
 	if len(params.SourceIds) > 0 {
 		query := &bizsource.CheckSourceIdsQuery{
-			NotebookId: params.NotebookId,
+			NotebookId: targetChat.NotebookId,
 			SourceIds:  params.SourceIds,
 		}
 		existSourceIds, err := l.sourceBiz.CheckSourceIds(ctx, query)
@@ -104,23 +121,24 @@ func (l *Logic) CreateUserMessage(
 		if len(existSourceIds) == 0 {
 			return nil, errors.ErrParams.Msgf(
 				"no source ids found, notebook_id=%s, source_ids=%v",
-				params.NotebookId, params.SourceIds)
+				targetChat.NotebookId, params.SourceIds)
 		}
 	}
 
 	// 先注册任务
-	streamTask, err := l.eventManager.CreateTask(ctx, &bizchat.CreateTaskCommand{
-		ChatId: params.NotebookId.String(),
-		UserId: pkgcontext.GetUserId(ctx),
-	})
+	streamTask, err := l.eventManager.CreateTask(ctx,
+		&bizchat.CreateTaskCommand{
+			ChatId: params.ChatId.String(),
+			UserId: userId,
+		})
 	if err != nil {
 		return nil, errors.WithMessage(err, "create task failed")
 	}
 
-	chatId := params.NotebookId
+	chatId := params.ChatId
 	userMsgId, err := l.chatBiz.AddUserMessage(ctx, &bizchat.AddUserMessageCommand{
 		ChatId:  chatId,
-		UserId:  pkgcontext.GetUserId(ctx),
+		UserId:  userId,
 		Content: params.Prompt,
 	})
 	if err != nil {
@@ -139,7 +157,7 @@ func (l *Logic) CreateUserMessage(
 	// 启动后台处理流程
 	ctx = context.WithoutCancel(ctx)
 	l.wg.Add(1)
-	go l.processUserMessageTask(ctx, streamTask.Id, params.NotebookId, userMsgId, params)
+	go l.processUserMessageTask(ctx, targetChat, streamTask.Id, userMsgId, params)
 
 	return &CreateUserMessageResult{
 		MsgId:  userMsgId,
@@ -203,19 +221,24 @@ func (l *Logic) ListMessages(
 	}, nil
 }
 
-type RetrieveSourceDocsParams struct {
-	NotebookId uuid.UUID
-	Prompt     string
-	SourceIds  []uuid.UUID
+// 清除会话的上下文缓存
+func (l *Logic) ClearChatContext(
+	ctx context.Context,
+	chatId uuid.UUID,
+) error {
+	return nil
 }
 
-func (l *Logic) RetrieveSourceDocs(
+func (l *Logic) retrieveSourceDocs(
 	ctx context.Context,
-	params *RetrieveSourceDocsParams,
+	notebookId uuid.UUID,
+	prompt string,
+	sourceIds []uuid.UUID,
+	taskId string,
 ) ([]*model.SourceDoc, error) {
 	query := &bizsource.CheckSourceIdsQuery{
-		NotebookId: params.NotebookId,
-		SourceIds:  params.SourceIds,
+		NotebookId: notebookId,
+		SourceIds:  sourceIds,
 	}
 	existSourceIds, err := l.sourceBiz.CheckSourceIds(ctx, query)
 	if err != nil {
@@ -225,29 +248,45 @@ func (l *Logic) RetrieveSourceDocs(
 	if len(existSourceIds) == 0 {
 		return nil, errors.ErrParams.Msgf(
 			"no source ids found, notebook_id=%s, source_ids=%v",
-			params.NotebookId, params.SourceIds)
+			notebookId, sourceIds)
 	}
 
 	retrieved, err := l.sourceBiz.RetrieveSourceDocs(ctx,
 		&bizsource.RetrieveSourceDocsQuery{
-			NotebookId: params.NotebookId,
+			NotebookId: notebookId,
 			SourceIds:  existSourceIds,
-			Query:      params.Prompt,
+			Query:      prompt,
 			Count:      conf.Global().Logic.Chat.GetSourceDocsRecallCount(),
 		})
 	if err != nil {
 		return nil, errors.WithMessage(err, "recall source docs failed")
 	}
 
-	slog.DebugContext(ctx, fmt.Sprintf("successfully recalled %d source docs", len(retrieved)))
+	slog.DebugContext(ctx,
+		fmt.Sprintf("successfully retrieved %d source docs", len(retrieved)),
+		slog.String("task_id", taskId),
+		slog.String("notebook_id", notebookId.String()),
+	)
 
 	return retrieved, nil
 }
 
+func (l *Logic) DeleteChatContext(
+	ctx context.Context,
+	chatId uuid.UUID,
+) error {
+	err := l.chatBiz.ClearChatContext(ctx, chatId)
+	if err != nil {
+		return errors.WithMessage(err, "clear chat context failed")
+	}
+
+	return nil
+}
+
 func (l *Logic) processUserMessageTask(
 	ctx context.Context,
+	chat *chatmodel.Chat,
 	taskId string,
-	chatId uuid.UUID,
 	msgId uuid.UUID,
 	params *CreateUserMessageParams,
 ) {
@@ -263,7 +302,7 @@ func (l *Logic) processUserMessageTask(
 		}
 	}()
 
-	if !l.processCheckUserMessage(ctx, chatId, msgId) {
+	if !l.processCheckUserMessage(ctx, chat.Id, msgId) {
 		return
 	}
 
@@ -271,7 +310,7 @@ func (l *Logic) processUserMessageTask(
 	sessionState := &chatSessionState{
 		id:             0, // accumulated id
 		taskId:         taskId,
-		chatId:         chatId,
+		chatId:         chat.Id,
 		userId:         userId,
 		enableThinking: params.EnableThinking,
 	}
@@ -282,7 +321,7 @@ func (l *Logic) processUserMessageTask(
 	}
 	selectedSourcDocs, ok := l.processCheckSourceDocs(
 		ctx,
-		params.NotebookId,
+		chat.NotebookId,
 		params.Prompt,
 		params.SourceIds,
 		taskId,
@@ -295,29 +334,41 @@ func (l *Logic) processUserMessageTask(
 		l.emitRetrievingStreamEvent(ctx, sessionState)
 	}
 
-	contextMsgs, ok := l.processCheckGetMessageContext(ctx, chatId)
+	contextMsgs, ok := l.processCheckGetMessageContext(ctx, chat.Id)
 	if !ok {
 		return
 	}
 
-	chatAgent := l.buildNewChatAgent(sessionState)
-	answer, err := chatAgent.produceAnswer(ctx, chatId, contextMsgs)
+	chatLLM, err := l.llmGateway.GetProvider(
+		conf.Global().Logic.Chat.ModelProvider,
+	)
+	if err != nil {
+		slog.ErrorContext(ctx, "get chat llm failed",
+			slog.String("chat_id", chat.Id.String()),
+			slog.String("model_provider", conf.Global().Logic.Chat.ModelProvider.String()),
+			slog.Any("err", err),
+		)
+		return
+	}
+
+	chatAgent := l.buildNewChatAgent(chatLLM, sessionState)
+	answer, err := chatAgent.Generate(ctx, contextMsgs)
 	if err != nil {
 		slog.ErrorContext(ctx, "chat agent loop failed",
-			slog.String("chat_id", chatId.String()),
+			slog.String("chat_id", chat.Id.String()),
 			slog.Any("err", err),
 		)
 	}
 
-	if finalErr := l.finalizingProcess(
+	if err := l.finalizingProcess(
 		ctx,
 		sessionState,
 		answer,
 		err,
-	); finalErr != nil {
+	); err != nil {
 		slog.ErrorContext(ctx, "finalizing process failed",
-			slog.String("chat_id", chatId.String()),
-			slog.Any("err", finalErr),
+			slog.String("chat_id", chat.Id.String()),
+			slog.Any("err", err),
 		)
 	}
 }
@@ -378,16 +429,11 @@ func (l *Logic) processCheckSourceDocs(
 		return nil, false
 	}
 
-	sourceDocs, err := l.RetrieveSourceDocs(ctx,
-		&RetrieveSourceDocsParams{
-			NotebookId: notebookId,
-			Prompt:     prompt,
-			SourceIds:  sourceIds,
-		})
+	sourceDocs, err := l.retrieveSourceDocs(ctx, notebookId, prompt, sourceIds, taskId)
 	if err != nil {
-		slog.ErrorContext(ctx, "chat logicrecall source docs failed",
+		slog.ErrorContext(ctx, "chat logic retrieve source docs failed",
+			slog.String("task_id", taskId),
 			slog.String("notebook_id", notebookId.String()),
-			slog.Int("source_docs_count", len(sourceDocs)),
 			slog.Any("err", err),
 		)
 
@@ -418,20 +464,35 @@ func (l *Logic) finalizingProcess(
 	ctx context.Context,
 	state *chatSessionState,
 	answerMsg *einoschema.Message,
-	finalErr error,
+	answerErr error,
 ) error {
-	if finalErr != nil {
-		if errors.Is(finalErr, context.Canceled) {
+	if answerErr != nil {
+		if errors.Is(answerErr, context.Canceled) {
 			// 任务是手动取消的 不需要处理
-			slog.DebugContext(ctx, fmt.Sprintf("task is canceled, task_id=%s, chat_id=%s", state.taskId, state.chatId.String()))
+			slog.DebugContext(ctx,
+				fmt.Sprintf("task is canceled, task_id=%s, chat_id=%s",
+					state.taskId, state.chatId.String()),
+			)
 			return nil
 		}
+
+		slog.WarnContext(ctx, "chat agent loop failed",
+			slog.String("chat_id", state.chatId.String()),
+			slog.Any("err", answerErr),
+		)
+
+		const errorContent = "生成失败，请重试"
+
+		defer func() {
+			l.emitErrorFinishStreamEvent(ctx, state, errorContent, chatmodel.FinishReasonStop)
+			l.finalizingProcessClean(ctx, state)
+		}()
 
 		_, err := l.chatBiz.AddAssistantSystemMessage(ctx,
 			&bizchat.AddAssistantSystemMessageCommand{
 				ChatId:  state.chatId,
 				UserId:  state.userId,
-				Content: "生成失败，请重试",
+				Content: errorContent,
 			})
 		if err != nil {
 			slog.ErrorContext(ctx, "add assistant system message failed",
@@ -467,16 +528,23 @@ func (l *Logic) finalizingProcess(
 		)
 	}
 
-	ttl := conf.Global().Logic.Chat.GetTaskTimeout()
-
 	// 先写入最后一个block
-	l.emitFinishStreamEvent(
+	l.emitNormalFinishStreamEvent(
 		ctx,
 		state,
 		chatmodel.FinishReason(answerMsg.ResponseMeta.FinishReason),
 	)
+	l.finalizingProcessClean(ctx, state)
 
-	if err = l.eventManager.SetEventStreamTTL(ctx, state.taskId, ttl); err != nil {
+	return nil
+}
+
+func (l *Logic) finalizingProcessClean(
+	ctx context.Context,
+	state *chatSessionState,
+) {
+	ttl := conf.Global().Logic.Chat.GetTaskTimeout()
+	if err := l.eventManager.SetEventStreamTTL(ctx, state.taskId, ttl); err != nil {
 		slog.ErrorContext(ctx, "set event stream ttl failed",
 			slog.String("task_id", state.taskId),
 			slog.Any("err", err),
@@ -484,7 +552,7 @@ func (l *Logic) finalizingProcess(
 	}
 
 	// 最后设置任务状态为finish
-	if err = l.eventManager.UpdateTaskStatus(
+	if err := l.eventManager.UpdateTaskStatus(
 		ctx,
 		state.taskId,
 		chatmodel.MessageStreamTaskStatusFinished,
@@ -495,27 +563,33 @@ func (l *Logic) finalizingProcess(
 			slog.Any("err", err),
 		)
 	}
-
-	return nil
 }
 
-func (l *Logic) buildNewChatAgent(sessionState *chatSessionState) *agent[*chatSessionState] {
+func (l *Logic) buildNewChatAgent(
+	chatLLM einomodel.ToolCallingChatModel,
+	sessionState *chatSessionState,
+) *bizagent.Agent[*chatSessionState] {
 	var (
-		maxRound    = 10
-		agentConfig = agentConfig[*chatSessionState]{
-			maxRound:       maxRound,
-			llm:            l.llm,
-			options:        llmchat.BuildThinkingOptions(&conf.Global().ChatModel, sessionState.enableThinking),
-			beforeChat:     l.agentBeforeChatHook,
-			beforeRound:    l.agentBeforeRoundHook,
-			msgAppender:    l.agentMessageAppender,
-			onReasoning:    l.agentOnReasoningHook,
-			onReasoningEnd: l.agentOnReasoningEndHook,
-			onContent:      l.agentOnContentHook,
+		maxRound = 10
+		options  = llmchat.BuildThinkingOptions(
+			conf.Global().Logic.Chat.ModelProvider,
+			sessionState.enableThinking,
+		)
+
+		agentConfig = bizagent.AgentConfig[*chatSessionState]{
+			MaxRound:       maxRound,
+			LLM:            chatLLM,
+			Options:        options,
+			BeforeChat:     l.agentBeforeChatHook,
+			BeforeRound:    l.agentBeforeRoundHook,
+			MsgAppender:    l.agentMessageAppender,
+			OnReasoning:    l.agentOnReasoningHook,
+			OnReasoningEnd: l.agentOnReasoningEndHook,
+			OnContent:      l.agentOnContentHook,
 		}
 	)
 
-	agent := newAgent(agentConfig, sessionState)
+	agent := bizagent.NewAgent(agentConfig, sessionState)
 
 	// TODO bind tools if needed
 
@@ -525,12 +599,12 @@ func (l *Logic) buildNewChatAgent(sessionState *chatSessionState) *agent[*chatSe
 // 每一轮的所有消息都写入上下文
 func (l *Logic) agentMessageAppender(
 	ctx context.Context,
-	chatId uuid.UUID,
+	state *chatSessionState,
 	newMsgs []*einoschema.Message,
 ) {
-	if err := l.chatBiz.AppendContextMessage(ctx, chatId, newMsgs); err != nil {
+	if err := l.chatBiz.AppendContextMessage(ctx, state.chatId, newMsgs); err != nil {
 		slog.ErrorContext(ctx, "append context message failed",
-			slog.String("chat_id", chatId.String()),
+			slog.String("chat_id", state.chatId.String()),
 			slog.Any("err", err),
 		)
 	}
@@ -704,7 +778,7 @@ func (l *Logic) emitAnswerStreamEvent(
 }
 
 // 流式输出完成 结束流式输出
-func (l *Logic) emitFinishStreamEvent(
+func (l *Logic) emitNormalFinishStreamEvent(
 	ctx context.Context,
 	state *chatSessionState,
 	finishReason chatmodel.FinishReason,
@@ -718,6 +792,30 @@ func (l *Logic) emitFinishStreamEvent(
 		Phase: &chatmodel.MessageStreamPhaseData{
 			Type:   chatmodel.MessageStreamPhaseAnswer,
 			Status: chatmodel.MessageStreamFinished,
+		},
+	}
+
+	l.emitStreamEvent(ctx, state, event)
+}
+
+// 流式输出中途出错 结束流式输出
+func (l *Logic) emitErrorFinishStreamEvent(
+	ctx context.Context,
+	state *chatSessionState,
+	content string,
+	finishReason chatmodel.FinishReason,
+) {
+	timestamp := time.Now().Unix()
+	event := &chatmodel.MessageStreamEvent{
+		Id:           state.nextId(),
+		Timestamp:    timestamp,
+		Finished:     true,
+		FinishReason: finishReason,
+		Phase: &chatmodel.MessageStreamPhaseData{
+			Type:    chatmodel.MessageStreamPhaseAnswer,
+			Status:  chatmodel.MessageStreamFinished,
+			Action:  chatmodel.MessageStreamPhaseContentActionOverride,
+			Content: content,
 		},
 	}
 

@@ -22,14 +22,15 @@ import (
 )
 
 func (s *Server) registerChatRoutes(g *route.RouterGroup) {
-	g.GET("/chat/message/list", s.ListChatMessages)
-	g.POST("/chat/message/create", s.ChatCreateMessage)
-	g.POST("/chat/stream/abort", s.ChatAbortStream)
-	g.GET("/chat/stream", middleware.SlowRequestThreshold(60*time.Second), s.GetChatStream) // sse api
+	g.GET("/chat/:id/message/list", s.ListChatMessages)
+	g.POST("/chat/:id/message/create", s.ChatCreateMessage)
+	g.POST("/chat/:id/stream/abort", s.ChatAbortStream)
+	g.GET("/chat/:id/stream", middleware.SlowRequestThreshold(60*time.Second), s.GetChatStream) // sse api
+	g.DELETE("/chat/:id/context", s.DeleteChatContext)
 }
 
 type ChatCreateMessageRequest struct {
-	NotebookId     uuid.UUID   `json:"notebook_id,required"`
+	Id             uuid.UUID   `path:"id,required"`
 	Prompt         string      `json:"prompt,required"`
 	SourceIds      []uuid.UUID `json:"source_ids"`
 	EnableThinking bool        `json:"enable_thinking"`
@@ -55,7 +56,7 @@ func (s *Server) ChatCreateMessage(ctx context.Context, c *app.RequestContext) {
 
 	result, err := s.chatLogic.CreateUserMessage(ctx,
 		&chatlogic.CreateUserMessageParams{
-			NotebookId:     req.NotebookId,
+			ChatId:         req.Id,
 			Prompt:         req.Prompt,
 			SourceIds:      req.SourceIds,
 			EnableThinking: req.EnableThinking,
@@ -72,7 +73,7 @@ func (s *Server) ChatCreateMessage(ctx context.Context, c *app.RequestContext) {
 }
 
 type ChatAbortStreamRequest struct {
-	ChatId uuid.UUID `json:"chat_id,required"`
+	Id     uuid.UUID `path:"id,required"`
 	TaskId string    `json:"task_id,required"`
 }
 
@@ -86,7 +87,7 @@ func (s *Server) ChatAbortStream(ctx context.Context, c *app.RequestContext) {
 
 	if err := s.chatLogic.AbortStreamTask(ctx,
 		&chatlogic.AbortStreamTaskParams{
-			ChatId: req.ChatId,
+			ChatId: req.Id,
 			TaskId: req.TaskId,
 		}); err != nil {
 		http.ErrResp(c, err)
@@ -97,7 +98,7 @@ func (s *Server) ChatAbortStream(ctx context.Context, c *app.RequestContext) {
 }
 
 type GetChatStreamRequest struct {
-	ChatId       uuid.UUID `query:"chat_id,required"`
+	Id           uuid.UUID `path:"id,required"` // chat id
 	TaskId       string    `query:"task_id,required"`
 	LastStreamId string    `query:"last_stream_id"`
 }
@@ -117,7 +118,7 @@ func (s *Server) GetChatStream(ctx context.Context, c *app.RequestContext) {
 
 	result, err := s.chatLogic.GetStreamTask(ctx,
 		&chatlogic.GetStreamTaskParams{
-			ChatId:       req.ChatId,
+			ChatId:       req.Id,
 			TaskId:       req.TaskId,
 			LastStreamId: req.LastStreamId,
 		})
@@ -166,7 +167,7 @@ consumeLoop:
 }
 
 type ListChatMessagesRequest struct {
-	ChatId uuid.UUID `query:"chat_id,required"`
+	Id     uuid.UUID `path:"id,required"`
 	Cursor int64     `query:"cursor" validate:"min=0"`
 	Limit  int       `query:"limit"  validate:"omitempty,min=1,max=100"`
 }
@@ -226,7 +227,7 @@ func (s *Server) ListChatMessages(ctx context.Context, c *app.RequestContext) {
 
 	result, err := s.chatLogic.ListMessages(ctx,
 		&chatlogic.ListMessagesParams{
-			ChatId: req.ChatId,
+			ChatId: req.Id,
 			Cursor: req.Cursor,
 			Limit:  req.Limit,
 		})
@@ -306,4 +307,25 @@ func toListChatMessageCitationResponse(citation []*chatmodel.Citation) []*ListCh
 	}
 
 	return items
+}
+
+type DeleteChatContextRequest struct {
+	Id uuid.UUID `path:"id,required"`
+}
+
+func (s *Server) DeleteChatContext(ctx context.Context, c *app.RequestContext) {
+	var req DeleteChatContextRequest
+	err := c.BindAndValidate(&req)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	err = s.chatLogic.DeleteChatContext(ctx, req.Id)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	http.OkResp(c, nil)
 }

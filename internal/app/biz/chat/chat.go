@@ -19,18 +19,24 @@ import (
 
 type Id = uuid.UUID
 
-var ErrChatMessageNotFound = errors.New("chat message not found")
+var (
+	ErrChatMessageNotFound = errors.New("chat message not found")
+	ErrChatNotFound        = errors.New("chat not found")
+)
 
 type Biz struct {
+	chatStore    dal.ChatStore                 // chat store
 	messageStore dal.ChatMessageStore          // chat message store
 	contextStore cache.ChatContextMessageCache // chat context message cache store
 }
 
 func New(
+	chatStore dal.ChatStore,
 	messageStore dal.ChatMessageStore,
 	contextStore cache.ChatContextMessageCache,
 ) *Biz {
 	return &Biz{
+		chatStore:    chatStore,
 		messageStore: messageStore,
 		contextStore: contextStore,
 	}
@@ -135,6 +141,99 @@ func (b *Biz) createAssistantMessage(
 	}
 
 	return msgId, nil
+}
+
+type CreateChatCommand struct {
+	NotebookId Id
+	UserId     string
+}
+
+func (b *Biz) CreateChat(
+	ctx context.Context,
+	cmd *CreateChatCommand,
+) (*chatmodel.Chat, error) {
+	chatId := uuid.NewV7()
+
+	chat := &dalschema.Chat{
+		Id:         chatId,
+		NotebookId: cmd.NotebookId,
+		OwnerId:    cmd.UserId,
+		UpdatedAt:  time.Now().UnixMilli(),
+	}
+
+	err := b.chatStore.Create(ctx, chat)
+	if err != nil {
+		return nil, errors.WithMessage(err, "create chat failed")
+	}
+	return chatmodel.NewChat(chat), nil
+}
+
+func (b *Biz) GetChat(
+	ctx context.Context,
+	chatId Id,
+) (*chatmodel.Chat, error) {
+	chat, err := b.chatStore.GetById(ctx, chatId)
+	if err != nil {
+		if errors.Is(err, errors.ErrNoRecord) {
+			return nil, ErrChatNotFound
+		}
+
+		return nil, errors.WithMessage(err, "get chat failed")
+	}
+
+	return chatmodel.NewChat(chat), nil
+}
+
+type CreateIfAbsentCommand struct {
+	NotebookId Id
+	UserId     string
+}
+
+func (b *Biz) CreateIfAbsent(
+	ctx context.Context,
+	cmd *CreateIfAbsentCommand,
+) (*chatmodel.Chat, error) {
+	chat, err := b.chatStore.GetByNotebookIdAndOwnerId(ctx, cmd.NotebookId, cmd.UserId)
+	if err != nil {
+		if !errors.Is(err, errors.ErrNoRecord) {
+			return nil, errors.WithMessage(err, "get chat failed")
+		}
+
+		// create if not exists
+		return b.CreateChat(ctx, &CreateChatCommand{
+			NotebookId: cmd.NotebookId,
+			UserId:     cmd.UserId,
+		})
+
+	}
+
+	return chatmodel.NewChat(chat), nil
+}
+
+type GetUserNotebookChatQuery struct {
+	NotebookId Id
+	UserId     string
+}
+
+// 获取用户在指定notebook下的会话
+func (b *Biz) GetUserNotebookChat(
+	ctx context.Context,
+	query *GetUserNotebookChatQuery,
+) (*chatmodel.Chat, error) {
+	chat, err := b.chatStore.GetByNotebookIdAndOwnerId(
+		ctx,
+		query.NotebookId,
+		query.UserId,
+	)
+	if err != nil {
+		if errors.Is(err, errors.ErrNoRecord) {
+			return nil, ErrChatNotFound
+		}
+
+		return nil, errors.WithMessage(err, "get chat failed")
+	}
+
+	return chatmodel.NewChat(chat), nil
 }
 
 type AddUserMessageCommand struct {
@@ -362,4 +461,16 @@ func (b *Biz) ListContextMessages(
 	}
 
 	return einoMsgs, nil
+}
+
+func (b *Biz) ClearChatContext(
+	ctx context.Context,
+	chatId Id,
+) error {
+	err := b.contextStore.Destroy(ctx, chatId.String())
+	if err != nil {
+		return errors.WithMessage(err, "clear chat context failed")
+	}
+
+	return nil
 }

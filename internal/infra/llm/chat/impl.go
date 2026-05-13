@@ -12,13 +12,14 @@ import (
 
 func New(
 	ctx context.Context,
-	cfg *Config,
+	providerType Type,
+	cfg *ProviderConfig,
 ) (model.ToolCallingChatModel, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("config must not be nil")
 	}
 
-	switch cfg.Type {
+		switch providerType {
 	case DeepSeek:
 		return deepseek.NewChatModel(ctx, cfg.DeepSeek.ToEino())
 	case Openai:
@@ -26,6 +27,6 @@ func New(
 	case Qwen:
 		return qwen.NewChatModel(ctx, cfg.Qwen.ToEino())
 	default:
-		return nil, fmt.Errorf("model type %q is not supported", cfg.Type)
+		return nil, fmt.Errorf("model type %q is not supported", providerType)
 	}
 }

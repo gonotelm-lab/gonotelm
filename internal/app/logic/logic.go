@@ -9,7 +9,7 @@ import (
 	chatlogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infra"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/mq"
 	mqimpl "github.com/gonotelm-lab/gonotelm/internal/infra/mq/impl"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/mq/impl/kafka"
@@ -29,8 +29,11 @@ func MustNewLogic(
 ) *Logic {
 	// biz instances initialization
 	var (
-		notebookBiz      = biznotebook.New(infrastructures.Dal.NotebookStore)
-		chatBiz          = bizchat.New(infrastructures.Dal.ChatMessageStore, infrastructures.Cache.ChatMessageContextCache)
+		notebookBiz = biznotebook.New(infrastructures.Dal.NotebookStore)
+		chatBiz     = bizchat.New(
+			infrastructures.Dal.ChatStore,
+			infrastructures.Dal.ChatMessageStore,
+			infrastructures.Cache.ChatMessageContextCache)
 		chatEventManager = bizchat.NewChatEventManager(infrastructures.Cache.ChatMessageStreamCache)
 	)
 
@@ -46,6 +49,7 @@ func MustNewLogic(
 	notebookLogic := NewNotebookLogic(
 		notebookBiz,
 		sourceBiz,
+		chatBiz,
 	)
 
 	sourceLogic := MustNewSourceLogic(
@@ -55,13 +59,13 @@ func MustNewLogic(
 		sourceBiz,
 	)
 
-	llm, err := chat.New(ctx, &conf.Global().ChatModel)
+	gateway, err := gateway.New(&conf.Global().Provider)
 	if err != nil {
 		panic(err)
 	}
 
 	chatLogic := chatlogic.MustNewLogic(
-		llm,
+		gateway,
 		notebookBiz,
 		sourceBiz,
 		chatBiz,

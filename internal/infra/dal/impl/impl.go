@@ -36,6 +36,7 @@ func New(t Type, cfg *sql.Config) (*dal.DAL, error) {
 
 			NotebookStore:    postgres.NewNotebookStoreImpl(db),
 			SourceStore:      postgres.NewSourceStoreImpl(db),
+			ChatStore:        postgres.NewChatStoreImpl(db),
 			ChatMessageStore: postgres.NewChatMessageStoreImpl(db),
 		}, nil
 	}

@@ -3,9 +3,11 @@ package logic
 import (
 	"context"
 
+	bizchat "github.com/gonotelm-lab/gonotelm/internal/app/biz/chat"
 	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
+	chatmodel "github.com/gonotelm-lab/gonotelm/internal/app/model/chat"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
@@ -14,15 +16,18 @@ import (
 type NotebookLogic struct {
 	notebookBiz *biznotebook.Biz
 	sourceBiz   *bizsource.Biz
+	chatBiz     *bizchat.Biz
 }
 
 func NewNotebookLogic(
 	notebookBiz *biznotebook.Biz,
 	sourceBiz *bizsource.Biz,
+	chatBiz *bizchat.Biz,
 ) *NotebookLogic {
 	return &NotebookLogic{
 		notebookBiz: notebookBiz,
 		sourceBiz:   sourceBiz,
+		chatBiz:     chatBiz,
 	}
 }
 
@@ -213,4 +218,21 @@ func (l *NotebookLogic) UpdateNotebookDesc(
 	}
 
 	return nil
+}
+
+func (l *NotebookLogic) GetOrCreateNotebookChat(
+	ctx context.Context,
+	id uuid.UUID,
+) (*chatmodel.Chat, error) {
+	userId := pkgcontext.GetUserId(ctx)
+	chat, err := l.chatBiz.CreateIfAbsent(ctx,
+		&bizchat.CreateIfAbsentCommand{
+			NotebookId: id,
+			UserId:     userId,
+		})
+	if err != nil {
+		return nil, errors.WithMessage(err, "create notebook chat failed")
+	}
+
+	return chat, nil
 }

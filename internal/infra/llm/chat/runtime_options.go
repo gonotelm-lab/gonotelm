@@ -10,18 +10,16 @@ import (
 )
 
 // BuildThinkingOptions builds per-request model options for thinking behavior.
-func BuildThinkingOptions(modelCfg *Config, enableThinking bool) []einomodel.Option {
-	if modelCfg == nil {
-		return nil
-	}
-
-	switch modelCfg.Type {
+func BuildThinkingOptions(
+	providerType Type,
+	enableThinking bool,
+) []einomodel.Option {
+	switch providerType {
 	case Openai:
 		if !enableThinking {
 			return nil
 		}
-		effort := normalizeOpenAIReasoningEffort(modelCfg.Openai.ReasoningEffort)
-		return []einomodel.Option{openaiext.WithReasoningEffort(effort)}
+		return []einomodel.Option{openaiext.WithReasoningEffort(openaiext.ReasoningEffortLevelHigh)}
 	case Qwen:
 		return []einomodel.Option{qwenext.WithEnableThinking(enableThinking)}
 	case DeepSeek:

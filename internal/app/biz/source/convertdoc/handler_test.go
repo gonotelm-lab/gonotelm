@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/cloudwego/eino/schema"
+	convertdoctransformer "github.com/gonotelm-lab/gonotelm/internal/app/biz/source/convertdoc/transformer"
 )
 
 func testLenFn(s string) int {
@@ -13,7 +14,7 @@ func testLenFn(s string) int {
 }
 
 func TestChunkTransformer_Transform_LogHTML(t *testing.T) {
-	transformer := NewChunkTransformer(200, 20, testLenFn)
+	transformer := convertdoctransformer.NewChunkTransformer(200, 20, testLenFn)
 	htmlContent := strings.Join([]string{
 		"<h1>GonoteLM 介绍</h1>",
 		"<p>这是一段用于测试 HTML 分块效果的文本。我们希望看到分块后每个 chunk 的 id、metadata 和内容预览。</p>",
@@ -23,17 +24,21 @@ func TestChunkTransformer_Transform_LogHTML(t *testing.T) {
 		"<p>" + strings.Repeat("这里继续补充一些段落文本。", 16) + "</p>",
 	}, "\n")
 
-	input := attachChunkSplitMethod(&schema.Document{
+	input := &schema.Document{
 		ID:      "html_doc",
 		Content: htmlContent,
 		MetaData: map[string]any{
 			"source_kind": "file",
 		},
-	}, chunkHtmlSplitMethod)
+	}
 
 	logInputSummary(t, "HTML", input.Content, []string{"h1: GonoteLM 介绍", "h2: 核心能力", "h2: 更多信息"})
 
-	chunks, err := transformer.Transform(context.Background(), []*schema.Document{input})
+	chunks, err := transformer.Transform(
+		context.Background(),
+		[]*schema.Document{input},
+		convertdoctransformer.WithChunkSplitMethod(convertdoctransformer.ChunkHtmlSplitMethod),
+	)
 	if err != nil {
 		t.Logf("transform html error: %v", err)
 		return
@@ -43,7 +48,7 @@ func TestChunkTransformer_Transform_LogHTML(t *testing.T) {
 }
 
 func TestChunkTransformer_Transform_LogMarkdown(t *testing.T) {
-	transformer := NewChunkTransformer(200, 20, testLenFn)
+	transformer := convertdoctransformer.NewChunkTransformer(200, 20, testLenFn)
 	markdownContent := strings.Join([]string{
 		"# 文档标题",
 		"这是一段 markdown 的正文内容，用于观察 header splitter 的分块情况。",
@@ -58,13 +63,13 @@ func TestChunkTransformer_Transform_LogMarkdown(t *testing.T) {
 		strings.Repeat("子节内容。", 18),
 	}, "\n")
 
-	input := attachChunkSplitMethod(&schema.Document{
+	input := &schema.Document{
 		ID:      "md_doc",
 		Content: markdownContent,
 		MetaData: map[string]any{
 			"source_kind": "text",
 		},
-	}, chunkMarkdownSplitMethod)
+	}
 
 	logInputSummary(
 		t,
@@ -73,7 +78,11 @@ func TestChunkTransformer_Transform_LogMarkdown(t *testing.T) {
 		[]string{"# 文档标题", "## 第一部分", "## 第二部分", "### 第二部分-子节"},
 	)
 
-	chunks, err := transformer.Transform(context.Background(), []*schema.Document{input})
+	chunks, err := transformer.Transform(
+		context.Background(),
+		[]*schema.Document{input},
+		convertdoctransformer.WithChunkSplitMethod(convertdoctransformer.ChunkMarkdownSplitMethod),
+	)
 	if err != nil {
 		t.Logf("transform markdown error: %v", err)
 		return
@@ -83,7 +92,7 @@ func TestChunkTransformer_Transform_LogMarkdown(t *testing.T) {
 }
 
 func TestChunkTransformer_Transform_LogRecursiveFallback(t *testing.T) {
-	transformer := NewChunkTransformer(120, 10, testLenFn)
+	transformer := convertdoctransformer.NewChunkTransformer(120, 10, testLenFn)
 	input := &schema.Document{
 		ID:      "fallback_doc",
 		Content: strings.Repeat("没有显式设置分块方式时会走 recursive fallback。", 30),

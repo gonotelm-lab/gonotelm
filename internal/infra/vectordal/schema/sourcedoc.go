@@ -41,6 +41,12 @@ type SourceDocBatchDeleteParams struct {
 	SourceId   []string
 }
 
+type SourceDocGetParams struct {
+	NotebookId string
+	SourceId   string
+	DocId      string
+}
+
 type SourceDocQueryParams struct {
 	// Target notebook id
 	NotebookId string

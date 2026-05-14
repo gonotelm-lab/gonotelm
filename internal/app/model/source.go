@@ -7,6 +7,10 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal/schema"
 )
 
+type FromBytes interface {
+	From(b []byte) error
+}
+
 type SourceKind string
 
 const (
@@ -55,8 +59,8 @@ func (s SourceKind) Supported() bool {
 }
 
 type Source struct {
-	Id          Id    `json:"id"`
-	NotebookId  Id    `json:"notebook_id"`
+	Id          Id           `json:"id"`
+	NotebookId  Id           `json:"notebook_id"`
 	Kind        SourceKind   `json:"kind"`
 	Status      SourceStatus `json:"status"`
 	DisplayName string       `json:"display_name"`
@@ -153,6 +157,8 @@ type TextSourceContent struct {
 	Text string `json:"text"`
 }
 
+var _ FromBytes = (*TextSourceContent)(nil)
+
 func (t *TextSourceContent) From(b []byte) error {
 	return sonic.Unmarshal(b, t)
 }
@@ -160,6 +166,8 @@ func (t *TextSourceContent) From(b []byte) error {
 type UrlSourceContent struct {
 	Url string `json:"url"`
 }
+
+var _ FromBytes = (*UrlSourceContent)(nil)
 
 func (u *UrlSourceContent) From(b []byte) error {
 	return sonic.Unmarshal(b, u)
@@ -174,6 +182,8 @@ type FileSourceContent struct {
 
 	Url string `json:"-"` // output usage
 }
+
+var _ FromBytes = (*FileSourceContent)(nil)
 
 func (f *FileSourceContent) From(b []byte) error {
 	return sonic.Unmarshal(b, f)

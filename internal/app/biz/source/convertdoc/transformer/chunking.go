@@ -1,4 +1,4 @@
-package convertdoc
+package transformer
 
 import (
 	"context"
@@ -18,7 +18,10 @@ func splitDocIdGenerator(ctx context.Context, originalID string, splitIndex int)
 	return uuid.NewV4().String()
 }
 
-type LenCalulator func(string) int
+type LenCalculator func(string) int
+
+// 保留旧命名兼容历史调用。
+type LenCalulator = LenCalculator
 
 type ChunkTransformer struct {
 	html      document.Transformer
@@ -27,10 +30,10 @@ type ChunkTransformer struct {
 
 	chunkSize   int
 	overlapSize int
-	lenFn       LenCalulator
+	lenFn       LenCalculator
 }
 
-func NewChunkTransformer(chunkSize, overlapSize int, lenFn LenCalulator) *ChunkTransformer {
+func NewChunkTransformer(chunkSize, overlapSize int, lenFn LenCalculator) *ChunkTransformer {
 	ctx := context.Background()
 	ht, _ := einohtml.NewHeaderSplitter(ctx, &einohtml.HeaderConfig{
 		IDGenerator: func(ctx context.Context, originalID string, splitIndex int) string {
@@ -94,51 +97,75 @@ func (t *ChunkTransformer) Transform(
 	docs []*schema.Document,
 	opts ...document.TransformerOption,
 ) ([]*schema.Document, error) {
+	splitMethod := GetChunkSplitMethodOption(opts...)
 	ret := make([]*schema.Document, 0, len(docs))
 
 	for _, doc := range docs {
-		var (
-			tmpRets         []*schema.Document
-			err             error
-			secondCheckDocs = []*schema.Document{}
-		)
-
-		switch getChunkSplitMethod(doc) {
-		case chunkHtmlSplitMethod:
-			var tmpDocs []*schema.Document
-			tmpDocs, err = t.html.Transform(ctx, []*schema.Document{doc}, opts...)
-			secondCheckDocs = append(secondCheckDocs, tmpDocs...)
-		case chunkMarkdownSplitMethod:
-			var tmpDocs []*schema.Document
-			tmpDocs, err = t.markdown.Transform(ctx, []*schema.Document{doc}, opts...)
-			secondCheckDocs = append(secondCheckDocs, tmpDocs...)
-		default:
-			tmpRets, err = t.recursive.Transform(ctx, []*schema.Document{doc}, opts...)
-		}
+		docChunks, err := t.splitDoc(ctx, doc, splitMethod, opts...)
 		if err != nil {
 			return nil, errors.Wrap(err, "chunk transformer transform failed")
 		}
-
-		if len(secondCheckDocs) > 0 {
-			for _, doc := range secondCheckDocs {
-				if t.lenFn(doc.Content) > t.chunkSize {
-					// do it again
-					docAgain, err := t.recursive.Transform(ctx, []*schema.Document{doc}, opts...)
-					if err != nil {
-						return nil, errors.Wrap(err, "chunk transformer transform failed")
-					}
-					ret = append(ret, docAgain...)
-				} else {
-					ret = append(ret, doc)
-				}
-			}
-		} else {
-			ret = append(ret, tmpRets...)
-		}
+		ret = append(ret, docChunks...)
 	}
 
 	// filter empty chunks
-	ret = filterEmptyDocs(ret)
+	return filterEmptyDocs(ret), nil
+}
+
+func (t *ChunkTransformer) splitDoc(
+	ctx context.Context,
+	doc *schema.Document,
+	splitMethod string,
+	opts ...document.TransformerOption,
+) ([]*schema.Document, error) {
+	splitDocs, needSecondCheck, err := t.splitByMethod(ctx, doc, splitMethod, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	if !needSecondCheck {
+		return splitDocs, nil
+	}
+
+	return t.applyRecursiveFallback(ctx, splitDocs, opts...)
+}
+
+func (t *ChunkTransformer) splitByMethod(
+	ctx context.Context,
+	doc *schema.Document,
+	splitMethod string,
+	opts ...document.TransformerOption,
+) (docs []*schema.Document, needSecondCheck bool, err error) {
+	switch normalizeChunkSplitMethod(splitMethod) {
+	case ChunkHtmlSplitMethod:
+		docs, err = t.html.Transform(ctx, []*schema.Document{doc}, opts...)
+		return docs, true, err
+	case ChunkMarkdownSplitMethod:
+		docs, err = t.markdown.Transform(ctx, []*schema.Document{doc}, opts...)
+		return docs, true, err
+	default:
+		docs, err = t.recursive.Transform(ctx, []*schema.Document{doc}, opts...)
+		return docs, false, err
+	}
+}
+
+func (t *ChunkTransformer) applyRecursiveFallback(
+	ctx context.Context,
+	docs []*schema.Document,
+	opts ...document.TransformerOption,
+) ([]*schema.Document, error) {
+	ret := make([]*schema.Document, 0, len(docs))
+	for _, doc := range docs {
+		if t.lenFn(doc.Content) > t.chunkSize {
+			docAgain, err := t.recursive.Transform(ctx, []*schema.Document{doc}, opts...)
+			if err != nil {
+				return nil, err
+			}
+			ret = append(ret, docAgain...)
+			continue
+		}
+		ret = append(ret, doc)
+	}
 	return ret, nil
 }
 

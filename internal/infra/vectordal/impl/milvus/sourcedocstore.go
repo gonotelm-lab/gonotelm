@@ -29,6 +29,8 @@ const (
 
 	notebookIDTemplateKey = "notebook_id"
 	sourceIDsTemplateKey  = "source_ids"
+	sourceIDTemplateKey   = "source_id"
+	docIDTemplateKey      = "doc_id"
 )
 
 type SourceDocStoreImpl struct {
@@ -203,6 +205,66 @@ func (s *SourceDocStoreImpl) BatchDelete(
 	}
 
 	return nil
+}
+
+func (s *SourceDocStoreImpl) Get(
+	ctx context.Context,
+	params *schema.SourceDocGetParams,
+) (*schema.SourceDoc, error) {
+	if params == nil {
+		return nil, errors.ErrParams.Msg("get source doc params is nil")
+	}
+
+	notebookID := strings.TrimSpace(params.NotebookId)
+	sourceID := strings.TrimSpace(params.SourceId)
+	docID := strings.TrimSpace(params.DocId)
+	if notebookID == "" {
+		return nil, errors.ErrParams.Msg("notebook id is empty")
+	}
+	if sourceID == "" {
+		return nil, errors.ErrParams.Msg("source id is empty")
+	}
+	if docID == "" {
+		return nil, errors.ErrParams.Msg("doc id is empty")
+	}
+
+	partitionName := partitionNameByNotebookID(notebookID)
+	filterExpr := fmt.Sprintf(
+		`%s == {%s} && %s == {%s} && %s == {%s}`,
+		schema.FieldNotebookID, notebookIDTemplateKey,
+		schema.FieldSourceID, sourceIDTemplateKey,
+		schema.FieldID, docIDTemplateKey,
+	)
+
+	opt := milvusclient.NewQueryOption(collectionName).
+		WithPartitions(partitionName).
+		WithLimit(1).
+		WithOutputFields(
+			schema.FieldID,
+			schema.FieldNotebookID,
+			schema.FieldSourceID,
+			schema.FieldContent,
+			schema.FieldOwner,
+		).
+		WithFilter(filterExpr).
+		WithTemplateParam(notebookIDTemplateKey, notebookID).
+		WithTemplateParam(sourceIDTemplateKey, sourceID).
+		WithTemplateParam(docIDTemplateKey, docID)
+
+	rs, err := s.cli.Query(ctx, opt)
+	if err != nil {
+		return nil, errors.WithMessage(err, "query source doc failed")
+	}
+
+	docs, err := extractSourceDocsFromResultSet(rs)
+	if err != nil {
+		return nil, errors.WithMessage(err, "decode source doc query result failed")
+	}
+	if len(docs) == 0 {
+		return nil, errors.ErrNoRecord.Msg("source doc not found")
+	}
+
+	return docs[0], nil
 }
 
 func (s *SourceDocStoreImpl) Query(

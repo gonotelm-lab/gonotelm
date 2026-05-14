@@ -153,6 +153,49 @@ func (l *SourceLogic) GetSource(
 	return source, nil
 }
 
+type GetSourceDocParams struct {
+	SourceId uuid.UUID
+	DocId    string
+}
+
+type GetSourceDocResult struct {
+	SourceId    string
+	DocId       string
+	SourceTitle string
+	Content     string
+}
+
+func (l *SourceLogic) GetSourceDoc(
+	ctx context.Context,
+	params *GetSourceDocParams,
+) (*GetSourceDocResult, error) {
+	userId := pkgcontext.GetUserId(ctx)
+
+	source, err := l.GetSource(ctx, params.SourceId)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "get source failed, source_id=%s", params.SourceId)
+	}
+	if source.OwnerId != userId {
+		return nil, errors.ErrPermission.Msg("source access denied")
+	}
+
+	doc, err := l.sourceBiz.GetSourceDoc(ctx, &bizsource.GetSourceDocQuery{
+		NotebookId: source.NotebookId,
+		SourceId:   source.Id,
+		DocId:      params.DocId,
+	})
+	if err != nil {
+		return nil, errors.WithMessagef(err, "get source doc failed, source_id=%s, doc_id=%s", source.Id, params.DocId)
+	}
+
+	return &GetSourceDocResult{
+		SourceId:    source.Id.String(),
+		DocId:       doc.Id,
+		SourceTitle: source.DisplayName,
+		Content:     doc.Content,
+	}, nil
+}
+
 type UploadSourceParams struct {
 	SourceId uuid.UUID
 	Filename string
@@ -332,6 +375,7 @@ func (l *SourceLogic) pollFileSourceStatus(
 			err = errors.WithMessagef(err, "stat object failed, key=%s", fileSource.StoreKey)
 			return
 		}
+		err = nil
 	} else {
 		// uploaded, make it preparing
 		err = l.notifySourceEventMessage(ctx, source)

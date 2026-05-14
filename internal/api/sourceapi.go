@@ -19,6 +19,7 @@ func (s *Server) registerSourcesRoutes(g *route.RouterGroup) {
 	g.POST("/source/:id/status", s.PollSourceStatus)       // check source processing status
 	g.POST("/source/:id/reload", s.RetrySourcePreparation) // retry source preparation
 	g.DELETE("/source/:id", s.DeleteSource)
+	g.GET("/source/:id/doc/:doc_id", s.GetSourceDoc)
 }
 
 type CreateSourceRequest struct {
@@ -211,4 +212,42 @@ func (s *Server) DeleteSource(ctx context.Context, c *app.RequestContext) {
 	}
 
 	http.OkResp(c, nil)
+}
+
+type GetSourceDocRequest struct {
+	Id    uuid.UUID `path:"id,required"` // source id
+	DocId string    `path:"doc_id,required"`
+}
+
+type GetSourceDocResponse struct {
+	SourceId    string `json:"source_id"`
+	DocId       string `json:"doc_id"`
+	SourceTitle string `json:"source_title"`
+	Content     string `json:"content"`
+}
+
+// 获取来源的文档片段
+func (s *Server) GetSourceDoc(ctx context.Context, c *app.RequestContext) {
+	var req GetSourceDocRequest
+	err := c.BindAndValidate(&req)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	doc, err := s.sourceLogic.GetSourceDoc(ctx, &logic.GetSourceDocParams{
+		SourceId: req.Id,
+		DocId:    req.DocId,
+	})
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	http.OkResp(c, &GetSourceDocResponse{
+		SourceId:    doc.SourceId,
+		DocId:       doc.DocId,
+		SourceTitle: doc.SourceTitle,
+		Content:     doc.Content,
+	})
 }

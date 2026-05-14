@@ -375,6 +375,33 @@ type RetrieveSourceDocsQuery struct {
 	Count      int
 }
 
+type GetSourceDocQuery struct {
+	NotebookId uuid.UUID
+	SourceId   uuid.UUID
+	DocId      string
+}
+
+func (b *Biz) GetSourceDoc(
+	ctx context.Context,
+	query *GetSourceDocQuery,
+) (*model.SourceDoc, error) {
+	doc, err := b.sourceDocStore.Get(ctx, &vecschema.SourceDocGetParams{
+		NotebookId: query.NotebookId.String(),
+		SourceId:   query.SourceId.String(),
+		DocId:      query.DocId,
+	})
+	if err != nil {
+		return nil, errors.WithMessage(err, "get source doc failed")
+	}
+
+	sourceDoc, err := model.NewSourceDoc(doc)
+	if err != nil {
+		return nil, errors.WithMessage(err, "new source doc failed")
+	}
+
+	return sourceDoc, nil
+}
+
 // 召回来源片段
 func (b *Biz) RetrieveSourceDocs(
 	ctx context.Context,

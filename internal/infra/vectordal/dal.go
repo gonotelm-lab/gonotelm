@@ -11,6 +11,7 @@ import (
 type SourceDocStore interface {
 	BatchInsert(ctx context.Context, docs []*schema.SourceDoc) error
 	BatchDelete(ctx context.Context, params *schema.SourceDocBatchDeleteParams) error
+	Get(ctx context.Context, params *schema.SourceDocGetParams) (*schema.SourceDoc, error)
 	Query(ctx context.Context, params *schema.SourceDocQueryParams) ([]*schema.SourceDoc, error)
 }
 

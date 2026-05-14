@@ -1,86 +1,32 @@
 package convertdoc
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"log/slog"
 	"maps"
-	"path/filepath"
-	"strings"
 
+	convertdoctransformer "github.com/gonotelm-lab/gonotelm/internal/app/biz/source/convertdoc/transformer"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/token"
 
 	"github.com/cloudwego/eino/components/document"
-	"github.com/cloudwego/eino/components/document/parser"
+	einoparser "github.com/cloudwego/eino/components/document/parser"
 	"github.com/cloudwego/eino/schema"
+)
+
+const (
+	parserMetaSourceObjKey        = "_gonotelm_source_obj"
+	parserMetaSourceIdKey         = "_gonotelm_source_id"
+	parserMetaSourceNotebookIdKey = "_gonotelm_source_notebook_id"
+	parserMetaSourceKindKey       = "_gonotelm_source_kind"
 )
 
 type HandlerConfig struct {
 	ChunkSize   int
 	OverlapSize int
-}
-
-// parsing + chunking
-type commonHandler struct {
-	name         string
-	parser       parser.Parser // 最好统一parse成markdown格式
-	transformers []document.Transformer
-}
-
-func (p *commonHandler) doHandle(
-	ctx context.Context,
-	source *model.Source,
-	r io.Reader,
-	parseOpts ...parser.Option,
-) ([]*schema.Document, error) {
-	var (
-		docs []*schema.Document
-		err  error
-	)
-
-	docs, err = p.parser.Parse(ctx, r, append(parseOpts, withParseSource(source))...) // 此处统一注入source
-	if err != nil {
-		return nil, errors.Wrapf(err, "parse document failed, id=%s, pipeline=%s", source.Id, p.name)
-	}
-
-	customMetas := make(map[string]any)
-	customMetas[parserMetaSourceObjKey] = source
-	customMetas[parserMetaSourceIdKey] = source.Id
-	customMetas[parserMetaSourceNotebookIdKey] = source.NotebookId
-	customMetas[parserMetaSourceKindKey] = source.Kind
-
-	// 对每个doc注入source
-	for _, doc := range docs {
-		if doc.MetaData == nil {
-			doc.MetaData = make(map[string]any)
-		}
-		maps.Copy(doc.MetaData, customMetas)
-	}
-
-	for idx, transformer := range p.transformers {
-		if transformer != nil {
-			docs, err = transformer.Transform(ctx, docs)
-			if err != nil {
-				slog.WarnContext(ctx,
-					fmt.Sprintf("source handle pipeline %s transformer[%d] failed", p.name, idx),
-					"source_id", source.Id, "err", err, "pipeline_name", p.name)
-				continue
-			}
-		}
-	}
-
-	return docs, nil
-}
-
-func defaultDocTransformer(c HandlerConfig) []document.Transformer {
-	return []document.Transformer{
-		NewChunkTransformer(c.ChunkSize, c.OverlapSize, token.EstimateToken),
-	}
 }
 
 type HandleResult struct {
@@ -93,114 +39,99 @@ type Handler interface {
 	Handle(ctx context.Context, s *model.Source) (*HandleResult, error)
 }
 
-var (
-	_ Handler = (*TextHandler)(nil)
-	_ Handler = (*UrlHandler)(nil)
-	_ Handler = (*FileObjectHandler)(nil)
-)
-
-type TextHandler struct {
-	impl *commonHandler
+// parsing + chunking
+type commonHandler struct {
+	name         string
+	parser       einoparser.Parser // 最好统一parse成markdown格式
+	transformers []document.Transformer
 }
 
-func NewTextHandler(c HandlerConfig) *TextHandler {
-	parser := parser.TextParser{}
-
-	return &TextHandler{
-		impl: &commonHandler{
-			name:         "text-pipe",
-			parser:       parser,
-			transformers: defaultDocTransformer(c),
-		},
+func newCommonHandler(name string, docParser einoparser.Parser, c HandlerConfig) *commonHandler {
+	return &commonHandler{
+		name:         name,
+		parser:       docParser,
+		transformers: defaultDocTransformer(c),
 	}
 }
 
-func (e *TextHandler) Handle(ctx context.Context, s *model.Source) (*HandleResult, error) {
-	ts := model.TextSourceContent{}
-	err := ts.From(s.Content)
+func (h *commonHandler) doHandle(
+	ctx context.Context,
+	source *model.Source,
+	r io.Reader,
+	parseOpts []einoparser.Option,
+	transformOpts ...document.TransformerOption,
+) ([]*schema.Document, error) {
+	docs, err := h.parse(ctx, r, parseOpts...)
 	if err != nil {
-		return nil, errors.Wrap(errors.ErrSerde, "unmarshal text source content failed")
+		return nil, errors.Wrapf(err, "parse document failed, id=%s, pipeline=%s", source.Id, h.name)
 	}
 
-	docs, err := e.impl.doHandle(ctx, s, strings.NewReader(ts.Text))
-	if err != nil {
-		return nil, errors.Wrap(err, "handle text source failed")
+	h.injectSourceMeta(source, docs)
+	docs = h.transform(ctx, source, docs, transformOpts...)
+	return docs, nil
+}
+
+func (h *commonHandler) parse(
+	ctx context.Context,
+	r io.Reader,
+	parseOpts ...einoparser.Option,
+) ([]*schema.Document, error) {
+	return h.parser.Parse(ctx, r, parseOpts...)
+}
+
+func (h *commonHandler) injectSourceMeta(
+	source *model.Source,
+	docs []*schema.Document,
+) {
+	customMetas := map[string]any{
+		parserMetaSourceObjKey:        source,
+		parserMetaSourceIdKey:         source.Id,
+		parserMetaSourceNotebookIdKey: source.NotebookId,
+		parserMetaSourceKindKey:       source.Kind,
 	}
-
-	return &HandleResult{Docs: docs}, nil
-}
-
-type UrlHandler struct {
-	impl *commonHandler
-}
-
-func NewUrlHandler(c HandlerConfig) *UrlHandler {
-	parser := parser.TextParser{}
-	// TODO
-	return &UrlHandler{
-		impl: &commonHandler{
-			name:         "url-pipe",
-			parser:       parser,
-			transformers: defaultDocTransformer(c),
-		},
-	}
-}
-
-func (e *UrlHandler) Handle(ctx context.Context, s *model.Source) (*HandleResult, error) {
-	us := model.UrlSourceContent{}
-	err := us.From(s.Content)
-	if err != nil {
-		return nil, errors.Wrap(errors.ErrSerde, "unmarshal url source content failed")
-	}
-
-	return nil, errors.New("not implemented")
-}
-
-type FileObjectHandler struct {
-	objectStorage storage.Storage
-	impl          *commonHandler
-}
-
-func NewFileObjectHandler(c HandlerConfig, objectStorage storage.Storage) *FileObjectHandler {
-	return &FileObjectHandler{
-		objectStorage: objectStorage,
-		impl: &commonHandler{
-			name:         "file-object-pipe",
-			parser:       &fileObjectParser{},
-			transformers: defaultDocTransformer(c),
-		},
+	for _, doc := range docs {
+		if doc.MetaData == nil {
+			doc.MetaData = make(map[string]any)
+		}
+		maps.Copy(doc.MetaData, customMetas)
 	}
 }
 
-func (e *FileObjectHandler) Handle(ctx context.Context, s *model.Source) (*HandleResult, error) {
-	fs := model.FileSourceContent{}
-	err := fs.From(s.Content)
-	if err != nil {
-		return nil, errors.Wrap(errors.ErrSerde, "unmarshal file source content failed")
-	}
-
-	// load object
-	obj, err := e.objectStorage.GetObject(ctx, &storage.GetObjectRequest{
-		Key: fs.StoreKey,
-	})
-	if err != nil {
-		if errors.Is(err, storage.ErrObjectNotFound) {
-			slog.ErrorContext(ctx, "file source object not found", "store_key", fs.StoreKey)
-			return &HandleResult{}, nil
+func (h *commonHandler) transform(
+	ctx context.Context,
+	source *model.Source,
+	docs []*schema.Document,
+	opts ...document.TransformerOption,
+) []*schema.Document {
+	for idx, transformer := range h.transformers {
+		if transformer == nil {
+			continue
 		}
 
-		return nil, errors.Wrap(err, "get file source object failed")
+		newDocs, err := transformer.Transform(ctx, docs, opts...)
+		if err != nil {
+			slog.WarnContext(ctx,
+				fmt.Sprintf("source handle pipeline %s transformer[%d] failed", h.name, idx),
+				"source_id", source.Id, "err", err, "pipeline_name", h.name)
+			continue
+		}
+
+		docs = newDocs
 	}
 
-	reader := bytes.NewReader(obj.Body)
-	docs, err := e.impl.doHandle(
-		ctx, s, reader,
-		withParseFileMime(fs.Format),
-		withParseFileExt(filepath.Ext(fs.Filename)),
-	)
-	if err != nil {
-		return nil, errors.Wrap(err, "handle file source failed")
+	return docs
+}
+
+func defaultDocTransformer(c HandlerConfig) []document.Transformer {
+	return []document.Transformer{
+		convertdoctransformer.NewChunkTransformer(c.ChunkSize, c.OverlapSize, token.EstimateToken),
+	}
+}
+
+func decodeSourceContent(content []byte, decoder model.FromBytes, errMsg string) error {
+	if err := decoder.From(content); err != nil {
+		return errors.Wrap(errors.ErrSerde, errMsg)
 	}
 
-	return &HandleResult{Docs: docs}, nil
+	return nil
 }

@@ -26,7 +26,10 @@ func OpenPgSqlWithLogger(config *Config, logger gormlogger.Interface) (*gorm.DB,
 	if logger == nil {
 		logger = NewSlogGormLogger(nil)
 	}
-	gormConfig := &gorm.Config{Logger: logger}
+	gormConfig := &gorm.Config{
+		Logger:      logger,
+		QueryFields: true,
+	}
 	db, err := gorm.Open(postgres.Open(dsn), gormConfig)
 	if err != nil {
 		return nil, err

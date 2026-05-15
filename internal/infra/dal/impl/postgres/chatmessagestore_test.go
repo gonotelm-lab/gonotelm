@@ -39,7 +39,7 @@ func TestChatMessageStoreCreateListDeleteByChatId(t *testing.T) {
 		So(store.Create(ctx, msgOld), ShouldBeNil)
 		So(store.Create(ctx, msgNew), ShouldBeNil)
 		t.Cleanup(func() {
-			_ = testDB.WithContext(ctx).Exec(`DELETE FROM chat_messages WHERE chat_id = ?`, chatID).Error
+			_ = testDB.WithContext(ctx).Where("chat_id = ?", chatID).Delete(&schema.ChatMessage{}).Error
 		})
 
 		gotByID, err := store.GetById(ctx, msgNew.Id)
@@ -70,10 +70,10 @@ func TestChatMessageStoreCreateListDeleteByChatId(t *testing.T) {
 		So(err, ShouldBeNil)
 
 		var count int64
-		err = testDB.WithContext(ctx).Raw(
-			`SELECT COUNT(1) FROM chat_messages WHERE chat_id = ?`,
-			chatID,
-		).Scan(&count).Error
+		err = testDB.WithContext(ctx).
+			Model(&schema.ChatMessage{}).
+			Where("chat_id = ?", chatID).
+			Count(&count).Error
 		So(err, ShouldBeNil)
 		So(count, ShouldEqual, int64(0))
 	})
@@ -131,7 +131,7 @@ func TestChatMessageStoreListByChatIdPagination(t *testing.T) {
 		So(store.Create(ctx, msgOld), ShouldBeNil)
 		So(store.Create(ctx, msgNew), ShouldBeNil)
 		t.Cleanup(func() {
-			_ = testDB.WithContext(ctx).Exec(`DELETE FROM chat_messages WHERE chat_id = ?`, chatID).Error
+			_ = testDB.WithContext(ctx).Where("chat_id = ?", chatID).Delete(&schema.ChatMessage{}).Error
 		})
 
 		firstPage, err := store.ListByChatId(ctx, chatID, 1, 0)
@@ -178,7 +178,7 @@ func TestChatMessageStoreListByChatIdBeforeSeqNoIncludesExtra(t *testing.T) {
 		So(store.Create(ctx, msgOld), ShouldBeNil)
 		So(store.Create(ctx, msgNew), ShouldBeNil)
 		t.Cleanup(func() {
-			_ = testDB.WithContext(ctx).Exec(`DELETE FROM chat_messages WHERE chat_id = ?`, chatID).Error
+			_ = testDB.WithContext(ctx).Where("chat_id = ?", chatID).Delete(&schema.ChatMessage{}).Error
 		})
 
 		rows, err := store.ListByChatIdBeforeSeqNo(ctx, chatID, 3000, 10)

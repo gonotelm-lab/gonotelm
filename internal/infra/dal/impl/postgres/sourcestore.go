@@ -25,29 +25,23 @@ func NewSourceStoreImpl(db *gorm.DB) *SourceStoreImpl {
 }
 
 func (s *SourceStoreImpl) Create(ctx context.Context, source *schema.Source) error {
-	tx := s.db.WithContext(ctx).Exec(
-		"INSERT INTO sources (id, notebook_id, kind, status, display_name, content, owner_id, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-		source.Id, source.NotebookId, source.Kind, source.Status, source.DisplayName, source.Content, source.OwnerId, source.UpdatedAt,
-	)
-	if tx.Error != nil {
-		return sql.WrapErr(tx.Error)
+	if err := s.db.WithContext(ctx).Create(source).Error; err != nil {
+		return sql.WrapErr(err)
 	}
 
 	return nil
 }
 
 func (s *SourceStoreImpl) GetById(ctx context.Context, id dal.Id) (*schema.Source, error) {
-	source, err := gorm.G[*schema.Source](s.db).
-		Raw(
-			"SELECT id, notebook_id, kind, status, display_name, content, owner_id, updated_at FROM sources WHERE id = ? LIMIT 1",
-			id,
-		).
-		First(ctx)
+	var source schema.Source
+	err := s.db.WithContext(ctx).
+		Where("id = ?", id).
+		Take(&source).Error
 	if err != nil {
 		return nil, sql.WrapErr(err)
 	}
 
-	return source, nil
+	return &source, nil
 }
 
 func (s *SourceStoreImpl) CountByNotebookId(
@@ -56,12 +50,9 @@ func (s *SourceStoreImpl) CountByNotebookId(
 ) (int64, error) {
 	var count int64
 	err := s.db.WithContext(ctx).
-		Raw(
-			"SELECT COUNT(1) FROM sources WHERE notebook_id = ? AND status <> ?",
-			notebookId,
-			schema.SourceStatusInited,
-		).
-		Scan(&count).Error
+		Model(&schema.Source{}).
+		Where("notebook_id = ? AND status <> ?", notebookId, schema.SourceStatusInited).
+		Count(&count).Error
 	if err != nil {
 		return 0, sql.WrapErr(err)
 	}
@@ -78,15 +69,13 @@ func (s *SourceStoreImpl) ListByNotebookId(
 		return nil, xerror.ErrParams.Msgf("invalid pagination params: limit=%d offset=%d", limit, offset)
 	}
 
-	rows, err := gorm.G[*schema.Source](s.db).
-		Raw(
-			"SELECT id, notebook_id, kind, status, display_name, content, owner_id, updated_at FROM sources WHERE notebook_id = ? AND status <> ? ORDER BY updated_at DESC LIMIT ? OFFSET ?",
-			notebookId,
-			schema.SourceStatusInited,
-			limit,
-			offset,
-		).
-		Find(ctx)
+	var rows []*schema.Source
+	err := s.db.WithContext(ctx).
+		Where("notebook_id = ? AND status <> ?", notebookId, schema.SourceStatusInited).
+		Order("updated_at DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&rows).Error
 	if err != nil {
 		return nil, sql.WrapErr(err)
 	}
@@ -95,46 +84,69 @@ func (s *SourceStoreImpl) ListByNotebookId(
 }
 
 func (s *SourceStoreImpl) DeleteById(ctx context.Context, id dal.Id) error {
-	tx := s.db.WithContext(ctx).Exec("DELETE FROM sources WHERE id = ?", id)
-	if tx.Error != nil {
-		return sql.WrapErr(tx.Error)
+	if err := s.db.WithContext(ctx).Where("id = ?", id).Delete(&schema.Source{}).Error; err != nil {
+		return sql.WrapErr(err)
 	}
 
 	return nil
 }
 
 func (s *SourceStoreImpl) DeleteByNotebookId(ctx context.Context, notebookId dal.Id) error {
-	tx := s.db.WithContext(ctx).Exec(
-		"DELETE FROM sources WHERE notebook_id = ?",
-		notebookId,
-	)
-
-	if tx.Error != nil {
-		return sql.WrapErr(tx.Error)
+	if err := s.db.WithContext(ctx).
+		Where("notebook_id = ?", notebookId).
+		Delete(&schema.Source{}).Error; err != nil {
+		return sql.WrapErr(err)
 	}
 
 	return nil
 }
 
-func (s *SourceStoreImpl) UpdateStatus(ctx context.Context, id dal.Id, status string) error {
-	tx := s.db.WithContext(ctx).Exec(
-		"UPDATE sources SET status = ? WHERE id = ?",
-		status, id)
-
-	if tx.Error != nil {
-		return sql.WrapErr(tx.Error)
+func (s *SourceStoreImpl) UpdateStatus(
+	ctx context.Context,
+	params *schema.SourceUpdateStatusParams,
+) error {
+	if err := s.db.WithContext(ctx).
+		Model(&schema.Source{}).
+		Where("id = ?", params.Id).
+		Updates(map[string]any{
+			"status":     params.Status,
+			"updated_at": params.UpdatedAt,
+		}).Error; err != nil {
+		return sql.WrapErr(err)
 	}
 
 	return nil
 }
 
 func (s *SourceStoreImpl) Update(ctx context.Context, params *schema.SourceUpdateParams) error {
-	tx := s.db.WithContext(ctx).Exec(
-		"UPDATE sources SET status = ?, display_name = ?, content = ?, updated_at = ? WHERE id = ?",
-		params.Status, params.DisplayName, params.Content, params.UpdatedAt, params.Id)
+	err := s.db.WithContext(ctx).
+		Model(&schema.Source{}).
+		Where("id = ?", params.Id).
+		Updates(map[string]any{
+			"status":       params.Status,
+			"display_name": params.DisplayName,
+			"content":      params.Content,
+			"updated_at":   params.UpdatedAt,
+		}).Error
+	if err != nil {
+		return sql.WrapErr(err)
+	}
 
-	if tx.Error != nil {
-		return sql.WrapErr(tx.Error)
+	return nil
+}
+
+func (s *SourceStoreImpl) UpdateParsedContent(
+	ctx context.Context,
+	params *schema.SourceUpdateParsedContentParams,
+) error {
+	if err := s.db.WithContext(ctx).
+		Model(&schema.Source{}).
+		Where("id = ?", params.Id).
+		Updates(map[string]any{
+			"parsed_content": params.ParsedContent,
+			"updated_at":     params.UpdatedAt,
+		}).Error; err != nil {
+		return sql.WrapErr(err)
 	}
 
 	return nil
@@ -146,12 +158,10 @@ func (s *SourceStoreImpl) ListByIds(ctx context.Context, ids []dal.Id) ([]*schem
 		ids,
 		sourceIDsQueryBatchSize,
 		func(ctx context.Context, batch []dal.Id) ([]*schema.Source, error) {
-			rows, err := gorm.G[*schema.Source](s.db).
-				Raw(
-					"SELECT id, notebook_id, kind, status, display_name, content, owner_id, updated_at FROM sources WHERE id IN ?",
-					batch,
-				).
-				Find(ctx)
+			var rows []*schema.Source
+			err := s.db.WithContext(ctx).
+				Where("id IN ?", batch).
+				Find(&rows).Error
 			if err != nil {
 				return nil, sql.WrapErr(err)
 			}
@@ -170,13 +180,10 @@ func (s *SourceStoreImpl) ListByNotebookIdAndIds(
 		ids,
 		sourceIDsQueryBatchSize,
 		func(ctx context.Context, batch []dal.Id) ([]*schema.Source, error) {
-			rows, err := gorm.G[*schema.Source](s.db).
-				Raw(
-					"SELECT id, notebook_id, kind, status, display_name, content, owner_id, updated_at FROM sources WHERE notebook_id = ? AND id IN ?",
-					notebookId,
-					batch,
-				).
-				Find(ctx)
+			var rows []*schema.Source
+			err := s.db.WithContext(ctx).
+				Where("notebook_id = ? AND id IN ?", notebookId, batch).
+				Find(&rows).Error
 			if err != nil {
 				return nil, sql.WrapErr(err)
 			}

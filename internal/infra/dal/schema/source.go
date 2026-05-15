@@ -7,14 +7,15 @@ const (
 )
 
 type Source struct {
-	Id          uuid.UUID `gorm:"column:id"`
-	NotebookId  uuid.UUID `gorm:"column:notebook_id"`
-	Kind        string    `gorm:"column:kind"`
-	Status      string    `gorm:"column:status"`
-	DisplayName string    `gorm:"column:display_name"`
-	Content     []byte    `gorm:"column:content"`
-	OwnerId     string    `gorm:"column:owner_id"`
-	UpdatedAt   int64     `gorm:"column:updated_at"`
+	Id            uuid.UUID `gorm:"column:id"`
+	NotebookId    uuid.UUID `gorm:"column:notebook_id"`
+	Kind          string    `gorm:"column:kind"`
+	Status        string    `gorm:"column:status"`
+	DisplayName   string    `gorm:"column:display_name"`
+	Content       []byte    `gorm:"column:content"`
+	ParsedContent []byte    `gorm:"column:parsed_content"`
+	OwnerId       string    `gorm:"column:owner_id"`
+	UpdatedAt     int64     `gorm:"column:updated_at"`
 }
 
 func (Source) TableName() string {
@@ -27,4 +28,16 @@ type SourceUpdateParams struct {
 	DisplayName string
 	Content     []byte
 	UpdatedAt   int64
+}
+
+type SourceUpdateStatusParams struct {
+	Id        uuid.UUID
+	Status    string
+	UpdatedAt int64
+}
+
+type SourceUpdateParsedContentParams struct {
+	Id            uuid.UUID
+	ParsedContent []byte
+	UpdatedAt     int64
 }

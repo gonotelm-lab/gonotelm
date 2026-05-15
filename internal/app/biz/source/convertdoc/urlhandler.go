@@ -12,12 +12,12 @@ import (
 var _ Handler = (*UrlHandler)(nil)
 
 type UrlHandler struct {
-	impl *commonHandler
+	impl *baseHandler
 }
 
 func NewUrlHandler(c HandlerConfig) *UrlHandler {
 	return &UrlHandler{
-		impl: newCommonHandler("url-pipe", einoparser.TextParser{}, c),
+		impl: newBaseHandler("url-pipe", einoparser.TextParser{}, c),
 	}
 }
 

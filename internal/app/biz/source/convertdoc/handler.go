@@ -7,9 +7,10 @@ import (
 	"log/slog"
 	"maps"
 
-	convertdoctransformer "github.com/gonotelm-lab/gonotelm/internal/app/biz/source/convertdoc/transformer"
+	"github.com/gonotelm-lab/gonotelm/internal/app/biz/source/convertdoc/transformer"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 	"github.com/gonotelm-lab/gonotelm/pkg/token"
 
 	"github.com/cloudwego/eino/components/document"
@@ -18,10 +19,14 @@ import (
 )
 
 const (
-	parserMetaSourceObjKey        = "_gonotelm_source_obj"
-	parserMetaSourceIdKey         = "_gonotelm_source_id"
-	parserMetaSourceNotebookIdKey = "_gonotelm_source_notebook_id"
-	parserMetaSourceKindKey       = "_gonotelm_source_kind"
+	markdownMimeType = "text/markdown"
+)
+
+const (
+	parserMetaSourceObjKey        = "source_obj"
+	parserMetaSourceIdKey         = "source_id"
+	parserMetaSourceNotebookIdKey = "source_notebook_id"
+	parserMetaSourceKindKey       = "source_kind"
 )
 
 type HandlerConfig struct {
@@ -31,6 +36,9 @@ type HandlerConfig struct {
 
 type HandleResult struct {
 	Docs []*schema.Document
+
+	ParsedContent     []byte
+	ParsedContentType string
 }
 
 // Handler handles the source content before doing the actual embedding
@@ -40,38 +48,41 @@ type Handler interface {
 }
 
 // parsing + chunking
-type commonHandler struct {
+type baseHandler struct {
 	name         string
 	parser       einoparser.Parser // 最好统一parse成markdown格式
 	transformers []document.Transformer
 }
 
-func newCommonHandler(name string, docParser einoparser.Parser, c HandlerConfig) *commonHandler {
-	return &commonHandler{
+func newBaseHandler(name string, docParser einoparser.Parser, c HandlerConfig) *baseHandler {
+	return &baseHandler{
 		name:         name,
 		parser:       docParser,
 		transformers: defaultDocTransformer(c),
 	}
 }
 
-func (h *commonHandler) doHandle(
+func (h *baseHandler) doHandle(
 	ctx context.Context,
 	source *model.Source,
 	r io.Reader,
 	parseOpts []einoparser.Option,
 	transformOpts ...document.TransformerOption,
-) ([]*schema.Document, error) {
+) ([]*schema.Document, []byte, error) {
+	// !note: make sure docs only contains one document
 	docs, err := h.parse(ctx, r, parseOpts...)
 	if err != nil {
-		return nil, errors.Wrapf(err, "parse document failed, id=%s, pipeline=%s", source.Id, h.name)
+		return nil, nil, errors.Wrapf(err, "parse document failed, id=%s, pipeline=%s", source.Id, h.name)
 	}
+
+	convertedDoc := docs[0].Content
 
 	h.injectSourceMeta(source, docs)
 	docs = h.transform(ctx, source, docs, transformOpts...)
-	return docs, nil
+	return docs, pkgstring.AsBytes(convertedDoc), nil
 }
 
-func (h *commonHandler) parse(
+func (h *baseHandler) parse(
 	ctx context.Context,
 	r io.Reader,
 	parseOpts ...einoparser.Option,
@@ -79,7 +90,7 @@ func (h *commonHandler) parse(
 	return h.parser.Parse(ctx, r, parseOpts...)
 }
 
-func (h *commonHandler) injectSourceMeta(
+func (h *baseHandler) injectSourceMeta(
 	source *model.Source,
 	docs []*schema.Document,
 ) {
@@ -97,7 +108,7 @@ func (h *commonHandler) injectSourceMeta(
 	}
 }
 
-func (h *commonHandler) transform(
+func (h *baseHandler) transform(
 	ctx context.Context,
 	source *model.Source,
 	docs []*schema.Document,
@@ -124,7 +135,7 @@ func (h *commonHandler) transform(
 
 func defaultDocTransformer(c HandlerConfig) []document.Transformer {
 	return []document.Transformer{
-		convertdoctransformer.NewChunkTransformer(c.ChunkSize, c.OverlapSize, token.EstimateToken),
+		transformer.NewChunkTransformer(c.ChunkSize, c.OverlapSize, token.EstimateToken),
 	}
 }
 

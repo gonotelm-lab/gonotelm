@@ -27,36 +27,23 @@ func (s *ChatMessageStoreImpl) Create(ctx context.Context, message *schema.ChatM
 		message.Id = uuid.NewV7()
 	}
 
-	tx := s.db.WithContext(ctx).Exec(
-		"INSERT INTO chat_messages (id, chat_id, user_id, msg_role, msg_type, content, seq_no, extra) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-		message.Id,
-		message.ChatId,
-		message.UserId,
-		message.MsgRole,
-		message.MsgType,
-		message.Content,
-		message.SeqNo,
-		message.Extra,
-	)
-	if tx.Error != nil {
-		return sql.WrapErr(tx.Error)
+	if err := s.db.WithContext(ctx).Create(message).Error; err != nil {
+		return sql.WrapErr(err)
 	}
 
 	return nil
 }
 
 func (s *ChatMessageStoreImpl) GetById(ctx context.Context, id dal.Id) (*schema.ChatMessage, error) {
-	row, err := gorm.G[*schema.ChatMessage](s.db).
-		Raw(
-			"SELECT id, chat_id, user_id, msg_role, msg_type, content, seq_no, extra FROM chat_messages WHERE id = ? LIMIT 1",
-			id,
-		).
-		First(ctx)
+	var row schema.ChatMessage
+	err := s.db.WithContext(ctx).
+		Where("id = ?", id).
+		Take(&row).Error
 	if err != nil {
 		return nil, sql.WrapErr(err)
 	}
 
-	return row, nil
+	return &row, nil
 }
 
 func (s *ChatMessageStoreImpl) GetByIdAndChatId(
@@ -64,18 +51,15 @@ func (s *ChatMessageStoreImpl) GetByIdAndChatId(
 	id dal.Id,
 	chatId dal.Id,
 ) (*schema.ChatMessage, error) {
-	row, err := gorm.G[*schema.ChatMessage](s.db).
-		Raw(
-			"SELECT id, chat_id, user_id, msg_role, msg_type, content, seq_no, extra FROM chat_messages WHERE id = ? AND chat_id = ? LIMIT 1",
-			id,
-			chatId,
-		).
-		First(ctx)
+	var row schema.ChatMessage
+	err := s.db.WithContext(ctx).
+		Where("id = ? AND chat_id = ?", id, chatId).
+		Take(&row).Error
 	if err != nil {
 		return nil, sql.WrapErr(err)
 	}
 
-	return row, nil
+	return &row, nil
 }
 
 func (s *ChatMessageStoreImpl) ListByChatId(
@@ -87,14 +71,13 @@ func (s *ChatMessageStoreImpl) ListByChatId(
 		return nil, xerror.ErrParams.Msgf("invalid pagination params: limit=%d offset=%d", limit, offset)
 	}
 
-	rows, err := gorm.G[*schema.ChatMessage](s.db).
-		Raw(
-			"SELECT id, chat_id, user_id, msg_role, msg_type, content, seq_no, extra FROM chat_messages WHERE chat_id = ? ORDER BY seq_no DESC LIMIT ? OFFSET ?",
-			chatId,
-			limit,
-			offset,
-		).
-		Find(ctx)
+	var rows []*schema.ChatMessage
+	err := s.db.WithContext(ctx).
+		Where("chat_id = ?", chatId).
+		Order("seq_no DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&rows).Error
 	if err != nil {
 		return nil, sql.WrapErr(err)
 	}
@@ -115,14 +98,12 @@ func (s *ChatMessageStoreImpl) ListByChatIdBeforeSeqNo(
 		return nil, xerror.ErrParams.Msgf("invalid cursor params: before_seq_no=%d", beforeSeqNo)
 	}
 
-	rows, err := gorm.G[*schema.ChatMessage](s.db).
-		Raw(
-			"SELECT id, chat_id, user_id, msg_role, msg_type, content, seq_no, extra FROM chat_messages WHERE chat_id = ? AND seq_no < ? ORDER BY seq_no DESC LIMIT ?",
-			chatId,
-			beforeSeqNo,
-			limit,
-		).
-		Find(ctx)
+	var rows []*schema.ChatMessage
+	err := s.db.WithContext(ctx).
+		Where("chat_id = ? AND seq_no < ?", chatId, beforeSeqNo).
+		Order("seq_no DESC").
+		Limit(limit).
+		Find(&rows).Error
 	if err != nil {
 		return nil, sql.WrapErr(err)
 	}
@@ -131,9 +112,10 @@ func (s *ChatMessageStoreImpl) ListByChatIdBeforeSeqNo(
 }
 
 func (s *ChatMessageStoreImpl) DeleteByChatId(ctx context.Context, chatId dal.Id) error {
-	tx := s.db.WithContext(ctx).Exec("DELETE FROM chat_messages WHERE chat_id = ?", chatId)
-	if tx.Error != nil {
-		return sql.WrapErr(tx.Error)
+	if err := s.db.WithContext(ctx).
+		Where("chat_id = ?", chatId).
+		Delete(&schema.ChatMessage{}).Error; err != nil {
+		return sql.WrapErr(err)
 	}
 
 	return nil

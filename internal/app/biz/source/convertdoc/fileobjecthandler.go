@@ -20,13 +20,13 @@ var _ Handler = (*FileObjectHandler)(nil)
 
 type FileObjectHandler struct {
 	objectStorage storage.Storage
-	impl          *commonHandler
+	baseHandler   *baseHandler
 }
 
 func NewFileObjectHandler(c HandlerConfig, objectStorage storage.Storage) *FileObjectHandler {
 	return &FileObjectHandler{
 		objectStorage: objectStorage,
-		impl:          newCommonHandler("file-object-pipe", &convertdocparser.FileObjectParser{}, c),
+		baseHandler:   newBaseHandler("file-object-pipe", &convertdocparser.FileObjectParser{}, c),
 	}
 }
 
@@ -45,7 +45,7 @@ func (e *FileObjectHandler) Handle(ctx context.Context, s *model.Source) (*Handl
 	}
 
 	parseOpts, transformOpts := fileConversionOptions(fs)
-	docs, err := e.impl.doHandle(
+	docs, converted, err := e.baseHandler.doHandle(
 		ctx,
 		s,
 		bytes.NewReader(objBody),
@@ -56,7 +56,11 @@ func (e *FileObjectHandler) Handle(ctx context.Context, s *model.Source) (*Handl
 		return nil, errors.Wrap(err, "handle file source failed")
 	}
 
-	return &HandleResult{Docs: docs}, nil
+	return &HandleResult{
+		Docs:              docs,
+		ParsedContent:     converted,
+		ParsedContentType: markdownMimeType,
+	}, nil
 }
 
 func fileConversionOptions(fs model.FileSourceContent) ([]einoparser.Option, []document.TransformerOption) {

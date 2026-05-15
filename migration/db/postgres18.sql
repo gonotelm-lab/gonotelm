@@ -40,6 +40,9 @@ COMMENT ON COLUMN sources.content IS 'source content payload (file source stores
 COMMENT ON COLUMN sources.owner_id IS 'source owner id';
 COMMENT ON COLUMN sources.updated_at IS 'source updated time (unix ms)';
 
+ALTER TABLE sources ADD COLUMN parsed_content BYTEA;
+COMMENT ON COLUMN sources.parsed_content IS 'source parsed content';
+
 CREATE TABLE chats (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   notebook_id UUID NOT NULL DEFAULT uuidv7(),

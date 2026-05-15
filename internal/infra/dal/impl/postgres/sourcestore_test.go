@@ -33,7 +33,7 @@ func TestSourceStoreCRUD(t *testing.T) {
 		err := store.Create(ctx, source)
 		So(err, ShouldBeNil)
 		t.Cleanup(func() {
-			_ = db.WithContext(ctx).Exec(`DELETE FROM sources WHERE id = ?`, source.Id).Error
+			_ = db.WithContext(ctx).Where("id = ?", source.Id).Delete(&schema.Source{}).Error
 		})
 
 		got, err := store.GetById(ctx, source.Id)
@@ -45,21 +45,27 @@ func TestSourceStoreCRUD(t *testing.T) {
 		So(got.Content, ShouldNotBeNil)
 		So(string(got.Content), ShouldEqual, content)
 
-		err = store.UpdateStatus(ctx, source.Id, "done")
+		newUpdatedAt := time.Now().UnixMilli()
+		err = store.UpdateStatus(ctx, &schema.SourceUpdateStatusParams{
+			Id:        source.Id,
+			Status:    "done",
+			UpdatedAt: newUpdatedAt,
+		})
 		So(err, ShouldBeNil)
 
 		gotAfterUpdate, err := store.GetById(ctx, source.Id)
 		So(err, ShouldBeNil)
 		So(strings.TrimSpace(gotAfterUpdate.Status), ShouldEqual, "done")
+		So(gotAfterUpdate.UpdatedAt, ShouldEqual, newUpdatedAt)
 
 		err = store.DeleteById(ctx, source.Id)
 		So(err, ShouldBeNil)
 
 		var count int64
-		err = db.WithContext(ctx).Raw(
-			`SELECT COUNT(1) FROM sources WHERE id = ?`,
-			source.Id,
-		).Scan(&count).Error
+		err = db.WithContext(ctx).
+			Model(&schema.Source{}).
+			Where("id = ?", source.Id).
+			Count(&count).Error
 		So(err, ShouldBeNil)
 		So(count, ShouldEqual, int64(0))
 	})
@@ -91,7 +97,7 @@ func TestSourceStoreListAndDeleteByNotebookId(t *testing.T) {
 		err = store.Create(ctx, srcNew)
 		So(err, ShouldBeNil)
 		t.Cleanup(func() {
-			_ = testDB.WithContext(ctx).Exec(`DELETE FROM sources WHERE notebook_id = ?`, notebookID).Error
+			_ = testDB.WithContext(ctx).Where("notebook_id = ?", notebookID).Delete(&schema.Source{}).Error
 		})
 
 		firstPage, err := store.ListByNotebookId(ctx, notebookID, 1, 0)
@@ -108,10 +114,10 @@ func TestSourceStoreListAndDeleteByNotebookId(t *testing.T) {
 		So(err, ShouldBeNil)
 
 		var count int64
-		err = testDB.WithContext(ctx).Raw(
-			`SELECT COUNT(1) FROM sources WHERE notebook_id = ?`,
-			notebookID,
-		).Scan(&count).Error
+		err = testDB.WithContext(ctx).
+			Model(&schema.Source{}).
+			Where("notebook_id = ?", notebookID).
+			Count(&count).Error
 		So(err, ShouldBeNil)
 		So(count, ShouldEqual, int64(0))
 	})
@@ -149,7 +155,7 @@ func TestSourceStoreListAndCountIgnoreInited(t *testing.T) {
 		So(store.Create(ctx, srcReady), ShouldBeNil)
 		So(store.Create(ctx, srcInited), ShouldBeNil)
 		t.Cleanup(func() {
-			_ = testDB.WithContext(ctx).Exec(`DELETE FROM sources WHERE notebook_id = ?`, notebookID).Error
+			_ = testDB.WithContext(ctx).Where("notebook_id = ?", notebookID).Delete(&schema.Source{}).Error
 		})
 
 		count, err := store.CountByNotebookId(ctx, notebookID)
@@ -199,7 +205,7 @@ func TestSourceStoreUpdate(t *testing.T) {
 		err := store.Create(ctx, source)
 		So(err, ShouldBeNil)
 		t.Cleanup(func() {
-			_ = testDB.WithContext(ctx).Exec(`DELETE FROM sources WHERE id = ?`, source.Id).Error
+			_ = testDB.WithContext(ctx).Where("id = ?", source.Id).Delete(&schema.Source{}).Error
 		})
 
 		updated := &schema.SourceUpdateParams{
@@ -216,6 +222,95 @@ func TestSourceStoreUpdate(t *testing.T) {
 		So(strings.TrimSpace(got.Status), ShouldEqual, updated.Status)
 		So(string(got.Content), ShouldEqual, string(updated.Content))
 		So(got.UpdatedAt, ShouldEqual, updated.UpdatedAt)
+	})
+}
+
+func TestSourceStoreParsedContentCompatibility(t *testing.T) {
+	Convey("SourceStore should keep parsed_content and owner_id compatible", t, func() {
+		store := testSourceStore
+		ctx := t.Context()
+		notebookID := createNotebookForSourceTest(t, testDB)
+
+		source := &schema.Source{
+			Id:            dal.Id(uuid.NewV7()),
+			NotebookId:    notebookID,
+			Kind:          "doc",
+			Status:        "new",
+			DisplayName:   "source-with-converted",
+			Content:       []byte("raw-content"),
+			ParsedContent: []byte("converted-content"),
+			OwnerId:       "owner_" + uuid.NewV7().String(),
+			UpdatedAt:     1000,
+		}
+
+		err := store.Create(ctx, source)
+		So(err, ShouldBeNil)
+		t.Cleanup(func() {
+			_ = testDB.WithContext(ctx).Where("id = ?", source.Id).Delete(&schema.Source{}).Error
+		})
+
+		created, err := store.GetById(ctx, source.Id)
+		So(err, ShouldBeNil)
+		So(created, ShouldNotBeNil)
+		So(string(created.ParsedContent), ShouldEqual, "converted-content")
+		So(created.OwnerId, ShouldEqual, source.OwnerId)
+
+		err = store.Update(ctx, &schema.SourceUpdateParams{
+			Id:          source.Id,
+			Status:      "ready",
+			DisplayName: "updated-name",
+			Content:     []byte("raw-content-updated"),
+			UpdatedAt:   2000,
+		})
+		So(err, ShouldBeNil)
+
+		updated, err := store.GetById(ctx, source.Id)
+		So(err, ShouldBeNil)
+		So(updated, ShouldNotBeNil)
+		// update path does not touch parsed_content/owner_id, they should remain stable.
+		So(string(updated.ParsedContent), ShouldEqual, "converted-content")
+		So(updated.OwnerId, ShouldEqual, source.OwnerId)
+	})
+}
+
+func TestSourceStoreUpdateParsedContent(t *testing.T) {
+	Convey("SourceStore UpdateParsedContent", t, func() {
+		store := testSourceStore
+		ctx := t.Context()
+		notebookID := createNotebookForSourceTest(t, testDB)
+
+		source := &schema.Source{
+			Id:            dal.Id(uuid.NewV7()),
+			NotebookId:    notebookID,
+			Kind:          "doc",
+			Status:        "ready",
+			DisplayName:   "source-update-converted",
+			Content:       []byte("raw-content"),
+			ParsedContent: []byte("converted-old"),
+			OwnerId:       "owner_" + uuid.NewV7().String(),
+			UpdatedAt:     1000,
+		}
+		So(store.Create(ctx, source), ShouldBeNil)
+		t.Cleanup(func() {
+			_ = testDB.WithContext(ctx).Where("id = ?", source.Id).Delete(&schema.Source{}).Error
+		})
+
+		newUpdatedAt := time.Now().UnixMilli()
+		err := store.UpdateParsedContent(ctx, &schema.SourceUpdateParsedContentParams{
+			Id:            source.Id,
+			ParsedContent: []byte("converted-new"),
+			UpdatedAt:     newUpdatedAt,
+		})
+		So(err, ShouldBeNil)
+
+		got, err := store.GetById(ctx, source.Id)
+		So(err, ShouldBeNil)
+		So(got, ShouldNotBeNil)
+		So(string(got.ParsedContent), ShouldEqual, "converted-new")
+		// ensure unrelated field is not overwritten.
+		So(string(got.Content), ShouldEqual, "raw-content")
+		So(got.OwnerId, ShouldEqual, source.OwnerId)
+		So(got.UpdatedAt, ShouldEqual, newUpdatedAt)
 	})
 }
 
@@ -241,7 +336,7 @@ func TestSourceStoreListByIds(t *testing.T) {
 		So(store.Create(ctx, src1), ShouldBeNil)
 		So(store.Create(ctx, src2), ShouldBeNil)
 		t.Cleanup(func() {
-			_ = testDB.WithContext(ctx).Exec(`DELETE FROM sources WHERE notebook_id = ?`, notebookID).Error
+			_ = testDB.WithContext(ctx).Where("notebook_id = ?", notebookID).Delete(&schema.Source{}).Error
 		})
 
 		rows, err := store.ListByIds(ctx, []dal.Id{src1.Id, src2.Id})
@@ -294,7 +389,7 @@ func TestSourceStoreListByIdsBatches(t *testing.T) {
 		So(store.Create(ctx, src2), ShouldBeNil)
 		So(store.Create(ctx, src3), ShouldBeNil)
 		t.Cleanup(func() {
-			_ = testDB.WithContext(ctx).Exec(`DELETE FROM sources WHERE notebook_id = ?`, notebookID).Error
+			_ = testDB.WithContext(ctx).Where("notebook_id = ?", notebookID).Delete(&schema.Source{}).Error
 		})
 
 		rows, err := store.ListByIds(ctx, []dal.Id{src1.Id, src2.Id, src3.Id})
@@ -356,8 +451,8 @@ func TestSourceStoreListByNotebookIdAndIds(t *testing.T) {
 		So(store.Create(ctx, src2), ShouldBeNil)
 		So(store.Create(ctx, srcOther), ShouldBeNil)
 		t.Cleanup(func() {
-			_ = testDB.WithContext(ctx).Exec(`DELETE FROM sources WHERE notebook_id = ?`, notebookID).Error
-			_ = testDB.WithContext(ctx).Exec(`DELETE FROM sources WHERE notebook_id = ?`, otherNotebookID).Error
+			_ = testDB.WithContext(ctx).Where("notebook_id = ?", notebookID).Delete(&schema.Source{}).Error
+			_ = testDB.WithContext(ctx).Where("notebook_id = ?", otherNotebookID).Delete(&schema.Source{}).Error
 		})
 
 		rows, err := store.ListByNotebookIdAndIds(ctx, notebookID, []dal.Id{src1.Id, src2.Id, srcOther.Id})
@@ -394,21 +489,19 @@ func createNotebookForSourceTest(t *testing.T, db *gorm.DB) dal.Id {
 	t.Helper()
 	ctx := context.Background()
 	notebookID := dal.Id(uuid.NewV7())
-	tx := db.WithContext(ctx).Exec(
-		`INSERT INTO notebooks (id, name, description, owner_id, updated_at)
-		 VALUES (?, ?, ?, ?, ?)`,
-		notebookID,
-		"nb_for_source_"+uuid.NewV7().String(),
-		"for source tests",
-		"owner_"+uuid.NewV7().String(),
-		time.Now().UnixMilli(),
-	)
-	if tx.Error != nil {
-		t.Fatalf("insert notebook fixture failed: %v", tx.Error)
+	err := db.WithContext(ctx).Create(&schema.Notebook{
+		Id:          notebookID,
+		Name:        "nb_for_source_" + uuid.NewV7().String(),
+		Description: "for source tests",
+		OwnerId:     "owner_" + uuid.NewV7().String(),
+		UpdatedAt:   time.Now().UnixMilli(),
+	}).Error
+	if err != nil {
+		t.Fatalf("insert notebook fixture failed: %v", err)
 	}
 
 	t.Cleanup(func() {
-		_ = db.WithContext(ctx).Exec(`DELETE FROM notebooks WHERE id = ?`, notebookID).Error
+		_ = db.WithContext(ctx).Where("id = ?", notebookID).Delete(&schema.Notebook{}).Error
 	})
 	return notebookID
 }

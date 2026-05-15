@@ -161,7 +161,7 @@ func (s *Server) PollSourceStatus(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	status, err := s.sourceLogic.PeekSourceStatus(ctx, req.Id)
+	status, err := s.sourceLogic.PollSourceStatus(ctx, req.Id)
 	if err != nil {
 		http.ErrResp(c, err)
 		return

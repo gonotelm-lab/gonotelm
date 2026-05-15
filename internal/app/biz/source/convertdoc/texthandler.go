@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	convertdoctransformer "github.com/gonotelm-lab/gonotelm/internal/app/biz/source/convertdoc/transformer"
+	"github.com/gonotelm-lab/gonotelm/internal/app/biz/source/convertdoc/transformer"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 
@@ -14,31 +14,35 @@ import (
 var _ Handler = (*TextHandler)(nil)
 
 type TextHandler struct {
-	impl *commonHandler
+	impl *baseHandler
 }
 
 func NewTextHandler(c HandlerConfig) *TextHandler {
 	return &TextHandler{
-		impl: newCommonHandler("text-pipe", einoparser.TextParser{}, c),
+		impl: newBaseHandler("text-pipe", einoparser.TextParser{}, c),
 	}
 }
 
 func (e *TextHandler) Handle(ctx context.Context, s *model.Source) (*HandleResult, error) {
-	ts := model.TextSourceContent{}
-	if err := decodeSourceContent(s.Content, &ts, "unmarshal text source content failed"); err != nil {
+	textSource := model.TextSourceContent{}
+	if err := decodeSourceContent(s.Content, &textSource, "unmarshal text source content failed"); err != nil {
 		return nil, err
 	}
 
-	docs, err := e.impl.doHandle(
+	docs, converted, err := e.impl.doHandle(
 		ctx,
 		s,
-		strings.NewReader(ts.Text),
+		strings.NewReader(textSource.Text),
 		nil,
-		convertdoctransformer.WithChunkSplitMethod(convertdoctransformer.ChunkRecursiveSplitMethod),
+		transformer.WithChunkSplitMethod(transformer.ChunkRecursiveSplitMethod),
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "handle text source failed")
 	}
 
-	return &HandleResult{Docs: docs}, nil
+	return &HandleResult{
+		Docs: docs,
+		ParsedContent: converted,
+		ParsedContentType: markdownMimeType,
+	}, nil
 }

@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal/schema"
@@ -23,45 +22,38 @@ func NewNotebookStoreImpl(db *gorm.DB) *NotebookStoreImpl {
 }
 
 func (s *NotebookStoreImpl) Create(ctx context.Context, notebook *schema.Notebook) error {
-	tx := s.db.WithContext(ctx).Exec(
-		"INSERT INTO notebooks (id, name, description, owner_id, updated_at) VALUES (?, ?, ?, ?, ?)",
-		notebook.Id, notebook.Name, notebook.Description, notebook.OwnerId, notebook.UpdatedAt,
-	)
-	if tx.Error != nil {
-		return sql.WrapErr(tx.Error)
+	if err := s.db.WithContext(ctx).Create(notebook).Error; err != nil {
+		return sql.WrapErr(err)
 	}
 
 	return nil
 }
 
 func (s *NotebookStoreImpl) GetById(ctx context.Context, id dal.Id) (*schema.Notebook, error) {
-	notebook, err := gorm.G[*schema.Notebook](s.db).
-		Raw(
-			"SELECT id, name, description, owner_id, updated_at FROM notebooks WHERE id = ? LIMIT 1",
-			id).
-		First(ctx)
+	var notebook schema.Notebook
+	err := s.db.WithContext(ctx).
+		Where("id = ?", id).
+		Take(&notebook).Error
 	if err != nil {
 		return nil, sql.WrapErr(err)
 	}
 
-	return notebook, nil
+	return &notebook, nil
 }
 
 func (s *NotebookStoreImpl) GetByNameAndOwnerId(
 	ctx context.Context,
 	name, ownerId string,
 ) (*schema.Notebook, error) {
-	notebook, err := gorm.G[*schema.Notebook](s.db).
-		Raw("SELECT id, name, description, owner_id, updated_at FROM notebooks WHERE name = ? AND owner_id = ? LIMIT 1",
-			name,
-			ownerId,
-		).
-		First(ctx)
+	var notebook schema.Notebook
+	err := s.db.WithContext(ctx).
+		Where("name = ? AND owner_id = ?", name, ownerId).
+		Take(&notebook).Error
 	if err != nil {
 		return nil, sql.WrapErr(err)
 	}
 
-	return notebook, nil
+	return &notebook, nil
 }
 
 func (s *NotebookStoreImpl) ListByOwnerId(
@@ -73,18 +65,16 @@ func (s *NotebookStoreImpl) ListByOwnerId(
 		return nil, xerror.ErrParams.Msgf("invalid pagination params: limit=%d offset=%d", limit, offset)
 	}
 
-	var orderByClause string
+	query := s.db.WithContext(ctx).
+		Where("owner_id = ?", ownerId)
 	if orderBy == 0 {
-		orderByClause = "id ASC"
+		query = query.Order("id ASC")
 	} else {
-		orderByClause = "updated_at DESC"
+		query = query.Order("updated_at DESC")
 	}
-	
-	sqlClause := fmt.Sprintf("ORDER BY %s LIMIT ? OFFSET ?", orderByClause)
-	rows, err := gorm.G[*schema.Notebook](s.db).
-		Raw("SELECT id, name, description, owner_id, updated_at FROM notebooks WHERE owner_id = ? "+sqlClause,
-			ownerId, limit, offset).
-		Find(ctx)
+
+	var rows []*schema.Notebook
+	err := query.Limit(limit).Offset(offset).Find(&rows).Error
 	if err != nil {
 		return nil, sql.WrapErr(err)
 	}
@@ -93,37 +83,45 @@ func (s *NotebookStoreImpl) ListByOwnerId(
 }
 
 func (s *NotebookStoreImpl) Update(ctx context.Context, notebook *schema.Notebook) error {
-	tx := s.db.WithContext(ctx).Exec(
-		"UPDATE notebooks SET name = ?, description = ?, owner_id = ?, updated_at = ? WHERE id = ?",
-		notebook.Name, notebook.Description, notebook.OwnerId, notebook.UpdatedAt, notebook.Id,
-	)
-	if tx.Error != nil {
-		return sql.WrapErr(tx.Error)
+	err := s.db.WithContext(ctx).
+		Model(&schema.Notebook{}).
+		Where("id = ?", notebook.Id).
+		Updates(map[string]any{
+			"name":        notebook.Name,
+			"description": notebook.Description,
+			"owner_id":    notebook.OwnerId,
+			"updated_at":  notebook.UpdatedAt,
+		}).Error
+	if err != nil {
+		return sql.WrapErr(err)
 	}
 	return nil
 }
 
 func (s *NotebookStoreImpl) DeleteById(ctx context.Context, id dal.Id) error {
-	tx := s.db.WithContext(ctx).Exec(`DELETE FROM notebooks WHERE id = ?`, id)
-	if tx.Error != nil {
-		return sql.WrapErr(tx.Error)
+	if err := s.db.WithContext(ctx).Where("id = ?", id).Delete(&schema.Notebook{}).Error; err != nil {
+		return sql.WrapErr(err)
 	}
 
 	return nil
 }
 
 func (s *NotebookStoreImpl) UpdateName(ctx context.Context, id dal.Id, name string) error {
-	tx := s.db.WithContext(ctx).Exec("UPDATE notebooks SET name = ? WHERE id = ?", name, id)
-	if tx.Error != nil {
-		return sql.WrapErr(tx.Error)
+	if err := s.db.WithContext(ctx).
+		Model(&schema.Notebook{}).
+		Where("id = ?", id).
+		Update("name", name).Error; err != nil {
+		return sql.WrapErr(err)
 	}
 	return nil
 }
 
 func (s *NotebookStoreImpl) UpdateDesc(ctx context.Context, id dal.Id, desc string) error {
-	tx := s.db.WithContext(ctx).Exec("UPDATE notebooks SET description = ? WHERE id = ?", desc, id)
-	if tx.Error != nil {
-		return sql.WrapErr(tx.Error)
+	if err := s.db.WithContext(ctx).
+		Model(&schema.Notebook{}).
+		Where("id = ?", id).
+		Update("description", desc).Error; err != nil {
+		return sql.WrapErr(err)
 	}
 	return nil
 }

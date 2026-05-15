@@ -21,6 +21,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/slices"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 
+	"github.com/bytedance/sonic"
 	einoembed "github.com/cloudwego/eino/components/embedding"
 )
 
@@ -77,8 +78,8 @@ func New(
 	return b, nil
 }
 
-func (b *Biz) GetSource(ctx context.Context, id uuid.UUID) (*model.Source, error) {
-	source, err := b.sourceStore.GetById(ctx, id)
+func (b *Biz) GetSource(ctx context.Context, sourceId uuid.UUID) (*model.Source, error) {
+	source, err := b.sourceStore.GetById(ctx, sourceId)
 	if err != nil {
 		if errors.Is(err, errors.ErrNoRecord) {
 			return nil, ErrSourceNotFound
@@ -87,6 +88,20 @@ func (b *Biz) GetSource(ctx context.Context, id uuid.UUID) (*model.Source, error
 	}
 
 	return model.NewSourceFrom(source), nil
+}
+
+func (b *Biz) GetDecodedSource(ctx context.Context, sourceId uuid.UUID) (*model.DecodedSource, error) {
+	rawSource, err := b.GetSource(ctx, sourceId)
+	if err != nil {
+		return nil, err
+	}
+
+	decodedSource, err := model.NewDecodedSource(rawSource)
+	if err != nil {
+		return nil, errors.Wrapf(errors.ErrSerde, "new decoded source failed, source_id=%s", sourceId)
+	}
+
+	return decodedSource, nil
 }
 
 func (b *Biz) CountSourcesByNotebook(
@@ -101,11 +116,11 @@ func (b *Biz) CountSourcesByNotebook(
 	return count, nil
 }
 
-func (b *Biz) ListSourcesByNotebook(
+func (b *Biz) ListDecodedSourcesByNotebook(
 	ctx context.Context,
 	notebookId uuid.UUID,
 	limit, offset int,
-) ([]*model.SourceWithContent, error) {
+) ([]*model.DecodedSource, error) {
 	rows, err := b.sourceStore.ListByNotebookId(ctx, notebookId, limit, offset)
 	if err != nil {
 		return nil, errors.WithMessage(err, "store list sources failed")
@@ -117,11 +132,14 @@ func (b *Biz) ListSourcesByNotebook(
 		sources = append(sources, model.NewSourceFrom(row))
 	}
 
-	sourcesWithContents := make([]*model.SourceWithContent, 0, len(sources))
+	sourcesWithContents := make([]*model.DecodedSource, 0, len(sources))
 	for _, source := range sources {
-		sc, err := model.NewSourceWithContent(source)
+		sc, err := model.NewDecodedSource(source)
 		if err != nil {
-			slog.ErrorContext(ctx, "new source with content failed", slog.Any("err", err))
+			slog.ErrorContext(ctx, "new decoded source failed",
+				slog.Any("err", err),
+				slog.String("source_id", source.Id.String()),
+			)
 			return nil, errors.WithMessagef(err, "new source with content failed, source_id=%s", source.Id)
 		}
 
@@ -169,17 +187,21 @@ func (b *Biz) CreateSource(ctx context.Context, cmd *CreateSourceCommand) (*mode
 	return newSource, nil
 }
 
-func (b *Biz) UpdateStatus(ctx context.Context, id uuid.UUID, status model.SourceStatus) error {
-	err := b.sourceStore.UpdateStatus(ctx, id, status.String())
+func (b *Biz) UpdateStatus(ctx context.Context, sourceId uuid.UUID, status model.SourceStatus) error {
+	err := b.sourceStore.UpdateStatus(ctx, &schema.SourceUpdateStatusParams{
+		Id:        sourceId,
+		Status:    status.String(),
+		UpdatedAt: time.Now().UnixMilli(),
+	})
 	if err != nil {
-		return errors.WithMessagef(err, "store update source status failed, id=%s", id)
+		return errors.WithMessagef(err, "store update source status failed, id=%s", sourceId)
 	}
 
 	return nil
 }
 
 func (b *Biz) DeleteSource(ctx context.Context, sourceId uuid.UUID) error {
-	source, err := b.GetSource(ctx, sourceId)
+	source, err := b.GetDecodedSource(ctx, sourceId)
 	if err != nil {
 		if errors.Is(err, ErrSourceNotFound) || errors.Is(err, errors.ErrNoRecord) {
 			return nil
@@ -222,11 +244,27 @@ func (b *Biz) DeleteSource(ctx context.Context, sourceId uuid.UUID) error {
 			Key: fileStoreKey,
 		})
 		if err != nil {
-			slog.WarnContext(ctx, "ignore delete source object failure",
+			slog.WarnContext(ctx, "delete source object failure",
 				slog.String("source_id", sourceId.String()),
 				slog.String("key", fileStoreKey),
 				slog.Any("err", err),
 			)
+		}
+	}
+
+	// delete parsed content
+	if source.ParsedContent != nil {
+		if storeKey := source.ParsedContent.StoreKey; storeKey != "" {
+			err = b.objectStorage.DeleteObject(ctx, &storage.DeleteObjectRequest{
+				Key: storeKey,
+			})
+			if err != nil {
+				slog.WarnContext(ctx, "delete source parsed object failure",
+					slog.String("source_id", sourceId.String()),
+					slog.String("key", storeKey),
+					slog.Any("err", err),
+				)
+			}
 		}
 	}
 
@@ -255,33 +293,86 @@ func (b *Biz) UpdateContent(ctx context.Context, cmd *UpdateContentCommand) erro
 	return nil
 }
 
+type UpdateParsedContentCommand struct {
+	Id     uuid.UUID
+	Parsed *model.ParsedSourceContent
+}
+
+func (b *Biz) UpdateParsedContent(ctx context.Context, cmd *UpdateParsedContentCommand) error {
+	parsedContent, err := sonic.Marshal(cmd.Parsed)
+	if err != nil {
+		return errors.WithMessage(err, "marshal parsed content failed")
+	}
+
+	err = b.sourceStore.UpdateParsedContent(ctx, &schema.SourceUpdateParsedContentParams{
+		Id:            cmd.Id,
+		ParsedContent: parsedContent,
+		UpdatedAt:     time.Now().UnixMilli(),
+	})
+	if err != nil {
+		return errors.WithMessagef(err, "store update source parsed content failed, source_id=%s", cmd.Id)
+	}
+
+	return nil
+}
+
+type PrepareSourceIndicesResult struct {
+	ParsedContent     []byte
+	ParsedContentType string
+}
+
 // 准备数据源
 // 包含chunk + embedding的索引过程
-func (b *Biz) PrepareSourceIndices(ctx context.Context, sourceId uuid.UUID) error {
+func (b *Biz) PrepareSourceIndices(
+	ctx context.Context,
+	sourceId uuid.UUID,
+) (*PrepareSourceIndicesResult, error) {
 	source, err := b.GetSource(ctx, sourceId)
 	if err != nil {
 		if errors.Is(err, ErrSourceNotFound) {
-			return nil
+			return &PrepareSourceIndicesResult{}, nil
 		}
-
-		return errors.WithMessagef(err, "get source failed, id=%s", sourceId)
+		return nil, errors.WithMessagef(err, "get source failed, id=%s", sourceId)
 	}
 
-	var (
-		notebookIdStr = source.NotebookId.String()
-		sourceIdStr   = sourceId.String()
-	)
+	result, err := b.convertSourceToDocs(ctx, source)
+	if err != nil {
+		return nil, err
+	}
 
+	err = b.embedAndInsertSourceDocs(ctx, source, result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &PrepareSourceIndicesResult{
+		ParsedContent:     result.ParsedContent,
+		ParsedContentType: result.ParsedContentType,
+	}, nil
+}
+
+func (b *Biz) convertSourceToDocs(
+	ctx context.Context,
+	source *model.Source,
+) (*convertdoc.HandleResult, error) {
 	docConverter, ok := b.docConverters[source.Kind]
 	if !ok {
-		return errors.ErrParams.Msgf("can not convert source for kind %s", source.Kind)
+		return nil, errors.ErrParams.Msgf("can not convert source for kind %s", source.Kind)
 	}
 
 	result, err := docConverter.Handle(ctx, source)
 	if err != nil {
-		return errors.WithMessagef(err, "embed source failed")
+		return nil, errors.WithMessagef(err, "embed source failed")
 	}
 
+	return result, nil
+}
+
+func (b *Biz) embedAndInsertSourceDocs(
+	ctx context.Context,
+	source *model.Source,
+	result *convertdoc.HandleResult,
+) error {
 	texts := make([]string, 0, len(result.Docs))
 	for _, doc := range result.Docs {
 		texts = append(texts, doc.Content)
@@ -291,7 +382,7 @@ func (b *Biz) PrepareSourceIndices(ctx context.Context, sourceId uuid.UUID) erro
 		slog.Int("text_size", len(texts)),
 		slog.Int("batch_size", b.embedBatchSize),
 		slog.Int("max_concurrency", b.embedMaxConcurrency),
-		slog.String("source_id", sourceIdStr))
+		slog.String("source_id", source.Id.String()))
 
 	embeddings, err := batch.ParallelMap(
 		ctx,
@@ -314,20 +405,17 @@ func (b *Biz) PrepareSourceIndices(ctx context.Context, sourceId uuid.UUID) erro
 		)
 	}
 
+	notebookIdStr := source.NotebookId.String()
+	sourceIdStr := source.Id.String()
 	docs := make([]*vecschema.SourceDoc, len(result.Docs))
 	for i, doc := range result.Docs {
-		embedding := embeddings[i]
-		embedding32 := make([]float32, len(embedding))
-		for j, v := range embedding {
-			embedding32[j] = float32(v)
-		}
 		docs[i] = &vecschema.SourceDoc{
 			Id:         doc.ID,
 			NotebookId: notebookIdStr,
 			SourceId:   sourceIdStr,
 			Content:    doc.Content,
 			Owner:      source.OwnerId,
-			Embedding:  embedding32,
+			Embedding:  float64ToFloat32(embeddings[i]),
 		}
 	}
 

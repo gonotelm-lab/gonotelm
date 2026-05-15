@@ -30,10 +30,11 @@ type SourceStore interface {
 	ListByNotebookId(ctx context.Context, notebookId Id, limit, offset int) ([]*schema.Source, error)
 	DeleteById(ctx context.Context, id Id) error
 	DeleteByNotebookId(ctx context.Context, notebookId Id) error
-	UpdateStatus(ctx context.Context, id Id, status string) error
+	UpdateStatus(ctx context.Context, params *schema.SourceUpdateStatusParams) error
 	Update(ctx context.Context, params *schema.SourceUpdateParams) error
 	ListByIds(ctx context.Context, ids []Id) ([]*schema.Source, error)
 	ListByNotebookIdAndIds(ctx context.Context, notebookId Id, ids []Id) ([]*schema.Source, error)
+	UpdateParsedContent(ctx context.Context, params *schema.SourceUpdateParsedContentParams) error
 }
 
 type ChatStore interface {

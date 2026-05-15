@@ -27,7 +27,7 @@ func TestNotebookStoreCRUD(t *testing.T) {
 		err := store.Create(ctx, notebook)
 		So(err, ShouldBeNil)
 		t.Cleanup(func() {
-			_ = testDB.WithContext(ctx).Exec(`DELETE FROM notebooks WHERE id = ?`, notebook.Id).Error
+			_ = testDB.WithContext(ctx).Where("id = ?", notebook.Id).Delete(&schema.Notebook{}).Error
 		})
 
 		gotByID, err := store.GetById(ctx, notebook.Id)
@@ -54,10 +54,10 @@ func TestNotebookStoreCRUD(t *testing.T) {
 		So(err, ShouldBeNil)
 
 		var count int64
-		err = testDB.WithContext(ctx).Raw(
-			`SELECT COUNT(1) FROM notebooks WHERE id = ?`,
-			notebook.Id,
-		).Scan(&count).Error
+		err = testDB.WithContext(ctx).
+			Model(&schema.Notebook{}).
+			Where("id = ?", notebook.Id).
+			Count(&count).Error
 		So(err, ShouldBeNil)
 		So(count, ShouldEqual, int64(0))
 	})
@@ -89,7 +89,7 @@ func TestNotebookStoreListByOwnerId(t *testing.T) {
 		err = store.Create(ctx, nbNew)
 		So(err, ShouldBeNil)
 		t.Cleanup(func() {
-			_ = testDB.WithContext(ctx).Exec(`DELETE FROM notebooks WHERE owner_id = ?`, ownerID).Error
+			_ = testDB.WithContext(ctx).Where("owner_id = ?", ownerID).Delete(&schema.Notebook{}).Error
 		})
 
 		firstPage, err := store.ListByOwnerId(ctx, ownerID, 1, 0, 1)

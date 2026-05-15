@@ -22,24 +22,21 @@ func NewChatStoreImpl(db *gorm.DB) *ChatStoreImpl {
 }
 
 func (s *ChatStoreImpl) Create(ctx context.Context, chat *schema.Chat) error {
-	tx := s.db.WithContext(ctx).Exec(
-		"INSERT INTO chats (id, notebook_id, owner_id, updated_at) VALUES (?, ?, ?, ?)",
-		chat.Id, chat.NotebookId, chat.OwnerId, chat.UpdatedAt,
-	)
-	if tx.Error != nil {
-		return sql.WrapErr(tx.Error)
+	if err := s.db.WithContext(ctx).Create(chat).Error; err != nil {
+		return sql.WrapErr(err)
 	}
 	return nil
 }
 
 func (s *ChatStoreImpl) GetById(ctx context.Context, id dal.Id) (*schema.Chat, error) {
-	chat, err := gorm.G[*schema.Chat](s.db).
-		Raw("SELECT id, notebook_id, owner_id, updated_at FROM chats WHERE id = ? LIMIT 1", id).
-		First(ctx)
+	var chat schema.Chat
+	err := s.db.WithContext(ctx).
+		Where("id = ?", id).
+		Take(&chat).Error
 	if err != nil {
 		return nil, sql.WrapErr(err)
 	}
-	return chat, nil
+	return &chat, nil
 }
 
 func (s *ChatStoreImpl) GetByNotebookIdAndOwnerId(
@@ -47,14 +44,14 @@ func (s *ChatStoreImpl) GetByNotebookIdAndOwnerId(
 	notebookId dal.Id,
 	ownerId string,
 ) (*schema.Chat, error) {
-	chat, err := gorm.G[*schema.Chat](s.db).
-		Raw("SELECT id, notebook_id, owner_id, updated_at FROM chats WHERE notebook_id = ? AND owner_id = ? LIMIT 1",
-			notebookId, ownerId).
-		First(ctx)
+	var chat schema.Chat
+	err := s.db.WithContext(ctx).
+		Where("notebook_id = ? AND owner_id = ?", notebookId, ownerId).
+		Take(&chat).Error
 	if err != nil {
 		return nil, sql.WrapErr(err)
 	}
-	return chat, nil
+	return &chat, nil
 }
 
 func (s *ChatStoreImpl) ListByOwnerId(
@@ -66,10 +63,13 @@ func (s *ChatStoreImpl) ListByOwnerId(
 		return nil, xerror.ErrParams.Msgf("invalid pagination params: limit=%d offset=%d", limit, offset)
 	}
 
-	rows, err := gorm.G[*schema.Chat](s.db).
-		Raw("SELECT id, notebook_id, owner_id, updated_at FROM chats WHERE owner_id = ? ORDER BY updated_at DESC LIMIT ? OFFSET ?",
-			ownerId, limit, offset).
-		Find(ctx)
+	var rows []*schema.Chat
+	err := s.db.WithContext(ctx).
+		Where("owner_id = ?", ownerId).
+		Order("updated_at DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&rows).Error
 	if err != nil {
 		return nil, sql.WrapErr(err)
 	}
@@ -77,17 +77,17 @@ func (s *ChatStoreImpl) ListByOwnerId(
 }
 
 func (s *ChatStoreImpl) DeleteById(ctx context.Context, id dal.Id) error {
-	tx := s.db.WithContext(ctx).Exec("DELETE FROM chats WHERE id = ?", id)
-	if tx.Error != nil {
-		return sql.WrapErr(tx.Error)
+	if err := s.db.WithContext(ctx).Where("id = ?", id).Delete(&schema.Chat{}).Error; err != nil {
+		return sql.WrapErr(err)
 	}
 	return nil
 }
 
 func (s *ChatStoreImpl) DeleteByNotebookId(ctx context.Context, notebookId dal.Id) error {
-	tx := s.db.WithContext(ctx).Exec("DELETE FROM chats WHERE notebook_id = ?", notebookId)
-	if tx.Error != nil {
-		return sql.WrapErr(tx.Error)
+	if err := s.db.WithContext(ctx).
+		Where("notebook_id = ?", notebookId).
+		Delete(&schema.Chat{}).Error; err != nil {
+		return sql.WrapErr(err)
 	}
 	return nil
 }

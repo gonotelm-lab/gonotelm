@@ -27,11 +27,17 @@ type ObjectDeleter interface {
 	DeleteObject(ctx context.Context, req *DeleteObjectRequest) error
 }
 
+type ObjectUploader interface {
+	// 上传对象
+	UploadObject(ctx context.Context, req *UploadObjectRequest) error
+}
+
 // 对象存储通用接口 底层可有多种对象存储实现
 type Storage interface {
 	Provider
 	ObjectGetter
 	ObjectDeleter
+	ObjectUploader
 
 	// 获取Post Policy的预签名上传链接
 	PresignedPostPolicy(ctx context.Context, req *PresignedPostPolicyRequest) (*PresignedPostPolicyResponse, error)
@@ -87,4 +93,20 @@ type GetObjectResponse struct {
 
 type DeleteObjectRequest struct {
 	Key string
+}
+
+type UploadObjectRequest struct {
+	Key string
+
+	Body []byte
+
+	// 可选: 上传时设置对象内容类型
+	ContentType string
+
+	// 可选: 上传时设置用户自定义元信息
+	Metadata map[string]string
+}
+
+type UploadObjectResponse struct {
+	Url string
 }

@@ -1,6 +1,7 @@
 package minio
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"net/http"
@@ -8,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
 type Storage struct {
@@ -113,6 +114,35 @@ func (s *Storage) DeleteObject(
 	err := s.client.RemoveObject(ctx, s.bucket, req.Key, minio.RemoveObjectOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "minio delete object failed, key=%s", req.Key)
+	}
+
+	return nil
+}
+
+func (s *Storage) UploadObject(
+	ctx context.Context,
+	req *storage.UploadObjectRequest,
+) error {
+	if req == nil {
+		return errors.ErrParams.Msg("upload object request is nil")
+	}
+	if req.Key == "" {
+		return errors.ErrParams.Msg("upload object request key is empty")
+	}
+
+	reader := bytes.NewReader(req.Body)
+	_, err := s.client.PutObject(
+		ctx,
+		s.bucket,
+		req.Key,
+		reader,
+		int64(len(req.Body)),
+		minio.PutObjectOptions{
+			ContentType:  req.ContentType,
+			UserMetadata: req.Metadata,
+		})
+	if err != nil {
+		return errors.Wrapf(err, "minio upload object failed, key=%s", req.Key)
 	}
 
 	return nil

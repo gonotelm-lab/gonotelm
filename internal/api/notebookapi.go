@@ -231,7 +231,7 @@ func (s *Server) ListNotebookSources(ctx context.Context, c *app.RequestContext)
 	})
 }
 
-func toNotebookSourceResponses(sources []*model.SourceWithContent) []*NotebookSourceResponse {
+func toNotebookSourceResponses(sources []*model.DecodedSource) []*NotebookSourceResponse {
 	resp := make([]*NotebookSourceResponse, 0, len(sources))
 	for _, source := range sources {
 		sourceResp := NotebookSourceResponse{

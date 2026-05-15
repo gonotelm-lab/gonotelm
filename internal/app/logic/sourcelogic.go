@@ -266,7 +266,7 @@ func (l *SourceLogic) UploadFileSource(
 }
 
 // check source status and update if necessary
-func (l *SourceLogic) PeekSourceStatus(
+func (l *SourceLogic) PollSourceStatus(
 	ctx context.Context,
 	sourceId uuid.UUID,
 ) (model.SourceStatus, error) {
@@ -453,7 +453,7 @@ func (l *SourceLogic) notifySourceEventMessage(
 	return nil
 }
 
-// 消息队列消费
+// 消息队列消费 消费上传完成的任务 指定来源索引构建
 func (l *SourceLogic) handleSourceEventMessage(
 	ctx context.Context,
 	msg mq.Message,
@@ -472,7 +472,7 @@ func (l *SourceLogic) handleSourceEventMessage(
 		return errors.Wrap(err, "handle prep message unmarshal failed")
 	}
 
-	err = l.sourceBiz.PrepareSourceIndices(ctx, source.Id)
+	result, err := l.sourceBiz.PrepareSourceIndices(ctx, source.Id)
 	if err != nil {
 		// mark failure
 		err2 := l.sourceBiz.UpdateStatus(ctx, source.Id, model.SourceStatusFailed)
@@ -482,6 +482,29 @@ func (l *SourceLogic) handleSourceEventMessage(
 
 		slog.ErrorContext(ctx, "prepare source failed", "source_id", source.Id, "err", err)
 		return nil
+	}
+
+	if result.ParsedContent != nil {
+		storeKey := formatSourceParsedContentStoreKey(source.Id, source.NotebookId)
+		err = l.objectStorage.UploadObject(ctx, &storage.UploadObjectRequest{
+			Key:         storeKey,
+			Body:        result.ParsedContent,
+			ContentType: result.ParsedContentType,
+		})
+		// 解析成功 但是上传失败 仅打日志不影响后续流程
+		if err != nil {
+			slog.ErrorContext(ctx, "upload parsed content failed", "source_id", source.Id, "err", err)
+		} else {
+			err = l.sourceBiz.UpdateParsedContent(ctx, &bizsource.UpdateParsedContentCommand{
+				Id: source.Id,
+				Parsed: &model.ParsedSourceContent{
+					StoreKey: storeKey,
+				},
+			})
+			if err != nil {
+				slog.ErrorContext(ctx, "update source parsed content failed", "source_id", source.Id, "err", err)
+			}
+		}
 	}
 
 	// ok
@@ -513,4 +536,12 @@ func formatSourceStoreKey(
 	)
 
 	return fmt.Sprintf("file/%s/%s%s", notebookId, sourceId, ext)
+}
+
+// Format:
+// parsed_file/{{notebook_id}}/{{source_id}}
+func formatSourceParsedContentStoreKey(
+	sourceId, notebookId uuid.UUID,
+) string {
+	return fmt.Sprintf("parsed_file/%s/%s", notebookId.String(), sourceId.String())
 }

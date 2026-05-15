@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/bytedance/sonic"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal/schema"
@@ -59,14 +60,15 @@ func (s SourceKind) Supported() bool {
 }
 
 type Source struct {
-	Id          Id           `json:"id"`
-	NotebookId  Id           `json:"notebook_id"`
-	Kind        SourceKind   `json:"kind"`
-	Status      SourceStatus `json:"status"`
-	DisplayName string       `json:"display_name"`
-	Content     []byte       `json:"content"`
-	OwnerId     string       `json:"owner_id"`
-	UpdatedAt   int64        `json:"updated_at"`
+	Id            Id           `json:"id"`
+	NotebookId    Id           `json:"notebook_id"`
+	Kind          SourceKind   `json:"kind"`
+	Status        SourceStatus `json:"status"`
+	DisplayName   string       `json:"display_name"`
+	Content       []byte       `json:"content"`
+	ParsedContent []byte       `json:"parsed_content,omitempty"`
+	OwnerId       string       `json:"owner_id"`
+	UpdatedAt     int64        `json:"updated_at"`
 }
 
 func (s *Source) KindText() bool {
@@ -140,14 +142,15 @@ func (s *Source) To() *schema.Source {
 
 func NewSourceFrom(s *schema.Source) *Source {
 	source := &Source{
-		Id:          s.Id,
-		NotebookId:  s.NotebookId,
-		Kind:        SourceKind(s.Kind),
-		Status:      SourceStatus(s.Status),
-		DisplayName: s.DisplayName,
-		Content:     s.Content,
-		OwnerId:     s.OwnerId,
-		UpdatedAt:   s.UpdatedAt,
+		Id:            s.Id,
+		NotebookId:    s.NotebookId,
+		Kind:          SourceKind(s.Kind),
+		Status:        SourceStatus(s.Status),
+		DisplayName:   s.DisplayName,
+		Content:       s.Content,
+		ParsedContent: s.ParsedContent,
+		OwnerId:       s.OwnerId,
+		UpdatedAt:     s.UpdatedAt,
 	}
 
 	return source
@@ -206,18 +209,20 @@ func SupportedFileMimeType(mimeType string) bool {
 	return false
 }
 
-type SourceWithContent struct {
+type DecodedSource struct {
 	*Source
 
 	ContentText *TextSourceContent `json:"content_text,omitempty"`
 	ContentUrl  *UrlSourceContent  `json:"content_url,omitempty"`
 	ContentFile *FileSourceContent `json:"content_file,omitempty"`
+
+	ParsedContent *ParsedSourceContent `json:"parsed_content,omitempty"`
 }
 
-func NewSourceWithContent(s *Source) (*SourceWithContent, error) {
+func NewDecodedSource(s *Source) (*DecodedSource, error) {
 	var (
 		err error
-		sc  = SourceWithContent{Source: s}
+		sc  = DecodedSource{Source: s}
 	)
 	switch s.Kind {
 	case SourceKindText:
@@ -245,5 +250,16 @@ func NewSourceWithContent(s *Source) (*SourceWithContent, error) {
 		return nil, err
 	}
 
+	if s.ParsedContent != nil {
+		if err := sonic.Unmarshal(s.ParsedContent, &sc.ParsedContent); err != nil {
+			// log only
+			slog.Error("unmarshal parsed content failed", "source_id", s.Id, "err", err)
+		}
+	}
+
 	return &sc, nil
+}
+
+type ParsedSourceContent struct {
+	StoreKey string `json:"store_key,omitempty"`
 }

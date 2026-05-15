@@ -129,7 +129,7 @@ type ListNotebookSourcesParams struct {
 }
 
 type ListNotebookSourcesResult struct {
-	Sources []*model.SourceWithContent
+	Sources []*model.DecodedSource
 	HasMore bool
 }
 
@@ -143,7 +143,7 @@ func (l *NotebookLogic) ListNotebookSources(
 	}
 
 	fetchLimit := params.Limit + 1
-	sources, err := l.sourceBiz.ListSourcesByNotebook(
+	sources, err := l.sourceBiz.ListDecodedSourcesByNotebook(
 		ctx,
 		params.NotebookId,
 		fetchLimit,

@@ -343,6 +343,63 @@ func (l *SourceLogic) DeleteSource(ctx context.Context, sourceId uuid.UUID) erro
 	return nil
 }
 
+type GetSourceParsedContentResult struct {
+	Content string `json:"content,omitempty"`
+	Url     string `json:"url,omitempty"`
+}
+
+func (l *SourceLogic) GetSourceParsedContent(
+	ctx context.Context,
+	sourceId uuid.UUID,
+) (*GetSourceParsedContentResult, error) {
+	source, err := l.sourceBiz.GetDecodedSource(ctx, sourceId)
+	if err != nil {
+		if errors.Is(err, bizsource.ErrSourceNotFound) {
+			return nil, errors.ErrParams.Msgf("source not found, id=%s", sourceId)
+		}
+
+		return nil, errors.WithMessagef(err, "get source failed, id=%s", sourceId)
+	}
+
+	userId := pkgcontext.GetUserId(ctx)
+	// check user permission
+	if source.OwnerId != userId {
+		return nil, errors.ErrPermission.Msg("source access denied")
+	}
+
+	if source.Status != model.SourceStatusReady {
+		return nil, errors.ErrParams.Msgf("source is not ready, status=%s", source.Status)
+	}
+
+	if source.Kind == model.SourceKindText {
+		return &GetSourceParsedContentResult{
+			Content: source.ContentText.Text,
+		}, nil
+	}
+
+	var storeKey string
+	if source.ParsedContent != nil {
+		storeKey = source.ParsedContent.StoreKey
+	}
+
+	if storeKey == "" {
+		// slog.WarnContext(ctx, "parsed content store key is empty", "source_id", sourceId)
+		return &GetSourceParsedContentResult{}, nil
+	}
+
+	resp, err := l.objectStorage.PresignedGetObject(ctx,
+		&storage.PresignedGetObjectRequest{
+			Key: storeKey,
+		})
+	if err != nil {
+		return nil, errors.WithMessage(err, "get presigned get object failed")
+	}
+
+	return &GetSourceParsedContentResult{
+		Url: resp.Url,
+	}, nil
+}
+
 func (l *SourceLogic) pollFileSourceStatus(
 	ctx context.Context,
 	source *model.Source,

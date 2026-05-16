@@ -20,6 +20,7 @@ func (s *Server) registerSourcesRoutes(g *route.RouterGroup) {
 	g.POST("/source/:id/reload", s.RetrySourcePreparation) // retry source preparation
 	g.DELETE("/source/:id", s.DeleteSource)
 	g.GET("/source/:id/doc/:doc_id", s.GetSourceDoc)
+	g.GET("/source/:id/parsed/content", s.GetSourceParsedContent)
 }
 
 type CreateSourceRequest struct {
@@ -249,5 +250,41 @@ func (s *Server) GetSourceDoc(ctx context.Context, c *app.RequestContext) {
 		DocId:       doc.DocId,
 		SourceTitle: doc.SourceTitle,
 		Content:     doc.Content,
+	})
+}
+
+type GetSourceParsedContentRequest struct {
+	Id uuid.UUID `path:"id,required"`
+}
+
+type GetSourceParsedContentResponse struct {
+	// one of the following fields will be present
+	Content string `json:"content,omitempty"`
+	Url     string `json:"url,omitempty"`
+}
+
+func (s *Server) GetSourceParsedContent(ctx context.Context, c *app.RequestContext) {
+	var req GetSourceParsedContentRequest
+	err := c.BindAndValidate(&req)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	resp, err := s.sourceLogic.GetSourceParsedContent(ctx, req.Id)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	if resp.Content == "" && resp.Url == "" {
+		// no content
+		http.OkRespNoContent(c)
+		return
+	}
+
+	http.OkResp(c, &GetSourceParsedContentResponse{
+		Content: resp.Content,
+		Url:     resp.Url,
 	})
 }

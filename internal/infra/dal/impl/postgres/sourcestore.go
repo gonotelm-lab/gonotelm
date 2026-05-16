@@ -72,7 +72,7 @@ func (s *SourceStoreImpl) ListByNotebookId(
 	var rows []*schema.Source
 	err := s.db.WithContext(ctx).
 		Where("notebook_id = ? AND status <> ?", notebookId, schema.SourceStatusInited).
-		Order("updated_at DESC").
+		Order("id DESC").
 		Limit(limit).
 		Offset(offset).
 		Find(&rows).Error

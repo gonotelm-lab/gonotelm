@@ -232,7 +232,7 @@ func (s *Storage) PresignedGetObject(
 
 	presignedURL, err := s.client.PresignedGetObject(ctx, s.bucket, req.Key, s.presignExpiry, params)
 	if err != nil {
-		return nil, errors.Wrap(err, "generate minio presigned get object failed")
+		return nil, errors.Wrapf(err, "generate minio presigned get object failed, key=%s", req.Key)
 	}
 
 	return &storage.PresignedGetObjectResponse{

@@ -19,6 +19,10 @@ func OkResp(c *app.RequestContext, data any) {
 	c.JSON(http.StatusOK, NewOkResult(data))
 }
 
+func OkRespNoContent(c *app.RequestContext) {
+	c.Status(http.StatusNoContent)
+}
+
 func ErrResp(c *app.RequestContext, err error) {
 	cause := xerror.Cause(err)
 	var ie *xerror.InnerError

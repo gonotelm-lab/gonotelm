@@ -8,6 +8,12 @@ exitWaitTimeout = "${ENV_GONOTELM_API_EXIT_WAIT_TIMEOUT:-10s}"
 
 [logic.chat]
 modelProvider = "qwen"
+model = "glm-5.1"
+maxRound = 10
+
+[logic.source]
+modelProvider = "qwen"
+model = "qwen3.5-27b"
 
 [database]
 type = "postgres"

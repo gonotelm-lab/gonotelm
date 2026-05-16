@@ -4,6 +4,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/app/server"
 	"github.com/gonotelm-lab/gonotelm/internal/app/logic"
 	chatlogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/chat"
+	sourcelogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/source"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 	"github.com/gonotelm-lab/gonotelm/pkg/http/middleware"
@@ -13,7 +14,7 @@ type Server struct {
 	h *server.Hertz
 
 	notebookLogic *logic.NotebookLogic
-	sourceLogic   *logic.SourceLogic
+	sourceLogic   *sourcelogic.SourceLogic
 	chatLogic     *chatlogic.Logic
 }
 
@@ -46,6 +47,7 @@ func (s *Server) registerRoutes() {
 	s.registerNotebooksRoutes(v1Group)
 	s.registerSourcesRoutes(v1Group)
 	s.registerChatRoutes(v1Group)
+	s.registerInsightsRoutes(v1Group)
 }
 
 func (s *Server) Run() {

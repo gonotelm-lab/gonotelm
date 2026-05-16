@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"hash/fnv"
+	"io"
 	"log/slog"
 	"strings"
 	"time"
@@ -19,10 +20,12 @@ import (
 )
 
 const (
-	collectionName     = "source_docs"
-	defaultSearchLimit = 10
-	maxSearchLimit     = 100
-	collectionLoadWait = 30 * time.Second
+	collectionName       = "source_docs"
+	defaultSearchLimit   = 10
+	maxSearchLimit       = 100
+	defaultListBatchSize = 500
+	maxListBatchSize     = 2000
+	collectionLoadWait   = 30 * time.Second
 
 	partitionCount  = 16 // DO NOT MODIFY THIS VALUE
 	partitionPrefix = "_p"
@@ -361,6 +364,71 @@ func (s *SourceDocStoreImpl) Query(
 	return docs, nil
 }
 
+func (s *SourceDocStoreImpl) List(
+	ctx context.Context,
+	params *schema.SourceDocListParams,
+) ([]*schema.SourceDoc, error) {
+	if params == nil {
+		return nil, errors.ErrParams.Msg("list params is nil")
+	}
+
+	notebookID := strings.TrimSpace(params.NotebookId)
+	if notebookID == "" {
+		return nil, errors.ErrParams.Msg("notebook id is empty")
+	}
+
+	sourceID := strings.TrimSpace(params.SourceId)
+	if sourceID == "" {
+		return nil, errors.ErrParams.Msg("source id is empty")
+	}
+
+	partitionName := partitionNameByNotebookID(notebookID)
+	filterExpr := fmt.Sprintf(
+		`%s == %s && %s == %s`,
+		schema.FieldNotebookID, notebookID,
+		schema.FieldSourceID, sourceID,
+	)
+	outputFields := []string{
+		schema.FieldID,
+		schema.FieldNotebookID,
+		schema.FieldSourceID,
+		schema.FieldContent,
+		schema.FieldOwner,
+	}
+	batchSize := resolveListBatchSize(params.BatchSize)
+
+	iter, err := s.cli.QueryIterator(
+		ctx,
+		milvusclient.NewQueryIteratorOption(collectionName).
+			WithPartitions(partitionName).
+			WithFilter(filterExpr).
+			WithOutputFields(outputFields...).
+			WithBatchSize(batchSize),
+	)
+	if err != nil {
+		return nil, errors.WithMessage(err, "create source doc query iterator failed")
+	}
+
+	docs := make([]*schema.SourceDoc, 0, batchSize)
+	for {
+		rs, err := iter.Next(ctx)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, errors.WithMessage(err, "iterate source docs failed")
+		}
+
+		batchDocs, err := extractSourceDocsFromResultSet(rs)
+		if err != nil {
+			return nil, errors.WithMessage(err, "decode source docs list batch failed")
+		}
+		docs = append(docs, batchDocs...)
+	}
+
+	return docs, nil
+}
+
 func partitionNameByNotebookID(notebookID string) string {
 	h := fnv.New32a()
 	_, _ = h.Write([]byte(notebookID))
@@ -404,6 +472,16 @@ func resolveSearchLimit(limit int) int {
 		return maxSearchLimit
 	}
 	return limit
+}
+
+func resolveListBatchSize(batchSize int) int {
+	if batchSize <= 0 {
+		return defaultListBatchSize
+	}
+	if batchSize > maxListBatchSize {
+		return maxListBatchSize
+	}
+	return batchSize
 }
 
 func extractSourceDocsFromResults(resultSets []milvusclient.ResultSet) ([]*schema.SourceDoc, error) {

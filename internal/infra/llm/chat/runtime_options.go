@@ -9,34 +9,44 @@ import (
 	einomodel "github.com/cloudwego/eino/components/model"
 )
 
-// BuildThinkingOptions builds per-request model options for thinking behavior.
-func BuildThinkingOptions(
+// BuildThinkingOption builds per-request model options for thinking behavior.
+func BuildThinkingOption(
 	providerType Type,
 	enableThinking bool,
-) []einomodel.Option {
+) einomodel.Option {
 	switch providerType {
 	case Openai:
 		if !enableThinking {
-			return nil
+			return einomodel.Option{}
 		}
-		return []einomodel.Option{openaiext.WithReasoningEffort(openaiext.ReasoningEffortLevelHigh)}
+		return openaiext.WithReasoningEffort(openaiext.ReasoningEffortLevelHigh)
 	case Qwen:
-		return []einomodel.Option{qwenext.WithEnableThinking(enableThinking)}
+		return qwenext.WithEnableThinking(enableThinking)
 	case DeepSeek:
 		thinkingType := "disabled"
 		if enableThinking {
 			thinkingType = "enabled"
 		}
-		return []einomodel.Option{
-			deepseekext.WithExtraFields(map[string]interface{}{
-				"thinking": map[string]string{
-					"type": thinkingType,
-				},
-			}),
-		}
+		return deepseekext.WithExtraFields(map[string]interface{}{
+			"thinking": map[string]string{
+				"type": thinkingType,
+			},
+		})
 	default:
-		return nil
+		return einomodel.Option{}
 	}
+}
+
+func BuildLLMModelOption(model string) einomodel.Option {
+	if model != "" {
+		return einomodel.WithModel(model)
+	}
+
+	return einomodel.Option{}
+}
+
+func BuildLLMOptions(opts ...einomodel.Option) []einomodel.Option {
+	return opts
 }
 
 func normalizeOpenAIReasoningEffort(

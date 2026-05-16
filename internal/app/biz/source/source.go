@@ -272,22 +272,35 @@ func (b *Biz) DeleteSource(ctx context.Context, sourceId uuid.UUID) error {
 }
 
 type UpdateContentCommand struct {
-	Id          uuid.UUID
-	Content     []byte
-	Status      model.SourceStatus
-	DisplayName string
+	Id      uuid.UUID
+	Content []byte
+	Status  model.SourceStatus
+	Title   string
 }
 
 func (b *Biz) UpdateContent(ctx context.Context, cmd *UpdateContentCommand) error {
 	err := b.sourceStore.Update(ctx, &schema.SourceUpdateParams{
-		Id:          cmd.Id,
-		Content:     cmd.Content,
-		Status:      cmd.Status.String(),
-		DisplayName: cmd.DisplayName,
-		UpdatedAt:   time.Now().UnixMilli(),
+		Id:        cmd.Id,
+		Content:   cmd.Content,
+		Status:    cmd.Status.String(),
+		Title:     cmd.Title,
+		UpdatedAt: time.Now().UnixMilli(),
 	})
 	if err != nil {
 		return errors.WithMessagef(err, "store update source content failed, id=%s", cmd.Id)
+	}
+
+	return nil
+}
+
+func (b *Biz) UpdateTitle(ctx context.Context, sourceId uuid.UUID, title string) error {
+	err := b.sourceStore.UpdateTitle(ctx, &schema.SourceUpdateTitleParams{
+		Id:        sourceId,
+		Title:     title,
+		UpdatedAt: time.Now().UnixMilli(),
+	})
+	if err != nil {
+		return errors.WithMessagef(err, "store update source title failed, id=%s", sourceId)
 	}
 
 	return nil
@@ -316,9 +329,23 @@ func (b *Biz) UpdateParsedContent(ctx context.Context, cmd *UpdateParsedContentC
 	return nil
 }
 
+func (b *Biz) UpdateAbstract(ctx context.Context, sourceId uuid.UUID, abstract string) error {
+	err := b.sourceStore.UpdateAbstract(ctx, &schema.SourceUpdateAbstractParams{
+		Id:        sourceId,
+		Abstract:  abstract,
+		UpdatedAt: time.Now().UnixMilli(),
+	})
+	if err != nil {
+		return errors.WithMessagef(err, "store update source abstract failed, id=%s", sourceId)
+	}
+
+	return nil
+}
+
 type PrepareSourceIndicesResult struct {
 	ParsedContent     []byte
 	ParsedContentType string
+	Chunks            []string
 }
 
 // 准备数据源
@@ -340,7 +367,7 @@ func (b *Biz) PrepareSourceIndices(
 		return nil, err
 	}
 
-	err = b.embedAndInsertSourceDocs(ctx, source, result)
+	textChunks, err := b.embedAndInsertSourceDocs(ctx, source, result)
 	if err != nil {
 		return nil, err
 	}
@@ -348,6 +375,7 @@ func (b *Biz) PrepareSourceIndices(
 	return &PrepareSourceIndicesResult{
 		ParsedContent:     result.ParsedContent,
 		ParsedContentType: result.ParsedContentType,
+		Chunks:            textChunks,
 	}, nil
 }
 
@@ -372,7 +400,7 @@ func (b *Biz) embedAndInsertSourceDocs(
 	ctx context.Context,
 	source *model.Source,
 	result *convertdoc.HandleResult,
-) error {
+) ([]string, error) {
 	texts := make([]string, 0, len(result.Docs))
 	for _, doc := range result.Docs {
 		texts = append(texts, doc.Content)
@@ -394,10 +422,10 @@ func (b *Biz) embedAndInsertSourceDocs(
 		},
 	)
 	if err != nil {
-		return errors.WithMessagef(err, "embed docs failed")
+		return nil, errors.WithMessagef(err, "embed docs failed")
 	}
 	if len(embeddings) != len(texts) {
-		return errors.Wrapf(
+		return nil, errors.Wrapf(
 			errors.ErrSerde,
 			"embed result count mismatch, expected=%d, actual=%d",
 			len(texts),
@@ -407,9 +435,9 @@ func (b *Biz) embedAndInsertSourceDocs(
 
 	notebookIdStr := source.NotebookId.String()
 	sourceIdStr := source.Id.String()
-	docs := make([]*vecschema.SourceDoc, len(result.Docs))
+	vsDocs := make([]*vecschema.SourceDoc, len(result.Docs))
 	for i, doc := range result.Docs {
-		docs[i] = &vecschema.SourceDoc{
+		vsDocs[i] = &vecschema.SourceDoc{
 			Id:         doc.ID,
 			NotebookId: notebookIdStr,
 			SourceId:   sourceIdStr,
@@ -419,12 +447,12 @@ func (b *Biz) embedAndInsertSourceDocs(
 		}
 	}
 
-	err = b.sourceDocStore.BatchInsert(ctx, docs)
+	err = b.sourceDocStore.BatchInsert(ctx, vsDocs)
 	if err != nil {
-		return errors.WithMessagef(err, "insert source docs failed")
+		return nil, errors.WithMessagef(err, "insert source docs failed")
 	}
 
-	return nil
+	return texts, nil
 }
 
 type CheckSourceIdsQuery struct {
@@ -488,6 +516,43 @@ func (b *Biz) GetSourceDoc(
 	}
 
 	return sourceDoc, nil
+}
+
+type ListSourceDocsQuery struct {
+	NotebookId uuid.UUID
+	SourceId   uuid.UUID
+}
+
+// 列出source的全部doc
+func (b *Biz) ListSourceDocs(
+	ctx context.Context,
+	query *ListSourceDocsQuery,
+) ([]*model.SourceDoc, error) {
+	docs, err := b.sourceDocStore.List(ctx,
+		&vecschema.SourceDocListParams{
+			NotebookId: query.NotebookId.String(),
+			SourceId:   query.SourceId.String(),
+		})
+	if err != nil {
+		return nil, errors.WithMessage(err, "store list source docs failed")
+	}
+
+	sourceDocs := make([]*model.SourceDoc, 0, len(docs))
+	for _, doc := range docs {
+		sourceDoc, err := model.NewSourceDoc(doc)
+		if err != nil {
+			slog.ErrorContext(ctx, "new source doc failed",
+				slog.Any("err", err),
+				slog.String("doc_id", doc.Id),
+				slog.String("source_id", query.SourceId.String()),
+				slog.String("notebook_id", query.NotebookId.String()),
+			)
+			continue
+		}
+		sourceDocs = append(sourceDocs, sourceDoc)
+	}
+
+	return sourceDocs, nil
 }
 
 // 召回来源片段

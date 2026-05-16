@@ -123,12 +123,29 @@ func (s *SourceStoreImpl) Update(ctx context.Context, params *schema.SourceUpdat
 		Model(&schema.Source{}).
 		Where("id = ?", params.Id).
 		Updates(map[string]any{
-			"status":       params.Status,
-			"display_name": params.DisplayName,
-			"content":      params.Content,
-			"updated_at":   params.UpdatedAt,
+			"status":     params.Status,
+			"title":      params.Title,
+			"content":    params.Content,
+			"updated_at": params.UpdatedAt,
 		}).Error
 	if err != nil {
+		return sql.WrapErr(err)
+	}
+
+	return nil
+}
+
+func (s *SourceStoreImpl) UpdateTitle(
+	ctx context.Context,
+	params *schema.SourceUpdateTitleParams,
+) error {
+	if err := s.db.WithContext(ctx).
+		Model(&schema.Source{}).
+		Where("id = ?", params.Id).
+		Updates(map[string]any{
+			"title":      params.Title,
+			"updated_at": params.UpdatedAt,
+		}).Error; err != nil {
 		return sql.WrapErr(err)
 	}
 
@@ -145,6 +162,23 @@ func (s *SourceStoreImpl) UpdateParsedContent(
 		Updates(map[string]any{
 			"parsed_content": params.ParsedContent,
 			"updated_at":     params.UpdatedAt,
+		}).Error; err != nil {
+		return sql.WrapErr(err)
+	}
+
+	return nil
+}
+
+func (s *SourceStoreImpl) UpdateAbstract(
+	ctx context.Context,
+	params *schema.SourceUpdateAbstractParams,
+) error {
+	if err := s.db.WithContext(ctx).
+		Model(&schema.Source{}).
+		Where("id = ?", params.Id).
+		Updates(map[string]any{
+			"abstract":   params.Abstract,
+			"updated_at": params.UpdatedAt,
 		}).Error; err != nil {
 		return sql.WrapErr(err)
 	}

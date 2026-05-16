@@ -3,10 +3,11 @@ package api
 import (
 	"context"
 	"net/url"
+	"strings"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/route"
-	"github.com/gonotelm-lab/gonotelm/internal/app/logic"
+	logic "github.com/gonotelm-lab/gonotelm/internal/app/logic/source"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
@@ -21,6 +22,7 @@ func (s *Server) registerSourcesRoutes(g *route.RouterGroup) {
 	g.DELETE("/source/:id", s.DeleteSource)
 	g.GET("/source/:id/doc/:doc_id", s.GetSourceDoc)
 	g.GET("/source/:id/parsed/content", s.GetSourceParsedContent)
+	g.PUT("/source/:id/title", s.UpdateSourceTitle)
 }
 
 type CreateSourceRequest struct {
@@ -287,4 +289,35 @@ func (s *Server) GetSourceParsedContent(ctx context.Context, c *app.RequestConte
 		Content: resp.Content,
 		Url:     resp.Url,
 	})
+}
+
+type UpdateSourceTitleRequest struct {
+	Id    uuid.UUID `path:"id,required"`
+	Title string    `json:"title" validate:"max=255"`
+}
+
+func (r *UpdateSourceTitleRequest) Validate() error {
+	r.Title = strings.TrimSpace(r.Title)
+	if r.Title == "" {
+		return errors.ErrParams.Msg("source title is empty")
+	}
+
+	return nil
+}
+
+func (s *Server) UpdateSourceTitle(ctx context.Context, c *app.RequestContext) {
+	var req UpdateSourceTitleRequest
+	err := c.BindAndValidate(&req)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	err = s.sourceLogic.UpdateSourceTitle(ctx, req.Id, req.Title)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	http.OkResp(c, nil)
 }

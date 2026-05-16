@@ -569,25 +569,28 @@ func (l *Logic) buildNewChatAgent(
 	chatLLM einomodel.ToolCallingChatModel,
 	sessionState *chatSessionState,
 ) *bizagent.Agent[*chatSessionState] {
-	var (
-		maxRound = 10
-		options  = llmchat.BuildThinkingOptions(
+	options := llmchat.BuildLLMOptions(
+		llmchat.BuildThinkingOption(
 			conf.Global().Logic.Chat.ModelProvider,
 			sessionState.enableThinking,
-		)
-
-		agentConfig = bizagent.AgentConfig[*chatSessionState]{
-			MaxRound:       maxRound,
-			LLM:            chatLLM,
-			Options:        options,
-			BeforeChat:     l.agentBeforeChatHook,
-			BeforeRound:    l.agentBeforeRoundHook,
-			MsgAppender:    l.agentMessageAppender,
-			OnReasoning:    l.agentOnReasoningHook,
-			OnReasoningEnd: l.agentOnReasoningEndHook,
-			OnContent:      l.agentOnContentHook,
-		}
+		),
 	)
+
+	if conf.Global().Logic.Chat.Model != "" {
+		options = append(options, llmchat.BuildLLMModelOption(conf.Global().Logic.Chat.Model))
+	}
+
+	agentConfig := bizagent.AgentConfig[*chatSessionState]{
+		MaxRound:       conf.Global().Logic.Chat.GetMaxRound(),
+		LLM:            chatLLM,
+		Options:        options,
+		BeforeChat:     l.agentBeforeChatHook,
+		BeforeRound:    l.agentBeforeRoundHook,
+		MsgAppender:    l.agentMessageAppender,
+		OnReasoning:    l.agentOnReasoningHook,
+		OnReasoningEnd: l.agentOnReasoningEndHook,
+		OnContent:      l.agentOnContentHook,
+	}
 
 	agent := bizagent.NewAgent(agentConfig, sessionState)
 

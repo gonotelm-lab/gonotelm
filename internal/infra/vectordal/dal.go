@@ -13,6 +13,10 @@ type SourceDocStore interface {
 	BatchDelete(ctx context.Context, params *schema.SourceDocBatchDeleteParams) error
 	Get(ctx context.Context, params *schema.SourceDocGetParams) (*schema.SourceDoc, error)
 	Query(ctx context.Context, params *schema.SourceDocQueryParams) ([]*schema.SourceDoc, error)
+
+	// 获取所有符合条件的source doc
+	// 在方法内部需要分批迭代
+	List(ctx context.Context, params *schema.SourceDocListParams) ([]*schema.SourceDoc, error)
 }
 
 type DAL struct {

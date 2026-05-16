@@ -64,7 +64,7 @@ type Source struct {
 	NotebookId    Id           `json:"notebook_id"`
 	Kind          SourceKind   `json:"kind"`
 	Status        SourceStatus `json:"status"`
-	DisplayName   string       `json:"display_name"`
+	Title         string       `json:"title"`
 	Content       []byte       `json:"content"`
 	ParsedContent []byte       `json:"parsed_content,omitempty"`
 	OwnerId       string       `json:"owner_id"`
@@ -129,14 +129,14 @@ func (s *Source) StatusFailed() bool {
 
 func (s *Source) To() *schema.Source {
 	return &schema.Source{
-		Id:          s.Id,
-		NotebookId:  s.NotebookId,
-		Kind:        string(s.Kind),
-		Status:      s.Status.String(),
-		DisplayName: s.DisplayName,
-		Content:     s.Content,
-		OwnerId:     s.OwnerId,
-		UpdatedAt:   s.UpdatedAt,
+		Id:         s.Id,
+		NotebookId: s.NotebookId,
+		Kind:       string(s.Kind),
+		Status:     s.Status.String(),
+		Title:      s.Title,
+		Content:    s.Content,
+		OwnerId:    s.OwnerId,
+		UpdatedAt:  s.UpdatedAt,
 	}
 }
 
@@ -146,7 +146,7 @@ func NewSourceFrom(s *schema.Source) *Source {
 		NotebookId:    s.NotebookId,
 		Kind:          SourceKind(s.Kind),
 		Status:        SourceStatus(s.Status),
-		DisplayName:   s.DisplayName,
+		Title:         s.Title,
 		Content:       s.Content,
 		ParsedContent: s.ParsedContent,
 		OwnerId:       s.OwnerId,

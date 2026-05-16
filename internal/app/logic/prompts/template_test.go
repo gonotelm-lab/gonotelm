@@ -9,10 +9,7 @@ import (
 )
 
 func TestTemplateMessage(t *testing.T) {
-	tmpl, err := NewTemplate[ChatTemplateVars](TemplateNameChat, "zh")
-	if err != nil {
-		t.Fatalf("new template failed: %v", err)
-	}
+	tmpl := newTemplate[ChatTemplateVars](templateNameChat, "zh")
 
 	msg, err := tmpl.Message(context.Background(), ChatTemplateVars{
 		Notebook: "项目笔记",
@@ -64,22 +61,38 @@ func TestTemplateDefaultLang(t *testing.T) {
 }
 
 func TestTemplateUnknownLang(t *testing.T) {
-	_, err := NewTemplate[ChatTemplateVars](TemplateNameChat, "en")
-	if err == nil {
-		t.Fatalf("expect error when lang does not exist")
+	tmpl := newTemplate[ChatTemplateVars](templateNameChat, "en")
+
+	msg, err := tmpl.Message(context.Background(), ChatTemplateVars{})
+	if err != nil {
+		t.Fatalf("render fallback lang message failed: %v", err)
+	}
+
+	if msg.Role != schema.System {
+		t.Fatalf("unexpected role: %s", msg.Role)
 	}
 }
 
 func TestTemplateUnknownTemplateName(t *testing.T) {
-	_, err := NewTemplate[ChatTemplateVars]("summary", "zh")
-	if err == nil {
-		t.Fatalf("expect error when template name does not exist")
-	}
+	assertPanics(t, func() {
+		_ = newTemplate[ChatTemplateVars](templateName("summary"), "zh")
+	})
 }
 
 func TestTemplateEmptyTemplateName(t *testing.T) {
-	_, err := NewTemplate[ChatTemplateVars]("", "zh")
-	if err == nil {
-		t.Fatalf("expect error when template name is empty")
-	}
+	assertPanics(t, func() {
+		_ = newTemplate[ChatTemplateVars](templateName(""), "zh")
+	})
+}
+
+func assertPanics(t *testing.T, fn func()) {
+	t.Helper()
+
+	defer func() {
+		if recover() == nil {
+			t.Fatalf("expected panic, but did not panic")
+		}
+	}()
+
+	fn()
 }

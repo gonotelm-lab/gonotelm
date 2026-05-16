@@ -83,10 +83,10 @@ type FileSourceContent struct {
 }
 
 type NotebookSourceResponse struct {
-	Id          string             `json:"id"`
-	Kind        model.SourceKind   `json:"kind"`
-	Status      model.SourceStatus `json:"status"`
-	DisplayName string             `json:"display_name"`
+	Id     string             `json:"id"`
+	Kind   model.SourceKind   `json:"kind"`
+	Status model.SourceStatus `json:"status"`
+	Title  string             `json:"title"`
 
 	Text *TextSourceContent `json:"text,omitempty"`
 	Url  *UrlSourceContent  `json:"url,omitempty"`
@@ -235,10 +235,10 @@ func toNotebookSourceResponses(sources []*model.DecodedSource) []*NotebookSource
 	resp := make([]*NotebookSourceResponse, 0, len(sources))
 	for _, source := range sources {
 		sourceResp := NotebookSourceResponse{
-			Id:          source.Id.String(),
-			Kind:        source.Kind,
-			Status:      source.Status,
-			DisplayName: source.DisplayName,
+			Id:     source.Id.String(),
+			Kind:   source.Kind,
+			Status: source.Status,
+			Title:  source.Title,
 		}
 		if source.Kind.IsText() {
 			sourceResp.Text = &TextSourceContent{

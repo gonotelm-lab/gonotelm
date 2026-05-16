@@ -63,3 +63,9 @@ type SourceDocQueryParams struct {
 	// top-k returned docs
 	Limit int
 }
+
+type SourceDocListParams struct {
+	NotebookId string
+	SourceId   string
+	BatchSize  int
+}

@@ -32,9 +32,11 @@ type SourceStore interface {
 	DeleteByNotebookId(ctx context.Context, notebookId Id) error
 	UpdateStatus(ctx context.Context, params *schema.SourceUpdateStatusParams) error
 	Update(ctx context.Context, params *schema.SourceUpdateParams) error
+	UpdateTitle(ctx context.Context, params *schema.SourceUpdateTitleParams) error
 	ListByIds(ctx context.Context, ids []Id) ([]*schema.Source, error)
 	ListByNotebookIdAndIds(ctx context.Context, notebookId Id, ids []Id) ([]*schema.Source, error)
 	UpdateParsedContent(ctx context.Context, params *schema.SourceUpdateParsedContentParams) error
+	UpdateAbstract(ctx context.Context, params *schema.SourceUpdateAbstractParams) error
 }
 
 type ChatStore interface {

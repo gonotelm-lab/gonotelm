@@ -236,7 +236,7 @@ func TestSourceStoreParsedContentCompatibility(t *testing.T) {
 			NotebookId:    notebookID,
 			Kind:          "doc",
 			Status:        "new",
-			DisplayName:   "source-with-converted",
+			Title:         "source-with-converted",
 			Content:       []byte("raw-content"),
 			ParsedContent: []byte("converted-content"),
 			OwnerId:       "owner_" + uuid.NewV7().String(),
@@ -256,11 +256,11 @@ func TestSourceStoreParsedContentCompatibility(t *testing.T) {
 		So(created.OwnerId, ShouldEqual, source.OwnerId)
 
 		err = store.Update(ctx, &schema.SourceUpdateParams{
-			Id:          source.Id,
-			Status:      "ready",
-			DisplayName: "updated-name",
-			Content:     []byte("raw-content-updated"),
-			UpdatedAt:   2000,
+			Id:        source.Id,
+			Status:    "ready",
+			Title:     "updated-name",
+			Content:   []byte("raw-content-updated"),
+			UpdatedAt: 2000,
 		})
 		So(err, ShouldBeNil)
 
@@ -284,7 +284,7 @@ func TestSourceStoreUpdateParsedContent(t *testing.T) {
 			NotebookId:    notebookID,
 			Kind:          "doc",
 			Status:        "ready",
-			DisplayName:   "source-update-converted",
+			Title:         "source-update-converted",
 			Content:       []byte("raw-content"),
 			ParsedContent: []byte("converted-old"),
 			OwnerId:       "owner_" + uuid.NewV7().String(),

@@ -1,15 +1,16 @@
-package logic
+package source
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net/url"
-	"path/filepath"
+	"strings"
+	"sync"
 
 	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/mq"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
@@ -41,11 +42,14 @@ type SourceLogic struct {
 	rootCtx       context.Context
 	objectStorage storage.Storage
 
-	notebookBiz *biznotebook.Biz
-
+	notebookBiz  *biznotebook.Biz
 	sourceBiz    *bizsource.Biz
 	prepProducer mq.Producer
 	prepConsumer mq.Consumer
+
+	llmGateway *gateway.Gateway
+
+	wg sync.WaitGroup
 }
 
 func (l *SourceLogic) Close(ctx context.Context) {
@@ -59,6 +63,8 @@ func (l *SourceLogic) Close(ctx context.Context) {
 			slog.WarnContext(ctx, "close source prep producer failed", slog.Any("err", err))
 		}
 	}
+
+	l.wg.Wait()
 }
 
 func MustNewSourceLogic(
@@ -66,12 +72,14 @@ func MustNewSourceLogic(
 	objectStorage storage.Storage,
 	notebookBiz *biznotebook.Biz,
 	sourceBiz *bizsource.Biz,
+	llmGateway *gateway.Gateway,
 ) *SourceLogic {
 	sl := &SourceLogic{
 		rootCtx:       rootCtx,
 		objectStorage: objectStorage,
 		notebookBiz:   notebookBiz,
 		sourceBiz:     sourceBiz,
+		llmGateway:    llmGateway,
 	}
 
 	sl.mustInitMsgQueue()
@@ -153,6 +161,38 @@ func (l *SourceLogic) GetSource(
 	return source, nil
 }
 
+func (l *SourceLogic) UpdateSourceTitle(
+	ctx context.Context,
+	sourceId uuid.UUID,
+	title string,
+) error {
+	nextTitle := strings.TrimSpace(title)
+	if nextTitle == "" {
+		return errors.ErrParams.Msg("source title is empty")
+	}
+
+	source, err := l.GetSource(ctx, sourceId)
+	if err != nil {
+		return errors.WithMessagef(err, "get source failed, source_id=%s", sourceId)
+	}
+
+	userId := pkgcontext.GetUserId(ctx)
+	if source.OwnerId != userId {
+		return errors.ErrPermission.Msg("source access denied")
+	}
+
+	if source.Title == nextTitle {
+		return nil
+	}
+
+	err = l.sourceBiz.UpdateTitle(ctx, sourceId, nextTitle)
+	if err != nil {
+		return errors.WithMessagef(err, "update source title failed, source_id=%s", sourceId)
+	}
+
+	return nil
+}
+
 type GetSourceDocParams struct {
 	SourceId uuid.UUID
 	DocId    string
@@ -191,7 +231,7 @@ func (l *SourceLogic) GetSourceDoc(
 	return &GetSourceDocResult{
 		SourceId:    source.Id.String(),
 		DocId:       doc.Id,
-		SourceTitle: source.DisplayName,
+		SourceTitle: source.Title,
 		Content:     doc.Content,
 	}, nil
 }
@@ -471,134 +511,13 @@ func (l *SourceLogic) updateFileSourceContent(
 	}
 
 	return l.sourceBiz.UpdateContent(ctx, &bizsource.UpdateContentCommand{
-		Id:          source.Id,
-		Status:      model.SourceStatusUploading,
-		DisplayName: fileContent.Filename,
-		Content:     content,
+		Id:      source.Id,
+		Status:  model.SourceStatusUploading,
+		Title:   fileContent.Filename,
+		Content: content,
 	})
-}
-
-func (l *SourceLogic) notifySourceEventMessage(
-	ctx context.Context,
-	source *model.Source,
-) error {
-	sourceEvent := &sourceEventMessage{
-		Id:         source.Id,
-		NotebookId: source.NotebookId,
-		Kind:       source.Kind,
-		Status:     source.Status,
-	}
-	value, err := sonic.Marshal(sourceEvent)
-	if err != nil {
-		return errors.Wrapf(err,
-			"marshal source failed, kind=%s, source_id=%s",
-			source.Kind, source.Id)
-	}
-
-	err = l.prepProducer.Send(ctx, &mq.ProducerSendRequest{
-		Topic:   TopicSourcePreparation,
-		Key:     []byte(source.Id.String()),
-		Value:   value,
-		Headers: nil, // TODO add trace headers?
-	})
-	if err != nil {
-		return errors.Wrapf(err,
-			"send source inserted message failed, kind=%s, source_id=%s",
-			source.Kind, source.Id)
-	}
-
-	return nil
-}
-
-// 消息队列消费 消费上传完成的任务 指定来源索引构建
-func (l *SourceLogic) handleSourceEventMessage(
-	ctx context.Context,
-	msg mq.Message,
-) error {
-	var (
-		key    = msg.Key()
-		val    = msg.Value()
-		source sourceEventMessage
-		err    error
-	)
-
-	sourceId, _ := uuid.FromBytes(key)
-	slog.DebugContext(ctx, "received and handling source prep message", "msg_key", sourceId.String())
-	err = sonic.Unmarshal(val, &source)
-	if err != nil {
-		return errors.Wrap(err, "handle prep message unmarshal failed")
-	}
-
-	result, err := l.sourceBiz.PrepareSourceIndices(ctx, source.Id)
-	if err != nil {
-		// mark failure
-		err2 := l.sourceBiz.UpdateStatus(ctx, source.Id, model.SourceStatusFailed)
-		if err2 != nil {
-			return errors.WithMessage(err2, "update source status failed")
-		}
-
-		slog.ErrorContext(ctx, "prepare source failed", "source_id", source.Id, "err", err)
-		return nil
-	}
-
-	if result.ParsedContent != nil {
-		storeKey := formatSourceParsedContentStoreKey(source.Id, source.NotebookId)
-		err = l.objectStorage.UploadObject(ctx, &storage.UploadObjectRequest{
-			Key:         storeKey,
-			Body:        result.ParsedContent,
-			ContentType: result.ParsedContentType,
-		})
-		// 解析成功 但是上传失败 仅打日志不影响后续流程
-		if err != nil {
-			slog.ErrorContext(ctx, "upload parsed content failed", "source_id", source.Id, "err", err)
-		} else {
-			err = l.sourceBiz.UpdateParsedContent(ctx, &bizsource.UpdateParsedContentCommand{
-				Id: source.Id,
-				Parsed: &model.ParsedSourceContent{
-					StoreKey: storeKey,
-				},
-			})
-			if err != nil {
-				slog.ErrorContext(ctx, "update source parsed content failed", "source_id", source.Id, "err", err)
-			}
-		}
-	}
-
-	// ok
-	err = l.sourceBiz.UpdateStatus(ctx, source.Id, model.SourceStatusReady)
-	if err != nil {
-		return errors.WithMessage(err, "update source status failed")
-	}
-
-	slog.DebugContext(ctx, "prepared source success", "source_id", source.Id)
-
-	return nil
 }
 
 func checkSourceUploadable(source *model.Source) bool {
 	return source.KindFile() && source.StatusInited()
-}
-
-// Format:
-// file/{{notebook_id}}/{{source_id}}{{.format}}
-func formatSourceStoreKey(
-	params *UploadSourceParams,
-	source *model.Source,
-) string {
-	var (
-		notebookId = source.NotebookId.String()
-		sourceId   = source.Id.String()
-		// take extension from input filename
-		ext = filepath.Ext(params.Filename)
-	)
-
-	return fmt.Sprintf("file/%s/%s%s", notebookId, sourceId, ext)
-}
-
-// Format:
-// parsed_file/{{notebook_id}}/{{source_id}}
-func formatSourceParsedContentStoreKey(
-	sourceId, notebookId uuid.UUID,
-) string {
-	return fmt.Sprintf("parsed_file/%s/%s", notebookId.String(), sourceId.String())
 }

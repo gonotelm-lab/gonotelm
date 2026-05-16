@@ -17,12 +17,15 @@ COMMENT ON COLUMN notebooks.description IS 'notebook description';
 COMMENT ON COLUMN notebooks.owner_id IS 'notebook owner id';
 COMMENT ON COLUMN notebooks.updated_at IS 'notebook updated time (unix ms)';
 
+ALTER TABLE notebooks ADD COLUMN summary VARCHAR(512) NOT NULL DEFAULT '';
+COMMENT ON COLUMN notebooks.summary IS 'notebook summary';
+
 CREATE TABLE sources (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   notebook_id UUID NOT NULL DEFAULT uuidv7(),
   kind VARCHAR(16) NOT NULL DEFAULT '',
   status VARCHAR(16) NOT NULL DEFAULT '',
-  display_name VARCHAR(255) NOT NULL DEFAULT '',
+  title VARCHAR(255) NOT NULL DEFAULT '',
   content BYTEA,
   owner_id VARCHAR(255) NOT NULL DEFAULT '',
   updated_at BIGINT NOT NULL DEFAULT 0
@@ -35,13 +38,16 @@ COMMENT ON COLUMN sources.id IS 'source ID, primary key';
 COMMENT ON COLUMN sources.notebook_id IS 'notebook id';
 COMMENT ON COLUMN sources.kind IS 'source kind';
 COMMENT ON COLUMN sources.status IS 'source processing state';
-COMMENT ON COLUMN sources.display_name IS 'source display name';
+COMMENT ON COLUMN sources.title IS 'source title';
 COMMENT ON COLUMN sources.content IS 'source content payload (file source stores format in content)';
 COMMENT ON COLUMN sources.owner_id IS 'source owner id';
 COMMENT ON COLUMN sources.updated_at IS 'source updated time (unix ms)';
 
 ALTER TABLE sources ADD COLUMN parsed_content BYTEA;
 COMMENT ON COLUMN sources.parsed_content IS 'source parsed content';
+
+ALTER TABLE sources ADD COLUMN abstract TEXT;
+COMMENT ON COLUMN sources.abstract IS 'generated abstract for the source';
 
 CREATE TABLE chats (
   id UUID PRIMARY KEY DEFAULT uuidv7(),

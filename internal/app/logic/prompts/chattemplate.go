@@ -32,10 +32,19 @@ func (v ChatTemplateVars) PromptVars() map[string]any {
 	}
 }
 
-type ChatTemplate = Template[ChatTemplateVars]
+type ChatTemplate = template[ChatTemplateVars]
 
 func NewChatTemplate(lang string) (*ChatTemplate, error) {
-	return NewTemplate[ChatTemplateVars](TemplateNameChat, lang)
+	return newTemplate[ChatTemplateVars](templateNameChat, lang), nil
+}
+
+func normalizeTemplateLang(lang string) string {
+	normalizedLang := strings.TrimSpace(lang)
+	if normalizedLang == "" {
+		normalizedLang = defaultLang
+	}
+
+	return normalizedLang
 }
 
 // ChatTemplateManager manages chat templates cache and lazy loading.
@@ -55,10 +64,7 @@ func newChatTemplateManager(
 	defaultLanguage string,
 	loader func(lang string) (*ChatTemplate, error),
 ) (*ChatTemplateManager, error) {
-	normalizedLang := strings.TrimSpace(defaultLanguage)
-	if normalizedLang == "" {
-		normalizedLang = defaultLang
-	}
+	normalizedLang := normalizeTemplateLang(defaultLanguage)
 	if loader == nil {
 		return nil, fmt.Errorf("chat template loader is required")
 	}

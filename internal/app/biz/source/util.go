@@ -40,15 +40,15 @@ func buildNewSource(ctx context.Context, cmd *CreateSourceCommand) (*model.Sourc
 	case model.SourceKindText:
 		ts := model.TextSourceContent{Text: cmd.TextContent}
 		source.Content, err = sonic.Marshal(&ts)
-		source.DisplayName = truncateRunes(cmd.TextContent, 32)
+		source.Title = truncateRunes(cmd.TextContent, 32)
 	case model.SourceKindUrl:
 		us := model.UrlSourceContent{Url: cmd.UrlContent.String()}
 		source.Content, err = sonic.Marshal(&us)
-		source.DisplayName = us.Url
+		source.Title = us.Url
 	case model.SourceKindFile:
 		// file source inited with empty content
 		source.Content = nil
-		source.DisplayName = ""
+		source.Title = ""
 	default:
 		return nil, errors.ErrParams.Msgf("invalid source kind: %s", cmd.Kind)
 	}

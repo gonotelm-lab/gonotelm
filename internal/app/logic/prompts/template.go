@@ -19,8 +19,9 @@ type templateName string
 const (
 	defaultLang = "zh"
 
-	templateNameChat      templateName = "chat"
-	templateNameSummarize templateName = "summarize"
+	templateNameChat            templateName = "chat"
+	templateNameSummarize       templateName = "summarize"
+	templateNameNotebookSummary templateName = "notebook-summary"
 )
 
 //go:embed */*.jinja
@@ -146,7 +147,7 @@ func supportedLangs(name templateName) []string {
 func normalizeTemplateName(name templateName) templateName {
 	normalizedName := templateName(strings.TrimSpace(string(name)))
 	switch normalizedName {
-	case templateNameChat, templateNameSummarize:
+	case templateNameChat, templateNameSummarize, templateNameNotebookSummary:
 		return normalizedName
 	case "":
 		panic("template name is required")

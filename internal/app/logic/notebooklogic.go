@@ -45,7 +45,7 @@ func (l *NotebookLogic) CreateNotebook(
 		ctx, &biznotebook.CreateNotebookCommand{
 			Name:    params.Name,
 			OwnerId: userId,
-			Desc:    params.Desc,
+			Description:    params.Desc,
 		})
 	if err != nil {
 		return nil, errors.WithMessage(err, "create notebook failed")
@@ -80,9 +80,17 @@ func (l *NotebookLogic) GetNotebook(
 	return output, nil
 }
 
+type ListNotebooksSortBy int
+
+const (
+	ListNotebooksSortByCreateTime ListNotebooksSortBy = 0
+	ListNotebooksSortByLastActive ListNotebooksSortBy = 1
+)
+
 type ListNotebooksParams struct {
 	Limit  int
 	Offset int
+	SortBy ListNotebooksSortBy
 }
 
 type ListNotebooksResult struct {
@@ -101,6 +109,7 @@ func (l *NotebookLogic) ListNotebooks(
 			Limit:   params.Limit,
 			OwnerId: userId,
 			Offset:  params.Offset,
+			SortBy:  int(params.SortBy),
 		},
 	)
 	if err != nil {
@@ -142,12 +151,13 @@ func (l *NotebookLogic) ListNotebookSources(
 		return nil, errors.WithMessagef(err, "get notebook failed, notebook_id=%s", params.NotebookId)
 	}
 
-	fetchLimit := params.Limit + 1
-	sources, err := l.sourceBiz.ListDecodedSourcesByNotebook(
-		ctx,
-		params.NotebookId,
-		fetchLimit,
-		params.Offset)
+	fetchLimit := params.Limit + 1 // for has more check
+	req := &bizsource.ListDecodedSourcesByNotebookQuery{
+		NotebookId: params.NotebookId,
+		Limit:      fetchLimit,
+		Offset:     params.Offset,
+	}
+	sources, err := l.sourceBiz.ListDecodedSourcesByNotebook(ctx, req)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "list notebook sources failed, notebook_id=%s", params.NotebookId)
 	}
@@ -199,7 +209,7 @@ func (l *NotebookLogic) UpdateNotebookName(
 	return nil
 }
 
-func (l *NotebookLogic) UpdateNotebookDesc(
+func (l *NotebookLogic) UpdateNotebookDescription(
 	ctx context.Context,
 	id uuid.UUID,
 	desc string,
@@ -212,7 +222,11 @@ func (l *NotebookLogic) UpdateNotebookDesc(
 		return errors.WithMessage(err, "update notebook desc failed")
 	}
 
-	err = l.notebookBiz.UpdateNotebookDesc(ctx, id, desc)
+	err = l.notebookBiz.UpdateNotebookDescription(ctx,
+		&biznotebook.UpdateNotebookDescriptionCommand{
+			Id:          id,
+			Description: desc,
+		})
 	if err != nil {
 		return errors.WithMessage(err, "update notebook desc failed")
 	}

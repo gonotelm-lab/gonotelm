@@ -48,7 +48,7 @@ func (u UUID) UnixSec() int64 {
 	return u.Time().Unix()
 }
 
-func (u UUID) UnixMill() int64 {
+func (u UUID) UnixMilli() int64 {
 	return u.Time().UnixMilli()
 }
 

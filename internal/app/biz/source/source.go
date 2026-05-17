@@ -116,12 +116,21 @@ func (b *Biz) CountSourcesByNotebook(
 	return count, nil
 }
 
+type ListDecodedSourcesByNotebookQuery struct {
+	NotebookId uuid.UUID
+	Limit      int
+	Offset     int
+}
+
 func (b *Biz) ListDecodedSourcesByNotebook(
-	ctx context.Context,
-	notebookId uuid.UUID,
-	limit, offset int,
+	ctx context.Context, query *ListDecodedSourcesByNotebookQuery,
 ) ([]*model.DecodedSource, error) {
-	rows, err := b.sourceStore.ListByNotebookId(ctx, notebookId, limit, offset)
+	rows, err := b.sourceStore.ListByNotebookId(
+		ctx,
+		query.NotebookId,
+		query.Limit,
+		query.Offset,
+	)
 	if err != nil {
 		return nil, errors.WithMessage(err, "store list sources failed")
 	}
@@ -163,6 +172,34 @@ func (b *Biz) ListDecodedSourcesByNotebook(
 	}
 
 	return sourcesWithContents, nil
+}
+
+// 获取notebook的全部来源
+func (b *Biz) GetAllNotebookSources(
+	ctx context.Context,
+	notebookId uuid.UUID,
+) ([]*model.Source, error) {
+	var (
+		limit      = 100
+		offset     = 0
+		allSources = make([]*model.Source, 0, limit)
+	)
+
+	for {
+		sources, err := b.sourceStore.ListByNotebookId(ctx, notebookId, limit, offset)
+		if err != nil {
+			return nil, errors.WithMessagef(err, "list notebook sources failed, notebook_id=%s", notebookId)
+		}
+		if len(sources) == 0 {
+			break
+		}
+		for _, source := range sources {
+			allSources = append(allSources, model.NewSourceFrom(source))
+		}
+		offset += limit
+	}
+
+	return allSources, nil
 }
 
 type CreateSourceCommand struct {

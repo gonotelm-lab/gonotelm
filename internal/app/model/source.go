@@ -67,6 +67,7 @@ type Source struct {
 	Title         string       `json:"title"`
 	Content       []byte       `json:"content"`
 	ParsedContent []byte       `json:"parsed_content,omitempty"`
+	Abstract      string       `json:"abstract"`
 	OwnerId       string       `json:"owner_id"`
 	UpdatedAt     int64        `json:"updated_at"`
 }
@@ -149,6 +150,7 @@ func NewSourceFrom(s *schema.Source) *Source {
 		Title:         s.Title,
 		Content:       s.Content,
 		ParsedContent: s.ParsedContent,
+		Abstract:      s.Abstract,
 		OwnerId:       s.OwnerId,
 		UpdatedAt:     s.UpdatedAt,
 	}

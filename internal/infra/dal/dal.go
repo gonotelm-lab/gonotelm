@@ -19,8 +19,10 @@ type NotebookStore interface {
 	ListByOwnerId(ctx context.Context, ownerId string, limit, offset, orderBy int) ([]*schema.Notebook, error)
 	Update(ctx context.Context, notebook *schema.Notebook) error
 	DeleteById(ctx context.Context, id Id) error
-	UpdateName(ctx context.Context, id Id, name string) error
-	UpdateDesc(ctx context.Context, id Id, desc string) error
+	UpdateName(ctx context.Context, params *schema.NotebookUpdateNameParams) error
+	UpdateDescription(ctx context.Context, params *schema.NotebookUpdateDescriptionParams) error
+	// 仅填充空的name/description，非空字段保持不变
+	FillNameAndDescriptionIfEmpty(ctx context.Context, params *schema.NotebookFillNameAndDescriptionParams) error
 }
 
 type SourceStore interface {

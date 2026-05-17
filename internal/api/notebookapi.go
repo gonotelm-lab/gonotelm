@@ -17,7 +17,6 @@ func (s *Server) registerNotebooksRoutes(g *route.RouterGroup) {
 	g.GET("/notebook/:id/source/list", s.ListNotebookSources)
 	g.GET("/notebook/list", s.ListNotebooks)
 	g.PUT("/notebook/:id/name", s.UpdateNotebookName)
-	g.PUT("/notebook/:id/desc", s.UpdateNotebookDesc)
 	g.POST("/notebook/:id/chat", s.GetOrCreateNotebookChat)
 }
 
@@ -39,10 +38,11 @@ func (s *Server) CreateNotebook(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp, err := s.notebookLogic.CreateNotebook(ctx, &logic.CreateNotebookParams{
-		Name: req.Name,
-		Desc: req.Desc,
-	})
+	resp, err := s.notebookLogic.CreateNotebook(ctx,
+		&logic.CreateNotebookParams{
+			Name: req.Name,
+			Desc: req.Desc,
+		})
 	if err != nil {
 		http.ErrResp(c, err)
 		return
@@ -115,9 +115,28 @@ func (s *Server) GetNotebook(ctx context.Context, c *app.RequestContext) {
 	})
 }
 
+type ListNotebooksSortBy string
+
+const (
+	ListNotebooksSortByLastActive ListNotebooksSortBy = "last_active"
+	ListNotebooksSortByCreateTime ListNotebooksSortBy = "create_time"
+)
+
+func (s ListNotebooksSortBy) ToSortBy() logic.ListNotebooksSortBy {
+	switch s {
+	case ListNotebooksSortByLastActive:
+		return logic.ListNotebooksSortByLastActive
+	case ListNotebooksSortByCreateTime:
+		return logic.ListNotebooksSortByCreateTime
+	}
+
+	return logic.ListNotebooksSortByCreateTime
+}
+
 type ListNotebooksRequest struct {
-	Limit  int `query:"limit"  validate:"omitempty,min=1,max=100"`
-	Offset int `query:"offset" validate:"min=0"`
+	Limit  int                 `query:"limit"   validate:"omitempty,min=1,max=100"`
+	Offset int                 `query:"offset"  validate:"min=0"`
+	SortBy ListNotebooksSortBy `query:"sort_by" validate:"omitempty,oneof=last_active create_time"`
 }
 
 const (
@@ -128,6 +147,11 @@ func (r *ListNotebooksRequest) Validate() error {
 	if r.Limit == 0 {
 		r.Limit = defaultNotebooksListLimit
 	}
+
+	if r.SortBy == "" {
+		r.SortBy = ListNotebooksSortByCreateTime
+	}
+
 	return nil
 }
 
@@ -143,6 +167,8 @@ type ListNotebookItemResponse struct {
 	Name        string `json:"name"`
 	Desc        string `json:"desc"`
 	SourceCount int64  `json:"source_count"`
+	UpdatedAt   int64  `json:"updated_at"` // unix ms
+	CreatedAt   int64  `json:"created_at"` // unix ms
 }
 
 func (s *Server) ListNotebooks(ctx context.Context, c *app.RequestContext) {
@@ -153,10 +179,12 @@ func (s *Server) ListNotebooks(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	result, err := s.notebookLogic.ListNotebooks(ctx, &logic.ListNotebooksParams{
-		Limit:  req.Limit,
-		Offset: req.Offset,
-	})
+	result, err := s.notebookLogic.ListNotebooks(ctx,
+		&logic.ListNotebooksParams{
+			Limit:  req.Limit,
+			Offset: req.Offset,
+			SortBy: req.SortBy.ToSortBy(),
+		})
 	if err != nil {
 		http.ErrResp(c, err)
 		return
@@ -169,6 +197,8 @@ func (s *Server) ListNotebooks(ctx context.Context, c *app.RequestContext) {
 			Name:        notebook.Notebook.Name,
 			Desc:        notebook.Notebook.Description,
 			SourceCount: notebook.SourceCount,
+			UpdatedAt:   notebook.Notebook.UpdatedAt,
+			CreatedAt:   notebook.Notebook.Id.UnixMilli(),
 		})
 	}
 
@@ -266,7 +296,7 @@ func toNotebookSourceResponses(sources []*model.DecodedSource) []*NotebookSource
 
 type UpdateNotebookNameRequest struct {
 	Id   uuid.UUID `path:"id,required"`
-	Name string    `json:"name" validate:"min=0,max=128"`
+	Name string    `json:"name"        validate:"min=0,max=128"`
 }
 
 func (s *Server) UpdateNotebookName(ctx context.Context, c *app.RequestContext) {
@@ -278,28 +308,6 @@ func (s *Server) UpdateNotebookName(ctx context.Context, c *app.RequestContext) 
 	}
 
 	err = s.notebookLogic.UpdateNotebookName(ctx, req.Id, req.Name)
-	if err != nil {
-		http.ErrResp(c, err)
-		return
-	}
-
-	http.OkResp(c, nil)
-}
-
-type UpdateNotebookDescRequest struct {
-	Id   uuid.UUID `path:"id,required"`
-	Desc string    `json:"desc" validate:"max=1024"`
-}
-
-func (s *Server) UpdateNotebookDesc(ctx context.Context, c *app.RequestContext) {
-	var req UpdateNotebookDescRequest
-	err := c.BindAndValidate(&req)
-	if err != nil {
-		http.ErrResp(c, err)
-		return
-	}
-
-	err = s.notebookLogic.UpdateNotebookDesc(ctx, req.Id, req.Desc)
 	if err != nil {
 		http.ErrResp(c, err)
 		return

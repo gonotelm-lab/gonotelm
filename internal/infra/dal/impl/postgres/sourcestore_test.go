@@ -26,6 +26,8 @@ func TestSourceStoreCRUD(t *testing.T) {
 			NotebookId: notebookID,
 			Kind:       "doc",
 			Status:     "new",
+			Abstract:   "initial abstract",
+			OwnerId:    "owner_" + uuid.NewV7().String(),
 			Content:    []byte(content),
 			UpdatedAt:  time.Now().UnixMilli(),
 		}
@@ -42,6 +44,8 @@ func TestSourceStoreCRUD(t *testing.T) {
 		So(got.Id, ShouldEqual, source.Id)
 		So(got.NotebookId, ShouldEqual, source.NotebookId)
 		So(strings.TrimSpace(got.Status), ShouldEqual, source.Status)
+		So(got.Abstract, ShouldEqual, source.Abstract)
+		So(got.OwnerId, ShouldEqual, source.OwnerId)
 		So(got.Content, ShouldNotBeNil)
 		So(string(got.Content), ShouldEqual, content)
 
@@ -239,6 +243,7 @@ func TestSourceStoreParsedContentCompatibility(t *testing.T) {
 			Title:         "source-with-converted",
 			Content:       []byte("raw-content"),
 			ParsedContent: []byte("converted-content"),
+			Abstract:      "initial abstract",
 			OwnerId:       "owner_" + uuid.NewV7().String(),
 			UpdatedAt:     1000,
 		}
@@ -253,6 +258,7 @@ func TestSourceStoreParsedContentCompatibility(t *testing.T) {
 		So(err, ShouldBeNil)
 		So(created, ShouldNotBeNil)
 		So(string(created.ParsedContent), ShouldEqual, "converted-content")
+		So(created.Abstract, ShouldEqual, source.Abstract)
 		So(created.OwnerId, ShouldEqual, source.OwnerId)
 
 		err = store.Update(ctx, &schema.SourceUpdateParams{
@@ -267,9 +273,51 @@ func TestSourceStoreParsedContentCompatibility(t *testing.T) {
 		updated, err := store.GetById(ctx, source.Id)
 		So(err, ShouldBeNil)
 		So(updated, ShouldNotBeNil)
-		// update path does not touch parsed_content/owner_id, they should remain stable.
+		// update path does not touch parsed_content/abstract/owner_id, they should remain stable.
 		So(string(updated.ParsedContent), ShouldEqual, "converted-content")
+		So(updated.Abstract, ShouldEqual, source.Abstract)
 		So(updated.OwnerId, ShouldEqual, source.OwnerId)
+	})
+}
+
+func TestSourceStoreUpdateAbstract(t *testing.T) {
+	Convey("SourceStore UpdateAbstract", t, func() {
+		store := testSourceStore
+		ctx := t.Context()
+		notebookID := createNotebookForSourceTest(t, testDB)
+
+		source := &schema.Source{
+			Id:         dal.Id(uuid.NewV7()),
+			NotebookId: notebookID,
+			Kind:       "doc",
+			Status:     "ready",
+			Title:      "source-update-abstract",
+			Content:    []byte("raw-content"),
+			Abstract:   "abstract-old",
+			OwnerId:    "owner_" + uuid.NewV7().String(),
+			UpdatedAt:  1000,
+		}
+		So(store.Create(ctx, source), ShouldBeNil)
+		t.Cleanup(func() {
+			_ = testDB.WithContext(ctx).Where("id = ?", source.Id).Delete(&schema.Source{}).Error
+		})
+
+		newUpdatedAt := time.Now().UnixMilli()
+		err := store.UpdateAbstract(ctx, &schema.SourceUpdateAbstractParams{
+			Id:        source.Id,
+			Abstract:  "abstract-new",
+			UpdatedAt: newUpdatedAt,
+		})
+		So(err, ShouldBeNil)
+
+		got, err := store.GetById(ctx, source.Id)
+		So(err, ShouldBeNil)
+		So(got, ShouldNotBeNil)
+		So(got.Abstract, ShouldEqual, "abstract-new")
+		// ensure unrelated fields are not overwritten.
+		So(string(got.Content), ShouldEqual, "raw-content")
+		So(got.OwnerId, ShouldEqual, source.OwnerId)
+		So(got.UpdatedAt, ShouldEqual, newUpdatedAt)
 	})
 }
 

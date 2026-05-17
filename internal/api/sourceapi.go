@@ -4,9 +4,11 @@ import (
 	"context"
 	"net/url"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/route"
+	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	logic "github.com/gonotelm-lab/gonotelm/internal/app/logic/source"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -46,6 +48,9 @@ func (r *CreateSourceRequest) Validate() error {
 	case model.SourceKindText:
 		if r.Text == "" {
 			return errors.Errorf("text content is required")
+		}
+		if tLen := utf8.RuneCountInString(r.Text); tLen > constants.MaxSourceTextContentLength {
+			return errors.Errorf("text content is too long")
 		}
 	case model.SourceKindUrl:
 		parsedUrl, err := url.ParseRequestURI(r.Url)

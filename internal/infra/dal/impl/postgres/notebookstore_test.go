@@ -119,3 +119,200 @@ func TestNotebookStoreListByOwnerIdInvalidPagination(t *testing.T) {
 		So(strings.Contains(err.Error(), "invalid pagination params"), ShouldBeTrue)
 	})
 }
+
+func TestNotebookStoreUpdateName(t *testing.T) {
+	Convey("NotebookStore UpdateName", t, func() {
+		store := testNotebookStore
+		ctx := t.Context()
+
+		notebook := &schema.Notebook{
+			Id:          dal.Id(uuid.NewV7()),
+			Name:        "nb_" + uuid.NewV7().String(),
+			Description: "initial desc",
+			OwnerId:     "owner_" + uuid.NewV7().String(),
+			UpdatedAt:   time.Now().UnixMilli(),
+		}
+		err := store.Create(ctx, notebook)
+		So(err, ShouldBeNil)
+		t.Cleanup(func() {
+			_ = testDB.WithContext(ctx).Where("id = ?", notebook.Id).Delete(&schema.Notebook{}).Error
+		})
+
+		newName := "nb_updated_" + uuid.NewV7().String()
+		updatedAt := notebook.UpdatedAt + 100
+		err = store.UpdateName(ctx, &schema.NotebookUpdateNameParams{
+			Id:        notebook.Id,
+			Name:      newName,
+			UpdatedAt: updatedAt,
+		})
+		So(err, ShouldBeNil)
+
+		got, err := store.GetById(ctx, notebook.Id)
+		So(err, ShouldBeNil)
+		So(got.Name, ShouldEqual, newName)
+		So(got.Description, ShouldEqual, notebook.Description)
+		So(got.UpdatedAt, ShouldEqual, updatedAt)
+	})
+}
+
+func TestNotebookStoreUpdateDescription(t *testing.T) {
+	Convey("NotebookStore UpdateDescription", t, func() {
+		store := testNotebookStore
+		ctx := t.Context()
+
+		createNotebook := func(desc string, updatedAt int64) *schema.Notebook {
+			notebook := &schema.Notebook{
+				Id:          dal.Id(uuid.NewV7()),
+				Name:        "nb_" + uuid.NewV7().String(),
+				Description: desc,
+				OwnerId:     "owner_" + uuid.NewV7().String(),
+				UpdatedAt:   updatedAt,
+			}
+			err := store.Create(ctx, notebook)
+			So(err, ShouldBeNil)
+			t.Cleanup(func() {
+				_ = testDB.WithContext(ctx).Where("id = ?", notebook.Id).Delete(&schema.Notebook{}).Error
+			})
+			return notebook
+		}
+
+		Convey("updates description when SkipIfNonEmpty is false", func() {
+			notebook := createNotebook("initial desc", 1000)
+			err := store.UpdateDescription(ctx, &schema.NotebookUpdateDescriptionParams{
+				Id:             notebook.Id,
+				Description:    "updated desc",
+				SkipIfNonEmpty: false,
+				UpdatedAt:      1100,
+			})
+			So(err, ShouldBeNil)
+
+			got, err := store.GetById(ctx, notebook.Id)
+			So(err, ShouldBeNil)
+			So(got.Description, ShouldEqual, "updated desc")
+			So(got.UpdatedAt, ShouldEqual, int64(1100))
+		})
+
+		Convey("updates empty description when SkipIfNonEmpty is true", func() {
+			notebook := createNotebook("", 2000)
+			err := store.UpdateDescription(ctx, &schema.NotebookUpdateDescriptionParams{
+				Id:             notebook.Id,
+				Description:    "generated desc",
+				SkipIfNonEmpty: true,
+				UpdatedAt:      2100,
+			})
+			So(err, ShouldBeNil)
+
+			got, err := store.GetById(ctx, notebook.Id)
+			So(err, ShouldBeNil)
+			So(got.Description, ShouldEqual, "generated desc")
+			So(got.UpdatedAt, ShouldEqual, int64(2100))
+		})
+
+		Convey("does not update non-empty description when SkipIfNonEmpty is true", func() {
+			notebook := createNotebook("manual desc", 3000)
+			err := store.UpdateDescription(ctx, &schema.NotebookUpdateDescriptionParams{
+				Id:             notebook.Id,
+				Description:    "generated desc",
+				SkipIfNonEmpty: true,
+				UpdatedAt:      3100,
+			})
+			So(err, ShouldBeNil)
+
+			got, err := store.GetById(ctx, notebook.Id)
+			So(err, ShouldBeNil)
+			So(got.Description, ShouldEqual, "manual desc")
+			So(got.UpdatedAt, ShouldEqual, int64(3000))
+		})
+	})
+}
+
+func TestNotebookStoreFillNameAndDescriptionIfEmpty(t *testing.T) {
+	Convey("NotebookStore FillNameAndDescriptionIfEmpty", t, func() {
+		store := testNotebookStore
+		ctx := t.Context()
+
+		createNotebook := func(name, desc string, updatedAt int64) *schema.Notebook {
+			notebook := &schema.Notebook{
+				Id:          dal.Id(uuid.NewV7()),
+				Name:        name,
+				Description: desc,
+				OwnerId:     "owner_" + uuid.NewV7().String(),
+				UpdatedAt:   updatedAt,
+			}
+			err := store.Create(ctx, notebook)
+			So(err, ShouldBeNil)
+			t.Cleanup(func() {
+				_ = testDB.WithContext(ctx).Where("id = ?", notebook.Id).Delete(&schema.Notebook{}).Error
+			})
+			return notebook
+		}
+
+		Convey("updates both fields when both are empty", func() {
+			notebook := createNotebook("", "", 1000)
+			err := store.FillNameAndDescriptionIfEmpty(ctx, &schema.NotebookFillNameAndDescriptionParams{
+				Id:          notebook.Id,
+				Name:        "new_name",
+				Description: "new_desc",
+				UpdatedAt:   1100,
+			})
+			So(err, ShouldBeNil)
+
+			got, err := store.GetById(ctx, notebook.Id)
+			So(err, ShouldBeNil)
+			So(got.Name, ShouldEqual, "new_name")
+			So(got.Description, ShouldEqual, "new_desc")
+			So(got.UpdatedAt, ShouldEqual, int64(1100))
+		})
+
+		Convey("keeps non-empty name while updating empty description", func() {
+			notebook := createNotebook("manual_name", "", 2000)
+			err := store.FillNameAndDescriptionIfEmpty(ctx, &schema.NotebookFillNameAndDescriptionParams{
+				Id:          notebook.Id,
+				Name:        "generated_name",
+				Description: "new_desc",
+				UpdatedAt:   2100,
+			})
+			So(err, ShouldBeNil)
+
+			got, err := store.GetById(ctx, notebook.Id)
+			So(err, ShouldBeNil)
+			So(got.Name, ShouldEqual, "manual_name")
+			So(got.Description, ShouldEqual, "new_desc")
+			So(got.UpdatedAt, ShouldEqual, int64(2100))
+		})
+
+		Convey("keeps non-empty description while updating empty name", func() {
+			notebook := createNotebook("", "manual_desc", 3000)
+			err := store.FillNameAndDescriptionIfEmpty(ctx, &schema.NotebookFillNameAndDescriptionParams{
+				Id:          notebook.Id,
+				Name:        "new_name",
+				Description: "generated_desc",
+				UpdatedAt:   3100,
+			})
+			So(err, ShouldBeNil)
+
+			got, err := store.GetById(ctx, notebook.Id)
+			So(err, ShouldBeNil)
+			So(got.Name, ShouldEqual, "new_name")
+			So(got.Description, ShouldEqual, "manual_desc")
+			So(got.UpdatedAt, ShouldEqual, int64(3100))
+		})
+
+		Convey("keeps both fields and updated_at when both are non-empty", func() {
+			notebook := createNotebook("old_name", "old_desc", 1000)
+			err := store.FillNameAndDescriptionIfEmpty(ctx, &schema.NotebookFillNameAndDescriptionParams{
+				Id:          notebook.Id,
+				Name:        "new_name",
+				Description: "new_desc",
+				UpdatedAt:   1100,
+			})
+			So(err, ShouldBeNil)
+
+			got, err := store.GetById(ctx, notebook.Id)
+			So(err, ShouldBeNil)
+			So(got.Name, ShouldEqual, "old_name")
+			So(got.Description, ShouldEqual, "old_desc")
+			So(got.UpdatedAt, ShouldEqual, int64(1000))
+		})
+	})
+}

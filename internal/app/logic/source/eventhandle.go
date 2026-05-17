@@ -6,7 +6,9 @@ import (
 	"strings"
 	"sync"
 
+	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
+	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/logic/prompts"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
@@ -136,6 +138,8 @@ func (l *SourceLogic) handleSourceEventMessage(
 	})
 	wg.Wait()
 
+	l.generateNotebookSummary(ctx, sourceEvent.NotebookId)
+
 	// ok
 	err = l.sourceBiz.UpdateStatus(ctx, sourceEvent.Id, model.SourceStatusReady)
 	if err != nil {
@@ -231,9 +235,18 @@ func (l *SourceLogic) generateSourceSummary(
 		batchSize,
 		maxConcurrency,
 		func(ctx context.Context, batch []string) ([]string, error) {
-			msgs := []*einoschema.Message{
-				prompts.SummarizePromptMessage(ctx, batch[0], userLang),
+			summaryPrompt, err := prompts.SummarizePromptMessage(
+				ctx, batch[0], userLang,
+			)
+			if err != nil {
+				slog.ErrorContext(ctx, "render summarize prompt failed",
+					slog.String("source_id", sourceId.String()),
+					slog.Any("err", err),
+				)
+				return []string{}, nil
 			}
+
+			msgs := []*einoschema.Message{summaryPrompt}
 			result, err := summaryModel.Generate(ctx, msgs, llmOption)
 			if err != nil {
 				slog.ErrorContext(ctx, "generate summary failed",
@@ -256,9 +269,18 @@ func (l *SourceLogic) generateSourceSummary(
 
 	// 给那个chunk的summary再输出一句summary
 	summarizingTexts := strings.Join(chunkSummaries, "\n")
-	msgs := []*einoschema.Message{
-		prompts.SummarizePromptMessage(ctx, summarizingTexts, userLang),
+	summaryPrompt, err := prompts.SummarizePromptMessage(
+		ctx, summarizingTexts, userLang,
+	)
+	if err != nil {
+		slog.ErrorContext(ctx, "render summarize prompt failed",
+			slog.String("source_id", sourceId.String()),
+			slog.Any("err", err),
+		)
+		return
 	}
+
+	msgs := []*einoschema.Message{summaryPrompt}
 	summaryResult, err := summaryModel.Generate(ctx, msgs, llmOption)
 	if err != nil {
 		slog.ErrorContext(ctx, "generate summary failed",
@@ -273,5 +295,126 @@ func (l *SourceLogic) generateSourceSummary(
 			slog.String("source_id", sourceId.String()),
 			slog.Any("err", err),
 		)
+	}
+}
+
+func (l *SourceLogic) generateNotebookSummary(
+	ctx context.Context,
+	notebookId uuid.UUID,
+) {
+	slog.DebugContext(ctx, "generate notebook summary",
+		slog.String("notebook_id", notebookId.String()),
+	)
+
+	notebook, err := l.notebookBiz.GetNotebook(ctx, notebookId)
+	if err != nil {
+		if errors.Is(err, biznotebook.ErrNotebookNotFound) {
+			return
+		}
+
+		slog.ErrorContext(ctx, "get notebook failed",
+			slog.String("notebook_id", notebookId.String()),
+			slog.Any("err", err),
+		)
+		return
+	}
+
+	if notebook.Description != "" {
+		// 自动生成的描述不覆盖已有的
+		return
+	}
+
+	// get all notebook sources
+	notebookSources, err := l.sourceBiz.GetAllNotebookSources(ctx, notebookId)
+	if err != nil {
+		slog.ErrorContext(ctx, "get all notebook sources failed",
+			slog.String("notebook_id", notebookId.String()),
+			slog.Any("err", err),
+		)
+		return
+	}
+
+	abstracts := make([]string, 0, len(notebookSources))
+	for _, source := range notebookSources {
+		if source.Abstract != "" {
+			abstracts = append(abstracts, source.Abstract)
+		}
+	}
+
+	userLang := "" // TODO
+	// generate prompt message
+	msg, err := prompts.NotebookSummaryPromptMessage(
+		ctx, abstracts, userLang,
+	)
+	if err != nil {
+		slog.ErrorContext(ctx, "render notebook summary prompt failed",
+			slog.String("notebook_id", notebookId.String()),
+			slog.Any("err", err),
+		)
+		return
+	}
+
+	// generate summary
+	provider, err := l.llmGateway.GetProvider(
+		conf.Global().Logic.Source.ModelProvider,
+	)
+	if err != nil {
+		slog.ErrorContext(ctx, "get summary model failed",
+			slog.String("notebook_id", notebookId.String()),
+			slog.Any("err", err),
+		)
+		return
+	}
+	llmOption := llmchat.BuildLLMModelOption(conf.Global().Logic.Source.Model)
+	result, err := provider.Generate(
+		ctx,
+		[]*einoschema.Message{msg},
+		llmOption,
+	)
+	if err != nil {
+		slog.ErrorContext(ctx, "generate notebook summary failed",
+			slog.String("notebook_id", notebookId.String()),
+			slog.Any("err", err),
+		)
+		return
+	}
+
+	// now we update notebook description
+	convention := struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}{}
+
+	// truncate
+	convention.Name = strings.TrimSpace(convention.Name)
+	convention.Description = strings.TrimSpace(convention.Description)
+	convention.Name = constants.TruncateNotebookName(convention.Name)
+	convention.Description = constants.TruncateNotebookDescription(convention.Description)
+
+	err = sonic.Unmarshal(pkgstring.AsBytes(result.Content), &convention)
+	if err != nil {
+		slog.WarnContext(ctx, "llm model response unmarshal failed",
+			slog.String("notebook_id", notebookId.String()),
+			slog.Any("err", err),
+		)
+		return
+	}
+
+	slog.DebugContext(ctx, "update notebook description",
+		slog.String("notebook_id", notebookId.String()),
+	)
+
+	err = l.notebookBiz.FillNotebookMeta(ctx,
+		&biznotebook.FillNotebookMetaCommand{
+			Id:          notebookId,
+			Name:        convention.Name,
+			Description: convention.Description,
+		})
+	if err != nil {
+		slog.ErrorContext(ctx, "fill notebook meta failed",
+			slog.String("notebook_id", notebookId.String()),
+			slog.Any("err", err),
+		)
+		return
 	}
 }

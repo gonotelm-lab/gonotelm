@@ -17,9 +17,6 @@ COMMENT ON COLUMN notebooks.description IS 'notebook description';
 COMMENT ON COLUMN notebooks.owner_id IS 'notebook owner id';
 COMMENT ON COLUMN notebooks.updated_at IS 'notebook updated time (unix ms)';
 
-ALTER TABLE notebooks ADD COLUMN summary VARCHAR(512) NOT NULL DEFAULT '';
-COMMENT ON COLUMN notebooks.summary IS 'notebook summary';
-
 CREATE TABLE sources (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   notebook_id UUID NOT NULL DEFAULT uuidv7(),

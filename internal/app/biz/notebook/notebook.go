@@ -6,12 +6,9 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/dal/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
-)
-
-const (
-	untitledNotebookName = "Untitled notebook"
 )
 
 var ErrNotebookNotFound = errors.New("notebook not found")
@@ -40,6 +37,7 @@ type ListNotebooksQuery struct {
 	Limit   int
 	Offset  int
 	OwnerId string
+	SortBy  int // 0-create_time, 1-updated_at
 }
 
 type ListNotebooksResult struct {
@@ -57,7 +55,7 @@ func (b *Biz) ListNotebooks(
 		query.OwnerId,
 		fetchLimit,
 		query.Offset,
-		0,
+		query.SortBy,
 	)
 	if err != nil {
 		return nil, errors.WithMessage(err, "store list notebooks failed")
@@ -81,21 +79,17 @@ func (b *Biz) ListNotebooks(
 }
 
 type CreateNotebookCommand struct {
-	OwnerId string
-	Name    string
-	Desc    string
+	OwnerId     string
+	Name        string // optional
+	Description string // optional
 }
 
 func (b *Biz) CreateNotebook(ctx context.Context, cmd *CreateNotebookCommand) (*model.Notebook, error) {
 	notebookId := uuid.NewV7()
-
-	if cmd.Name == "" {
-		cmd.Name = untitledNotebookName
-	}
 	notebook := &model.Notebook{
 		Id:          notebookId,
 		Name:        cmd.Name,
-		Description: cmd.Desc,
+		Description: cmd.Description,
 		OwnerId:     cmd.OwnerId,
 		UpdatedAt:   time.Now().UnixMilli(),
 	}
@@ -108,8 +102,16 @@ func (b *Biz) CreateNotebook(ctx context.Context, cmd *CreateNotebookCommand) (*
 	return notebook, nil
 }
 
-func (b *Biz) UpdateNotebookName(ctx context.Context, id uuid.UUID, name string) error {
-	err := b.notebookStore.UpdateName(ctx, id, name)
+func (b *Biz) UpdateNotebookName(
+	ctx context.Context,
+	id uuid.UUID,
+	name string,
+) error {
+	err := b.notebookStore.UpdateName(ctx, &schema.NotebookUpdateNameParams{
+		Id:        id,
+		Name:      name,
+		UpdatedAt: time.Now().UnixMilli(),
+	})
 	if err != nil {
 		return errors.WithMessage(err, "store update notebook name failed")
 	}
@@ -117,10 +119,49 @@ func (b *Biz) UpdateNotebookName(ctx context.Context, id uuid.UUID, name string)
 	return nil
 }
 
-func (b *Biz) UpdateNotebookDesc(ctx context.Context, id uuid.UUID, desc string) error {
-	err := b.notebookStore.UpdateDesc(ctx, id, desc)
+type UpdateNotebookDescriptionCommand struct {
+	Id             uuid.UUID
+	Description    string
+	SkipIfNonEmpty bool
+}
+
+func (b *Biz) UpdateNotebookDescription(
+	ctx context.Context,
+	cmd *UpdateNotebookDescriptionCommand,
+) error {
+	err := b.notebookStore.UpdateDescription(ctx, &schema.NotebookUpdateDescriptionParams{
+		Id:             cmd.Id,
+		Description:    cmd.Description,
+		SkipIfNonEmpty: cmd.SkipIfNonEmpty,
+		UpdatedAt:      time.Now().UnixMilli(),
+	})
 	if err != nil {
-		return errors.WithMessage(err, "store update notebook desc failed")
+		return errors.WithMessage(err, "store update notebook description failed")
+	}
+
+	return nil
+}
+
+type FillNotebookMetaCommand struct {
+	Id          uuid.UUID
+	Name        string
+	Description string
+}
+
+// notebook meta = notebook name + description
+func (b *Biz) FillNotebookMeta(
+	ctx context.Context,
+	cmd *FillNotebookMetaCommand,
+) error {
+	err := b.notebookStore.FillNameAndDescriptionIfEmpty(ctx,
+		&schema.NotebookFillNameAndDescriptionParams{
+			Id:          cmd.Id,
+			Name:        cmd.Name,
+			Description: cmd.Description,
+			UpdatedAt:   time.Now().UnixMilli(),
+		})
+	if err != nil {
+		return errors.WithMessage(err, "store fill notebook meta failed")
 	}
 
 	return nil

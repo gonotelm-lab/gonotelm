@@ -21,7 +21,10 @@ func NewNotebookStoreImpl(db *gorm.DB) *NotebookStoreImpl {
 	return &NotebookStoreImpl{db: db}
 }
 
-func (s *NotebookStoreImpl) Create(ctx context.Context, notebook *schema.Notebook) error {
+func (s *NotebookStoreImpl) Create(
+	ctx context.Context,
+	notebook *schema.Notebook,
+) error {
 	if err := s.db.WithContext(ctx).Create(notebook).Error; err != nil {
 		return sql.WrapErr(err)
 	}
@@ -29,7 +32,9 @@ func (s *NotebookStoreImpl) Create(ctx context.Context, notebook *schema.Noteboo
 	return nil
 }
 
-func (s *NotebookStoreImpl) GetById(ctx context.Context, id dal.Id) (*schema.Notebook, error) {
+func (s *NotebookStoreImpl) GetById(
+	ctx context.Context, id dal.Id,
+) (*schema.Notebook, error) {
 	var notebook schema.Notebook
 	err := s.db.WithContext(ctx).
 		Where("id = ?", id).
@@ -99,29 +104,103 @@ func (s *NotebookStoreImpl) Update(ctx context.Context, notebook *schema.Noteboo
 }
 
 func (s *NotebookStoreImpl) DeleteById(ctx context.Context, id dal.Id) error {
-	if err := s.db.WithContext(ctx).Where("id = ?", id).Delete(&schema.Notebook{}).Error; err != nil {
+	if err := s.db.WithContext(ctx).
+		Where("id = ?", id).
+		Delete(&schema.Notebook{}).Error; err != nil {
 		return sql.WrapErr(err)
 	}
 
 	return nil
 }
 
-func (s *NotebookStoreImpl) UpdateName(ctx context.Context, id dal.Id, name string) error {
+func (s *NotebookStoreImpl) UpdateName(
+	ctx context.Context,
+	params *schema.NotebookUpdateNameParams,
+) error {
+	where := "id = ?"
+	whereParams := []any{params.Id}
+	if params.SkipIfNonEmpty {
+		where += " AND name = ''"
+	}
+
 	if err := s.db.WithContext(ctx).
 		Model(&schema.Notebook{}).
-		Where("id = ?", id).
-		Update("name", name).Error; err != nil {
+		Where(where, whereParams...).
+		Updates(map[string]any{
+			"name":       params.Name,
+			"updated_at": params.UpdatedAt,
+		}).Error; err != nil {
 		return sql.WrapErr(err)
 	}
 	return nil
 }
 
-func (s *NotebookStoreImpl) UpdateDesc(ctx context.Context, id dal.Id, desc string) error {
+func (s *NotebookStoreImpl) UpdateDescription(
+	ctx context.Context,
+	params *schema.NotebookUpdateDescriptionParams,
+) error {
+	where := "id = ?"
+	whereParams := []any{params.Id}
+	if params.SkipIfNonEmpty {
+		where += " AND description = ''"
+	}
+
 	if err := s.db.WithContext(ctx).
 		Model(&schema.Notebook{}).
-		Where("id = ?", id).
-		Update("description", desc).Error; err != nil {
+		Where(where, whereParams...).
+		Updates(map[string]any{
+			"description": params.Description,
+			"updated_at":  params.UpdatedAt,
+		}).Error; err != nil {
 		return sql.WrapErr(err)
 	}
+
+	return nil
+}
+
+func (s *NotebookStoreImpl) FillNameAndDescriptionIfEmpty(
+	ctx context.Context,
+	params *schema.NotebookFillNameAndDescriptionParams,
+) error {
+	// UPDATE "notebooks"
+	// SET
+	// 	"name" = CASE
+	// 		WHEN "name" <> '' THEN "name"
+	// 		ELSE $1
+	// 	END,
+	// 	"description" = CASE
+	// 		WHEN "description" <> '' THEN "description"
+	// 		ELSE $2
+	// 	END,
+	// 	"updated_at" = CASE
+	// 		WHEN "name" <> '' AND "description" <> '' THEN "updated_at"
+	// 		ELSE $3
+	// 	END
+	// WHERE "id" = $4;
+
+	if err := s.db.WithContext(ctx).
+		Model(&schema.Notebook{}).
+		Where("id = ?", params.Id).
+		Updates(map[string]any{
+			"name": gorm.Expr(
+				"CASE WHEN name <> '' THEN name ELSE ? END",
+				params.Name,
+			),
+			"description": gorm.Expr(
+				"CASE WHEN description <> '' THEN description ELSE ? END",
+				params.Description,
+			),
+			"updated_at": gorm.Expr(
+				`CASE
+					WHEN name <> '' AND description <> ''
+					THEN updated_at
+					ELSE ?
+				END`,
+				params.UpdatedAt,
+			),
+		}).Error; err != nil {
+		return sql.WrapErr(err)
+	}
+
 	return nil
 }

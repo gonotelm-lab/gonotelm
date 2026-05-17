@@ -14,6 +14,7 @@ type Source struct {
 	Title         string    `gorm:"column:title"`
 	Content       []byte    `gorm:"column:content"`
 	ParsedContent []byte    `gorm:"column:parsed_content"`
+	Abstract      string    `gorm:"column:abstract"`
 	OwnerId       string    `gorm:"column:owner_id"`
 	UpdatedAt     int64     `gorm:"column:updated_at"`
 }

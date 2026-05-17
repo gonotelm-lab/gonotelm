@@ -1,6 +1,8 @@
 package schema
 
-import "github.com/gonotelm-lab/gonotelm/pkg/uuid"
+import (
+	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
+)
 
 const (
 	SourceStatusInited = "inited"

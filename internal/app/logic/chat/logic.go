@@ -109,11 +109,11 @@ func (l *Logic) CreateUserMessage(
 
 	// 粗略检查source ids是否存在且属于notebookid
 	if len(params.SourceIds) > 0 {
-		query := &bizsource.CheckSourceIdsQuery{
+		query := &bizsource.CheckSourceIdsReadyQuery{
 			NotebookId: targetChat.NotebookId,
 			SourceIds:  params.SourceIds,
 		}
-		existSourceIds, err := l.sourceBiz.CheckSourceIds(ctx, query)
+		existSourceIds, err := l.sourceBiz.CheckSourceIdsReady(ctx, query)
 		if err != nil {
 			return nil, errors.WithMessage(err, "check source ids failed")
 		}
@@ -221,14 +221,6 @@ func (l *Logic) ListMessages(
 	}, nil
 }
 
-// 清除会话的上下文缓存
-func (l *Logic) ClearChatContext(
-	ctx context.Context,
-	chatId uuid.UUID,
-) error {
-	return nil
-}
-
 func (l *Logic) retrieveSourceDocs(
 	ctx context.Context,
 	notebookId uuid.UUID,
@@ -236,11 +228,11 @@ func (l *Logic) retrieveSourceDocs(
 	sourceIds []uuid.UUID,
 	taskId string,
 ) ([]*model.SourceDoc, error) {
-	query := &bizsource.CheckSourceIdsQuery{
+	query := &bizsource.CheckSourceIdsReadyQuery{
 		NotebookId: notebookId,
 		SourceIds:  sourceIds,
 	}
-	existSourceIds, err := l.sourceBiz.CheckSourceIds(ctx, query)
+	existSourceIds, err := l.sourceBiz.CheckSourceIdsReady(ctx, query)
 	if err != nil {
 		return nil, errors.WithMessage(err, "check source ids failed")
 	}
@@ -271,6 +263,7 @@ func (l *Logic) retrieveSourceDocs(
 	return retrieved, nil
 }
 
+// 清除会话的上下文缓存
 func (l *Logic) DeleteChatContext(
 	ctx context.Context,
 	chatId uuid.UUID,

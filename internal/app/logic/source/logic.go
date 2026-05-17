@@ -9,6 +9,7 @@ import (
 
 	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
+	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/mq"
@@ -115,6 +116,15 @@ func (l *SourceLogic) CreateSource(
 		}
 
 		return nil, errors.WithMessagef(err, "get notebook failed, id=%s", params.NotebookId)
+	}
+
+	// count
+	count, err := l.sourceBiz.CountSourcesByNotebook(ctx, params.NotebookId)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "count sources failed, notebook_id=%s", params.NotebookId)
+	}
+	if count >= constants.MaxSourceCountPerNotebook {
+		return nil, errors.ErrParams.Msgf("source count exceeds max count, notebook_id=%s", params.NotebookId)
 	}
 
 	source, err := l.sourceBiz.CreateSource(

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/app/biz/source/convertdoc"
+	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/cache"
@@ -19,13 +20,19 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/batch"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/slices"
+	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
+	"github.com/gonotelm-lab/gonotelm/pkg/token"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 
 	"github.com/bytedance/sonic"
 	einoembed "github.com/cloudwego/eino/components/embedding"
 )
 
-var ErrSourceNotFound = errors.New("source not found")
+var (
+	ErrSourceNotFound             = errors.New("source not found")
+	ErrSourceContentTooLong       = errors.New("source content too long")
+	ErrSourceCountExceedsMaxCount = errors.New("source count exceeds max count")
+)
 
 type Biz struct {
 	objectStorage  storage.Storage
@@ -404,6 +411,16 @@ func (b *Biz) PrepareSourceIndices(
 		return nil, err
 	}
 
+	// 超过的不处理
+	estimatedToken := token.EstimateToken(pkgstring.FromBytes(result.ParsedContent))
+	if estimatedToken > constants.MaxSourceTextContentToken {
+		return nil, errors.Wrapf(ErrSourceContentTooLong,
+			"source content too long, token count=%d, source_id=%s",
+			estimatedToken,
+			sourceId,
+		)
+	}
+
 	textChunks, err := b.embedAndInsertSourceDocs(ctx, source, result)
 	if err != nil {
 		return nil, err
@@ -492,15 +509,15 @@ func (b *Biz) embedAndInsertSourceDocs(
 	return texts, nil
 }
 
-type CheckSourceIdsQuery struct {
+type CheckSourceIdsReadyQuery struct {
 	NotebookId uuid.UUID
 	SourceIds  []uuid.UUID
 }
 
-// 检查source ids是否存在且属于notebookid
-func (b *Biz) CheckSourceIds(
+// 检查source ids是否ready且属于notebookid
+func (b *Biz) CheckSourceIdsReady(
 	ctx context.Context,
-	query *CheckSourceIdsQuery,
+	query *CheckSourceIdsReadyQuery,
 ) ([]uuid.UUID, error) {
 	qids := slices.Unique(query.SourceIds)
 	rows, err := b.sourceStore.ListByNotebookIdAndIds(
@@ -515,6 +532,11 @@ func (b *Biz) CheckSourceIds(
 	// 返回query ids中出现在rows中的ids
 	existSourceIds := make([]uuid.UUID, 0, len(rows))
 	for _, row := range rows {
+		// 只要ready的source ids
+		if row.Status != model.SourceStatusReady.String() {
+			continue
+		}
+
 		existSourceIds = append(existSourceIds, row.Id)
 	}
 

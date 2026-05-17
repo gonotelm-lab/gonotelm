@@ -119,6 +119,14 @@ func (l *SourceLogic) handleSourceEventMessage(
 			return errors.WithMessage(err2, "update source status failed")
 		}
 
+		if errors.Is(err, bizsource.ErrSourceContentTooLong) {
+			slog.WarnContext(ctx, "source content too long",
+				slog.String("source_id", sourceEvent.Id.String()),
+				slog.Any("err", err),
+			)
+			return nil
+		}
+
 		slog.ErrorContext(ctx, "prepare source failed",
 			slog.String("source_id", sourceEvent.Id.String()),
 			slog.Any("err", err),

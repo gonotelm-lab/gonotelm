@@ -44,6 +44,21 @@ func TestTemplateMessage(t *testing.T) {
 
 }
 
+func TestTemplateMessageWithoutSelectedSources_NoCitationSpec(t *testing.T) {
+	tmpl := newTemplate[ChatTemplateVars](templateNameChat, "zh")
+
+	msg, err := tmpl.Message(context.Background(), ChatTemplateVars{
+		Notebook: "项目笔记",
+	})
+	if err != nil {
+		t.Fatalf("render message failed: %v", err)
+	}
+
+	if strings.Contains(msg.Content, "# 引用规范") {
+		t.Fatalf("render result should not contain citation spec without selected sources")
+	}
+}
+
 func TestTemplateDefaultLang(t *testing.T) {
 	tmpl, err := NewChatTemplate("")
 	if err != nil {

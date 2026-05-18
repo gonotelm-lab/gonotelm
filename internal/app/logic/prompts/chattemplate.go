@@ -5,10 +5,26 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+
+	chatmodel "github.com/gonotelm-lab/gonotelm/internal/app/model/chat"
+)
+
+const (
+	ChatTemplateStyleDefault = chatmodel.ChatStyleDefault
+	ChatTemplateStyleAnalyst = chatmodel.ChatStyleAnalyst
+	ChatTemplateStyleGuide   = chatmodel.ChatStyleGuide
+)
+
+const (
+	ChatTemplateAnswerLengthDefault = chatmodel.ChatAnswerLengthDefault
+	ChatTemplateAnswerLengthLonger  = chatmodel.ChatAnswerLengthLonger
+	ChatTemplateAnswerLengthShorter = chatmodel.ChatAnswerLengthShorter
 )
 
 type ChatTemplateVars struct {
 	Notebook        string
+	Style           chatmodel.ChatStyle
+	AnswerLength    chatmodel.ChatAnswerLength
 	SelectedSources []ChatSelectedSourceGroup
 }
 
@@ -26,8 +42,20 @@ type ChatSelectedSourceDoc struct {
 }
 
 func (v ChatTemplateVars) PromptVars() map[string]any {
+	style := string(v.Style)
+	if style == "" {
+		style = string(ChatTemplateStyleDefault)
+	}
+
+	answerLength := string(v.AnswerLength)
+	if answerLength == "" {
+		answerLength = string(ChatTemplateAnswerLengthDefault)
+	}
+
 	return map[string]any{
 		"Notebook":        v.Notebook,
+		"Style":           style,
+		"AnswerLength":    answerLength,
 		"SelectedSources": v.SelectedSources,
 	}
 }

@@ -68,10 +68,12 @@ func (l *Logic) Close(ctx context.Context) {
 }
 
 type CreateUserMessageParams struct {
-	ChatId         uuid.UUID
-	Prompt         string
-	SourceIds      []uuid.UUID
-	EnableThinking bool
+	ChatId           uuid.UUID
+	Prompt           string
+	SourceIds        []uuid.UUID
+	EnableThinking   bool
+	ChatStyle        chatmodel.ChatStyle
+	ChatAnswerLength chatmodel.ChatAnswerLength
 }
 
 type CreateUserMessageResult struct {
@@ -301,11 +303,13 @@ func (l *Logic) processUserMessageTask(
 
 	userId := pkgcontext.GetUserId(ctx)
 	sessionState := &chatSessionState{
-		id:             0, // accumulated id
-		taskId:         taskId,
-		chatId:         chat.Id,
-		userId:         userId,
-		enableThinking: params.EnableThinking,
+		id:               0, // accumulated id
+		taskId:           taskId,
+		chatId:           chat.Id,
+		userId:           userId,
+		enableThinking:   params.EnableThinking,
+		chatStyle:        params.ChatStyle,
+		chatAnswerLength: params.ChatAnswerLength,
 	}
 	ctx, sessionState.cancel = context.WithCancel(ctx)
 
@@ -646,7 +650,7 @@ func (l *Logic) agentBeforeChatHook(
 	[]*einoschema.Message, error,
 ) {
 	chatTemplate := l.chatTemplateManager.Get(state.userLang)
-	templateVars := buildChatTemplateVars(state.sourceDocs)
+	templateVars := buildChatTemplateVars(state)
 
 	systemPrompt, err := chatTemplate.Message(ctx, templateVars)
 	if err != nil {
@@ -905,8 +909,10 @@ func buildPhaseCitationFromSourceDocs(sourceDocs []*model.SourceDoc) []*chatmode
 	return items
 }
 
-func buildChatTemplateVars(sourceDocs []*model.SourceDoc) prompts.ChatTemplateVars {
+func buildChatTemplateVars(state *chatSessionState) prompts.ChatTemplateVars {
+	sourceDocs := state.sourceDocs
 	templateVars := prompts.ChatTemplateVars{}
+
 	for _, sourceDoc := range sourceDocs {
 		if sourceDoc == nil {
 			continue
@@ -939,6 +945,9 @@ func buildChatTemplateVars(sourceDocs []*model.SourceDoc) prompts.ChatTemplateVa
 			},
 		)
 	}
+
+	templateVars.Style = state.chatStyle
+	templateVars.AnswerLength = state.chatAnswerLength
 
 	return templateVars
 }

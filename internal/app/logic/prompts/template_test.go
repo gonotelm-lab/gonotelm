@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/cloudwego/eino/schema"
+	chatmodel "github.com/gonotelm-lab/gonotelm/internal/app/model/chat"
 )
 
 func TestTemplateMessage(t *testing.T) {
@@ -56,6 +57,47 @@ func TestTemplateMessageWithoutSelectedSources_NoCitationSpec(t *testing.T) {
 
 	if strings.Contains(msg.Content, "# 引用规范") {
 		t.Fatalf("render result should not contain citation spec without selected sources")
+	}
+}
+
+func TestTemplateMessageStyleVariants(t *testing.T) {
+	tmpl := newTemplate[ChatTemplateVars](templateNameChat, "zh")
+
+	cases := []struct {
+		name           string
+		style          chatmodel.ChatStyle
+		expectContains string
+	}{
+		{
+			name:           "default",
+			style:          ChatTemplateStyleDefault,
+			expectContains: "高标准的认知学习助手",
+		},
+		{
+			name:           "analyst",
+			style:          ChatTemplateStyleAnalyst,
+			expectContains: "严谨的分析师型学习助手",
+		},
+		{
+			name:           "guide",
+			style:          ChatTemplateStyleGuide,
+			expectContains: "教学向导型学习助手",
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			msg, err := tmpl.Message(context.Background(), ChatTemplateVars{
+				Style: tt.style,
+			})
+			if err != nil {
+				t.Fatalf("render message failed: %v", err)
+			}
+
+			if !strings.Contains(msg.Content, tt.expectContains) {
+				t.Fatalf("render result does not contain expected style text: %s", tt.expectContains)
+			}
+		})
 	}
 }
 

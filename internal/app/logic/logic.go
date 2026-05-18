@@ -58,6 +58,7 @@ func MustNewLogic(
 
 	sourceLogic := sourcelogic.MustNewSourceLogic(
 		ctx,
+		infrastructures,
 		objectStorage,
 		notebookLogic.notebookBiz,
 		sourceBiz,

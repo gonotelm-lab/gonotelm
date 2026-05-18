@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
+	chatmodel "github.com/gonotelm-lab/gonotelm/internal/app/model/chat"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 
@@ -12,6 +13,9 @@ type chatSessionState struct {
 	chatId   uuid.UUID
 	userId   string
 	userLang string // TODO i18n
+
+	chatStyle        chatmodel.ChatStyle
+	chatAnswerLength chatmodel.ChatAnswerLength
 
 	sourceDocs     []*model.SourceDoc // 本地对话选中的文档
 	enableThinking bool

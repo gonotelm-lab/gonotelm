@@ -34,6 +34,28 @@ type ChatCreateMessageRequest struct {
 	Prompt         string      `json:"prompt,required"`
 	SourceIds      []uuid.UUID `json:"source_ids"`
 	EnableThinking bool        `json:"enable_thinking"`
+	Style          string      `json:"style"`
+	AnswerLength   string      `json:"answer_length"`
+}
+
+func (r *ChatCreateMessageRequest) Validate() error {
+	if r.Style == "" {
+		r.Style = string(chatmodel.ChatStyleDefault)
+	}
+
+	if !chatmodel.ChatStyle(r.Style).IsValid() {
+		return errors.ErrParams.Msgf("invalid chat style: %s", r.Style)
+	}
+
+	if r.AnswerLength == "" {
+		r.AnswerLength = string(chatmodel.ChatAnswerLengthDefault)
+	}
+
+	if !chatmodel.ChatAnswerLength(r.AnswerLength).IsValid() {
+		return errors.ErrParams.Msgf("invalid chat answer length: %s", r.AnswerLength)
+	}
+
+	return nil
 }
 
 type ChatCreateMessageResponse struct {
@@ -56,10 +78,12 @@ func (s *Server) ChatCreateMessage(ctx context.Context, c *app.RequestContext) {
 
 	result, err := s.chatLogic.CreateUserMessage(ctx,
 		&chatlogic.CreateUserMessageParams{
-			ChatId:         req.Id,
-			Prompt:         req.Prompt,
-			SourceIds:      req.SourceIds,
-			EnableThinking: req.EnableThinking,
+			ChatId:           req.Id,
+			Prompt:           req.Prompt,
+			SourceIds:        req.SourceIds,
+			EnableThinking:   req.EnableThinking,
+			ChatStyle:        chatmodel.ChatStyle(req.Style),
+			ChatAnswerLength: chatmodel.ChatAnswerLength(req.AnswerLength),
 		})
 	if err != nil {
 		http.ErrResp(c, err)

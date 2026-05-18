@@ -11,14 +11,17 @@ import (
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
+	"github.com/gonotelm-lab/gonotelm/internal/infra"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/mq"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/mutex"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 
 	"github.com/bytedance/sonic"
+	"github.com/redis/go-redis/v9"
 )
 
 // mq topic names
@@ -40,7 +43,9 @@ type sourceEventMessage struct {
 }
 
 type SourceLogic struct {
-	rootCtx       context.Context
+	rootCtx context.Context
+	redis   redis.UniversalClient
+
 	objectStorage storage.Storage
 
 	notebookBiz  *biznotebook.Biz
@@ -70,6 +75,7 @@ func (l *SourceLogic) Close(ctx context.Context) {
 
 func MustNewSourceLogic(
 	rootCtx context.Context,
+	infras *infra.Instances,
 	objectStorage storage.Storage,
 	notebookBiz *biznotebook.Biz,
 	sourceBiz *bizsource.Biz,
@@ -117,6 +123,16 @@ func (l *SourceLogic) CreateSource(
 
 		return nil, errors.WithMessagef(err, "get notebook failed, id=%s", params.NotebookId)
 	}
+
+	locker := mutex.NewRedisLock(l.redis, formatSourceCreateCacheKey(params.NotebookId))
+	err = locker.LockContext(ctx)
+	if err != nil {
+		return nil, errors.Wrapf(errors.ErrCache,
+			"lock source create failed, notebook_id=%s, err=%v",
+			params.NotebookId, err,
+		)
+	}
+	defer locker.UnlockContext(ctx)
 
 	// count
 	count, err := l.sourceBiz.CountSourcesByNotebook(ctx, params.NotebookId)

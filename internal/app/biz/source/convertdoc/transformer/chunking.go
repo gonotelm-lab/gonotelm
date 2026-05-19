@@ -7,12 +7,12 @@ import (
 
 	"github.com/cloudwego/eino/components/document"
 	"github.com/cloudwego/eino/schema"
+	"github.com/gonotelm-lab/gonotelm/pkg/eino-ext/chunker/recursive"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 
 	einohtml "github.com/cloudwego/eino-ext/components/document/transformer/splitter/html"
 	eniomarkdown "github.com/cloudwego/eino-ext/components/document/transformer/splitter/markdown"
-	einorecursive "github.com/cloudwego/eino-ext/components/document/transformer/splitter/recursive"
 )
 
 func splitDocIdGenerator(ctx context.Context, originalID string, splitIndex int) string {
@@ -88,13 +88,15 @@ func NewChunkTransformer(chunkSize, overlapSize int, lenFn LenCalculator) *Chunk
 		lenFn = func(s string) int { return utf8.RuneCountInString(s) }
 	}
 
-	rt, _ := einorecursive.NewSplitter(ctx, &einorecursive.Config{
-		ChunkSize:   chunkSize,
-		OverlapSize: overlapSize,
-		IDGenerator: splitDocIdGenerator,
-		LenFunc:     lenFn,
-		Separators:  []string{"\n\n", "\n", ". ", ", ", " ", "", "?", "!", "，", "。", "？", "！"},
-	})
+	rt, _ := recursive.NewSplitter(ctx,
+		&recursive.Config{
+			ChunkSize:   chunkSize,
+			OverlapSize: overlapSize,
+			IDGenerator: splitDocIdGenerator,
+			LenFunc:     lenFn,
+			KeepType:    recursive.KeepTypeEnd,
+			Separators:  []string{"\n\n", "\n", ".", " ", "", "?", "!", "。", "？", "！"},
+		})
 
 	return &ChunkTransformer{
 		html:      ht,

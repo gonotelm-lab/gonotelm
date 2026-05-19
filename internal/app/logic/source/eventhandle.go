@@ -137,7 +137,7 @@ func (l *SourceLogic) handleSourceEventMessage(
 	var wg sync.WaitGroup
 	wg.Add(2)
 	l.wg.Go(func() {
-		l.generateParsedContent(ctx, sourceEvent.Id, sourceEvent.NotebookId, result)
+		l.uploadParsedContent(ctx, sourceEvent.Id, sourceEvent.NotebookId, result)
 		wg.Done()
 	})
 	l.wg.Go(func() {
@@ -159,7 +159,7 @@ func (l *SourceLogic) handleSourceEventMessage(
 	return nil
 }
 
-func (l *SourceLogic) generateParsedContent(
+func (l *SourceLogic) uploadParsedContent(
 	ctx context.Context,
 	sourceId uuid.UUID,
 	notebookId uuid.UUID,
@@ -228,7 +228,7 @@ func (l *SourceLogic) generateSourceSummary(
 		batchSize          = 1
 		maxConcurrency     = 20
 		tokenSize          = 10000
-		maxSummarizedChunk = 25
+		maxSummarizedChunk = 50
 	)
 
 	newChunks := pkgstring.MergeChunks(result.Chunks, tokenSize)

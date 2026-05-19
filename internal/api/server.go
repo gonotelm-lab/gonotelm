@@ -47,6 +47,7 @@ func (s *Server) registerRoutes() {
 	s.registerNotebooksRoutes(v1Group)
 	s.registerSourcesRoutes(v1Group)
 	s.registerChatRoutes(v1Group)
+	s.registerStudioRoutes(v1Group)
 }
 
 func (s *Server) Run() {

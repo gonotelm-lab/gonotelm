@@ -12,7 +12,7 @@ import (
 
 func TestChunkTransformer_Transform_AssignsPositions_Recursive(t *testing.T) {
 	Convey("ChunkTransformer recursive split should annotate byte and rune positions", t, func() {
-		transformer := NewChunkTransformer(90, 24, func(s string) int { return len(s) })
+		transformer := NewChunkTransformer(90, 45, func(s string) int { return len(s) })
 		source := strings.Join([]string{
 			"Rust ownership keeps memory safe without runtime GC.",
 			strings.Repeat("borrow checker enforces aliasing rules. ", 10),

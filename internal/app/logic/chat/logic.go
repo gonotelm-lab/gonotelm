@@ -927,10 +927,11 @@ func buildChatTemplateVars(state *chatSessionState) prompts.ChatTemplateVars {
 			}
 		}
 		if groupIdx < 0 {
-			templateVars.SelectedSources = append(templateVars.SelectedSources, prompts.ChatSelectedSourceGroup{
-				SourceIndex: int64(len(templateVars.SelectedSources)),
-				SourceID:    sourceID,
-			})
+			templateVars.SelectedSources = append(templateVars.SelectedSources,
+				prompts.ChatSelectedSourceGroup{
+					SourceIndex: int64(len(templateVars.SelectedSources)),
+					SourceID:    sourceID,
+				})
 			groupIdx = len(templateVars.SelectedSources) - 1
 		}
 		docIndex := int64(len(templateVars.SelectedSources[groupIdx].Docs))

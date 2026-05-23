@@ -20,7 +20,7 @@
 
 - 只输出一个合法 JSON 对象，不要输出 Markdown、解释、代码块或任何额外文本。
 - 字段必须且仅能包含：`name`、`description`。
-- 长度限制：`name` <= 128 字符，`description` <= 1024 字符。
+- 长度限制：`name` <= {{MaxNameLen}} 字符，`description` <= {{MaxDescLen}} 字符。
 
 输出格式如下：
 {"name":"笔记本标题","description":"笔记本摘要"}
@@ -29,8 +29,8 @@
 
 以下是来源文档的摘要总结：
 
-{% if sources and sources|length > 0 %}
-{% for source in sources %}
+{% if Sources and Sources|length > 0 %}
+{% for source in Sources %}
 - {{source}}
 {% endfor %}
 {% else %}

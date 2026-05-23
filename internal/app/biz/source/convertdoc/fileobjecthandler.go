@@ -8,6 +8,7 @@ import (
 
 	convertdocparser "github.com/gonotelm-lab/gonotelm/internal/app/biz/source/convertdoc/parser"
 	convertdoctransformer "github.com/gonotelm-lab/gonotelm/internal/app/biz/source/convertdoc/transformer"
+	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -86,6 +87,10 @@ func (e *FileObjectHandler) loadObjectBody(ctx context.Context, storeKey string)
 			return nil, false, nil
 		}
 		return nil, false, errors.Wrap(err, "get file source object failed")
+	}
+
+	if obj.Info.Size > constants.MaxSourceFileSizeBytes {
+		return nil, false, errors.ErrParams.Msgf("file source object size exceeds max size, size=%d", obj.Info.Size)
 	}
 
 	return obj.Body, true, nil

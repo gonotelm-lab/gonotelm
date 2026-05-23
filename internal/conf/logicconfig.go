@@ -10,6 +10,7 @@ const (
 	DefaultMaxRound              = 10
 	DefaultSourceDocsRecallCount = 30
 	DefaultTaskTimeout           = 5 * time.Minute
+	DefaultGMMAutoMaxClusters    = 50
 )
 
 type LogicConfig struct {
@@ -50,6 +51,18 @@ func (c *ChatLogicConfig) GetMaxRound() int {
 }
 
 type SourceLogicConfig struct {
-	ModelProvider chat.Type `toml:"modelProvider"`
-	Model         string    `toml:"model"`
+	ModelProvider chat.Type       `toml:"modelProvider"`
+	Model         string          `toml:"model"`
+	GMM           SourceGMMConfig `toml:"gmm"`
+}
+
+type SourceGMMConfig struct {
+	AutoMaxClusters int `toml:"autoMaxClusters"`
+}
+
+func (c *SourceLogicConfig) GetGMMAutoMaxClusters() int {
+	if c.GMM.AutoMaxClusters <= 0 {
+		return DefaultGMMAutoMaxClusters
+	}
+	return c.GMM.AutoMaxClusters
 }

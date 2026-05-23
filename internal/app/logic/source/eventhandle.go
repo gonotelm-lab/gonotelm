@@ -215,6 +215,7 @@ func (l *SourceLogic) generateSourceSummary(
 	if err != nil {
 		slog.ErrorContext(ctx, "get summary model failed",
 			slog.String("source_id", sourceId.String()),
+			slog.String("notebook_id", notebookId.String()),
 			slog.Any("err", err),
 		)
 		return
@@ -227,8 +228,8 @@ func (l *SourceLogic) generateSourceSummary(
 	const (
 		batchSize          = 1
 		maxConcurrency     = 20
-		tokenSize          = 10000
-		maxSummarizedChunk = 50
+		tokenSize          = 8000
+		maxSummarizedChunk = 64
 	)
 
 	newChunks := pkgstring.MergeChunks(result.Chunks, tokenSize)
@@ -275,7 +276,7 @@ func (l *SourceLogic) generateSourceSummary(
 		return
 	}
 
-	// 给那个chunk的summary再输出一句summary
+	// 给每个chunk的summary组合后再输出一句summary 作为整个source的summary
 	summarizingTexts := strings.Join(chunkSummaries, "\n")
 	summaryPrompt, err := prompts.SummarizePromptMessage(
 		ctx, summarizingTexts, userLang,

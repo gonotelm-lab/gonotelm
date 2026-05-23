@@ -8,4 +8,7 @@ const (
 	MaxSourceTextContentLength = 50_000 // 50k
 
 	MaxSourceCountPerNotebook = 50
+
+	// 文件来源最大允许大小 100MB
+	MaxSourceFileSizeBytes = 100 * 1024 * 1024
 )

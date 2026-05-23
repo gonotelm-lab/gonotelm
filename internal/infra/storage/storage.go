@@ -2,11 +2,20 @@ package storage
 
 import (
 	"context"
+	"time"
 
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 var ErrObjectNotFound = errors.New("object not found")
+
+type ObjectInfo struct {
+	Key             string
+	LastModified    time.Time
+	Size            int64 // size in bytes
+	ContentType     string
+	ContentEncoding string
+}
 
 type Provider interface {
 	// Provider name
@@ -50,7 +59,7 @@ type StatObjectRequest struct {
 }
 
 type StatObjectResponse struct {
-	// TODO
+	ObjectInfo
 }
 
 type PresignedPostPolicyRequest struct {
@@ -89,6 +98,7 @@ type GetObjectRequest struct {
 
 type GetObjectResponse struct {
 	Body []byte
+	Info ObjectInfo
 }
 
 type DeleteObjectRequest struct {

@@ -36,3 +36,4 @@ gotest
 /.cursor
 __debug*
 main
+.venv

@@ -62,7 +62,7 @@ func (s *Storage) StatObject(
 		return nil, errors.ErrParams.Msg("stat object request key is empty")
 	}
 
-	_, err := s.client.StatObject(ctx, s.bucket, req.Key, minio.StatObjectOptions{})
+	objInfo, err := s.client.StatObject(ctx, s.bucket, req.Key, minio.StatObjectOptions{})
 	if err != nil {
 		if isNotFoundErr(err) {
 			return nil, storage.ErrObjectNotFound
@@ -70,7 +70,15 @@ func (s *Storage) StatObject(
 		return nil, errors.Wrapf(err, "minio stat object failed, key=%s", req.Key)
 	}
 
-	return &storage.StatObjectResponse{}, nil
+	return &storage.StatObjectResponse{
+		ObjectInfo: storage.ObjectInfo{
+			Key:             objInfo.Key,
+			LastModified:    objInfo.LastModified,
+			Size:            objInfo.Size,
+			ContentType:     objInfo.ContentType,
+			ContentEncoding: objInfo.ContentEncoding,
+		},
+	}, nil
 }
 
 func (s *Storage) GetObject(
@@ -89,6 +97,11 @@ func (s *Storage) GetObject(
 		return nil, errors.Wrap(err, "get object failed")
 	}
 
+	objInfo, err := object.Stat()
+	if err != nil {
+		return nil, errors.Wrap(err, "get stat object failed")
+	}
+
 	body, err := io.ReadAll(object)
 	if err != nil {
 		return nil, errors.Wrap(err, "read object body failed")
@@ -97,6 +110,13 @@ func (s *Storage) GetObject(
 
 	return &storage.GetObjectResponse{
 		Body: body,
+		Info: storage.ObjectInfo{
+			Key:             objInfo.Key,
+			LastModified:    objInfo.LastModified,
+			Size:            objInfo.Size,
+			ContentType:     objInfo.ContentType,
+			ContentEncoding: objInfo.ContentEncoding,
+		},
 	}, nil
 }
 

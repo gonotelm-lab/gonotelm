@@ -5,21 +5,33 @@ import (
 	"strings"
 
 	"github.com/cloudwego/eino/schema"
+	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 )
 
 type NotebookSummaryTemplateVars struct {
-	Sources []string
+	Sources    []string
+	MaxNameLen int // rune count
+	MaxDescLen int
 }
 
 func (v NotebookSummaryTemplateVars) PromptVars() map[string]any {
+	if v.MaxNameLen <= 0 {
+		v.MaxNameLen = constants.MaxNotebookNameLength
+	}
+	if v.MaxDescLen <= 0 {
+		v.MaxDescLen = constants.MaxNotebookDescriptionLength
+	}
+
 	return map[string]any{
-		"sources": normalizeNotebookSummarySources(v.Sources),
+		"Sources":    normalizeNotebookSummarySources(v.Sources),
+		"MaxNameLen": v.MaxNameLen,
+		"MaxDescLen": v.MaxDescLen,
 	}
 }
 
 type NotebookSummaryTemplate = template[NotebookSummaryTemplateVars]
 
-func NewNotebookSummaryTemplate(lang string) (*NotebookSummaryTemplate) {
+func NewNotebookSummaryTemplate(lang string) *NotebookSummaryTemplate {
 	return newTemplate[NotebookSummaryTemplateVars](templateNameNotebookSummary, lang)
 }
 

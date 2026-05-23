@@ -105,7 +105,7 @@ type UploadFileSourceRequest struct {
 	Md5      string `json:"md5,required"       validate:"md5"`
 }
 
-const maxUploadFileSizeBytes int64 = 100 * 1024 * 1024
+const maxUploadFileSizeBytes int64 = constants.MaxSourceFileSizeBytes
 
 type UploadFileSourceResponse struct {
 	Url     string            `json:"url"`

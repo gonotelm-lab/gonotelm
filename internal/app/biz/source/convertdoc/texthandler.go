@@ -2,6 +2,7 @@ package convertdoc
 
 import (
 	"context"
+	"regexp"
 	"strings"
 
 	"github.com/gonotelm-lab/gonotelm/internal/app/biz/source/convertdoc/transformer"
@@ -10,6 +11,8 @@ import (
 
 	einoparser "github.com/cloudwego/eino/components/document/parser"
 )
+
+var maybeMarkdownReg = regexp.MustCompile(`(?m)^#{1,6}\s+`)
 
 var _ Handler = (*TextHandler)(nil)
 
@@ -29,12 +32,17 @@ func (e *TextHandler) Handle(ctx context.Context, s *model.Source) (*HandleResul
 		return nil, err
 	}
 
+	splitMethod := transformer.ChunkRecursiveSplitMethod
+	if maybeIsMarkdown(textSource.Text) {
+		splitMethod = transformer.ChunkMarkdownSplitMethod
+	}
+
 	docs, converted, err := e.impl.doHandle(
 		ctx,
 		s,
 		strings.NewReader(textSource.Text),
 		nil,
-		transformer.WithChunkSplitMethod(transformer.ChunkRecursiveSplitMethod),
+		transformer.WithChunkSplitMethod(splitMethod),
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "handle text source failed")
@@ -45,4 +53,8 @@ func (e *TextHandler) Handle(ctx context.Context, s *model.Source) (*HandleResul
 		ParsedContent:     converted,
 		ParsedContentType: markdownMimeType,
 	}, nil
+}
+
+func maybeIsMarkdown(text string) bool {
+	return maybeMarkdownReg.MatchString(text[0:min(len(text), 512)])
 }

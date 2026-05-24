@@ -3,14 +3,15 @@ package source
 import (
 	"context"
 	"log/slog"
+	"runtime/debug"
 	"strings"
 	"sync"
 
 	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
-	"github.com/gonotelm-lab/gonotelm/internal/app/logic/prompts"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
+	"github.com/gonotelm-lab/gonotelm/internal/app/prompts"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/mq"
@@ -24,6 +25,11 @@ import (
 
 	"github.com/bytedance/sonic"
 	einoschema "github.com/cloudwego/eino/schema"
+)
+
+const (
+	sourcePrepareRetryKey   = "x-source-prepare-retry"
+	sourcePrepareRetryValue = "true"
 )
 
 func mustNewMsgQueueProducer() mq.Producer {
@@ -60,6 +66,7 @@ func mustNewMsgQueueConsumer(topic, groupId string) mq.Consumer {
 func (l *SourceLogic) notifySourceEventMessage(
 	ctx context.Context,
 	source *model.Source,
+	isRetry bool,
 ) error {
 	sourceEvent := &sourceEventMessage{
 		Id:         source.Id,
@@ -74,11 +81,19 @@ func (l *SourceLogic) notifySourceEventMessage(
 			source.Kind, source.Id)
 	}
 
+	var header []mq.MessageHeader
+	if isRetry {
+		header = append(header, mq.MessageHeader{
+			Key:   sourcePrepareRetryKey,
+			Value: []byte(sourcePrepareRetryValue),
+		})
+	}
+
 	err = l.prepProducer.Send(ctx, &mq.ProducerSendRequest{
 		Topic:   TopicSourcePreparation,
 		Key:     []byte(source.Id.String()),
 		Value:   value,
-		Headers: nil, // TODO add trace headers?
+		Headers: header,
 	})
 	if err != nil {
 		return errors.Wrapf(err,
@@ -102,13 +117,70 @@ func (l *SourceLogic) handleSourceEventMessage(
 		err         error
 	)
 
-	sourceId, _ := uuid.FromBytes(key)
+	sourceId, err := uuid.FromBytes(key)
+	if err != nil {
+		return errors.Wrapf(err, "parse source id failed, key=%s", string(key))
+	}
+
 	slog.DebugContext(ctx, "received and handling source prep message",
 		slog.String("msg_key", sourceId.String()),
 	)
 	err = sonic.Unmarshal(val, &sourceEvent)
 	if err != nil {
 		return errors.Wrap(err, "handle prep message unmarshal failed")
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			slog.ErrorContext(ctx, "source prep message handler panic",
+				slog.Any("err", r),
+				slog.String("stack", string(debug.Stack())),
+			)
+
+			// 本次处理失败
+			if uerr := l.sourceBiz.UpdateStatus(ctx, sourceEvent.Id, model.SourceStatusFailed); uerr != nil {
+				slog.ErrorContext(ctx, "update source status failed after recover from a panicking",
+					slog.String("source_id", sourceEvent.Id.String()),
+					slog.Any("err", uerr),
+				)
+			}
+		}
+	}()
+
+	source, err := l.sourceBiz.GetDecodedSource(ctx, sourceEvent.Id)
+	if err != nil {
+		if errors.Is(err, bizsource.ErrSourceNotFound) {
+			return nil
+		}
+
+		return errors.WithMessagef(err, "get source failed, id=%s", sourceEvent.Id)
+	}
+
+	isRetry := false
+	for _, h := range msg.Headers() {
+		if h.Key == sourcePrepareRetryKey {
+			if h.Value != nil && pkgstring.FromBytes(h.Value) == sourcePrepareRetryValue {
+				isRetry = true
+			}
+			break
+		}
+	}
+	if isRetry {
+		// clear original
+		if err := l.sourceBiz.ClearSourceIndices(ctx, sourceEvent.NotebookId, sourceEvent.Id); err != nil {
+			slog.ErrorContext(ctx, "clear source indices failed",
+				slog.String("source_id", sourceEvent.Id.String()),
+				slog.Any("err", err),
+			)
+		}
+
+		// delete parsed content if necessary
+		if err := l.deleteSourceParsedContent(ctx, source); err != nil {
+			slog.ErrorContext(ctx, "delete parsed content failed",
+				slog.String("source_id", sourceEvent.Id.String()),
+				slog.Any("err", err),
+			)
+		}
 	}
 
 	result, err := l.sourceBiz.PrepareSourceIndices(ctx, sourceEvent.Id)
@@ -392,6 +464,7 @@ func (l *SourceLogic) generateNotebookSummary(
 	convention := struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
+		Valid       bool   `json:"valid"`
 	}{}
 
 	// truncate
@@ -405,6 +478,13 @@ func (l *SourceLogic) generateNotebookSummary(
 		slog.WarnContext(ctx, "llm model response unmarshal failed",
 			slog.String("notebook_id", notebookId.String()),
 			slog.Any("err", err),
+		)
+		return
+	}
+
+	if !convention.Valid {
+		slog.WarnContext(ctx, "notebook summary is not valid",
+			slog.String("notebook_id", notebookId.String()),
 		)
 		return
 	}

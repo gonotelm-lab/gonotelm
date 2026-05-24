@@ -87,6 +87,7 @@ func MustNewSourceLogic(
 		notebookBiz:   notebookBiz,
 		sourceBiz:     sourceBiz,
 		llmGateway:    llmGateway,
+		redis:         infras.Redis,
 	}
 
 	sl.mustInitMsgQueue()
@@ -157,16 +158,7 @@ func (l *SourceLogic) CreateSource(
 
 	if !source.KindFile() {
 		// not file kind, we can do preparing immediately
-		sourceValue, err := sonic.Marshal(source)
-		if err != nil {
-			return nil, errors.Wrap(err, "marshal source failed")
-		}
-		err = l.prepProducer.Send(ctx, &mq.ProducerSendRequest{
-			Topic:   TopicSourcePreparation,
-			Key:     source.Id.Bytes(),
-			Value:   sourceValue,
-			Headers: nil,
-		})
+		err = l.notifySourceEventMessage(ctx, source, false)
 		if err != nil {
 			return nil, errors.Wrap(err, "send source inserted message failed")
 		}
@@ -386,7 +378,7 @@ func (l *SourceLogic) RetrySourcePreparation(
 	source.Status = model.SourceStatusPreparing
 
 	// do retry by re-sending the source event message
-	err = l.notifySourceEventMessage(ctx, source)
+	err = l.notifySourceEventMessage(ctx, source, true)
 	if err != nil {
 		rollbackErr := l.sourceBiz.UpdateStatus(ctx, source.Id, model.SourceStatusFailed)
 		if rollbackErr != nil {
@@ -401,9 +393,23 @@ func (l *SourceLogic) RetrySourcePreparation(
 }
 
 func (l *SourceLogic) DeleteSource(ctx context.Context, sourceId uuid.UUID) error {
-	err := l.sourceBiz.DeleteSource(ctx, sourceId)
+	originSource, err := l.sourceBiz.DeleteSource(ctx, sourceId)
 	if err != nil {
+		if errors.Is(err, bizsource.ErrSourceNotFound) {
+			return nil
+		}
+
 		return errors.WithMessagef(err, "delete source failed, id=%s", sourceId)
+	}
+
+	if originSource != nil {
+		return nil
+	}
+
+	// delete parsed content
+	err = l.deleteSourceParsedContent(ctx, originSource)
+	if err != nil {
+		return errors.WithMessage(err, "delete source parsed content failed")
 	}
 
 	return nil
@@ -501,7 +507,7 @@ func (l *SourceLogic) pollFileSourceStatus(
 		err = nil
 	} else {
 		// uploaded, make it preparing
-		err = l.notifySourceEventMessage(ctx, source)
+		err = l.notifySourceEventMessage(ctx, source, false)
 		if err != nil {
 			err = errors.WithMessage(err, "notify source preparing failed")
 			return
@@ -542,6 +548,28 @@ func (l *SourceLogic) updateFileSourceContent(
 		Title:   fileContent.Filename,
 		Content: content,
 	})
+}
+
+func (l *SourceLogic) deleteSourceParsedContent(
+	ctx context.Context,
+	source *model.DecodedSource,
+) error {
+	if source == nil || source.ParsedContent == nil {
+		return nil
+	}
+
+	if source.ParsedContent.StoreKey == "" {
+		return nil
+	}
+
+	err := l.objectStorage.DeleteObject(ctx, &storage.DeleteObjectRequest{
+		Key: source.ParsedContent.StoreKey,
+	})
+	if err != nil {
+		return errors.WithMessage(err, "delete source parsed content failed")
+	}
+
+	return nil
 }
 
 func checkSourceUploadable(source *model.Source) bool {

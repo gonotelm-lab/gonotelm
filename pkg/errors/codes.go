@@ -19,13 +19,16 @@ const (
 	CodeStorageErr  = -3 // storage error
 	CodeMsgQueueErr = -4 // message queue error
 	CodeCacheErr    = -5 // cache error
-	CodeUnknownErr  = -999
+
+	CodeInnerErr   = -998
+	CodeUnknownErr = -999
 )
 
 const (
 	MsgInvalidParams = "invalid parameters"
 	MsgNoRecord      = "no record found"
 	MsgEmbedErr      = "embedding error"
+	MsgInnerErr      = "inner error"
 )
 
 // Errors that should return 200 status code
@@ -65,5 +68,6 @@ var (
 	ErrStorage  = NewInnerError(statusInternal, CodeStorageErr, MsgStorageErr)
 	ErrMsgQueue = NewInnerError(statusInternal, CodeMsgQueueErr, MsgMsgQueueErr)
 	ErrCache    = NewInnerError(statusInternal, CodeCacheErr, MsgCacheErr)
+	ErrInner    = NewInnerError(statusInternal, CodeInnerErr, MsgInnerErr)
 	ErrUnknown  = NewInnerError(statusInternal, CodeUnknownErr, MsgUnknownErr)
 )

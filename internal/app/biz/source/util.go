@@ -69,12 +69,3 @@ func truncateRunes(input string, max int) string {
 	}
 	return string(runes[:max])
 }
-
-func float64ToFloat32(f []float64) []float32 {
-	result := make([]float32, len(f))
-	for i, v := range f {
-		result[i] = float32(v)
-	}
-
-	return result
-}

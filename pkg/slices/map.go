@@ -42,3 +42,12 @@ func Map[T any, R any](ss []T, fn func(T) R) []R {
 
 	return out
 }
+
+func MapSet[T comparable](s []T) map[T]struct{} {
+	out := make(map[T]struct{})
+	for _, v := range s {
+		out[v] = struct{}{}
+	}
+	
+	return out
+}

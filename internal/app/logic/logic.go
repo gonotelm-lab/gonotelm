@@ -36,16 +36,17 @@ func MustNewLogic(
 		chatEventManager = bizchat.NewChatEventManager(infrastructures.Cache.ChatMessageStreamCache)
 	)
 
-	sourceBiz, err := bizsource.New(
-		objectStorage,
-		infrastructures.Dal.SourceStore,
-		infrastructures.VectorDal.SourceDocStore,
-	)
+	gateway, err := gateway.New(&conf.Global().Provider)
 	if err != nil {
 		panic(err)
 	}
 
-	gateway, err := gateway.New(&conf.Global().Provider)
+	sourceBiz, err := bizsource.New(
+		objectStorage,
+		infrastructures.Dal.SourceStore,
+		infrastructures.VectorDal.SourceDocStore,
+		gateway,
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -91,4 +92,3 @@ func (l *Logic) Close(ctx context.Context) {
 
 	wg.Wait()
 }
-

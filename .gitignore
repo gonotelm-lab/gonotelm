@@ -37,3 +37,4 @@ gotest
 __debug*
 main
 .venv
+__pycache__

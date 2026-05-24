@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -122,7 +123,12 @@ func (c *Consumer) Subscribe(ctx context.Context, topic string, handler mq.Messa
 		defer close(done)
 		defer func() {
 			if err := recover(); err != nil {
-				slog.ErrorContext(ctx, "kafka reader panic", slog.Any("err", err))
+				slog.ErrorContext(
+					ctx,
+					"kafka reader panic",
+					slog.Any("err", err),
+					slog.String("stack", string(debug.Stack())),
+				)
 			}
 		}()
 

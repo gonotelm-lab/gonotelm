@@ -6,22 +6,18 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/gonotelm-lab/gonotelm/internal/app/biz/source/convertdoc"
-	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/cache"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal/schema"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/embedding"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/vectordal"
 	vecschema "github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/schema"
-	"github.com/gonotelm-lab/gonotelm/pkg/batch"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/slices"
-	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
-	"github.com/gonotelm-lab/gonotelm/pkg/token"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 
 	"github.com/bytedance/sonic"
@@ -39,17 +35,16 @@ type Biz struct {
 	sourceStore    dal.SourceStore
 	sourceDocStore vectordal.SourceDocStore
 
-	embedder            einoembed.Embedder
-	embedBatchSize      int
-	embedMaxConcurrency int
-
-	docConverters map[model.SourceKind]convertdoc.Handler
+	llmGateway    *gateway.Gateway
+	embedder      einoembed.Embedder
+	sourceIndexer *SourceIndexer
 }
 
 func New(
 	objectStorage storage.Storage,
 	sourceStore dal.SourceStore,
 	sourceDocStore vectordal.SourceDocStore,
+	llmGateway *gateway.Gateway,
 ) (*Biz, error) {
 	embedder, err := embedding.New(
 		context.Background(),
@@ -60,26 +55,13 @@ func New(
 		return nil, errors.WithMessage(err, "new embedder failed")
 	}
 
-	hc := convertdoc.HandlerConfig{
-		ChunkSize:   conf.Global().Chunking.Size,
-		OverlapSize: conf.Global().Chunking.OverlapSize,
-	}
-	if hc.OverlapSize == 0 || hc.OverlapSize > hc.ChunkSize {
-		hc.OverlapSize = int(float64(hc.ChunkSize) * 0.15)
-	}
-
 	b := &Biz{
-		objectStorage:       objectStorage,
-		sourceStore:         sourceStore,
-		sourceDocStore:      sourceDocStore,
-		embedder:            embedder,
-		embedBatchSize:      conf.Global().Embedding.BatchSize,
-		embedMaxConcurrency: conf.Global().Embedding.MaxConcurrency,
-		docConverters: map[model.SourceKind]convertdoc.Handler{
-			model.SourceKindText: convertdoc.NewTextHandler(hc),
-			model.SourceKindUrl:  convertdoc.NewUrlHandler(hc),
-			model.SourceKindFile: convertdoc.NewFileObjectHandler(hc, objectStorage),
-		},
+		objectStorage:  objectStorage,
+		sourceStore:    sourceStore,
+		sourceDocStore: sourceDocStore,
+		embedder:       embedder,
+		sourceIndexer:  NewSourceIndexer(embedder, sourceDocStore, objectStorage, llmGateway),
+		llmGateway:     llmGateway,
 	}
 
 	return b, nil
@@ -244,13 +226,13 @@ func (b *Biz) UpdateStatus(ctx context.Context, sourceId uuid.UUID, status model
 	return nil
 }
 
-func (b *Biz) DeleteSource(ctx context.Context, sourceId uuid.UUID) error {
+func (b *Biz) DeleteSource(ctx context.Context, sourceId uuid.UUID) (*model.DecodedSource, error) {
 	source, err := b.GetDecodedSource(ctx, sourceId)
 	if err != nil {
 		if errors.Is(err, ErrSourceNotFound) || errors.Is(err, errors.ErrNoRecord) {
-			return nil
+			return nil, ErrSourceNotFound
 		}
-		return errors.WithMessagef(err, "get source failed before deleting, id=%s", sourceId)
+		return nil, errors.WithMessagef(err, "get source failed before deleting, id=%s", sourceId)
 	}
 
 	var fileStoreKey string
@@ -272,7 +254,7 @@ func (b *Biz) DeleteSource(ctx context.Context, sourceId uuid.UUID) error {
 
 	err = b.sourceStore.DeleteById(ctx, sourceId)
 	if err != nil {
-		return errors.WithMessagef(err, "store delete source failed, id=%s", sourceId)
+		return nil, errors.WithMessagef(err, "store delete source failed, id=%s", sourceId)
 	}
 
 	err = b.sourceDocStore.BatchDelete(ctx, &vecschema.SourceDocBatchDeleteParams{
@@ -280,7 +262,7 @@ func (b *Biz) DeleteSource(ctx context.Context, sourceId uuid.UUID) error {
 		SourceId:   []string{source.Id.String()},
 	})
 	if err != nil {
-		return errors.WithMessagef(err, "delete source docs failed, source_id=%s", sourceId)
+		return nil, errors.WithMessagef(err, "delete source docs failed, source_id=%s", sourceId)
 	}
 
 	if fileStoreKey != "" {
@@ -296,23 +278,7 @@ func (b *Biz) DeleteSource(ctx context.Context, sourceId uuid.UUID) error {
 		}
 	}
 
-	// delete parsed content
-	if source.ParsedContent != nil {
-		if storeKey := source.ParsedContent.StoreKey; storeKey != "" {
-			err = b.objectStorage.DeleteObject(ctx, &storage.DeleteObjectRequest{
-				Key: storeKey,
-			})
-			if err != nil {
-				slog.WarnContext(ctx, "delete source parsed object failure",
-					slog.String("source_id", sourceId.String()),
-					slog.String("key", storeKey),
-					slog.Any("err", err),
-				)
-			}
-		}
-	}
-
-	return nil
+	return source, nil
 }
 
 type UpdateContentCommand struct {
@@ -406,107 +372,31 @@ func (b *Biz) PrepareSourceIndices(
 		return nil, errors.WithMessagef(err, "get source failed, id=%s", sourceId)
 	}
 
-	result, err := b.convertSourceToDocs(ctx, source)
+	result, err := b.sourceIndexer.Prepare(ctx, source)
 	if err != nil {
-		return nil, err
-	}
-
-	// 超过的不处理
-	estimatedToken := token.EstimateToken(pkgstring.FromBytes(result.ParsedContent))
-	if estimatedToken > constants.MaxSourceTextContentToken {
-		return nil, errors.Wrapf(ErrSourceContentTooLong,
-			"source content too long, token count=%d, source_id=%s",
-			estimatedToken,
-			sourceId,
-		)
-	}
-
-	textChunks, err := b.embedAndInsertSourceDocs(ctx, source, result)
-	if err != nil {
-		return nil, err
-	}
-
-	return &PrepareSourceIndicesResult{
-		ParsedContent:     result.ParsedContent,
-		ParsedContentType: result.ParsedContentType,
-		Chunks:            textChunks,
-	}, nil
-}
-
-func (b *Biz) convertSourceToDocs(
-	ctx context.Context,
-	source *model.Source,
-) (*convertdoc.HandleResult, error) {
-	docConverter, ok := b.docConverters[source.Kind]
-	if !ok {
-		return nil, errors.ErrParams.Msgf("can not convert source for kind %s", source.Kind)
-	}
-
-	result, err := docConverter.Handle(ctx, source)
-	if err != nil {
-		return nil, errors.WithMessagef(err, "embed source failed")
+		return nil, errors.WithMessagef(err, "prepare source indices failed, source_id=%s", sourceId)
 	}
 
 	return result, nil
 }
 
-func (b *Biz) embedAndInsertSourceDocs(
+// 清理已存在的所有来源的索引
+func (b *Biz) ClearSourceIndices(
 	ctx context.Context,
-	source *model.Source,
-	result *convertdoc.HandleResult,
-) ([]string, error) {
-	texts := make([]string, 0, len(result.Docs))
-	for _, doc := range result.Docs {
-		texts = append(texts, doc.Content)
-	}
-
-	slog.DebugContext(ctx, "embedding source docs",
-		slog.Int("text_size", len(texts)),
-		slog.Int("batch_size", b.embedBatchSize),
-		slog.Int("max_concurrency", b.embedMaxConcurrency),
-		slog.String("source_id", source.Id.String()))
-
-	embeddings, err := batch.ParallelMap(
-		ctx,
-		texts,
-		b.embedBatchSize,
-		b.embedMaxConcurrency,
-		func(ctx context.Context, bt []string) ([][]float64, error) {
-			return b.embedder.EmbedStrings(ctx, bt)
-		},
-	)
+	notebookId uuid.UUID,
+	sourceId uuid.UUID,
+) error {
+	err := b.sourceDocStore.BatchDelete(ctx, &vecschema.SourceDocBatchDeleteParams{
+		NotebookId: notebookId.String(),
+		SourceId:   []string{sourceId.String()},
+	})
 	if err != nil {
-		return nil, errors.WithMessagef(err, "embed docs failed")
-	}
-	if len(embeddings) != len(texts) {
-		return nil, errors.Wrapf(
-			errors.ErrSerde,
-			"embed result count mismatch, expected=%d, actual=%d",
-			len(texts),
-			len(embeddings),
-		)
+		return errors.WithMessagef(err,
+			"delete source docs failed, notebook_id=%s, source_id=%s",
+			notebookId, sourceId)
 	}
 
-	notebookIdStr := source.NotebookId.String()
-	sourceIdStr := source.Id.String()
-	vsDocs := make([]*vecschema.SourceDoc, len(result.Docs))
-	for i, doc := range result.Docs {
-		vsDocs[i] = &vecschema.SourceDoc{
-			Id:         doc.ID,
-			NotebookId: notebookIdStr,
-			SourceId:   sourceIdStr,
-			Content:    doc.Content,
-			Owner:      source.OwnerId,
-			Embedding:  float64ToFloat32(embeddings[i]),
-		}
-	}
-
-	err = b.sourceDocStore.BatchInsert(ctx, vsDocs)
-	if err != nil {
-		return nil, errors.WithMessagef(err, "insert source docs failed")
-	}
-
-	return texts, nil
+	return nil
 }
 
 type CheckSourceIdsReadyQuery struct {
@@ -640,7 +530,7 @@ func (b *Biz) RetrieveSourceDocs(
 			query.Query, query.NotebookId)
 	}
 
-	queryEmbedding := float64ToFloat32(queryEmbeddings[0])
+	queryEmbedding := slices.CastFloat[float64, float32](queryEmbeddings[0])
 	docs, err := b.sourceDocStore.Query(ctx,
 		&vecschema.SourceDocQueryParams{
 			NotebookId: notebookId,

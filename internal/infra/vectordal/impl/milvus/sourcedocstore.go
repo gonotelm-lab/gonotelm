@@ -2,6 +2,7 @@ package milvus
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infra/vectordal"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/slices"
 
 	"github.com/milvus-io/milvus/client/v2/column"
 	"github.com/milvus-io/milvus/client/v2/entity"
@@ -35,6 +37,8 @@ const (
 	sourceIDTemplateKey   = "source_id"
 	docIDTemplateKey      = "doc_id"
 )
+
+var reservedSourceDocFields = slices.MapSet(schema.OutputFields)
 
 type SourceDocStoreImpl struct {
 	cli *milvusclient.Client
@@ -131,7 +135,11 @@ func (s *SourceDocStoreImpl) BatchInsert(
 
 			rows := make([]any, 0, len(sourceDocs)) // []map[string]any
 			for _, doc := range sourceDocs {
-				rows = append(rows, doc.AsMap())
+				if doc == nil {
+					continue
+				}
+				row := buildSourceDocMilvusRow(doc)
+				rows = append(rows, row)
 			}
 
 			opt := milvusclient.NewRowBasedInsertOption(collectionName, rows...)
@@ -160,6 +168,22 @@ func (s *SourceDocStoreImpl) BatchInsert(
 	}
 
 	return nil
+}
+
+func buildSourceDocMilvusRow(doc *schema.SourceDoc) map[string]any {
+	row := doc.AsMap()
+	for key, value := range doc.Meta {
+		k := strings.TrimSpace(key)
+		if k == "" {
+			continue
+		}
+		if _, ok := reservedSourceDocFields[k]; ok {
+			continue
+		}
+		row[k] = value
+	}
+
+	return row
 }
 
 func (s *SourceDocStoreImpl) BatchDelete(
@@ -242,13 +266,7 @@ func (s *SourceDocStoreImpl) Get(
 	opt := milvusclient.NewQueryOption(collectionName).
 		WithPartitions(partitionName).
 		WithLimit(1).
-		WithOutputFields(
-			schema.FieldID,
-			schema.FieldNotebookID,
-			schema.FieldSourceID,
-			schema.FieldContent,
-			schema.FieldOwner,
-		).
+		WithOutputFields(schema.OutputFields...).
 		WithFilter(filterExpr).
 		WithTemplateParam(notebookIDTemplateKey, notebookID).
 		WithTemplateParam(sourceIDTemplateKey, sourceID).
@@ -259,7 +277,7 @@ func (s *SourceDocStoreImpl) Get(
 		return nil, errors.WithMessage(err, "query source doc failed")
 	}
 
-	docs, err := extractSourceDocsFromResultSet(rs)
+	docs, err := extractSourceDocsFromResultSet(ctx, rs)
 	if err != nil {
 		return nil, errors.WithMessage(err, "decode source doc query result failed")
 	}
@@ -293,13 +311,6 @@ func (s *SourceDocStoreImpl) Query(
 
 	partitionName := partitionNameByNotebookID(notebookID)
 	filterExpr := buildQueryFilterExpr(len(sourceIDs) > 0)
-	outputFields := []string{
-		schema.FieldID,
-		schema.FieldNotebookID,
-		schema.FieldSourceID,
-		schema.FieldContent,
-		schema.FieldOwner,
-	}
 
 	var (
 		resultSets []milvusclient.ResultSet
@@ -333,7 +344,7 @@ func (s *SourceDocStoreImpl) Query(
 			sparseReq,
 		).WithReranker(milvusclient.NewRRFReranker()).
 			WithPartitions(partitionName).
-			WithOutputFields(outputFields...)
+			WithOutputFields(schema.OutputFields...)
 		resultSets, err = s.cli.HybridSearch(ctx, opt)
 		if err != nil {
 			return nil, errors.WithMessage(err, "hybrid search source docs failed")
@@ -345,7 +356,7 @@ func (s *SourceDocStoreImpl) Query(
 			[]entity.Vector{entity.Text(target)},
 		).WithANNSField(schema.FieldSparseContent).
 			WithPartitions(partitionName).
-			WithOutputFields(outputFields...)
+			WithOutputFields(schema.OutputFields...)
 		opt.WithFilter(filterExpr).WithTemplateParam(notebookIDTemplateKey, notebookID)
 		if len(sourceIDs) > 0 {
 			opt.WithTemplateParam(sourceIDsTemplateKey, sourceIDs)
@@ -356,7 +367,7 @@ func (s *SourceDocStoreImpl) Query(
 		}
 	}
 
-	docs, err := extractSourceDocsFromResults(resultSets)
+	docs, err := extractSourceDocsFromResults(ctx, resultSets)
 	if err != nil {
 		return nil, errors.WithMessage(err, "decode milvus query result failed")
 	}
@@ -388,13 +399,6 @@ func (s *SourceDocStoreImpl) List(
 		schema.FieldNotebookID, notebookID,
 		schema.FieldSourceID, sourceID,
 	)
-	outputFields := []string{
-		schema.FieldID,
-		schema.FieldNotebookID,
-		schema.FieldSourceID,
-		schema.FieldContent,
-		schema.FieldOwner,
-	}
 	batchSize := resolveListBatchSize(params.BatchSize)
 
 	iter, err := s.cli.QueryIterator(
@@ -402,7 +406,7 @@ func (s *SourceDocStoreImpl) List(
 		milvusclient.NewQueryIteratorOption(collectionName).
 			WithPartitions(partitionName).
 			WithFilter(filterExpr).
-			WithOutputFields(outputFields...).
+			WithOutputFields(schema.OutputFields...).
 			WithBatchSize(batchSize),
 	)
 	if err != nil {
@@ -419,7 +423,7 @@ func (s *SourceDocStoreImpl) List(
 			return nil, errors.WithMessage(err, "iterate source docs failed")
 		}
 
-		batchDocs, err := extractSourceDocsFromResultSet(rs)
+		batchDocs, err := extractSourceDocsFromResultSet(ctx, rs)
 		if err != nil {
 			return nil, errors.WithMessage(err, "decode source docs list batch failed")
 		}
@@ -484,10 +488,13 @@ func resolveListBatchSize(batchSize int) int {
 	return batchSize
 }
 
-func extractSourceDocsFromResults(resultSets []milvusclient.ResultSet) ([]*schema.SourceDoc, error) {
+func extractSourceDocsFromResults(
+	ctx context.Context,
+	resultSets []milvusclient.ResultSet,
+) ([]*schema.SourceDoc, error) {
 	docs := make([]*schema.SourceDoc, 0, len(resultSets))
 	for _, rs := range resultSets {
-		setDocs, err := extractSourceDocsFromResultSet(rs)
+		setDocs, err := extractSourceDocsFromResultSet(ctx, rs)
 		if err != nil {
 			return nil, err
 		}
@@ -503,9 +510,15 @@ type sourceDocResultColumns struct {
 	sourceID   column.Column
 	content    column.Column
 	owner      column.Column
+	chunkPos   column.Column
+	meta       column.Column
+	dynamic    []column.Column
 }
 
-func extractSourceDocsFromResultSet(rs milvusclient.ResultSet) ([]*schema.SourceDoc, error) {
+func extractSourceDocsFromResultSet(
+	ctx context.Context,
+	rs milvusclient.ResultSet,
+) ([]*schema.SourceDoc, error) {
 	if rs.Err != nil {
 		return nil, rs.Err
 	}
@@ -520,7 +533,7 @@ func extractSourceDocsFromResultSet(rs milvusclient.ResultSet) ([]*schema.Source
 
 	docs := make([]*schema.SourceDoc, 0, rs.ResultCount)
 	for i := 0; i < rs.ResultCount; i++ {
-		doc, err := buildSourceDocFromColumns(cols, i)
+		doc, err := buildSourceDocFromColumns(ctx, cols, i)
 		if err != nil {
 			return nil, err
 		}
@@ -537,6 +550,21 @@ func getSourceDocResultColumns(rs milvusclient.ResultSet) (*sourceDocResultColum
 		sourceID:   rs.GetColumn(schema.FieldSourceID),
 		content:    rs.GetColumn(schema.FieldContent),
 		owner:      rs.GetColumn(schema.FieldOwner),
+		chunkPos:   rs.GetColumn(schema.FieldChunkPos),
+		meta:       rs.GetColumn(schema.FieldMeta),
+	}
+	for _, c := range rs.Fields {
+		if c == nil {
+			continue
+		}
+		fieldName := c.Name()
+		if fieldName == "" {
+			continue
+		}
+		if _, ok := reservedSourceDocFields[fieldName]; ok {
+			continue
+		}
+		cols.dynamic = append(cols.dynamic, c)
 	}
 
 	if missing := missingSourceDocColumns(cols); len(missing) > 0 {
@@ -551,7 +579,7 @@ func getSourceDocResultColumns(rs milvusclient.ResultSet) (*sourceDocResultColum
 }
 
 func missingSourceDocColumns(cols *sourceDocResultColumns) []string {
-	missing := make([]string, 0, 5)
+	missing := make([]string, 0, 6)
 	if cols.id == nil {
 		missing = append(missing, schema.FieldID)
 	}
@@ -567,10 +595,17 @@ func missingSourceDocColumns(cols *sourceDocResultColumns) []string {
 	if cols.owner == nil {
 		missing = append(missing, schema.FieldOwner)
 	}
+	if cols.chunkPos == nil {
+		missing = append(missing, schema.FieldChunkPos)
+	}
 	return missing
 }
 
-func buildSourceDocFromColumns(cols *sourceDocResultColumns, index int) (*schema.SourceDoc, error) {
+func buildSourceDocFromColumns(
+	ctx context.Context,
+	cols *sourceDocResultColumns,
+	index int,
+) (*schema.SourceDoc, error) {
 	id, err := cols.id.GetAsString(index)
 	if err != nil {
 		return nil, errors.WithMessage(err, "read id from result failed")
@@ -591,6 +626,25 @@ func buildSourceDocFromColumns(cols *sourceDocResultColumns, index int) (*schema
 	if err != nil {
 		return nil, errors.WithMessage(err, "read owner from result failed")
 	}
+	chunkPos := int32(-1)
+	if isNull, err := cols.chunkPos.IsNull(index); err != nil {
+		// 兼容旧数据 chunk_pos可能为null 这里不处理
+	} else if !isNull {
+		chunkPosInt64, err := cols.chunkPos.GetAsInt64(index)
+		if err != nil {
+			return nil, errors.WithMessage(err, "read chunk_pos from result failed")
+		}
+		chunkPos = int32(chunkPosInt64)
+	}
+	meta, err := buildSourceDocMeta(ctx, cols, index)
+	if err != nil {
+		slog.WarnContext(ctx,
+			"build source doc meta failed, fallback without meta",
+			slog.Int("index", index),
+			slog.Any("err", err),
+		)
+		meta = nil
+	}
 
 	return &schema.SourceDoc{
 		Id:         id,
@@ -598,5 +652,113 @@ func buildSourceDocFromColumns(cols *sourceDocResultColumns, index int) (*schema
 		SourceId:   sourceID,
 		Content:    content,
 		Owner:      owner,
+		ChunkPos:   chunkPos,
+		Meta:       meta,
 	}, nil
+}
+
+func buildSourceDocMeta(ctx context.Context, cols *sourceDocResultColumns, index int) (map[string]any, error) {
+	meta := make(map[string]any)
+
+	if cols.meta != nil {
+		if isNull, err := cols.meta.IsNull(index); err != nil {
+			slog.WarnContext(ctx,
+				"check $meta null state failed, skip meta",
+				slog.Int("index", index),
+				slog.Any("err", err),
+			)
+			return nil, nil
+		} else if !isNull {
+			rawMeta, err := cols.meta.Get(index)
+			if err != nil {
+				slog.WarnContext(ctx,
+					"read $meta from result failed, skip meta",
+					slog.Int("index", index),
+					slog.Any("err", err),
+				)
+				return nil, nil
+			}
+			parsedMeta, err := parseMilvusMeta(rawMeta)
+			if err != nil {
+				slog.WarnContext(ctx,
+					"parse $meta failed, skip meta",
+					slog.Int("index", index),
+					slog.Any("err", err),
+				)
+				return nil, nil
+			}
+			for key, value := range parsedMeta {
+				if _, ok := reservedSourceDocFields[key]; ok {
+					continue
+				}
+				meta[key] = value
+			}
+		}
+	}
+
+	for _, c := range cols.dynamic {
+		if c == nil {
+			continue
+		}
+		if isNull, err := c.IsNull(index); err != nil {
+			slog.WarnContext(ctx,
+				"check dynamic field null state failed, skip field",
+				slog.Int("index", index),
+				slog.String("field", c.Name()),
+				slog.Any("err", err),
+			)
+			continue
+		} else if isNull {
+			continue
+		}
+		value, err := c.Get(index)
+		if err != nil {
+			slog.WarnContext(ctx,
+				"read dynamic field from result failed, skip field",
+				slog.Int("index", index),
+				slog.String("field", c.Name()),
+				slog.Any("err", err),
+			)
+			continue
+		}
+		meta[c.Name()] = value
+	}
+
+	if len(meta) == 0 {
+		return nil, nil
+	}
+	return meta, nil
+}
+
+func parseMilvusMeta(raw any) (map[string]any, error) {
+	if raw == nil {
+		return nil, nil
+	}
+
+	switch val := raw.(type) {
+	case map[string]any:
+		return val, nil
+	case []byte:
+		return unmarshalMetaBytes(val)
+	case string:
+		return unmarshalMetaBytes([]byte(val))
+	default:
+		payload, err := json.Marshal(val)
+		if err != nil {
+			return nil, errors.WithMessage(err, "marshal unknown $meta payload failed")
+		}
+		return unmarshalMetaBytes(payload)
+	}
+}
+
+func unmarshalMetaBytes(payload []byte) (map[string]any, error) {
+	if len(payload) == 0 || string(payload) == "null" {
+		return nil, nil
+	}
+
+	out := make(map[string]any)
+	if err := json.Unmarshal(payload, &out); err != nil {
+		return nil, errors.WithMessage(err, "unmarshal $meta payload failed")
+	}
+	return out, nil
 }

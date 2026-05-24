@@ -21,7 +21,7 @@ type Instances struct {
 	Dal       *dal.DAL
 	VectorDal *vectordal.DAL
 	Cache     *cacheimpl.Cache
-	redis     redis.UniversalClient
+	Redis     redis.UniversalClient
 }
 
 func MustInit(c *conf.Config) *Instances {
@@ -49,7 +49,7 @@ func MustInit(c *conf.Config) *Instances {
 		Dal:       d,
 		VectorDal: vd,
 		Cache:     cacheImpl,
-		redis:     cache.GetRedis(),
+		Redis:     cache.GetRedis(),
 	}
 
 	return gInstances
@@ -59,7 +59,7 @@ func Close(ctx context.Context) {
 	if err := gInstances.VectorDal.Close(ctx); err != nil {
 		slog.ErrorContext(ctx, "close vector dal failed", slog.Any("err", err))
 	}
-	if err := gInstances.redis.Close(); err != nil {
+	if err := gInstances.Redis.Close(); err != nil {
 		slog.ErrorContext(ctx, "close redis cache failed", slog.Any("err", err))
 	}
 	if err := gInstances.Dal.Close(ctx); err != nil {

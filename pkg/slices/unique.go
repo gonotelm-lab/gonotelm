@@ -11,3 +11,11 @@ func Unique[T comparable](slice []T) []T {
 	}
 	return result
 }
+
+func UniqueCount[T comparable](slice []T) int {
+	seen := make(map[T]struct{})
+	for _, v := range slice {
+		seen[v] = struct{}{}
+	}
+	return len(seen)
+}

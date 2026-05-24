@@ -7,13 +7,13 @@ exitWaitTimeout = "${ENV_GONOTELM_API_EXIT_WAIT_TIMEOUT:-10s}"
 [logic]
 
 [logic.chat]
-modelProvider = "qwen"
-model = "glm-5.1"
+modelProvider = "${ENV_GONOTELM_LOGIC_CHAT_PROVIDER:-qwen}"
+model = "${ENV_GONOTELM_LOGIC_CHAT_MODEL:-glm-5.1}"
 maxRound = 10
 
 [logic.source]
-modelProvider = "qwen"
-model = "qwen3.5-27b"
+modelProvider = "${ENV_GONOTELM_LOGIC_SOURCE_PROVIDER:-qwen}"
+model = "${ENV_GONOTELM_LOGIC_SOURCE_MODEL:-qwen3.5-27b}"
 
 [database]
 type = "postgres"
@@ -98,6 +98,7 @@ location = "${ENV_GONOTELM_GEMINI_LOCATION:-}"
 model = "${ENV_GONOTELM_GEMINI_MODEL:-gemini-embedding-001}"
 taskType = "${ENV_GONOTELM_GEMINI_TASK_TYPE:-RETRIEVAL_DOCUMENT}"
 title = "${ENV_GONOTELM_GEMINI_TITLE:-}"
+outputDimensionality = ${ENV_GONOTELM_GEMINI_EMBED_DIMENSIONS:-1024}
 mimeType = "${ENV_GONOTELM_GEMINI_MIME_TYPE:-text/plain}"
 autoTruncate = ${ENV_GONOTELM_GEMINI_AUTO_TRUNCATE:-true}
 
@@ -113,7 +114,7 @@ apiKey = "${ENV_GONOTELM_OPENAI_API_KEY:-}"
 model = "${ENV_GONOTELM_OPENAI_MODEL:-text-embedding-3-small}"
 timeout = "${ENV_GONOTELM_OPENAI_TIMEOUT:-30s}"
 encodingFormat = "${ENV_GONOTELM_OPENAI_ENCODING_FORMAT:-float}"
-dimensions = ${ENV_GONOTELM_OPENAI_DIMENSIONS:-1536}
+dimensions = ${ENV_GONOTELM_OPENAI_DIMENSIONS:-1024}
 user = "${ENV_GONOTELM_OPENAI_USER:-}"
 byAzure = ${ENV_GONOTELM_OPENAI_BY_AZURE:-false}
 baseUrl = "${ENV_GONOTELM_OPENAI_BASE_URL:-}"

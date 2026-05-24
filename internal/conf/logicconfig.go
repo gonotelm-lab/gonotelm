@@ -51,18 +51,6 @@ func (c *ChatLogicConfig) GetMaxRound() int {
 }
 
 type SourceLogicConfig struct {
-	ModelProvider chat.Type       `toml:"modelProvider"`
-	Model         string          `toml:"model"`
-	GMM           SourceGMMConfig `toml:"gmm"`
-}
-
-type SourceGMMConfig struct {
-	AutoMaxClusters int `toml:"autoMaxClusters"`
-}
-
-func (c *SourceLogicConfig) GetGMMAutoMaxClusters() int {
-	if c.GMM.AutoMaxClusters <= 0 {
-		return DefaultGMMAutoMaxClusters
-	}
-	return c.GMM.AutoMaxClusters
+	ModelProvider chat.Type `toml:"modelProvider"`
+	Model         string    `toml:"model"`
 }

@@ -173,7 +173,7 @@ func (l *SourceLogic) GetSource(
 ) (*model.Source, error) {
 	source, err := l.sourceBiz.GetSource(ctx, id)
 	if err != nil {
-		return nil, errors.WithMessage(err, "get source failed")
+		return nil, wrapGetSourceError(err, id)
 	}
 
 	return source, nil
@@ -274,7 +274,7 @@ func (l *SourceLogic) UploadFileSource(
 	params *UploadSourceParams,
 ) (*UploadSourceResult, error) {
 	if params.Size > maxUploadFileSizeBytes {
-		return nil, errors.ErrParams.Msgf("file size must be less than or equal to %d bytes", maxUploadFileSizeBytes)
+		return nil, errors.ErrParams.Msg("file size too large")
 	}
 	if !model.SupportedFileMimeType(params.MimeType) {
 		return nil, errors.ErrParams.Msgf("unsupported mime_type: %s", params.MimeType)
@@ -286,7 +286,8 @@ func (l *SourceLogic) UploadFileSource(
 	}
 
 	if !checkSourceUploadable(source) {
-		return nil, errors.ErrParams.Msgf("source is not uploadable, kind=%s, status=%s", source.Kind, source.Status)
+		return nil, errors.ErrParams.Msgf("source is not uploadable, kind=%s, status=%s",
+			source.Kind, source.Status)
 	}
 
 	storeKey := formatSourceStoreKey(params, source)
@@ -328,7 +329,7 @@ func (l *SourceLogic) PollSourceStatus(
 	ctx context.Context,
 	sourceId uuid.UUID,
 ) (model.SourceStatus, error) {
-	target, err := l.GetSource(ctx, sourceId)
+	target, err := l.sourceBiz.GetSource(ctx, sourceId)
 	if err != nil {
 		// source may be deleted while frontend polling status; treat as terminal status.
 		if errors.Is(err, bizsource.ErrSourceNotFound) || errors.Is(err, errors.ErrNoRecord) {
@@ -360,10 +361,6 @@ func (l *SourceLogic) RetrySourcePreparation(
 ) error {
 	source, err := l.GetSource(ctx, sourceId)
 	if err != nil {
-		if errors.Is(err, bizsource.ErrSourceNotFound) {
-			return nil
-		}
-
 		return errors.WithMessagef(err, "get source failed, id=%s", sourceId)
 	}
 
@@ -470,6 +467,23 @@ func (l *SourceLogic) GetSourceParsedContent(
 	return &GetSourceParsedContentResult{
 		Url: resp.Url,
 	}, nil
+}
+
+func (l *SourceLogic) GetSourceParsedTree(
+	ctx context.Context,
+	sourceId uuid.UUID,
+) (*ParsedSourceDocTree, error) {
+	source, err := l.GetSource(ctx, sourceId)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "get source failed, source_id=%s", sourceId)
+	}
+
+	tree, err := l.sourceBiz.GetSourceDocTree(ctx, source.NotebookId, sourceId)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "get source doc tree failed, source_id=%s", sourceId)
+	}
+
+	return buildParsedSourceDocTree(tree), nil
 }
 
 func (l *SourceLogic) pollFileSourceStatus(

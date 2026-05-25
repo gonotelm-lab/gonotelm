@@ -217,3 +217,15 @@ func TestNormalizeUnknownIcons(t *testing.T) {
 		t.Fatalf("expected private-use chars to normalize as bullet, got: %s", normalized)
 	}
 }
+
+func TestNormalizePDFPlainText_MergeHyphenLineBreakWord(t *testing.T) {
+	input := strings.Join([]string{
+		"Some will be sceptical about America's new-found zeal for co-",
+		"operation on this issue.",
+	}, "\n")
+
+	normalized := normalizePDFPlainText(input)
+	if !strings.Contains(normalized, "cooperation on this issue.") {
+		t.Fatalf("expected hyphen line-break word merge, got: %s", normalized)
+	}
+}

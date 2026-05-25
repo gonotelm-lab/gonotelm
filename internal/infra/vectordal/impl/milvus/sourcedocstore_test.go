@@ -3,11 +3,13 @@ package milvus
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/schema"
+	pkgerrors "github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/milvus-io/milvus/client/v2/milvusclient"
 	. "github.com/smartystreets/goconvey/convey"
 )
@@ -133,6 +135,123 @@ func TestSourceDocStore_GetWithoutMeta(t *testing.T) {
 		So(got, ShouldNotBeNil)
 		So(got.ChunkPos, ShouldEqual, int32(2))
 		So(got.Meta, ShouldBeNil)
+	})
+}
+
+func TestSourceDocStore_ListWithoutMatches(t *testing.T) {
+	Convey("SourceDocStore List should return empty docs without error when no matches", t, func() {
+		store, closeFn := mustNewTestStore(t)
+		defer closeFn()
+
+		ctx := t.Context()
+		suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+		notebookID := "test-nb-not-found-" + suffix
+		sourceID := "test-src-not-found-" + suffix
+
+		docs, err := store.List(ctx, &schema.SourceDocListParams{
+			NotebookId: notebookID,
+			SourceId:   sourceID,
+			BatchSize:  16,
+		})
+		So(err, ShouldBeNil)
+		So(docs, ShouldNotBeNil)
+		So(len(docs), ShouldEqual, 0)
+	})
+}
+
+func TestSourceDocStore_GetWithoutMatches(t *testing.T) {
+	Convey("SourceDocStore Get should return ErrNoRecord when no matches", t, func() {
+		store, closeFn := mustNewTestStore(t)
+		defer closeFn()
+
+		ctx := t.Context()
+		suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+		notebookID := "test-nb-get-not-found-" + suffix
+		sourceID := "test-src-get-not-found-" + suffix
+		docID := "test-doc-get-not-found-" + suffix
+
+		doc, err := store.Get(ctx, &schema.SourceDocGetParams{
+			NotebookId: notebookID,
+			SourceId:   sourceID,
+			DocId:      docID,
+		})
+		So(doc, ShouldBeNil)
+		So(err, ShouldNotBeNil)
+		So(pkgerrors.Is(err, pkgerrors.ErrNoRecord), ShouldBeTrue)
+	})
+}
+
+func TestSourceDocStore_QueryWithoutMatches(t *testing.T) {
+	Convey("SourceDocStore Query should return empty docs without error when no matches", t, func() {
+		store, closeFn := mustNewTestStore(t)
+		defer closeFn()
+
+		ctx := t.Context()
+		suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+		notebookID := "test-nb-query-no-match-" + suffix
+		sourceID := "test-src-query-no-match-" + suffix
+
+		docs, err := store.Query(ctx, &schema.SourceDocQueryParams{
+			NotebookId: notebookID,
+			SourceIds:  []string{sourceID},
+			Target:     "definitely-not-found-target-" + suffix,
+			Limit:      8,
+		})
+		So(err, ShouldBeNil)
+		So(docs, ShouldNotBeNil)
+		So(len(docs), ShouldEqual, 0)
+	})
+}
+
+func TestMilvusClient_QueryWithoutMatches(t *testing.T) {
+	Convey("Milvus Query should return empty result set without error when no matches", t, func() {
+		store, closeFn := mustNewTestStore(t)
+		defer closeFn()
+
+		ctx := t.Context()
+		suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+		notebookID := "test-nb-query-not-found-" + suffix
+		sourceID := "test-src-query-not-found-" + suffix
+		filterExpr := fmt.Sprintf(
+			`%s == %q && %s == %q`,
+			schema.FieldNotebookID, notebookID,
+			schema.FieldSourceID, sourceID,
+		)
+
+		rs, err := store.cli.Query(ctx, milvusclient.NewQueryOption(collectionName).
+			WithPartitions(partitionNameByNotebookID(notebookID)).
+			WithFilter(filterExpr).
+			WithLimit(16).
+			WithOutputFields(schema.OutputFields...))
+		So(err, ShouldBeNil)
+		So(rs.ResultCount, ShouldEqual, 0)
+	})
+}
+
+func TestMilvusClient_QueryIteratorWithoutMatches(t *testing.T) {
+	Convey("Milvus QueryIterator should return io.EOF when no matches", t, func() {
+		store, closeFn := mustNewTestStore(t)
+		defer closeFn()
+
+		ctx := t.Context()
+		suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+		notebookID := "test-nb-query-iter-not-found-" + suffix
+		sourceID := "test-src-query-iter-not-found-" + suffix
+		filterExpr := fmt.Sprintf(
+			`%s == %q && %s == %q`,
+			schema.FieldNotebookID, notebookID,
+			schema.FieldSourceID, sourceID,
+		)
+
+		iter, err := store.cli.QueryIterator(ctx, milvusclient.NewQueryIteratorOption(collectionName).
+			WithPartitions(partitionNameByNotebookID(notebookID)).
+			WithFilter(filterExpr).
+			WithBatchSize(16).
+			WithOutputFields(schema.OutputFields...))
+		So(err, ShouldBeNil)
+
+		_, err = iter.Next(ctx)
+		So(err, ShouldEqual, io.EOF)
 	})
 }
 

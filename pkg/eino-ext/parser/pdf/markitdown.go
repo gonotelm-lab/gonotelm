@@ -18,6 +18,7 @@ import (
 
 var (
 	partialNumberingPattern    = regexp.MustCompile(`^\.\d+$`)
+	hyphenLineBreakPattern     = regexp.MustCompile(`([\p{L}])-[ \t]*\n[ \t]*([\p{L}])`)
 	codeKeywordPattern         = regexp.MustCompile(`(?i)\b(func|function|def|class|return|if|elif|else|for|while|switch|case|break|continue|try|catch|finally|import|from|package|var|let|const|type|struct|interface|enum|impl|fn|pub|mod|use|select|insert|update|delete|create|drop|alter|begin|end|async|await|lambda)\b`)
 	listLikeLinePattern        = regexp.MustCompile(`^(\d+[\.\)]|[A-Za-z][\.\)]|[IVXLCDMivxlcdm]+[\.\)]|[（(]?\d+[）)]|[一二三四五六七八九十百千]+[、\.\s]|[-*•])`)
 	spacedAlphaSeqPattern      = regexp.MustCompile(`(?:\b[A-Za-z]\b(?: \b[A-Za-z]\b){1,})`)
@@ -1159,6 +1160,7 @@ func buildPDFMergedMarkdown(pageContents []string) string {
 func normalizePDFPlainText(content string) string {
 	content = strings.ReplaceAll(content, "\r\n", "\n")
 	content = strings.ReplaceAll(content, "\r", "\n")
+	content = hyphenLineBreakPattern.ReplaceAllString(content, `$1$2`)
 	content = mergePartialNumberingLines(content)
 
 	lines := strings.Split(content, "\n")

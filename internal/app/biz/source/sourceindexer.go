@@ -3,6 +3,7 @@ package source
 import (
 	"context"
 	"log/slog"
+	stdslices "slices"
 
 	"github.com/gonotelm-lab/gonotelm/internal/app/biz/source/convertdoc"
 	"github.com/gonotelm-lab/gonotelm/internal/app/biz/source/indices"
@@ -211,6 +212,7 @@ func (b *SourceIndexer) embedChunks(
 		for _, node := range nodes {
 			vDoc := node.Core()
 			vsDocs = append(vsDocs, vDoc)
+
 			if node.IsLeaf() {
 				continue
 			}
@@ -260,4 +262,162 @@ func (b *SourceIndexer) insertSourceDocs(
 	}
 
 	return nil
+}
+
+func RecoverDocTree(ctx context.Context, docs []*vecschema.SourceDoc) (*indices.DocTree, error) {
+	_ = ctx
+	if len(docs) == 0 {
+		return nil, errors.ErrParams.Msg("no source docs found")
+	}
+
+	// root 是最小 chunk_pos，先排序保证重建入口稳定。
+	sortedDocs := append(make([]*vecschema.SourceDoc, 0, len(docs)), docs...)
+	stdslices.SortFunc(sortedDocs, func(a, b *vecschema.SourceDoc) int {
+		return int(a.ChunkPos - b.ChunkPos)
+	})
+	rootDoc := sortedDocs[0]
+
+	docPosMapping := make(map[int]*vecschema.SourceDoc, len(sortedDocs))
+	for _, doc := range sortedDocs {
+		docPosMapping[int(doc.ChunkPos)] = doc
+	}
+
+	builder := &docTreeRecoverBuilder{
+		docPosMapping: docPosMapping,
+		nodeByPos:     make(map[int]*indices.DocTreeNode, len(sortedDocs)),
+		building:      make(map[int]bool, len(sortedDocs)),
+	}
+	rootNode, err := builder.buildNode(int(rootDoc.ChunkPos))
+	if err != nil {
+		return nil, errors.WithMessagef(err, "build root node failed, root_pos=%d", rootDoc.ChunkPos)
+	}
+
+	rebuiltNodes := make([]*indices.DocTreeNode, 0, len(sortedDocs))
+	maxLevel := 0
+	for _, doc := range sortedDocs {
+		pos := int(doc.ChunkPos)
+		node, ok := builder.nodeByPos[pos]
+		if !ok {
+			return nil, errors.ErrNoRecord.Msgf("orphan node found, node_pos=%d", pos)
+		}
+		rebuiltNodes = append(rebuiltNodes, node)
+		if node.Level() > maxLevel {
+			maxLevel = node.Level()
+		}
+	}
+
+	docTree := &indices.DocTree{}
+	docTree.SetRoot(rootNode)
+	docTree.SetNodes(rebuiltNodes)
+	docTree.SetHeight(maxLevel + 1)
+
+	return docTree, nil
+}
+
+type docTreeRecoverBuilder struct {
+	docPosMapping map[int]*vecschema.SourceDoc
+	nodeByPos     map[int]*indices.DocTreeNode
+	building      map[int]bool
+}
+
+func (b *docTreeRecoverBuilder) buildNode(pos int) (*indices.DocTreeNode, error) {
+	if n, ok := b.nodeByPos[pos]; ok {
+		return n, nil
+	}
+	if b.building[pos] {
+		return nil, errors.ErrInner.Msgf("cycle detected while rebuilding doc tree, node_pos=%d", pos)
+	}
+
+	doc, ok := b.docPosMapping[pos]
+	if !ok {
+		return nil, errors.ErrNoRecord.Msgf("doc not found for node pos, node_pos=%d", pos)
+	}
+
+	isLeaf := pos >= 0
+	level := 0
+	if lv, ok := doc.GetMetaInt(sourceDocMetaLevel); ok {
+		level = lv
+	}
+
+	b.building[pos] = true
+	defer delete(b.building, pos)
+
+	var (
+		children    []*indices.DocTreeNode
+		derivedFrom []string
+	)
+	if isLeaf {
+		derivedFrom = []string{doc.Id}
+	} else {
+		childrenPos, err := readSourceDocMetaIntSlice(doc, sourceDocMetaChildrenPos)
+		if err != nil {
+			return nil, errors.WithMessagef(err, "read children pos failed, node_pos=%d", pos)
+		}
+		if len(childrenPos) == 0 {
+			return nil, errors.ErrInner.Msgf("children pos is empty for non-leaf node, node_pos=%d", pos)
+		}
+		children = make([]*indices.DocTreeNode, 0, len(childrenPos))
+		for _, childPos := range childrenPos {
+			childNode, err := b.buildNode(childPos)
+			if err != nil {
+				return nil, err
+			}
+			children = append(children, childNode)
+		}
+
+		derivedFrom, err = readSourceDocDerivedFrom(doc, b.docPosMapping)
+		if err != nil {
+			return nil, errors.WithMessagef(err, "read deriving docs failed, node_pos=%d", pos)
+		}
+	}
+
+	node := indices.NewDocTreeNode(doc, level, pos, children, derivedFrom)
+	b.nodeByPos[pos] = node
+	return node, nil
+}
+
+func readSourceDocMetaIntSlice(doc *vecschema.SourceDoc, key string) ([]int, error) {
+	if doc == nil {
+		return nil, errors.ErrParams.Msg("source doc is nil")
+	}
+	out, ok, err := doc.GetMetaIntSlice(key)
+	if !ok {
+		return nil, errors.ErrInner.Msgf("meta key not found, key=%s", key)
+	}
+	if err != nil {
+		return nil, errors.WithMessagef(err, "cast children pos failed, key=%s", key)
+	}
+	return out, nil
+}
+
+func readSourceDocDerivedFrom(
+	doc *vecschema.SourceDoc,
+	docPosMapping map[int]*vecschema.SourceDoc,
+) ([]string, error) {
+	if doc == nil {
+		return nil, errors.ErrParams.Msg("source doc is nil")
+	}
+	encoded, ok := doc.GetStringMeta(sourceDocMetaDerivingPos)
+	if !ok || encoded == "" {
+		return nil, errors.ErrInner.Msgf("meta deriving pos not found, node_id=%s", doc.Id)
+	}
+	bm, err := bitmap.NewFrom(encoded)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "decode deriving bitmap failed, node_id=%s", doc.Id)
+	}
+
+	setPos := bm.GetAllSet()
+	if len(setPos) == 0 {
+		return nil, errors.ErrInner.Msgf("deriving bitmap has no set bit, node_id=%s", doc.Id)
+	}
+	derivedFrom := make([]string, 0, len(setPos))
+	for _, leafPos := range setPos {
+		leafDoc, ok := docPosMapping[int(leafPos)]
+		if !ok {
+			return nil, errors.ErrNoRecord.Msgf("leaf doc not found by deriving bitmap, leaf_pos=%d", leafPos)
+		}
+		derivedFrom = append(derivedFrom, leafDoc.Id)
+	}
+
+	return slices.Unique(derivedFrom), nil
 }

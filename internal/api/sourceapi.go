@@ -24,6 +24,7 @@ func (s *Server) registerSourcesRoutes(g *route.RouterGroup) {
 	g.DELETE("/source/:id", s.DeleteSource)
 	g.GET("/source/:id/doc/:doc_id", s.GetSourceDoc)
 	g.GET("/source/:id/parsed/content", s.GetSourceParsedContent)
+	g.GET("/source/:id/parsed/tree", s.GetSourceParsedTree)
 	g.PUT("/source/:id/title", s.UpdateSourceTitle)
 }
 
@@ -294,6 +295,27 @@ func (s *Server) GetSourceParsedContent(ctx context.Context, c *app.RequestConte
 		Content: resp.Content,
 		Url:     resp.Url,
 	})
+}
+
+type GetSourceParsedTreeRequest struct {
+	Id uuid.UUID `path:"id,required"`
+}
+
+func (s *Server) GetSourceParsedTree(ctx context.Context, c *app.RequestContext) {
+	var req GetSourceParsedTreeRequest
+	err := c.BindAndValidate(&req)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	resp, err := s.sourceLogic.GetSourceParsedTree(ctx, req.Id)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	http.OkResp(c, resp)
 }
 
 type UpdateSourceTitleRequest struct {

@@ -28,7 +28,7 @@ type DocTreeNode struct {
 
 	// 表示文档在来源中所处的位置
 	// pos < 0 表示为派生节点
-	// pos >= 0 表示为叶子节点 (原始来源文档的切块)
+	// pos >= 0 表示为原始来源文档的切块 (pos>=0表示为叶子节点)
 	// 和core.ChunkPos 一致
 	pos      int
 	children []*DocTreeNode
@@ -136,6 +136,30 @@ func (t *DocTree) Nodes() []*DocTreeNode {
 	return t.nodes
 }
 
+func (t *DocTree) SetNodes(nodes []*DocTreeNode) {
+	if t == nil {
+		return
+	}
+
+	t.nodes = nodes
+}
+
+func (t *DocTree) SetRoot(root *DocTreeNode) {
+	if t == nil {
+		return
+	}
+
+	t.root = root
+}
+
+func (t *DocTree) SetHeight(height int) {
+	if t == nil {
+		return
+	}
+
+	t.height = height
+}
+
 func (t *DocTree) Root() *DocTreeNode {
 	if t == nil {
 		return nil
@@ -152,6 +176,8 @@ func (t *DocTree) Height() int {
 
 // 从叶子节点nodes由下至上构建树结构
 // 得到的树结构最少都有两层
+// 
+// 由于ChunkPos的分配机制 得到的DocTree中Root的ChunkPos是所有节点中最小的
 func (b *DocTreeBuilder) Build(ctx context.Context, nodes []*DocTreeNode) (*DocTree, error) {
 	if len(nodes) == 0 {
 		return nil, errors.ErrParams.Msg("build doc tree nodes are empty")
@@ -418,7 +444,7 @@ func (b *DocTreeBuilder) extractNodes(
 			Owner:      owner,
 			Content:    summary,
 			Embedding:  slices.CastFloat[float64, float32](embedding),
-			ChunkPos:   -1,// 派生节点后续流程会分配
+			ChunkPos:   -1, // 派生节点后续流程会分配
 		},
 		level:       targetLevel,
 		pos:         -1,

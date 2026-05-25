@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/gonotelm-lab/gonotelm/internal/app/biz/source/indices"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/cache"
@@ -560,4 +561,29 @@ func (b *Biz) RetrieveSourceDocs(
 	}
 
 	return queriedDocs, nil
+}
+
+func (b *Biz) GetSourceDocTree(
+	ctx context.Context,
+	notebookId uuid.UUID,
+	sourceId uuid.UUID,
+) (*indices.DocTree, error) {
+	var (
+		sourceIdStr   = sourceId.String()
+		notebookIdStr = notebookId.String()
+	)
+
+	docs, err := b.sourceDocStore.List(
+		ctx,
+		&vecschema.SourceDocListParams{
+			NotebookId: notebookIdStr,
+			SourceId:   sourceIdStr,
+			BatchSize:  500,
+		},
+	)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "list source docs failed, source_id=%s", sourceIdStr)
+	}
+
+	return RecoverDocTree(ctx, docs)
 }

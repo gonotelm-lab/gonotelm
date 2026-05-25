@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"github.com/gonotelm-lab/gonotelm/pkg/cast"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 	"github.com/mitchellh/mapstructure"
 )
@@ -153,6 +154,43 @@ func (s *SourceDoc) GetBoolMeta(key string) (bool, bool) {
 		return false, false
 	}
 	return value.(bool), true
+}
+
+// GetMetaBool reads a bool meta value safely.
+func (s *SourceDoc) GetMetaBool(key string) (bool, bool) {
+	raw, ok := s.GetMeta(key)
+	if !ok {
+		return false, false
+	}
+	val, ok := raw.(bool)
+	return val, ok
+}
+
+// GetMetaInt reads a numeric meta value as int safely.
+func (s *SourceDoc) GetMetaInt(key string) (int, bool) {
+	raw, ok := s.GetMeta(key)
+	if !ok {
+		return 0, false
+	}
+	val, err := cast.AnyToInt(raw)
+	if err != nil {
+		return 0, false
+	}
+	return val, true
+}
+
+// GetMetaIntSlice reads a numeric slice meta value as []int safely.
+// The returned bool indicates whether key exists.
+func (s *SourceDoc) GetMetaIntSlice(key string) ([]int, bool, error) {
+	raw, ok := s.GetMeta(key)
+	if !ok {
+		return nil, false, nil
+	}
+	val, err := cast.AnyToIntSlice(raw)
+	if err != nil {
+		return nil, true, err
+	}
+	return val, true, nil
 }
 
 func (s *SourceDoc) AsMap() map[string]any {

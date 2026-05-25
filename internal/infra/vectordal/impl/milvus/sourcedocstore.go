@@ -129,7 +129,7 @@ func (s *SourceDocStoreImpl) BatchInsert(
 			var gErr error
 			defer func() {
 				if e := recover(); e != nil {
-					gErr = fmt.Errorf("panic in safe do: %v", e)
+					gErr = errors.Wrapf(errors.ErrInner, "panic in safe do: %v", e)
 				}
 			}()
 
@@ -164,7 +164,7 @@ func (s *SourceDocStoreImpl) BatchInsert(
 
 	err := eg.Wait()
 	if err != nil {
-		return errors.Wrap(err, "batch insert source docs failed")
+		return errors.WithMessage(err, "batch insert source docs failed")
 	}
 
 	return nil
@@ -208,7 +208,7 @@ func (s *SourceDocStoreImpl) BatchDelete(
 
 	for _, sourceID := range sourceIDs {
 		expr := fmt.Sprintf(
-			`%s == "%s" && %s == "%s"`,
+			`%s == %q && %s == %q`,
 			schema.FieldNotebookID,
 			notebookID,
 			schema.FieldSourceID,
@@ -395,7 +395,7 @@ func (s *SourceDocStoreImpl) List(
 
 	partitionName := partitionNameByNotebookID(notebookID)
 	filterExpr := fmt.Sprintf(
-		`%s == %s && %s == %s`,
+		`%s == %q && %s == %q`,
 		schema.FieldNotebookID, notebookID,
 		schema.FieldSourceID, sourceID,
 	)
@@ -410,7 +410,10 @@ func (s *SourceDocStoreImpl) List(
 			WithBatchSize(batchSize),
 	)
 	if err != nil {
-		return nil, errors.WithMessage(err, "create source doc query iterator failed")
+		return nil, errors.Wrapf(errors.ErrDatabase,
+			"create source doc query iterator failed, notebook_id=%q, source_id=%q, partition=%q, err=%v",
+			notebookID, sourceID, partitionName, err,
+		)
 	}
 
 	docs := make([]*schema.SourceDoc, 0, batchSize)
@@ -496,7 +499,7 @@ func extractSourceDocsFromResults(
 	for _, rs := range resultSets {
 		setDocs, err := extractSourceDocsFromResultSet(ctx, rs)
 		if err != nil {
-			return nil, err
+			return nil, errors.WithMessage(err, "extract source docs from result set failed")
 		}
 		docs = append(docs, setDocs...)
 	}
@@ -520,7 +523,7 @@ func extractSourceDocsFromResultSet(
 	rs milvusclient.ResultSet,
 ) ([]*schema.SourceDoc, error) {
 	if rs.Err != nil {
-		return nil, rs.Err
+		return nil, errors.Wrapf(errors.ErrDatabase, "result set has upstream error, err=%v", rs.Err)
 	}
 	if rs.ResultCount == 0 {
 		return nil, nil
@@ -528,14 +531,14 @@ func extractSourceDocsFromResultSet(
 
 	cols, err := getSourceDocResultColumns(rs)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithMessage(err, "get source doc result columns failed")
 	}
 
 	docs := make([]*schema.SourceDoc, 0, rs.ResultCount)
 	for i := 0; i < rs.ResultCount; i++ {
 		doc, err := buildSourceDocFromColumns(ctx, cols, i)
 		if err != nil {
-			return nil, err
+			return nil, errors.WithMessagef(err, "build source doc from columns failed, index=%d", i)
 		}
 		docs = append(docs, doc)
 	}
@@ -608,23 +611,23 @@ func buildSourceDocFromColumns(
 ) (*schema.SourceDoc, error) {
 	id, err := cols.id.GetAsString(index)
 	if err != nil {
-		return nil, errors.WithMessage(err, "read id from result failed")
+		return nil, errors.Wrapf(errors.ErrDatabase, "read id from result failed, err=%v", err)
 	}
 	notebookID, err := cols.notebookID.GetAsString(index)
 	if err != nil {
-		return nil, errors.WithMessage(err, "read notebook_id from result failed")
+		return nil, errors.Wrapf(errors.ErrDatabase, "read notebook_id from result failed, err=%v", err)
 	}
 	sourceID, err := cols.sourceID.GetAsString(index)
 	if err != nil {
-		return nil, errors.WithMessage(err, "read source_id from result failed")
+		return nil, errors.Wrapf(errors.ErrDatabase, "read source_id from result failed, err=%v", err)
 	}
 	content, err := cols.content.GetAsString(index)
 	if err != nil {
-		return nil, errors.WithMessage(err, "read content from result failed")
+		return nil, errors.Wrapf(errors.ErrDatabase, "read content from result failed, err=%v", err)
 	}
 	owner, err := cols.owner.GetAsString(index)
 	if err != nil {
-		return nil, errors.WithMessage(err, "read owner from result failed")
+		return nil, errors.Wrapf(errors.ErrDatabase, "read owner from result failed, err=%v", err)
 	}
 	chunkPos := int32(-1)
 	if isNull, err := cols.chunkPos.IsNull(index); err != nil {
@@ -632,7 +635,7 @@ func buildSourceDocFromColumns(
 	} else if !isNull {
 		chunkPosInt64, err := cols.chunkPos.GetAsInt64(index)
 		if err != nil {
-			return nil, errors.WithMessage(err, "read chunk_pos from result failed")
+			return nil, errors.Wrapf(errors.ErrDatabase, "read chunk_pos from result failed, err=%v", err)
 		}
 		chunkPos = int32(chunkPosInt64)
 	}
@@ -657,7 +660,11 @@ func buildSourceDocFromColumns(
 	}, nil
 }
 
-func buildSourceDocMeta(ctx context.Context, cols *sourceDocResultColumns, index int) (map[string]any, error) {
+func buildSourceDocMeta(
+	ctx context.Context,
+	cols *sourceDocResultColumns,
+	index int,
+) (map[string]any, error) {
 	meta := make(map[string]any)
 
 	if cols.meta != nil {
@@ -745,7 +752,7 @@ func parseMilvusMeta(raw any) (map[string]any, error) {
 	default:
 		payload, err := json.Marshal(val)
 		if err != nil {
-			return nil, errors.WithMessage(err, "marshal unknown $meta payload failed")
+			return nil, errors.Wrapf(errors.ErrSerde, "marshal unknown $meta payload failed, err=%v", err)
 		}
 		return unmarshalMetaBytes(payload)
 	}
@@ -758,7 +765,7 @@ func unmarshalMetaBytes(payload []byte) (map[string]any, error) {
 
 	out := make(map[string]any)
 	if err := json.Unmarshal(payload, &out); err != nil {
-		return nil, errors.WithMessage(err, "unmarshal $meta payload failed")
+		return nil, errors.Wrapf(errors.ErrSerde, "unmarshal $meta payload failed, err=%v", err)
 	}
 	return out, nil
 }

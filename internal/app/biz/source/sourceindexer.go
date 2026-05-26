@@ -204,10 +204,6 @@ func (b *SourceIndexer) embedChunks(
 		return texts, fallbackVsDocs, nil
 	} else {
 		nodes := docTree.Nodes()
-		nodePosMapping := make(map[*indices.DocTreeNode]int, len(nodes))
-		for pos, node := range nodes {
-			nodePosMapping[node] = pos
-		}
 
 		for _, node := range nodes {
 			vDoc := node.Core()
@@ -228,10 +224,8 @@ func (b *SourceIndexer) embedChunks(
 				}
 				childrenPos := make([]int, 0, len(node.Children()))
 				for _, child := range node.Children() {
-					cp, ok := nodePosMapping[child]
-					if ok {
-						childrenPos = append(childrenPos, cp)
-					}
+					// children_pos 必须和 RecoverDocTree 的查找键一致，使用 chunk_pos/pos 体系。
+					childrenPos = append(childrenPos, child.Pos())
 				}
 
 				vDoc.PutMeta(sourceDocMetaDerivingPos, bm.String())

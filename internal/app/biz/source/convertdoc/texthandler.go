@@ -51,7 +51,7 @@ func (e *TextHandler) Handle(ctx context.Context, s *model.Source) (*HandleResul
 	return &HandleResult{
 		Docs:              docs,
 		ParsedContent:     converted,
-		ParsedContentType: markdownMimeType,
+		ParsedContentType: model.MimeTypeMarkdown,
 	}, nil
 }
 

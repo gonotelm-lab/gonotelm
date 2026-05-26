@@ -98,6 +98,10 @@ func (b *SourceIndexer) Prepare(
 		slog.Int("estimated_token", estimatedToken),
 	)
 
+	if result.ParsedContentType == model.MimeTypeMarkdown {
+		// 对于有明显层级结构的markdown文档尝试使用语法树解析
+	}
+
 	textChunks, vsDocs, err := b.embedChunks(ctx, source, result)
 	if err != nil {
 		return nil, err
@@ -193,7 +197,7 @@ func (b *SourceIndexer) embedChunks(
 	}
 
 	// 构建索引树
-	docTree, err := b.docTreeBuilder.Build(ctx, leafNodes)
+	docTree, err := b.docTreeBuilder.MergeBuild(ctx, leafNodes)
 	if err != nil {
 		// log only
 		slog.ErrorContext(ctx, "build doc tree failed",

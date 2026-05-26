@@ -20,16 +20,16 @@ import (
 
 	einoembed "github.com/cloudwego/eino/components/embedding"
 	einoschema "github.com/cloudwego/eino/schema"
+	"github.com/yuin/goldmark"
+	goldtext "github.com/yuin/goldmark/text"
 )
 
 type DocTreeNode struct {
 	core  *vschema.SourceDoc
 	level int // 0-based, leaf is 0
 
-	// 表示文档在来源中所处的位置
-	// pos < 0 表示为派生节点
-	// pos >= 0 表示为原始来源文档的切块 (pos>=0表示为叶子节点)
-	// 和core.ChunkPos 一致
+	// 表示文档在来源中所处的位置（和 core.ChunkPos 一致）。
+	// 当前分配策略下通常 pos<0 为派生节点、pos>=0 为原始切块，
 	pos      int
 	children []*DocTreeNode
 
@@ -79,7 +79,7 @@ func (n *DocTreeNode) IsLeaf() bool {
 	if n == nil {
 		return false
 	}
-	return n.pos >= 0
+	return len(n.children) == 0
 }
 
 func (n *DocTreeNode) Children() []*DocTreeNode {
@@ -174,11 +174,11 @@ func (t *DocTree) Height() int {
 	return t.height
 }
 
-// 从叶子节点nodes由下至上构建树结构
+// 从叶子节点nodes由下至上通过合并的方式构建树结构
 // 得到的树结构最少都有两层
-// 
+//
 // 由于ChunkPos的分配机制 得到的DocTree中Root的ChunkPos是所有节点中最小的
-func (b *DocTreeBuilder) Build(ctx context.Context, nodes []*DocTreeNode) (*DocTree, error) {
+func (b *DocTreeBuilder) MergeBuild(ctx context.Context, nodes []*DocTreeNode) (*DocTree, error) {
 	if len(nodes) == 0 {
 		return nil, errors.ErrParams.Msg("build doc tree nodes are empty")
 	}
@@ -453,4 +453,17 @@ func (b *DocTreeBuilder) extractNodes(
 	}
 
 	return newNode, nil
+}
+
+// 通过解析markdown语法树的方式构建树结构
+//
+// 如果无法从content中解析出markdown语法树则返回错误
+func (b *DocTreeBuilder) ParseBuild(ctx context.Context, content []byte) (*DocTree, error) {
+	parser := goldmark.DefaultParser()
+	reader := goldtext.NewReader(content)
+	markdoc := parser.Parse(reader)
+
+	_ = markdoc
+
+	return nil, nil
 }

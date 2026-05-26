@@ -19,10 +19,6 @@ import (
 )
 
 const (
-	markdownMimeType = "text/markdown"
-)
-
-const (
 	parserMetaSourceObjKey        = "source_obj"
 	parserMetaSourceIdKey         = "source_id"
 	parserMetaSourceNotebookIdKey = "source_notebook_id"

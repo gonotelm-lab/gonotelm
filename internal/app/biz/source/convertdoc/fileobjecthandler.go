@@ -60,7 +60,7 @@ func (e *FileObjectHandler) Handle(ctx context.Context, s *model.Source) (*Handl
 	return &HandleResult{
 		Docs:              docs,
 		ParsedContent:     converted,
-		ParsedContentType: markdownMimeType,
+		ParsedContentType: model.MimeTypeMarkdown,
 	}, nil
 }
 

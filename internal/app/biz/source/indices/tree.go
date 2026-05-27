@@ -21,12 +21,13 @@ import (
 	einoembed "github.com/cloudwego/eino/components/embedding"
 	einoschema "github.com/cloudwego/eino/schema"
 	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/ast"
 	goldtext "github.com/yuin/goldmark/text"
 )
 
 type DocTreeNode struct {
 	core  *vschema.SourceDoc
-	level int // 0-based, leaf is 0
+	level int // 0-based, the deepest level is 0
 
 	// 表示文档在来源中所处的位置（和 core.ChunkPos 一致）。
 	// 当前分配策略下通常 pos<0 为派生节点、pos>=0 为原始切块，
@@ -455,6 +456,17 @@ func (b *DocTreeBuilder) extractNodes(
 	return newNode, nil
 }
 
+type parseDocTreeNode struct {
+	id       string
+	title    string
+	contents []string
+	children []*parseDocTreeNode
+	headingLevel    int // 此处根节点是level=0
+	pos      int
+
+	derivedFrom []string
+}
+
 // 通过解析markdown语法树的方式构建树结构
 //
 // 如果无法从content中解析出markdown语法树则返回错误
@@ -463,7 +475,51 @@ func (b *DocTreeBuilder) ParseBuild(ctx context.Context, content []byte) (*DocTr
 	reader := goldtext.NewReader(content)
 	markdoc := parser.Parse(reader)
 
-	_ = markdoc
+	// 虚拟根节点
+	vroot := &parseDocTreeNode{headingLevel: 0, title: "vroot"}
+	stack := []*parseDocTreeNode{vroot}
+	
+	// 栈顶放的节点为可能的父节点
+	pushStack := func(node *parseDocTreeNode) {
+		stack = append(stack, node)
+	}
+	peekStack := func() *parseDocTreeNode {
+		return stack[len(stack)-1]
+	}
+	popStack := func() *parseDocTreeNode {
+		last := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		return last
+	}
+
+	maxHeadingLevel := 0
+	curParent := vroot
+
+	for n := markdoc.FirstChild(); n != nil; n = n.NextSibling() {
+		switch node := n.(type) {
+		case *ast.Heading: // 只识别heading 其它一律归结为heading下的内容
+			// H1~H6
+			maxHeadingLevel = max(maxHeadingLevel, node.Level)
+			// 找到比当前节点Level更小的节点 也就是找到其父节点
+			for peekStack().headingLevel >= node.Level {
+				popStack()
+			}
+
+			parent := peekStack()
+			newNode := &parseDocTreeNode{
+				headingLevel: node.Level,
+			}
+
+			parent.children = append(parent.children, newNode)
+			pushStack(newNode) // 新的节点可能作为其他节点的父节点
+			curParent = newNode
+		default:
+			text := extractMarkdownBlockText(node, content)
+			if text != "" {
+				curParent.contents = append(curParent.contents, text)
+			}
+		}
+	}
 
 	return nil, nil
 }

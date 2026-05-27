@@ -1,4 +1,4 @@
-package indices
+package deptest
 
 import (
 	"encoding/json"
@@ -16,7 +16,7 @@ import (
 type testMarkdownDocNode struct {
 	Title    string                 `json:"title,omitempty"`    // 标题文本（根节点为空）
 	Level    int                    `json:"level"`              // 树层级，0 为文档最深标题层（叶子层），向上递增
-	Content  string                 `json:"content,omitempty"`  // 该节下聚合后的文本内容
+	Content  []string               `json:"content,omitempty"`  // 该节下聚合后的文本内容
 	Children []*testMarkdownDocNode `json:"children,omitempty"` // 子章节
 }
 
@@ -106,12 +106,12 @@ func TestParseMarkdownDocNode(t *testing.T) {
 		root := &testMarkdownDocNode{Level: 0, Title: "root"}
 		stack := []*testMarkdownDocNode{root}
 		maxHeadingLevel := 0
-		contentPartsByNode := map[*testMarkdownDocNode][]string{}
 
 		current := root
 
 		// 遍历顶级块节点
 		for n := doc.FirstChild(); n != nil; n = n.NextSibling() {
+			t.Log(n.Type(), n.Kind())
 			switch node := n.(type) {
 			case *ast.Heading:
 				if node.Level > maxHeadingLevel {
@@ -133,7 +133,7 @@ func TestParseMarkdownDocNode(t *testing.T) {
 			default:
 				text := extractBlockText(node, source)
 				if text != "" {
-					contentPartsByNode[current] = append(contentPartsByNode[current], text)
+					current.Content = append(current.Content, text)
 				}
 			}
 		}
@@ -149,21 +149,9 @@ func TestParseMarkdownDocNode(t *testing.T) {
 		}
 		relabelLevels(root)
 
-		var finalizeContent func(node *testMarkdownDocNode)
-		finalizeContent = func(node *testMarkdownDocNode) {
-			if parts := contentPartsByNode[node]; len(parts) > 0 {
-				node.Content = strings.Join(parts, "\n\n")
-				delete(contentPartsByNode, node)
-			}
-			for _, child := range node.Children {
-				finalizeContent(child)
-			}
-		}
-		finalizeContent(root)
-
 		return root, nil
 	}
-	md, err := os.ReadFile("./tree_test_data.md")
+	md, err := os.ReadFile("./testdata/test.md")
 	if err != nil {
 		t.Fatalf("read file failed, err=%v, err=%v", err, err)
 	}

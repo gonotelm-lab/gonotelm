@@ -2,17 +2,16 @@ package convertdoc
 
 import (
 	"context"
-	"regexp"
 	"strings"
 
 	"github.com/gonotelm-lab/gonotelm/internal/app/biz/source/convertdoc/transformer"
+	"github.com/gonotelm-lab/gonotelm/internal/app/biz/source/util"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 
 	einoparser "github.com/cloudwego/eino/components/document/parser"
 )
 
-var maybeMarkdownReg = regexp.MustCompile(`(?m)^#{1,6}\s+`)
 
 var _ Handler = (*TextHandler)(nil)
 
@@ -26,14 +25,18 @@ func NewTextHandler(c HandlerConfig) *TextHandler {
 	}
 }
 
-func (e *TextHandler) Handle(ctx context.Context, s *model.Source) (*HandleResult, error) {
+func (e *TextHandler) Handle(
+	ctx context.Context,
+	s *model.Source,
+	opts ...HandleOption,
+) (*HandleResult, error) {
 	textSource := model.TextSourceContent{}
 	if err := decodeSourceContent(s.Content, &textSource, "unmarshal text source content failed"); err != nil {
 		return nil, err
 	}
 
 	splitMethod := transformer.ChunkRecursiveSplitMethod
-	if maybeIsMarkdown(textSource.Text) {
+	if util.MaybeHasMarkdownHeading(textSource.Text) {
 		splitMethod = transformer.ChunkMarkdownSplitMethod
 	}
 
@@ -41,6 +44,7 @@ func (e *TextHandler) Handle(ctx context.Context, s *model.Source) (*HandleResul
 		ctx,
 		s,
 		strings.NewReader(textSource.Text),
+		append([]HandleOption{}, opts...),
 		nil,
 		transformer.WithChunkSplitMethod(splitMethod),
 	)
@@ -55,6 +59,4 @@ func (e *TextHandler) Handle(ctx context.Context, s *model.Source) (*HandleResul
 	}, nil
 }
 
-func maybeIsMarkdown(text string) bool {
-	return maybeMarkdownReg.MatchString(text[0:min(len(text), 512)])
-}
+

@@ -139,22 +139,42 @@ func newParseBuildMockGateway(
 }
 
 func parseBuildSplitByRuneWindow(maxSize int) ParseBuildChunkSplitFunc {
-	return func(_ context.Context, content string) ([]string, error) {
+	return func(_ context.Context, content string) ([]ParseBuildChunk, error) {
 		if maxSize <= 0 || content == "" {
-			return []string{content}, nil
+			return []ParseBuildChunk{
+				{
+					Content:   content,
+					StartByte: 0,
+					EndByte:   len(content),
+				},
+			}, nil
 		}
 		runes := []rune(content)
 		if len(runes) <= maxSize {
-			return []string{content}, nil
+			return []ParseBuildChunk{
+				{
+					Content:   content,
+					StartByte: 0,
+					EndByte:   len(content),
+				},
+			}, nil
 		}
 
-		chunks := make([]string, 0, len(runes)/maxSize+1)
+		chunks := make([]ParseBuildChunk, 0, len(runes)/maxSize+1)
+		byteStart := 0
 		for start := 0; start < len(runes); {
 			end := start + maxSize
 			if end > len(runes) {
 				end = len(runes)
 			}
-			chunks = append(chunks, string(runes[start:end]))
+			chunkContent := string(runes[start:end])
+			byteEnd := byteStart + len(chunkContent)
+			chunks = append(chunks, ParseBuildChunk{
+				Content:   chunkContent,
+				StartByte: byteStart,
+				EndByte:   byteEnd,
+			})
+			byteStart = byteEnd
 			start = end
 		}
 		return chunks, nil
@@ -287,6 +307,9 @@ func TestParseBuildMockedNonLeafDownshift(t *testing.T) {
 
 		parentNode := findNodeByExactContent(tree.Root(), "Parent")
 		So(parentNode, ShouldNotBeNil)
+		So(parentNode.IsLeaf(), ShouldBeFalse)
+		So(parentNode.ParseMetadata(), ShouldNotBeNil)
+		So(parentNode.ParseMetadata().Valid(), ShouldBeTrue)
 
 		// 非叶子超限后，父节点仅保留标题；内容下放为子节点（无标题纯内容节点）。
 		hasDownshiftContent := false
@@ -299,7 +322,7 @@ func TestParseBuildMockedNonLeafDownshift(t *testing.T) {
 			if content == "" {
 				continue
 			}
-			if content == "Child\nchild-body" {
+			if strings.HasPrefix(content, "Child\n") && strings.Contains(content, "child-body") {
 				hasChildSection = true
 				continue
 			}
@@ -312,6 +335,205 @@ func TestParseBuildMockedNonLeafDownshift(t *testing.T) {
 
 		assertAllNodesEmbedded(tree.Nodes())
 		So(mockLLM.GenerateCallCount(), ShouldEqual, 1)
+	})
+}
+
+func TestParseBuildNoHeadingKeepRootTitleEmpty(t *testing.T) {
+	Convey("ParseBuild 无标题正文时应保持根标题为空", t, func() {
+		mockLLM := &parseBuildMockLLM{response: "UNUSED-SUMMARY"}
+		mockEmbedder := &parseBuildMockEmbedder{}
+		mockGateway := newParseBuildMockGateway(chat.Openai, mockLLM)
+
+		builder := NewDocTreeBuilder(
+			mockEmbedder,
+			mockGateway,
+			func(_ context.Context) string { return string(chat.Openai) },
+			func(_ context.Context) string { return "mock-model" },
+		)
+
+		markdown := strings.Join([]string{
+			"这是第一段正文",
+			"这是第二段正文",
+		}, "\n\n")
+		tree, err := builder.ParseBuild(
+			context.Background(),
+			[]byte(markdown),
+			WithParseBuildMaxNodeToken(200),
+			WithParseBuildTokenLenFn(parseBuildRuneTokenLen),
+			WithParseBuildChunkSplitFunc(parseBuildSplitByRuneWindow(200)),
+		)
+
+		So(err, ShouldBeNil)
+		So(tree, ShouldNotBeNil)
+		So(tree.Root(), ShouldNotBeNil)
+		So(tree.Root().Core(), ShouldNotBeNil)
+		So(tree.Root().Core().Content, ShouldNotContainSubstring, "vroot")
+		So(tree.Root().Core().Content, ShouldContainSubstring, "这是第一段正文")
+		So(tree.Root().Core().Content, ShouldContainSubstring, "这是第二段正文")
+		So(mockLLM.GenerateCallCount(), ShouldEqual, 0)
+
+		assertAllNodesEmbedded(tree.Nodes())
+		So(mockEmbedder.CallCount(), ShouldBeGreaterThan, 0)
+	})
+}
+
+func TestParseBuildNoHeadingLongBodySplit(t *testing.T) {
+	Convey("ParseBuild 长正文无标题时应分片且根内容为空", t, func() {
+		mockLLM := &parseBuildMockLLM{response: "UNUSED-SUMMARY"}
+		mockEmbedder := &parseBuildMockEmbedder{}
+		mockGateway := newParseBuildMockGateway(chat.Openai, mockLLM)
+
+		builder := NewDocTreeBuilder(
+			mockEmbedder,
+			mockGateway,
+			func(_ context.Context) string { return string(chat.Openai) },
+			func(_ context.Context) string { return "mock-model" },
+		)
+
+		markdown := strings.Repeat("这是一段连续正文内容用于测试分片行为。", 20)
+		tree, err := builder.ParseBuild(
+			context.Background(),
+			[]byte(markdown),
+			WithParseBuildMaxNodeToken(80),
+			WithParseBuildTokenLenFn(parseBuildRuneTokenLen),
+			WithParseBuildChunkSplitFunc(parseBuildSplitByRuneWindow(40)),
+		)
+
+		So(err, ShouldBeNil)
+		So(tree, ShouldNotBeNil)
+		So(tree.Root(), ShouldNotBeNil)
+		So(tree.Root().Core(), ShouldNotBeNil)
+		So(tree.Root().Core().Content, ShouldEqual, "")
+		So(mockLLM.GenerateCallCount(), ShouldEqual, 0)
+
+		children := tree.Root().Children()
+		So(len(children), ShouldBeGreaterThan, 1)
+
+		nonEmptyChildCount := 0
+		for _, child := range children {
+			if child == nil || child.Core() == nil {
+				continue
+			}
+			content := child.Core().Content
+			if strings.TrimSpace(content) == "" {
+				continue
+			}
+			nonEmptyChildCount++
+			So(content, ShouldNotContainSubstring, "vroot")
+			So(child.IsLeaf(), ShouldBeTrue)
+			parseMeta := child.ParseMetadata()
+			So(parseMeta, ShouldNotBeNil)
+			So(parseMeta.Valid(), ShouldBeTrue)
+		}
+		So(nonEmptyChildCount, ShouldEqual, len(children))
+
+		assertAllNodesEmbedded(tree.Nodes())
+		So(mockEmbedder.CallCount(), ShouldBeGreaterThan, 0)
+	})
+}
+
+func TestParseBuildLeafParseMetadata(t *testing.T) {
+	Convey("ParseBuild 原生叶子节点应生成位置信息", t, func() {
+		mockLLM := &parseBuildMockLLM{response: "ROOT-META"}
+		mockEmbedder := &parseBuildMockEmbedder{}
+		mockGateway := newParseBuildMockGateway(chat.Openai, mockLLM)
+
+		builder := NewDocTreeBuilder(
+			mockEmbedder,
+			mockGateway,
+			func(_ context.Context) string { return string(chat.Openai) },
+			func(_ context.Context) string { return "mock-model" },
+		)
+
+		markdown := strings.Join([]string{
+			"# Parent",
+			"parent body",
+			"## Child",
+			"child body",
+		}, "\n")
+		tree, err := builder.ParseBuild(
+			context.Background(),
+			[]byte(markdown),
+			WithParseBuildMaxNodeToken(200),
+			WithParseBuildTokenLenFn(parseBuildRuneTokenLen),
+			WithParseBuildChunkSplitFunc(parseBuildSplitByRuneWindow(200)),
+		)
+		So(err, ShouldBeNil)
+		So(tree, ShouldNotBeNil)
+		So(tree.Root(), ShouldNotBeNil)
+		So(tree.Root().ParseMetadata(), ShouldBeNil)
+
+		parentNode := findNodeByExactContent(tree.Root(), "Parent\n\nparent body")
+		So(parentNode, ShouldNotBeNil)
+		So(parentNode.IsLeaf(), ShouldBeFalse)
+		parentMeta := parentNode.ParseMetadata()
+		So(parentMeta, ShouldNotBeNil)
+		So(parentMeta.Valid(), ShouldBeTrue)
+		parentRaw := markdown[parentMeta.StartByte():parentMeta.EndByte()]
+		So(parentRaw, ShouldContainSubstring, "Parent")
+		So(parentRaw, ShouldContainSubstring, "parent body")
+
+		childNode := findNodeByExactContent(tree.Root(), "Child\n\nchild body")
+		So(childNode, ShouldNotBeNil)
+		So(childNode.IsLeaf(), ShouldBeTrue)
+
+		parseMeta := childNode.ParseMetadata()
+		So(parseMeta, ShouldNotBeNil)
+		So(parseMeta.Valid(), ShouldBeTrue)
+		So(parseMeta.EndByte(), ShouldBeGreaterThan, parseMeta.StartByte())
+		So(parseMeta.EndRune(), ShouldBeGreaterThanOrEqualTo, parseMeta.StartRune())
+
+		raw := markdown[parseMeta.StartByte():parseMeta.EndByte()]
+		So(raw, ShouldContainSubstring, "Child")
+		So(raw, ShouldContainSubstring, "child body")
+	})
+}
+
+func TestParseBuildRootParseMetadataByDerivation(t *testing.T) {
+	Convey("ParseBuild 根节点派生与非派生场景的位置信息应符合预期", t, func() {
+		builder := NewDocTreeBuilder(
+			&parseBuildMockEmbedder{},
+			newParseBuildMockGateway(chat.Openai, &parseBuildMockLLM{response: "ROOT-DERIVED"}),
+			func(_ context.Context) string { return string(chat.Openai) },
+			func(_ context.Context) string { return "mock-model" },
+		)
+
+		headingMarkdown := "# H1\nbody"
+		headingTree, err := builder.ParseBuild(
+			context.Background(),
+			[]byte(headingMarkdown),
+			WithParseBuildMaxNodeToken(120),
+			WithParseBuildTokenLenFn(parseBuildRuneTokenLen),
+			WithParseBuildChunkSplitFunc(parseBuildSplitByRuneWindow(120)),
+		)
+		So(err, ShouldBeNil)
+		So(headingTree, ShouldNotBeNil)
+		So(headingTree.Root(), ShouldNotBeNil)
+		So(headingTree.Root().ParseMetadata(), ShouldBeNil)
+
+		noHeadingBuilder := NewDocTreeBuilder(
+			&parseBuildMockEmbedder{},
+			newParseBuildMockGateway(chat.Openai, &parseBuildMockLLM{response: "UNUSED"}),
+			func(_ context.Context) string { return string(chat.Openai) },
+			func(_ context.Context) string { return "mock-model" },
+		)
+		noHeadingMarkdown := "第一段\n\n第二段"
+		noHeadingTree, err := noHeadingBuilder.ParseBuild(
+			context.Background(),
+			[]byte(noHeadingMarkdown),
+			WithParseBuildMaxNodeToken(120),
+			WithParseBuildTokenLenFn(parseBuildRuneTokenLen),
+			WithParseBuildChunkSplitFunc(parseBuildSplitByRuneWindow(120)),
+		)
+		So(err, ShouldBeNil)
+		So(noHeadingTree, ShouldNotBeNil)
+		So(noHeadingTree.Root(), ShouldNotBeNil)
+		rootMeta := noHeadingTree.Root().ParseMetadata()
+		So(rootMeta, ShouldNotBeNil)
+		So(rootMeta.Valid(), ShouldBeTrue)
+		raw := noHeadingMarkdown[rootMeta.StartByte():rootMeta.EndByte()]
+		So(raw, ShouldContainSubstring, "第一段")
+		So(raw, ShouldContainSubstring, "第二段")
 	})
 }
 
@@ -381,5 +603,50 @@ func TestParseBuildMockedEmbedCountMismatch(t *testing.T) {
 		So(err.Error(), ShouldContainSubstring, "embed parse-build nodes failed")
 		So(mockLLM.GenerateCallCount(), ShouldEqual, 1)
 		So(mockEmbedder.CallCount(), ShouldBeGreaterThan, 0)
+	})
+}
+
+func TestParseBuildDerivedFromSemanticWithNonDerivedNodes(t *testing.T) {
+	Convey("ParseBuild 应使用非派生节点语义填充 derivedFrom", t, func() {
+		mockLLM := &parseBuildMockLLM{response: "ROOT-DERIVED"}
+		mockEmbedder := &parseBuildMockEmbedder{}
+		mockGateway := newParseBuildMockGateway(chat.Openai, mockLLM)
+
+		builder := NewDocTreeBuilder(
+			mockEmbedder,
+			mockGateway,
+			func(_ context.Context) string { return string(chat.Openai) },
+			func(_ context.Context) string { return "mock-model" },
+		)
+
+		markdown := strings.Join([]string{
+			"# Parent",
+			"parent body",
+			"## Child",
+			"child body",
+		}, "\n")
+		tree, err := builder.ParseBuild(
+			context.Background(),
+			[]byte(markdown),
+			WithParseBuildMaxNodeToken(200),
+			WithParseBuildTokenLenFn(parseBuildRuneTokenLen),
+			WithParseBuildChunkSplitFunc(parseBuildSplitByRuneWindow(200)),
+		)
+		So(err, ShouldBeNil)
+		So(tree, ShouldNotBeNil)
+		So(tree.Root(), ShouldNotBeNil)
+
+		parentNode := findNodeByExactContent(tree.Root(), "Parent\n\nparent body")
+		So(parentNode, ShouldNotBeNil)
+		So(parentNode.IsLeaf(), ShouldBeFalse)
+		So(parentNode.DerivedFrom(), ShouldResemble, []string{parentNode.Core().Id})
+
+		childNode := findNodeByExactContent(tree.Root(), "Child\n\nchild body")
+		So(childNode, ShouldNotBeNil)
+		So(childNode.IsLeaf(), ShouldBeTrue)
+		So(childNode.DerivedFrom(), ShouldResemble, []string{childNode.Core().Id})
+
+		// root 是派生节点，应指向其直接来源的非派生节点（这里是 Parent）。
+		So(tree.Root().DerivedFrom(), ShouldResemble, []string{parentNode.Core().Id})
 	})
 }

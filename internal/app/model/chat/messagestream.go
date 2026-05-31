@@ -42,12 +42,16 @@ type PhaseCitationItem struct {
 }
 
 type PhaseCitationDoc struct {
-	Id       string                    `json:"id,omitempty"`
-	Position *PhaseCitationDocPosition `json:"position,omitempty"`
+	Id        string                    `json:"id,omitempty"`
+
+	// 是否为总结性引用片段（对应派生/非派生节点）
+	// is_summary=true => 来自派生节点; is_summary=false => 来自非派生节点
+	IsSummary bool                      `json:"is_summary` 
+	Position  *PhaseCitationDocPosition `json:"position,omitempty"`
 }
 
 type PhaseCitationDocPosition struct {
-	// TODO 引用的文档片段在source中的定位位置 方便前端预览时跳转
+	// rune offset position
 	Start int `json:"start"`
 	End   int `json:"end"`
 }

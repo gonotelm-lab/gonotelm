@@ -274,13 +274,8 @@ func (b *DocTreeBuilder) extractNodes(
 		notebookId  = nodes[0].core.NotebookId
 		sourceId    = nodes[0].core.SourceId
 		owner       = nodes[0].core.Owner
-		derivedFrom []string
+		derivedFrom = collectDerivedFromFromChildren(nodes)
 	)
-
-	for _, node := range nodes {
-		derivedFrom = append(derivedFrom, node.derivedFrom...)
-	}
-	derivedFrom = slices.Unique(derivedFrom)
 
 	newNode := &DocTreeNode{
 		core: &vschema.SourceDoc{
@@ -299,4 +294,15 @@ func (b *DocTreeBuilder) extractNodes(
 	}
 
 	return newNode, nil
+}
+
+func collectDerivedFromFromChildren(nodes []*DocTreeNode) []string {
+	derivedFrom := make([]string, 0, len(nodes))
+	for _, node := range nodes {
+		if node == nil {
+			continue
+		}
+		derivedFrom = append(derivedFrom, node.derivedFrom...)
+	}
+	return slices.Unique(derivedFrom)
 }

@@ -177,21 +177,21 @@ func mustChunkPosition(chunk *schema.Document) (chunkPosition, error) {
 		return chunkPosition{}, fmt.Errorf("chunk metadata is nil, content=%q", chunk.Content)
 	}
 
-	startRaw, ok := chunk.MetaData[ChunkMetaPositionStartKey]
+	startRaw, ok := chunk.MetaData[ChunkMetaPosStartKey]
 	if !ok {
-		return chunkPosition{}, fmt.Errorf("chunk missing %s metadata, content=%q", ChunkMetaPositionStartKey, chunk.Content)
+		return chunkPosition{}, fmt.Errorf("chunk missing %s metadata, content=%q", ChunkMetaPosStartKey, chunk.Content)
 	}
-	endRaw, ok := chunk.MetaData[ChunkMetaPositionEndKey]
+	endRaw, ok := chunk.MetaData[ChunkMetaPosEndKey]
 	if !ok {
-		return chunkPosition{}, fmt.Errorf("chunk missing %s metadata, content=%q", ChunkMetaPositionEndKey, chunk.Content)
+		return chunkPosition{}, fmt.Errorf("chunk missing %s metadata, content=%q", ChunkMetaPosEndKey, chunk.Content)
 	}
-	byteStartRaw, ok := chunk.MetaData[ChunkMetaPositionByteStartKey]
+	byteStartRaw, ok := chunk.MetaData[ChunkMetaPosByteStartKey]
 	if !ok {
-		return chunkPosition{}, fmt.Errorf("chunk missing %s metadata, content=%q", ChunkMetaPositionByteStartKey, chunk.Content)
+		return chunkPosition{}, fmt.Errorf("chunk missing %s metadata, content=%q", ChunkMetaPosByteStartKey, chunk.Content)
 	}
-	byteEndRaw, ok := chunk.MetaData[ChunkMetaPositionByteEndKey]
+	byteEndRaw, ok := chunk.MetaData[ChunkMetaPosByteEndKey]
 	if !ok {
-		return chunkPosition{}, fmt.Errorf("chunk missing %s metadata, content=%q", ChunkMetaPositionByteEndKey, chunk.Content)
+		return chunkPosition{}, fmt.Errorf("chunk missing %s metadata, content=%q", ChunkMetaPosByteEndKey, chunk.Content)
 	}
 
 	runeStart, ok := startRaw.(int)

@@ -7,6 +7,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/app/biz/source/convertdoc"
 	"github.com/gonotelm-lab/gonotelm/internal/app/biz/source/indices"
+	"github.com/gonotelm-lab/gonotelm/internal/app/biz/source/util"
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
@@ -22,23 +23,20 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/token"
 
 	einoembed "github.com/cloudwego/eino/components/embedding"
-)
-
-const (
-	sourceDocMetaDerivingPos = "_doc_deriving_pos"      // 派生节点的来源叶子节点pos bitmap
-	sourceDocMetaLevel       = "_doc_tree_level"        // 派生节点在树中的层级
-	sourceDocMetaChildrenPos = "_doc_node_children_pos" // 派生节点的子节点pos列表
+	einoschema "github.com/cloudwego/eino/schema"
 )
 
 // 构建来源的索引
+//
+// Parse -> Chunk Transform
 type SourceIndexer struct {
 	embedder            einoembed.Embedder
 	embedBatchSize      int
 	embedMaxConcurrency int
 	sourceDocStore      vectordal.SourceDocStore
 
-	docConverters  map[model.SourceKind]convertdoc.Handler
-	docTreeBuilder *indices.DocTreeBuilder
+	sourceConverters map[model.SourceKind]convertdoc.Handler
+	docTreeBuilder   *indices.DocTreeBuilder
 }
 
 func NewSourceIndexer(
@@ -60,7 +58,7 @@ func NewSourceIndexer(
 		embedBatchSize:      conf.Global().Embedding.BatchSize,
 		embedMaxConcurrency: conf.Global().Embedding.MaxConcurrency,
 		sourceDocStore:      sourceDocStore,
-		docConverters: map[model.SourceKind]convertdoc.Handler{
+		sourceConverters: map[model.SourceKind]convertdoc.Handler{
 			model.SourceKindText: convertdoc.NewTextHandler(hc),
 			model.SourceKindUrl:  convertdoc.NewUrlHandler(hc),
 			model.SourceKindFile: convertdoc.NewFileObjectHandler(hc, objectStorage),
@@ -79,7 +77,7 @@ func (b *SourceIndexer) Prepare(
 	source *model.Source,
 ) (*PrepareSourceIndicesResult, error) {
 	slog.DebugContext(ctx, "prepare source indices, converting...", slog.String("source_id", source.Id.String()))
-	result, err := b.convertSource(ctx, source)
+	result, skippedTransform, err := b.handleConvertSource(ctx, source)
 	if err != nil {
 		return nil, err
 	}
@@ -104,8 +102,11 @@ func (b *SourceIndexer) Prepare(
 		vsDocs     []*vecschema.SourceDoc
 		log        string
 	)
-	if result.ParsedContentType == model.MimeTypeMarkdown {
-		// 对于有明显层级结构的markdown文档尝试使用语法树解析
+	// 对于有明显层级结构的markdown文档尝试使用语法树解析
+	shouldParseEmbed := skippedTransform ||
+		(result.ParsedContentType == model.MimeTypeMarkdown &&
+			util.MaybeHasMarkdownHeadingBytes(result.ParsedContent))
+	if shouldParseEmbed {
 		textChunks, vsDocs, err = b.parseEmbedChunks(ctx, source, result)
 		log = "parse embed"
 	} else {
@@ -128,21 +129,35 @@ func (b *SourceIndexer) Prepare(
 	}, nil
 }
 
-func (b *SourceIndexer) convertSource(
+func (b *SourceIndexer) handleConvertSource(
 	ctx context.Context,
 	source *model.Source,
-) (*convertdoc.HandleResult, error) {
-	docConverter, ok := b.docConverters[source.Kind]
+) (*convertdoc.HandleResult, bool, error) {
+	converter, ok := b.sourceConverters[source.Kind]
 	if !ok {
-		return nil, errors.ErrParams.Msgf("can not convert source for kind %s", source.Kind)
+		return nil, false, errors.ErrParams.Msgf("can not convert source for kind %s", source.Kind)
 	}
 
-	result, err := docConverter.Handle(ctx, source)
+	skippedTransform := false
+	result, err := converter.Handle(
+		ctx,
+		source,
+		convertdoc.WithHandleSkipTransformIf(func(
+			source *model.Source,
+			parsedDocs []*einoschema.Document,
+			parsedContent []byte,
+		) bool {
+			// 如果解析出来的是markdown就跳过transform分块 交由indexer后续步骤进行分块处理
+			ok := util.MaybeHasMarkdownHeadingBytes(parsedContent)
+			skippedTransform = ok
+			return ok
+		}),
+	)
 	if err != nil {
-		return nil, errors.WithMessagef(err, "embed source failed")
+		return nil, false, errors.WithMessagef(err, "embed source failed")
 	}
 
-	return result, nil
+	return result, skippedTransform, nil
 }
 
 func (b *SourceIndexer) parseEmbedChunks(
@@ -160,10 +175,6 @@ func (b *SourceIndexer) parseEmbedChunks(
 	}
 
 	nodes := tree.Nodes()
-	// ParseBuild 的派生关系以“叶子节点 pos 体系”为基准，这里先建立 id->pos 索引。
-	leafCount := 0
-	leafIDPosMapping := make(map[string]int, len(nodes))
-
 	chunkTexts := make([]string, 0, len(tree.Nodes()))
 	sourceDocs := make([]*vecschema.SourceDoc, 0, len(tree.Nodes()))
 	for _, node := range nodes {
@@ -173,13 +184,16 @@ func (b *SourceIndexer) parseEmbedChunks(
 		node.Core().NotebookId = source.NotebookId.String()
 		node.Core().SourceId = source.Id.String()
 		node.Core().Owner = source.OwnerId
-
-		if node.IsLeaf() {
-			leafCount++
-			// 仅叶子节点参与 deriving bitmap 的位图坐标。
-			leafIDPosMapping[node.Core().Id] = node.Pos()
+		node.Core().PutMeta(model.SourceDocMetaLevel, int64(node.Level()))
+		if parseMeta := node.ParseMetadata(); parseMeta != nil && parseMeta.Valid() {
+			node.Core().PutMeta(model.ChunkMetaPosStartKey, parseMeta.StartRune())
+			node.Core().PutMeta(model.ChunkMetaPosEndKey, parseMeta.EndRune())
+			node.Core().PutMeta(model.ChunkMetaPosByteStartKey, parseMeta.StartByte())
+			node.Core().PutMeta(model.ChunkMetaPosByteEndKey, parseMeta.EndByte())
 		}
 	}
+	// deriving bitmap 按“非派生节点 pos 体系”编码。
+	nonDerivedIDPosMapping, bitmapSize := buildNonDerivedIDPosMapping(nodes)
 
 	// 设置metadata
 	for _, node := range nodes {
@@ -187,21 +201,29 @@ func (b *SourceIndexer) parseEmbedChunks(
 			continue
 		}
 		if derivingIds := node.DerivedFrom(); len(derivingIds) > 0 {
-			bm := bitmap.New(uint32(leafCount))
-			for _, derivingID := range derivingIds {
-				bitPos, ok := leafIDPosMapping[derivingID]
+			if bitmapSize == 0 {
+				continue
+			}
+			derivingIDs := slices.Unique(derivingIds)
+			bm := bitmap.New(uint32(bitmapSize))
+			hasSetBit := false
+			for _, derivingID := range derivingIDs {
+				bitPos, ok := nonDerivedIDPosMapping[derivingID]
 				if ok {
 					bm.Set(uint32(bitPos))
+					hasSetBit = true
 				}
+			}
+			if !hasSetBit {
+				continue
 			}
 			childrenPos := make([]int, 0, len(node.Children()))
 			for _, child := range node.Children() {
 				childrenPos = append(childrenPos, child.Pos())
 			}
 
-			node.Core().PutMeta(sourceDocMetaDerivingPos, bm.String())
-			node.Core().PutMeta(sourceDocMetaLevel, int64(node.Level()))
-			node.Core().PutMeta(sourceDocMetaChildrenPos, childrenPos)
+			node.Core().PutMeta(model.SourceDocMetaDerivingPos, bm.String())
+			node.Core().PutMeta(model.SourceDocMetaChildrenPos, childrenPos)
 		}
 	}
 
@@ -251,7 +273,6 @@ func (b *SourceIndexer) mergeEmbedChunks(
 	vsDocs := make([]*vecschema.SourceDoc, 0, docsLen)
 	fallbackVsDocs := make([]*vecschema.SourceDoc, 0, docsLen)
 	leafNodes := make([]*indices.DocTreeNode, 0, docsLen)
-	idPosMapping := make(map[string]int, docsLen)
 	for pos, doc := range result.Docs {
 		vdoc := &vecschema.SourceDoc{
 			Id:         doc.ID,
@@ -262,10 +283,23 @@ func (b *SourceIndexer) mergeEmbedChunks(
 			Embedding:  slices.CastFloat[float64, float32](embeddings[pos]),
 			ChunkPos:   int32(pos),
 		}
+		// fallback 路径只有叶子节点，显式补 level=0，保证每个节点都有该元数据。
+		vdoc.PutMeta(model.SourceDocMetaLevel, int64(0))
+		if raw, ok := doc.MetaData[model.ChunkMetaPosStartKey]; ok {
+			vdoc.PutMeta(model.ChunkMetaPosStartKey, raw)
+		}
+		if raw, ok := doc.MetaData[model.ChunkMetaPosEndKey]; ok {
+			vdoc.PutMeta(model.ChunkMetaPosEndKey, raw)
+		}
+		if raw, ok := doc.MetaData[model.ChunkMetaPosByteStartKey]; ok {
+			vdoc.PutMeta(model.ChunkMetaPosByteStartKey, raw)
+		}
+		if raw, ok := doc.MetaData[model.ChunkMetaPosByteEndKey]; ok {
+			vdoc.PutMeta(model.ChunkMetaPosByteEndKey, raw)
+		}
 		fallbackVsDocs = append(fallbackVsDocs, vdoc)
 
 		leafNodes = append(leafNodes, indices.NewDocTreeNode(vdoc, 0, pos, nil, []string{doc.ID}))
-		idPosMapping[doc.ID] = pos
 	}
 
 	// 构建索引树
@@ -280,10 +314,12 @@ func (b *SourceIndexer) mergeEmbedChunks(
 		return texts, fallbackVsDocs, nil
 	} else {
 		nodes := docTree.Nodes()
+		nonDerivedIDPosMapping, bitmapSize := buildNonDerivedIDPosMapping(nodes)
 
 		for _, node := range nodes {
 			vDoc := node.Core()
 			vsDocs = append(vsDocs, vDoc)
+			vDoc.PutMeta(model.SourceDocMetaLevel, int64(node.Level()))
 
 			if node.IsLeaf() {
 				continue
@@ -291,12 +327,21 @@ func (b *SourceIndexer) mergeEmbedChunks(
 
 			// 派生节点需要额外处理
 			if derivingIds := node.DerivedFrom(); len(derivingIds) > 0 {
-				bm := bitmap.New(uint32(docsLen))
-				for _, derivingId := range derivingIds {
-					bitPos, ok := idPosMapping[derivingId]
+				if bitmapSize == 0 {
+					continue
+				}
+				derivingIDs := slices.Unique(derivingIds)
+				bm := bitmap.New(uint32(bitmapSize))
+				hasSetBit := false
+				for _, derivingID := range derivingIDs {
+					bitPos, ok := nonDerivedIDPosMapping[derivingID]
 					if ok {
 						bm.Set(uint32(bitPos))
+						hasSetBit = true
 					}
+				}
+				if !hasSetBit {
+					continue
 				}
 				childrenPos := make([]int, 0, len(node.Children()))
 				for _, child := range node.Children() {
@@ -304,9 +349,8 @@ func (b *SourceIndexer) mergeEmbedChunks(
 					childrenPos = append(childrenPos, child.Pos())
 				}
 
-				vDoc.PutMeta(sourceDocMetaDerivingPos, bm.String())
-				vDoc.PutMeta(sourceDocMetaLevel, int64(node.Level()))
-				vDoc.PutMeta(sourceDocMetaChildrenPos, childrenPos)
+				vDoc.PutMeta(model.SourceDocMetaDerivingPos, bm.String())
+				vDoc.PutMeta(model.SourceDocMetaChildrenPos, childrenPos)
 			}
 		}
 
@@ -334,7 +378,47 @@ func (b *SourceIndexer) insertSourceDocs(
 	return nil
 }
 
-func RecoverDocTree(ctx context.Context, docs []*vecschema.SourceDoc) (*indices.DocTree, error) {
+func buildNonDerivedIDPosMapping(nodes []*indices.DocTreeNode) (map[string]int, int) {
+	out := make(map[string]int, len(nodes))
+	maxPos := -1
+	for _, node := range nodes {
+		if !isNonDerivedNode(node) {
+			continue
+		}
+		pos := node.Pos()
+		if pos < 0 {
+			continue
+		}
+		out[node.Core().Id] = pos
+		if pos > maxPos {
+			maxPos = pos
+		}
+	}
+	return out, maxPos + 1
+}
+
+func isNonDerivedNode(node *indices.DocTreeNode) bool {
+	if node == nil || node.Core() == nil {
+		return false
+	}
+	return node.Pos() >= 0
+}
+
+func isLeafNodeByChildrenMeta(doc *vecschema.SourceDoc) (bool, []int, error) {
+	if doc == nil {
+		return true, nil, nil
+	}
+	childrenPos, ok, err := doc.GetMetaIntSlice(model.SourceDocMetaChildrenPos)
+	if err != nil {
+		return false, nil, err
+	}
+	if !ok {
+		return true, nil, nil
+	}
+	return false, childrenPos, nil
+}
+
+func recoverDocTree(ctx context.Context, docs []*vecschema.SourceDoc) (*indices.DocTree, error) {
 	_ = ctx
 	if len(docs) == 0 {
 		return nil, errors.ErrParams.Msg("no source docs found")
@@ -403,9 +487,12 @@ func (b *docTreeRecoverBuilder) buildNode(pos int) (*indices.DocTreeNode, error)
 		return nil, errors.ErrNoRecord.Msgf("doc not found for node pos, node_pos=%d", pos)
 	}
 
-	isLeaf := pos >= 0
+	isLeaf, childrenPos, err := isLeafNodeByChildrenMeta(doc)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "read children pos meta failed, node_pos=%d", pos)
+	}
 	level := 0
-	if lv, ok := doc.GetMetaInt(sourceDocMetaLevel); ok {
+	if lv, ok := doc.GetMetaInt(model.SourceDocMetaLevel); ok {
 		level = lv
 	}
 
@@ -419,10 +506,6 @@ func (b *docTreeRecoverBuilder) buildNode(pos int) (*indices.DocTreeNode, error)
 	if isLeaf {
 		derivedFrom = []string{doc.Id}
 	} else {
-		childrenPos, err := readSourceDocMetaIntSlice(doc, sourceDocMetaChildrenPos)
-		if err != nil {
-			return nil, errors.WithMessagef(err, "read children pos failed, node_pos=%d", pos)
-		}
 		if len(childrenPos) == 0 {
 			return nil, errors.ErrInner.Msgf("children pos is empty for non-leaf node, node_pos=%d", pos)
 		}
@@ -446,20 +529,6 @@ func (b *docTreeRecoverBuilder) buildNode(pos int) (*indices.DocTreeNode, error)
 	return node, nil
 }
 
-func readSourceDocMetaIntSlice(doc *vecschema.SourceDoc, key string) ([]int, error) {
-	if doc == nil {
-		return nil, errors.ErrParams.Msg("source doc is nil")
-	}
-	out, ok, err := doc.GetMetaIntSlice(key)
-	if !ok {
-		return nil, errors.ErrInner.Msgf("meta key not found, key=%s", key)
-	}
-	if err != nil {
-		return nil, errors.WithMessagef(err, "cast children pos failed, key=%s", key)
-	}
-	return out, nil
-}
-
 func readSourceDocDerivedFrom(
 	doc *vecschema.SourceDoc,
 	docPosMapping map[int]*vecschema.SourceDoc,
@@ -467,7 +536,7 @@ func readSourceDocDerivedFrom(
 	if doc == nil {
 		return nil, errors.ErrParams.Msg("source doc is nil")
 	}
-	encoded, ok := doc.GetStringMeta(sourceDocMetaDerivingPos)
+	encoded, ok := doc.GetStringMeta(model.SourceDocMetaDerivingPos)
 	if !ok || encoded == "" {
 		return nil, errors.ErrInner.Msgf("meta deriving pos not found, node_id=%s", doc.Id)
 	}
@@ -481,12 +550,15 @@ func readSourceDocDerivedFrom(
 		return nil, errors.ErrInner.Msgf("deriving bitmap has no set bit, node_id=%s", doc.Id)
 	}
 	derivedFrom := make([]string, 0, len(setPos))
-	for _, leafPos := range setPos {
-		leafDoc, ok := docPosMapping[int(leafPos)]
+	for _, nonDerivedPos := range setPos {
+		nonDerivedDoc, ok := docPosMapping[int(nonDerivedPos)]
 		if !ok {
-			return nil, errors.ErrNoRecord.Msgf("leaf doc not found by deriving bitmap, leaf_pos=%d", leafPos)
+			return nil, errors.ErrNoRecord.Msgf(
+				"non-derived doc not found by deriving bitmap, pos=%d",
+				nonDerivedPos,
+			)
 		}
-		derivedFrom = append(derivedFrom, leafDoc.Id)
+		derivedFrom = append(derivedFrom, nonDerivedDoc.Id)
 	}
 
 	return slices.Unique(derivedFrom), nil

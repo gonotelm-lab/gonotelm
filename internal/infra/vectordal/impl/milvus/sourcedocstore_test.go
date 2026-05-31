@@ -159,6 +159,112 @@ func TestSourceDocStore_ListWithoutMatches(t *testing.T) {
 	})
 }
 
+func TestSourceDocStore_ListByChunkPosEmptyChunkPoses(t *testing.T) {
+	Convey("SourceDocStore ListByChunkPos should return empty docs when chunk poses are empty", t, func() {
+		store := &SourceDocStoreImpl{}
+		docs, err := store.ListByChunkPos(t.Context(),
+			&schema.SourceDocListByChunkPosParams{
+				NotebookId: "test-notebook",
+				SourceId:   "test-source",
+				ChunkPoses: nil,
+				BatchSize:  16,
+			})
+		So(err, ShouldBeNil)
+		So(docs, ShouldNotBeNil)
+		So(len(docs), ShouldEqual, 0)
+	})
+}
+
+func TestSourceDocStore_BatchGetReturnsOrderedDocs(t *testing.T) {
+	Convey("SourceDocStore BatchGet should return docs in requested order", t, func() {
+		store, closeFn := mustNewTestStore(t)
+		defer closeFn()
+
+		ctx := t.Context()
+		suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+		notebookID := "test-nb-batch-get-" + suffix
+		sourceID := "test-src-batch-get-" + suffix
+		docID1 := "test-doc-batch-get-1-" + suffix
+		docID2 := "test-doc-batch-get-2-" + suffix
+
+		cleanupParams := &schema.SourceDocBatchDeleteParams{
+			NotebookId: notebookID,
+			SourceId:   []string{sourceID},
+		}
+		_ = store.BatchDelete(ctx, cleanupParams)
+		defer func() {
+			_ = store.BatchDelete(ctx, cleanupParams)
+		}()
+
+		err := store.BatchInsert(ctx, []*schema.SourceDoc{
+			{
+				Id:         docID1,
+				NotebookId: notebookID,
+				SourceId:   sourceID,
+				Content:    "test-content-batch-get-1",
+				Owner:      "test-owner",
+				Embedding:  make([]float32, 1024),
+				ChunkPos:   1,
+			},
+			{
+				Id:         docID2,
+				NotebookId: notebookID,
+				SourceId:   sourceID,
+				Content:    "test-content-batch-get-2",
+				Owner:      "test-owner",
+				Embedding:  make([]float32, 1024),
+				ChunkPos:   2,
+			},
+		})
+		So(err, ShouldBeNil)
+
+		var got []*schema.SourceDoc
+		deadline := time.Now().Add(8 * time.Second)
+		for {
+			got, err = store.BatchGet(ctx, &schema.SourceDocBatchGetParams{
+				NotebookId: notebookID,
+				SourceId:   sourceID,
+				DocIds:     []string{docID2, docID1},
+			})
+			if err == nil && len(got) == 2 {
+				break
+			}
+			if time.Now().After(deadline) {
+				break
+			}
+			time.Sleep(200 * time.Millisecond)
+		}
+
+		So(err, ShouldBeNil)
+		So(got, ShouldNotBeNil)
+		So(len(got), ShouldEqual, 2)
+		So(got[0].Id, ShouldEqual, docID2)
+		So(got[1].Id, ShouldEqual, docID1)
+	})
+}
+
+func TestSourceDocStore_BatchGetWithoutMatches(t *testing.T) {
+	Convey("SourceDocStore BatchGet should return ErrNoRecord when no matches", t, func() {
+		store, closeFn := mustNewTestStore(t)
+		defer closeFn()
+
+		ctx := t.Context()
+		suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+		notebookID := "test-nb-batch-get-not-found-" + suffix
+		sourceID := "test-src-batch-get-not-found-" + suffix
+		docID := "test-doc-batch-get-not-found-" + suffix
+
+		docs, err := store.BatchGet(ctx, &schema.SourceDocBatchGetParams{
+			NotebookId: notebookID,
+			SourceId:   sourceID,
+			DocIds:     []string{docID},
+		})
+		So(docs, ShouldBeNil)
+		So(err, ShouldNotBeNil)
+		So(pkgerrors.Is(err, pkgerrors.ErrNoRecord), ShouldBeTrue)
+	})
+}
+
 func TestSourceDocStore_GetWithoutMatches(t *testing.T) {
 	Convey("SourceDocStore Get should return ErrNoRecord when no matches", t, func() {
 		store, closeFn := mustNewTestStore(t)

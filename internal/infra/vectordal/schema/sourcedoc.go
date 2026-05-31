@@ -1,9 +1,9 @@
 package schema
 
 import (
-	"github.com/gonotelm-lab/gonotelm/pkg/cast"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 	"github.com/mitchellh/mapstructure"
+	spfcast "github.com/spf13/cast"
 )
 
 type Id = uuid.UUID
@@ -87,6 +87,7 @@ func (s *SourceDoc) GetChunkPos() int32 {
 	if s == nil {
 		return -1
 	}
+
 	return s.ChunkPos
 }
 
@@ -94,6 +95,7 @@ func (s *SourceDoc) GetScore() float32 {
 	if s == nil {
 		return 0
 	}
+
 	return s.Score
 }
 
@@ -109,61 +111,61 @@ func (s *SourceDoc) GetMeta(key string) (any, bool) {
 		return nil, false
 	}
 	value, ok := s.Meta[key]
+
 	return value, ok
 }
 
 func (s *SourceDoc) GetStringMeta(key string) (string, bool) {
-	if s.Meta == nil {
-		return "", false
-	}
-	value, ok := s.Meta[key]
+	raw, ok := s.GetMeta(key)
 	if !ok {
 		return "", false
 	}
-	return value.(string), true
+	value, err := spfcast.ToStringE(raw)
+	if err != nil {
+		return "", false
+	}
+	return value, true
 }
 
 func (s *SourceDoc) GetInt64Meta(key string) (int64, bool) {
-	if s.Meta == nil {
-		return 0, false
-	}
-	value, ok := s.Meta[key]
+	raw, ok := s.GetMeta(key)
 	if !ok {
 		return 0, false
 	}
-	return value.(int64), true
+	value, err := spfcast.ToInt64E(raw)
+	if err != nil {
+		return 0, false
+	}
+	return value, true
 }
 
 func (s *SourceDoc) GetFloat64Meta(key string) (float64, bool) {
-	if s.Meta == nil {
-		return 0, false
-	}
-	value, ok := s.Meta[key]
+	raw, ok := s.GetMeta(key)
 	if !ok {
 		return 0, false
 	}
-	return value.(float64), true
+	value, err := spfcast.ToFloat64E(raw)
+	if err != nil {
+		return 0, false
+	}
+	return value, true
 }
 
 func (s *SourceDoc) GetBoolMeta(key string) (bool, bool) {
-	if s.Meta == nil {
-		return false, false
-	}
-	value, ok := s.Meta[key]
-	if !ok {
-		return false, false
-	}
-	return value.(bool), true
-}
-
-// GetMetaBool reads a bool meta value safely.
-func (s *SourceDoc) GetMetaBool(key string) (bool, bool) {
 	raw, ok := s.GetMeta(key)
 	if !ok {
 		return false, false
 	}
-	val, ok := raw.(bool)
-	return val, ok
+	value, err := spfcast.ToBoolE(raw)
+	if err != nil {
+		return false, false
+	}
+	return value, true
+}
+
+// GetMetaBool reads a bool meta value safely.
+func (s *SourceDoc) GetMetaBool(key string) (bool, bool) {
+	return s.GetBoolMeta(key)
 }
 
 // GetMetaInt reads a numeric meta value as int safely.
@@ -172,7 +174,7 @@ func (s *SourceDoc) GetMetaInt(key string) (int, bool) {
 	if !ok {
 		return 0, false
 	}
-	val, err := cast.AnyToInt(raw)
+	val, err := spfcast.ToIntE(raw)
 	if err != nil {
 		return 0, false
 	}
@@ -186,7 +188,7 @@ func (s *SourceDoc) GetMetaIntSlice(key string) ([]int, bool, error) {
 	if !ok {
 		return nil, false, nil
 	}
-	val, err := cast.AnyToIntSlice(raw)
+	val, err := spfcast.ToIntSliceE(raw)
 	if err != nil {
 		return nil, true, err
 	}
@@ -210,6 +212,12 @@ type SourceDocGetParams struct {
 	DocId      string
 }
 
+type SourceDocBatchGetParams struct {
+	NotebookId string
+	SourceId   string
+	DocIds     []string
+}
+
 type SourceDocQueryParams struct {
 	// Target notebook id
 	NotebookId string
@@ -230,5 +238,12 @@ type SourceDocQueryParams struct {
 type SourceDocListParams struct {
 	NotebookId string
 	SourceId   string
+	BatchSize  int
+}
+
+type SourceDocListByChunkPosParams struct {
+	NotebookId string
+	SourceId   string
+	ChunkPoses []int32
 	BatchSize  int
 }

@@ -219,9 +219,13 @@ type GetSourceDocParams struct {
 
 type GetSourceDocResult struct {
 	SourceId    string
-	DocId       string
 	SourceTitle string
-	Content     string
+	Doc         *model.SourceDoc
+}
+
+type BatchGetSourceDocsParams struct {
+	SourceId uuid.UUID
+	DocIds   []string
 }
 
 func (l *SourceLogic) GetSourceDoc(
@@ -238,20 +242,59 @@ func (l *SourceLogic) GetSourceDoc(
 		return nil, errors.ErrPermission.Msg("source access denied")
 	}
 
-	doc, err := l.sourceBiz.GetSourceDoc(ctx, &bizsource.GetSourceDocQuery{
-		NotebookId: source.NotebookId,
-		SourceId:   source.Id,
-		DocId:      params.DocId,
-	})
+	doc, err := l.sourceBiz.GetSourceDoc(ctx,
+		&bizsource.GetSourceDocQuery{
+			NotebookId: source.NotebookId,
+			SourceId:   source.Id,
+			DocId:      params.DocId,
+			Populate:   true,
+		})
 	if err != nil {
 		return nil, errors.WithMessagef(err, "get source doc failed, source_id=%s, doc_id=%s", source.Id, params.DocId)
 	}
 
 	return &GetSourceDocResult{
 		SourceId:    source.Id.String(),
-		DocId:       doc.Id,
 		SourceTitle: source.Title,
-		Content:     doc.Content,
+		Doc:         doc,
+	}, nil
+}
+
+type BatchGetSourceDocsResult struct {
+	SourceId    string
+	SourceTitle string
+	Docs        []*model.SourceDoc
+}
+
+func (l *SourceLogic) BatchGetSourceDocs(
+	ctx context.Context,
+	params *BatchGetSourceDocsParams,
+) (*BatchGetSourceDocsResult, error) {
+	userId := pkgcontext.GetUserId(ctx)
+
+	source, err := l.GetSource(ctx, params.SourceId)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "get source failed, source_id=%s", params.SourceId)
+	}
+	if source.OwnerId != userId {
+		return nil, errors.ErrPermission.Msg("source access denied")
+	}
+
+	docs, err := l.sourceBiz.BatchGetSourceDocs(ctx,
+		&bizsource.BatchGetSourceDocsQuery{
+			NotebookId: source.NotebookId,
+			SourceId:   source.Id,
+			DocIds:     params.DocIds,
+			Populate:   true,
+		})
+	if err != nil {
+		return nil, errors.WithMessagef(err, "batch get source docs failed, source_id=%s", source.Id)
+	}
+
+	return &BatchGetSourceDocsResult{
+		SourceId:    source.Id.String(),
+		SourceTitle: source.Title,
+		Docs:        docs,
 	}, nil
 }
 

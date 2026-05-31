@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/app/biz/source/indices"
@@ -17,12 +18,14 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/vectordal"
 	vecschema "github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/schema"
+	"github.com/gonotelm-lab/gonotelm/pkg/bitmap"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/slices"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 
 	"github.com/bytedance/sonic"
 	einoembed "github.com/cloudwego/eino/components/embedding"
+	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -555,17 +558,21 @@ type GetSourceDocQuery struct {
 	NotebookId uuid.UUID
 	SourceId   uuid.UUID
 	DocId      string
+
+	// 是否填充额外字段
+	Populate bool
 }
 
 func (b *Biz) GetSourceDoc(
 	ctx context.Context,
 	query *GetSourceDocQuery,
 ) (*model.SourceDoc, error) {
-	doc, err := b.sourceDocStore.Get(ctx, &vecschema.SourceDocGetParams{
-		NotebookId: query.NotebookId.String(),
-		SourceId:   query.SourceId.String(),
-		DocId:      query.DocId,
-	})
+	doc, err := b.sourceDocStore.Get(ctx,
+		&vecschema.SourceDocGetParams{
+			NotebookId: query.NotebookId.String(),
+			SourceId:   query.SourceId.String(),
+			DocId:      query.DocId,
+		})
 	if err != nil {
 		return nil, errors.WithMessage(err, "get source doc failed")
 	}
@@ -574,13 +581,68 @@ func (b *Biz) GetSourceDoc(
 	if err != nil {
 		return nil, errors.WithMessage(err, "new source doc failed")
 	}
+	if query.Populate {
+		if err := b.PopulateSourceDocs(ctx, query.NotebookId, []*model.SourceDoc{sourceDoc}); err != nil {
+			slog.WarnContext(ctx, "populate source doc failed",
+				slog.Any("err", err),
+				slog.String("notebook_id", query.NotebookId.String()),
+			)
+		}
+	}
 
 	return sourceDoc, nil
+}
+
+type BatchGetSourceDocsQuery struct {
+	NotebookId uuid.UUID
+	SourceId   uuid.UUID
+	DocIds     []string
+
+	// 是否填充额外字段
+	Populate bool
+}
+
+func (b *Biz) BatchGetSourceDocs(
+	ctx context.Context,
+	query *BatchGetSourceDocsQuery,
+) ([]*model.SourceDoc, error) {
+	docs, err := b.sourceDocStore.BatchGet(ctx,
+		&vecschema.SourceDocBatchGetParams{
+			NotebookId: query.NotebookId.String(),
+			SourceId:   query.SourceId.String(),
+			DocIds:     query.DocIds,
+		})
+	if err != nil {
+		return nil, errors.WithMessage(err, "batch get source docs failed")
+	}
+
+	sourceDocs := make([]*model.SourceDoc, 0, len(docs))
+	for _, doc := range docs {
+		sourceDoc, err := model.NewSourceDoc(doc)
+		if err != nil {
+			return nil, errors.WithMessagef(err, "new source doc failed, doc_id=%s", doc.Id)
+		}
+		sourceDocs = append(sourceDocs, sourceDoc)
+	}
+
+	if query.Populate {
+		if err := b.PopulateSourceDocs(ctx, query.NotebookId, sourceDocs); err != nil {
+			slog.WarnContext(ctx, "populate source docs failed",
+				slog.Any("err", err),
+				slog.String("notebook_id", query.NotebookId.String()),
+			)
+		}
+	}
+
+	return sourceDocs, nil
 }
 
 type ListSourceDocsQuery struct {
 	NotebookId uuid.UUID
 	SourceId   uuid.UUID
+
+	// 是否填充额外字段
+	Populate bool
 }
 
 // 列出source的全部doc
@@ -611,11 +673,21 @@ func (b *Biz) ListSourceDocs(
 		}
 		sourceDocs = append(sourceDocs, sourceDoc)
 	}
+	if query.Populate {
+		if err := b.PopulateSourceDocs(ctx, query.NotebookId, sourceDocs); err != nil {
+			slog.WarnContext(ctx, "populate source docs failed",
+				slog.Any("err", err),
+				slog.String("notebook_id", query.NotebookId.String()),
+			)
+		}
+	}
 
 	return sourceDocs, nil
 }
 
 // 召回来源片段
+//
+// 需要注意的是 来源片段中可能会存在派生的片段, 这些派生片段一般为一些总结性的语句片段
 func (b *Biz) RetrieveSourceDocs(
 	ctx context.Context,
 	query *RetrieveSourceDocsQuery,
@@ -631,8 +703,8 @@ func (b *Biz) RetrieveSourceDocs(
 	queryEmbeddings, err := b.embedder.EmbedStrings(ctx, []string{query.Query})
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrEmbed,
-			"query embedding failed, query=%s, notebook_id=%s",
-			query.Query, notebookId)
+			"query embedding failed, query=%s, notebook_id=%s, err=%v",
+			query.Query, notebookId, err)
 	}
 
 	if len(queryEmbeddings) == 0 {
@@ -669,6 +741,13 @@ func (b *Biz) RetrieveSourceDocs(
 		}
 		queriedDocs = append(queriedDocs, queriedDoc)
 	}
+	if err := b.PopulateSourceDocs(ctx, query.NotebookId, queriedDocs); err != nil {
+		slog.WarnContext(ctx,
+			"populate source docs failed",
+			slog.Any("err", err),
+			slog.String("notebook_id", notebookId),
+		)
+	}
 
 	return queriedDocs, nil
 }
@@ -695,5 +774,148 @@ func (b *Biz) GetSourceDocTree(
 		return nil, errors.WithMessagef(err, "list source docs failed, source_id=%s", sourceIdStr)
 	}
 
-	return RecoverDocTree(ctx, docs)
+	return recoverDocTree(ctx, docs)
+}
+
+// 额外填充SourceDoc字段
+func (s *Biz) PopulateSourceDocs(
+	ctx context.Context,
+	notebookId uuid.UUID,
+	docs []*model.SourceDoc,
+) error {
+	if len(docs) == 0 {
+		return nil
+	}
+
+	notebookID := notebookId.String()
+	type deriveMeta struct {
+		doc      *model.SourceDoc
+		sourceId string
+		poses    []int32
+	}
+
+	metas := make([]*deriveMeta, 0, len(docs))
+	posesBySource := make(map[string][]int32)
+	for _, doc := range docs {
+		if doc == nil {
+			continue
+		}
+
+		derivingPos := doc.DerivingPos()
+		if derivingPos == "" {
+			continue
+		}
+
+		bm, err := bitmap.NewFrom(derivingPos)
+		if err != nil {
+			slog.WarnContext(ctx, "decode source doc deriving pos failed",
+				slog.String("doc_id", doc.Id),
+				slog.String("source_id", doc.SourceId.String()),
+				slog.String("notebook_id", notebookID),
+				slog.Any("err", err),
+			)
+			continue
+		}
+
+		setPos := bm.GetAllSet()
+		if len(setPos) == 0 {
+			continue
+		}
+
+		chunkPoses := make([]int32, 0, len(setPos))
+		for _, pos := range setPos {
+			chunkPoses = append(chunkPoses, int32(pos))
+		}
+		if len(chunkPoses) == 0 {
+			continue
+		}
+
+		sourceId := doc.SourceId.String()
+		metas = append(metas, &deriveMeta{
+			doc:      doc,
+			sourceId: sourceId,
+			poses:    chunkPoses,
+		},
+		)
+		posesBySource[sourceId] = append(posesBySource[sourceId], chunkPoses...)
+	}
+	if len(metas) == 0 {
+		return nil
+	}
+
+	docsBySourcePos := make(
+		map[string]map[int32]*vecschema.SourceDoc,
+		len(posesBySource),
+	)
+	var (
+		mu sync.Mutex
+		eg errgroup.Group
+	)
+	for sourceId, chunkPoses := range posesBySource {
+		posList := slices.Unique(chunkPoses)
+		eg.Go(func() error {
+			sourceDocs, err := s.sourceDocStore.ListByChunkPos(ctx,
+				&vecschema.SourceDocListByChunkPosParams{
+					NotebookId: notebookID,
+					SourceId:   sourceId,
+					ChunkPoses: posList,
+				})
+			if err != nil {
+				return errors.WithMessagef(err,
+					"list source docs by chunk pos failed, notebook_id=%s, source_id=%s",
+					notebookID,
+					sourceId,
+				)
+			}
+
+			docsByPos := make(map[int32]*vecschema.SourceDoc, len(sourceDocs))
+			for _, sourceDoc := range sourceDocs {
+				docsByPos[sourceDoc.ChunkPos] = sourceDoc
+			}
+			mu.Lock()
+			docsBySourcePos[sourceId] = docsByPos
+			mu.Unlock()
+
+			return nil
+		})
+	}
+	if err := eg.Wait(); err != nil {
+		return err
+	}
+
+	for _, meta := range metas {
+		docsByPos := docsBySourcePos[meta.sourceId]
+		if len(docsByPos) == 0 {
+			continue
+		}
+
+		derivedFrom := make([]uuid.UUID, 0, len(meta.poses))
+		seen := make(map[uuid.UUID]struct{}, len(meta.poses))
+		for _, pos := range meta.poses {
+			derivedDoc, ok := docsByPos[pos]
+			if !ok || derivedDoc == nil {
+				continue
+			}
+
+			derivedFromId, err := uuid.ParseString(derivedDoc.Id)
+			if err != nil {
+				slog.WarnContext(ctx, "ignore invalid source doc id while populating deriving ids",
+					slog.String("doc_id", derivedDoc.Id),
+					slog.Int64("chunk_pos", int64(pos)),
+					slog.String("source_id", meta.sourceId),
+					slog.String("notebook_id", notebookID),
+					slog.Any("err", err),
+				)
+				continue
+			}
+			if _, ok := seen[derivedFromId]; ok {
+				continue
+			}
+			seen[derivedFromId] = struct{}{}
+			derivedFrom = append(derivedFrom, derivedFromId)
+		}
+		meta.doc.DerivedFrom = derivedFrom
+	}
+
+	return nil
 }

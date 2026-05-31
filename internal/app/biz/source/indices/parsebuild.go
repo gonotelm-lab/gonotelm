@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	sourceutil "github.com/gonotelm-lab/gonotelm/internal/app/biz/source/util"
 	"github.com/gonotelm-lab/gonotelm/internal/app/prompts"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
 	vschema "github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/schema"
@@ -20,6 +21,53 @@ import (
 	einoschema "github.com/cloudwego/eino/schema"
 )
 
+type parseMetadata struct {
+	startByte int
+	endByte   int
+	startRune int
+	endRune   int
+}
+
+func (m *parseMetadata) StartByte() int {
+	if m == nil {
+		return 0
+	}
+	return m.startByte
+}
+
+func (m *parseMetadata) EndByte() int {
+	if m == nil {
+		return 0
+	}
+	return m.endByte
+}
+
+func (m *parseMetadata) StartRune() int {
+	if m == nil {
+		return 0
+	}
+	return m.startRune
+}
+
+func (m *parseMetadata) EndRune() int {
+	if m == nil {
+		return 0
+	}
+	return m.endRune
+}
+
+func (m *parseMetadata) Valid() bool {
+	if m == nil {
+		return false
+	}
+	return m.endByte > m.startByte && m.endRune >= m.startRune
+}
+
+type markdownByteRange struct {
+	start int
+	end   int
+}
+
 type markdownDocTreeNode struct {
 	id           string
 	title        string
@@ -29,9 +77,22 @@ type markdownDocTreeNode struct {
 	pos          int
 
 	derivedFrom []string
+
+	derived bool
+
+	parseMetadata *parseMetadata
+	contentRanges []markdownByteRange
 }
 
-type ParseBuildChunkSplitFunc func(ctx context.Context, content string) ([]string, error)
+type ParseBuildChunk struct {
+	Content string
+	// StartByte/EndByte 是相对于本次 split 输入 content 的 byte 偏移（左闭右开）。
+	// 当 splitter 无法提供 span 时可返回 <0，后续会跳过位置信息注入。
+	StartByte int
+	EndByte   int
+}
+
+type ParseBuildChunkSplitFunc func(ctx context.Context, content string) ([]ParseBuildChunk, error)
 
 type ParseBuildOption func(*parseBuildOptions)
 
@@ -138,39 +199,67 @@ func buildParseBuildOptions(opts ...ParseBuildOption) (*parseBuildOptions, error
 		cfg.separators = append([]string(nil), defaultParseBuildSeparators...)
 	}
 	if cfg.chunkSplitFn == nil {
-		splitter, err := recursive.NewSplitter(context.Background(), &recursive.Config{
-			ChunkSize:   cfg.maxNodeToken,
-			OverlapSize: cfg.overlapToken,
-			LenFunc:     cfg.tokenLenFn,
-			KeepType:    recursive.KeepTypeEnd,
-			Separators:  cfg.separators,
-		})
+		// 默认 splitter：返回 chunk 文本 + 相对 byte span，供 ParseBuild 直接映射到原文 offset，
+		// 避免在 parsebuild 内做二次字符串回扫定位。
+		splitter, err := recursive.NewSplitter(context.Background(),
+			&recursive.Config{
+				ChunkSize:   cfg.maxNodeToken,
+				OverlapSize: cfg.overlapToken,
+				LenFunc:     cfg.tokenLenFn,
+				KeepType:    recursive.KeepTypeEnd,
+				Separators:  cfg.separators,
+			})
 		if err != nil {
 			return nil, errors.Wrapf(errors.ErrInner, "create recursive splitter failed, err=%v", err)
 		}
-		cfg.chunkSplitFn = func(ctx context.Context, content string) ([]string, error) {
+		cfg.chunkSplitFn = func(ctx context.Context, content string) ([]ParseBuildChunk, error) {
 			docs, err := splitter.Transform(ctx, []*einoschema.Document{
 				{ID: "parsebuild", Content: content},
 			})
 			if err != nil {
-				return nil, errors.Wrapf(errors.ErrInner, "split content by recursive splitter failed, err=%v", err)
+				return nil, errors.Wrapf(errors.ErrInner,
+					"split content by recursive splitter failed, err=%v", err)
 			}
 
 			chunks := make([]string, 0, len(docs))
 			for _, doc := range docs {
 				chunks = append(chunks, doc.Content)
 			}
+			chunkSpans := sourceutil.BuildChunkByteSpans(content, chunks)
+			splitChunks := make([]ParseBuildChunk, 0, len(chunks))
+			for idx, chunk := range chunks {
+				span := chunkSpans[idx]
+				splitChunks = append(splitChunks, ParseBuildChunk{
+					Content:   chunk,
+					StartByte: span.StartByte,
+					EndByte:   span.EndByte,
+				})
+			}
 
-			return chunks, nil
+			return splitChunks, nil
 		}
 	}
 
 	return cfg, nil
 }
 
-// 通过解析markdown语法树的方式构建树结构
+// ParseBuild 基于 markdown AST 构建可检索的文档树（DocTree）。
 //
-// 如果无法从content中解析出markdown语法树则返回错误
+// 执行步骤：
+// 1) 解析 markdown 为 AST，并按 Heading 层级构建临时树。
+// 2) 同步采集每个节点在原文中的 byte span（标题 + 正文块）。
+// 3) 对超 token 节点做分裂（叶子横向分裂、非叶正文下放），并保留 span 映射关系。
+// 4) 统一将 byte offset 转成 rune offset，产出 parseMetadata。
+// 5) 组装 DocTreeNode 并执行 embedding。
+//
+// 关键原理：
+// - 位置信息遵循“原生节点优先”：派生节点（如 root 摘要）不注入 parseMetadata。
+// - split 接口返回 chunk+span（相对 split 输入内容），避免二次字符串回扫。
+// - 当 span 无法安全映射时，跳过该节点的位置信息而不阻塞主流程。
+//
+// 注意：
+// - content 为空直接返回参数错误。
+// - 若 LLM root 摘要、分裂或 embedding 失败，按阶段返回对应错误。
 func (b *DocTreeBuilder) ParseBuild(
 	ctx context.Context,
 	content []byte,
@@ -184,11 +273,12 @@ func (b *DocTreeBuilder) ParseBuild(
 		return nil, err
 	}
 
+	// 1) 先把 markdown 解析为 AST。
 	parser := goldmark.DefaultParser()
 	reader := goldtext.NewReader(content)
 	markdoc := parser.Parse(reader)
 
-	// 虚拟根节点
+	// 2) 遍历顶层节点，构建按标题组织的文档树，同时收集原文 byte span。
 	vroot := &markdownDocTreeNode{headingLevel: 0, title: "vroot"}
 	stack := []*markdownDocTreeNode{vroot}
 
@@ -221,14 +311,21 @@ func (b *DocTreeBuilder) ParseBuild(
 				headingLevel: node.Level,
 				title:        extractMarkdownInlineText(node, content),
 			}
+			if br, ok := extractMarkdownNodeByteRange(node, content); ok {
+				mergeMarkdownNodeParseMetadata(newNode, br)
+			}
 
 			parent.children = append(parent.children, newNode)
 			pushStack(newNode) // 新的节点可能作为其他节点的父节点
 			curParent = newNode
 		default:
+			// 非标题块全部挂到当前标题节点下，内容与 span 同步累计。
 			text := extractMarkdownBlockText(node, content)
 			if text != "" {
 				curParent.contents = append(curParent.contents, text)
+				if br, ok := extractMarkdownNodeByteRange(node, content); ok {
+					appendMarkdownNodeContentRange(curParent, text, br, content)
+				}
 			}
 		}
 	}
@@ -238,9 +335,19 @@ func (b *DocTreeBuilder) ParseBuild(
 		return nil, errors.Wrapf(errors.ErrInner, "generate vroot title failed, err=%v", err)
 	}
 
-	rootList, err := b.splitOversizedNode(ctx, vroot, buildOptions, true)
+	// 3) 对超限节点做递归分裂（会保留/下放结构并同步 span）。
+	rootList, err := b.splitOversizedNode(ctx, vroot, buildOptions, true, content)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "split oversized markdown tree node failed, err=%v", err)
+	}
+
+	// 4) 最后统一把 byte offset 转 rune offset，供上层写入元数据。
+	runeIndexByByteOffset := sourceutil.BuildRuneIndexByByteOffset(string(content))
+	for _, rootNode := range rootList {
+		if rootNode == nil {
+			continue
+		}
+		applyMarkdownNodeRuneOffset(rootNode, runeIndexByByteOffset)
 	}
 
 	root, nodes := buildDocTreeFromMarkdownNode(rootList[0])
@@ -260,7 +367,9 @@ func (b *DocTreeBuilder) ParseBuild(
 func (b *DocTreeBuilder) generateVRootTitle(ctx context.Context, vroot *markdownDocTreeNode) error {
 	titles := collectMarkdownNodeTitles(vroot.children)
 	if len(titles) == 0 {
-		vroot.title = "vroot"
+		// 无标题正文：root 仍是原文节点，不属于派生摘要节点。
+		vroot.title = ""
+		vroot.derived = false
 		return nil
 	}
 	titleContent := strings.Join(slices.Unique(titles), "\n")
@@ -287,6 +396,8 @@ func (b *DocTreeBuilder) generateVRootTitle(ctx context.Context, vroot *markdown
 		summary = "vroot"
 	}
 	vroot.title = summary
+	// 有标题场景下，root title 由 LLM 摘要生成，属于派生信息。
+	vroot.derived = true
 
 	return nil
 }
@@ -302,16 +413,324 @@ func collectMarkdownNodeTitles(nodes []*markdownDocTreeNode) []string {
 	return titles
 }
 
+func extractMarkdownNodeByteRange(node ast.Node, source []byte) (markdownByteRange, bool) {
+	if node == nil || len(source) == 0 {
+		return markdownByteRange{}, false
+	}
+
+	lines := node.Lines()
+	if lines == nil || lines.Len() == 0 {
+		return markdownByteRange{}, false
+	}
+
+	start := lines.At(0).Start
+	end := lines.At(lines.Len() - 1).Stop
+	return normalizeMarkdownByteRange(markdownByteRange{start: start, end: end}, len(source))
+}
+
+func normalizeMarkdownByteRange(br markdownByteRange, contentLen int) (markdownByteRange, bool) {
+	if contentLen <= 0 {
+		return markdownByteRange{}, false
+	}
+	if br.start < 0 {
+		br.start = 0
+	}
+	if br.end > contentLen {
+		br.end = contentLen
+	}
+	if br.start >= br.end {
+		return markdownByteRange{}, false
+	}
+	return br, true
+}
+
+func mergeMarkdownNodeParseMetadata(node *markdownDocTreeNode, br markdownByteRange) {
+	if node == nil {
+		return
+	}
+	node.parseMetadata = mergeParseMetadataByteRange(node.parseMetadata, br)
+}
+
+func appendMarkdownNodeContentRange(
+	node *markdownDocTreeNode,
+	content string,
+	br markdownByteRange,
+	source []byte,
+) {
+	if node == nil {
+		return
+	}
+	// 优先将 AST block 粗粒度 span 对齐到 extract 后文本的精确 span，
+	// 降低后续 split span 映射误差。
+	if aligned, ok := alignMarkdownByteRangeByContent(content, br, source); ok {
+		br = aligned
+	}
+	node.contentRanges = append(node.contentRanges, br)
+	mergeMarkdownNodeParseMetadata(node, br)
+}
+
+func alignMarkdownByteRangeByContent(
+	content string,
+	br markdownByteRange,
+	source []byte,
+) (markdownByteRange, bool) {
+	if content == "" || len(source) == 0 {
+		return markdownByteRange{}, false
+	}
+	scoped, ok := normalizeMarkdownByteRange(br, len(source))
+	if !ok {
+		return markdownByteRange{}, false
+	}
+
+	scopeText := string(source[scoped.start:scoped.end])
+	idx := strings.Index(scopeText, content)
+	if idx < 0 {
+		return markdownByteRange{}, false
+	}
+	alignedStart := scoped.start + idx
+	alignedEnd := alignedStart + len(content)
+	aligned, ok := normalizeMarkdownByteRange(
+		markdownByteRange{
+			start: alignedStart,
+			end:   alignedEnd,
+		},
+		len(source),
+	)
+	if !ok {
+		return markdownByteRange{}, false
+	}
+	return aligned, true
+}
+
+func mergeParseMetadataByteRange(meta *parseMetadata, br markdownByteRange) *parseMetadata {
+	if meta == nil {
+		return &parseMetadata{
+			startByte: br.start,
+			endByte:   br.end,
+		}
+	}
+	if br.start < meta.startByte {
+		meta.startByte = br.start
+	}
+	if br.end > meta.endByte {
+		meta.endByte = br.end
+	}
+	return meta
+}
+
+func cloneParseMetadata(meta *parseMetadata) *parseMetadata {
+	if meta == nil {
+		return nil
+	}
+	cloned := *meta
+	return &cloned
+}
+
+func normalizeParseBuildChunks(chunks []ParseBuildChunk) []ParseBuildChunk {
+	result := make([]ParseBuildChunk, 0, len(chunks))
+	for _, chunk := range chunks {
+		// splitter 可能保留首尾换行；此处做同一化，避免内容和 span 不一致。
+		leftTrim := len(chunk.Content) - len(strings.TrimLeft(chunk.Content, "\n\r"))
+		rightTrim := len(chunk.Content) - len(strings.TrimRight(chunk.Content, "\n\r"))
+		trimmed := strings.Trim(chunk.Content, "\n\r")
+		if strings.TrimSpace(trimmed) == "" {
+			continue
+		}
+
+		normalized := ParseBuildChunk{
+			Content:   trimmed,
+			StartByte: -1,
+			EndByte:   -1,
+		}
+		if chunk.StartByte >= 0 && chunk.EndByte >= chunk.StartByte {
+			normalized.StartByte = chunk.StartByte + leftTrim
+			normalized.EndByte = chunk.EndByte - rightTrim
+			if normalized.EndByte <= normalized.StartByte {
+				// span 非法时标记为 unknown，后续直接跳过位置注入而不影响主流程。
+				normalized.StartByte = -1
+				normalized.EndByte = -1
+			}
+		}
+		result = append(result, normalized)
+	}
+
+	return result
+}
+
+func mapParseBuildChunkToSourceRange(
+	node *markdownDocTreeNode,
+	source []byte,
+	chunk ParseBuildChunk,
+) (markdownByteRange, bool) {
+	// 目标：把 chunk（相对 join 后内容的 span）映射回原文 source 的 byte span。
+	if node == nil || len(source) == 0 {
+		return markdownByteRange{}, false
+	}
+	if chunk.StartByte < 0 || chunk.EndByte <= chunk.StartByte {
+		return markdownByteRange{}, false
+	}
+	// 仅当 contents 与 contentRanges 一一对应时才能做可逆映射。
+	if len(node.contents) == 0 || len(node.contentRanges) == 0 || len(node.contents) != len(node.contentRanges) {
+		return markdownByteRange{}, false
+	}
+
+	// chunk span 是相对于 joinMarkdownNodeContent(node.contents) 的；
+	// 先校验该 span 是否落在 join 后内容范围内。
+	joinedLen := 0
+	for idx, contentPart := range node.contents {
+		rangeLen := node.contentRanges[idx].end - node.contentRanges[idx].start
+		if rangeLen < len(contentPart) {
+			return markdownByteRange{}, false
+		}
+		// joinMarkdownNodeContent 在块间额外插入 '\n'，因此非最后一块额外 +1。
+		joinedLen += len(contentPart)
+		if idx < len(node.contents)-1 {
+			joinedLen++
+		}
+	}
+	if chunk.EndByte > joinedLen {
+		return markdownByteRange{}, false
+	}
+
+	startByte, ok := mapJoinedOffsetToSourceByte(node.contents, node.contentRanges, chunk.StartByte, false)
+	if !ok {
+		return markdownByteRange{}, false
+	}
+	// endByte 映射使用 isEndBoundary=true，确保落在拼接 '\n' 上时归属到前一块结尾。
+	endByte, ok := mapJoinedOffsetToSourceByte(node.contents, node.contentRanges, chunk.EndByte, true)
+	if !ok {
+		return markdownByteRange{}, false
+	}
+
+	// 最后统一归一化到合法 source 边界内。
+	return normalizeMarkdownByteRange(
+		markdownByteRange{
+			start: startByte,
+			end:   endByte,
+		},
+		len(source),
+	)
+}
+
+// mapJoinedOffsetToSourceByte 把 “join 后字符串的偏移” 映射回 “原文 byte 偏移”。
+//
+// 参数语义：
+// - contents/ranges：一一对应，表示每个块的抽取文本和其在原文中的 byte 区间。
+// - offset：基于 joinMarkdownNodeContent(contents) 的偏移。
+// - isEndBoundary：当 offset 正好落在块间拼接的 '\n' 上时，用于区分是“起始边界”还是“结束边界”。
+//
+// 例子：contents=["abc","def"]，join 后为 "abc\ndef"。
+// - offset=3（落在 '\n' 处）且 isEndBoundary=false -> 映射到第二块起点；
+// - offset=3 且 isEndBoundary=true  -> 映射到第一块终点。
+func mapJoinedOffsetToSourceByte(
+	contents []string,
+	ranges []markdownByteRange,
+	offset int,
+	isEndBoundary bool,
+) (int, bool) {
+	if offset < 0 || len(contents) == 0 || len(contents) != len(ranges) {
+		return 0, false
+	}
+
+	acc := 0
+	for idx, content := range contents {
+		rangeLen := ranges[idx].end - ranges[idx].start
+		contentLen := len(content)
+		if rangeLen < contentLen {
+			// 防御式检查：若抽取文本比原始区间还长，说明上游 span 对齐异常。
+			return 0, false
+		}
+
+		// 当前块在 join 后内容中的闭区间 [segmentStart, segmentEnd]。
+		segmentStart := acc
+		segmentEnd := acc + contentLen
+		if offset >= segmentStart && offset <= segmentEnd {
+			delta := offset - segmentStart
+			return ranges[idx].start + delta, true
+		}
+		acc = segmentEnd
+
+		if idx == len(contents)-1 {
+			break
+		}
+
+		// joinMarkdownNodeContent 会在块间插入 '\n'：
+		// - 对起始边界，映射到下一块开头；
+		// - 对结束边界，映射到前一块结尾。
+		if offset == acc {
+			if isEndBoundary {
+				return ranges[idx].end, true
+			}
+			return ranges[idx+1].start, true
+		}
+		// 跳过 join 时人为插入的 '\n'。
+		acc++
+	}
+
+	if offset == acc {
+		last := ranges[len(ranges)-1]
+		return last.end, true
+	}
+
+	return 0, false
+}
+
+func buildSplitChunkNode(
+	base *markdownDocTreeNode,
+	source []byte,
+	chunk ParseBuildChunk,
+	title string,
+	headingLevel int,
+) *markdownDocTreeNode {
+	var chunkParseMeta *parseMetadata
+	if br, ok := mapParseBuildChunkToSourceRange(base, source, chunk); ok {
+		chunkParseMeta = &parseMetadata{
+			startByte: br.start,
+			endByte:   br.end,
+		}
+	}
+
+	return &markdownDocTreeNode{
+		title:         title,
+		contents:      []string{chunk.Content},
+		headingLevel:  headingLevel,
+		derived:       false,
+		parseMetadata: chunkParseMeta,
+	}
+}
+
+func applyMarkdownNodeRuneOffset(node *markdownDocTreeNode, runeIndexByByteOffset []int) {
+	if node == nil {
+		return
+	}
+
+	if node.parseMetadata != nil {
+		if node.parseMetadata.endByte <= node.parseMetadata.startByte {
+			node.parseMetadata = nil
+		} else {
+			node.parseMetadata.startRune = sourceutil.ByteOffsetToRuneOffset(runeIndexByByteOffset, node.parseMetadata.startByte)
+			node.parseMetadata.endRune = sourceutil.ByteOffsetToRuneOffset(runeIndexByByteOffset, node.parseMetadata.endByte)
+		}
+	}
+
+	for _, child := range node.children {
+		applyMarkdownNodeRuneOffset(child, runeIndexByByteOffset)
+	}
+}
+
 func (b *DocTreeBuilder) splitOversizedNode(
 	ctx context.Context,
 	node *markdownDocTreeNode,
 	opt *parseBuildOptions,
 	isRoot bool,
+	source []byte,
 ) ([]*markdownDocTreeNode, error) {
-	// 先处理子节点，再处理当前节点。
+	// 步骤A：先分裂子节点再处理当前节点。
+	// 原因：当前节点是否还能保留/是否需要上提，依赖“子节点最终形态”，
+	// 不能基于分裂前的旧 children 做决策。
 	children := make([]*markdownDocTreeNode, 0, len(node.children))
 	for _, child := range node.children {
-		newChildren, err := b.splitOversizedNode(ctx, child, opt, false)
+		newChildren, err := b.splitOversizedNode(ctx, child, opt, false, source)
 		if err != nil {
 			return nil, err
 		}
@@ -320,67 +739,70 @@ func (b *DocTreeBuilder) splitOversizedNode(
 	node.children = children
 
 	content := joinMarkdownNodeContent(node.contents)
-	// 压缩空内容节点：叶子删除，非叶子上提子节点；根节点保留。
+	// 步骤B：压缩空节点（仅非根）。
+	// - 空叶子：直接删除（返回 nil）。
+	// - 空非叶：上提其 children，避免无意义中间层。
+	// - 根节点：即使为空也保留，保证树入口稳定。
 	if !isRoot && !hasNodeEmbeddingContent(node.title, content) {
 		if len(node.children) == 0 {
 			return nil, nil
 		}
 		return node.children, nil
 	}
+	// 步骤C：无需分裂直接返回（无内容或 token 未超限）。
 	if content == "" || !needSplitMarkdownNode(content, opt) {
 		return []*markdownDocTreeNode{node}, nil
 	}
 
+	// 步骤D：执行 split，并做 chunk 规范化（trim 首尾换行/过滤空块）。
 	chunks, err := opt.chunkSplitFn(ctx, content)
 	if err != nil {
 		return nil, err
 	}
-	chunks = normalizeNodeContentChunks(chunks)
+	chunks = normalizeParseBuildChunks(chunks)
 	if len(chunks) <= 1 {
 		return []*markdownDocTreeNode{node}, nil
 	}
 
-	// 叶子节点横向分裂，分裂节点和原节点同父。
+	// 步骤E1：叶子节点 -> 横向分裂。
+	// 行为：每个 chunk 变成“同层兄弟节点”（保持原 title 和 headingLevel）。
+	// 目的：避免新增中间层，保持检索结构扁平。
 	if len(node.children) == 0 && !isRoot {
 		siblings := make([]*markdownDocTreeNode, 0, len(chunks))
 		for _, chunk := range chunks {
-			siblings = append(siblings, &markdownDocTreeNode{
-				title:        node.title,
-				contents:     []string{chunk},
-				headingLevel: node.headingLevel,
-			})
+			siblings = append(siblings, buildSplitChunkNode(
+				node,
+				source,
+				chunk,
+				node.title,
+				node.headingLevel,
+			))
 		}
 		return siblings, nil
 	}
 
-	// 非叶子节点：保留 title，content 下放为子节点（子节点不带 title）。
+	// 步骤E2：非叶子节点 -> 内容下放。
+	// 行为：当前节点保留 title/children，原 contents 被切块后下放为“前置子节点”。
+	// 目的：保留目录语义（标题层级）同时缩短每个可嵌入单元。
 	chunkNodes := make([]*markdownDocTreeNode, 0, len(chunks))
 	for _, chunk := range chunks {
-		chunkNodes = append(chunkNodes, &markdownDocTreeNode{
-			title:        "",
-			contents:     []string{chunk},
-			headingLevel: node.headingLevel + 1,
-		})
+		chunkNodes = append(chunkNodes, buildSplitChunkNode(
+			node,
+			source,
+			chunk,
+			"",
+			node.headingLevel+1,
+		))
 	}
 	node.contents = nil
+	node.contentRanges = nil
+	// 新切出的内容块排在已有 children 前，保证“父节点正文优先于子标题内容”。
 	node.children = append(chunkNodes, node.children...)
 	return []*markdownDocTreeNode{node}, nil
 }
 
 func needSplitMarkdownNode(content string, opt *parseBuildOptions) bool {
 	return opt.tokenLenFn(content) > opt.maxNodeToken
-}
-
-func normalizeNodeContentChunks(chunks []string) []string {
-	result := make([]string, 0, len(chunks))
-	for _, chunk := range chunks {
-		trimmed := strings.Trim(chunk, "\n\r")
-		if strings.TrimSpace(trimmed) == "" {
-			continue
-		}
-		result = append(result, trimmed)
-	}
-	return result
 }
 
 func joinMarkdownNodeContent(contents []string) string {
@@ -398,26 +820,26 @@ func buildDocTreeFromMarkdownNode(
 	root *markdownDocTreeNode,
 ) (*DocTreeNode, []*DocTreeNode) {
 	type buildState struct {
-		leafPos   int
-		parentPos int
-		nodes     []*DocTreeNode
+		nonDerivedPos int
+		derivedPos    int
+		nodes         []*DocTreeNode
 	}
 
 	state := &buildState{
-		leafPos:   0,
-		parentPos: -1,
-		nodes:     make([]*DocTreeNode, 0),
+		nonDerivedPos: 0,
+		derivedPos:    -1,
+		nodes:         make([]*DocTreeNode, 0),
 	}
 
 	var build func(node *markdownDocTreeNode) *DocTreeNode
 	build = func(node *markdownDocTreeNode) *DocTreeNode {
 		children := make([]*DocTreeNode, 0, len(node.children))
-		derivedFrom := make([]string, 0)
+		childDerivedFrom := make([]string, 0)
 		maxChildLevel := 0
 		for _, child := range node.children {
 			childNode := build(child)
 			children = append(children, childNode)
-			derivedFrom = append(derivedFrom, childNode.derivedFrom...)
+			childDerivedFrom = append(childDerivedFrom, childNode.derivedFrom...)
 			if childNode.level > maxChildLevel {
 				maxChildLevel = childNode.level
 			}
@@ -432,21 +854,22 @@ func buildDocTreeFromMarkdownNode(
 			ChunkPos: -1,
 		}
 
-		if len(children) == 0 {
-			derivedFrom = []string{id}
-		} else {
-			derivedFrom = slices.Unique(derivedFrom)
+		derivedFrom := []string{id}
+		if node.derived {
+			derivedFrom = slices.Unique(childDerivedFrom)
 		}
 		node.derivedFrom = derivedFrom
 
 		level := 0
-		pos := state.leafPos
-		if len(children) == 0 {
-			state.leafPos++
-		} else {
+		if len(children) > 0 {
 			level = maxChildLevel + 1
-			pos = state.parentPos
-			state.parentPos--
+		}
+		pos := state.derivedPos
+		if node.derived {
+			state.derivedPos--
+		} else {
+			pos = state.nonDerivedPos
+			state.nonDerivedPos++
 		}
 
 		docNode := &DocTreeNode{
@@ -455,6 +878,12 @@ func buildDocTreeFromMarkdownNode(
 			pos:         pos,
 			children:    children,
 			derivedFrom: derivedFrom,
+		}
+		if !node.derived {
+			docNode.parseMetadata = cloneParseMetadata(node.parseMetadata)
+			if docNode.parseMetadata != nil && !docNode.parseMetadata.Valid() {
+				docNode.parseMetadata = nil
+			}
 		}
 		core.ChunkPos = int32(pos)
 		state.nodes = append(state.nodes, docNode)
@@ -474,7 +903,7 @@ func buildNodeEmbeddingContent(title string, content string) string {
 	case content == "":
 		return title
 	default:
-		return title + "\n" + content
+		return title + "\n\n" + content
 	}
 }
 

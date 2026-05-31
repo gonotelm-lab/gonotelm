@@ -21,7 +21,11 @@ func NewUrlHandler(c HandlerConfig) *UrlHandler {
 	}
 }
 
-func (e *UrlHandler) Handle(ctx context.Context, s *model.Source) (*HandleResult, error) {
+func (e *UrlHandler) Handle(
+	ctx context.Context,
+	s *model.Source,
+	opts ...HandleOption,
+) (*HandleResult, error) {
 	us := model.UrlSourceContent{}
 	if err := decodeSourceContent(s.Content, &us, "unmarshal url source content failed"); err != nil {
 		return nil, err

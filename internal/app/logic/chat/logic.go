@@ -21,6 +21,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/slices"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 
 	einomodel "github.com/cloudwego/eino/components/model"
@@ -226,7 +227,7 @@ func (l *Logic) ListMessages(
 func (l *Logic) retrieveSourceDocs(
 	ctx context.Context,
 	notebookId uuid.UUID,
-	prompt string,
+	userPrompt string,
 	sourceIds []uuid.UUID,
 	taskId string,
 ) ([]*model.SourceDoc, error) {
@@ -249,7 +250,7 @@ func (l *Logic) retrieveSourceDocs(
 		&bizsource.RetrieveSourceDocsQuery{
 			NotebookId: notebookId,
 			SourceIds:  existSourceIds,
-			Query:      prompt,
+			Query:      userPrompt,
 			Count:      conf.Global().Logic.Chat.GetSourceDocsRecallCount(),
 		})
 	if err != nil {
@@ -285,22 +286,6 @@ func (l *Logic) processUserMessageTask(
 	msgId uuid.UUID,
 	params *CreateUserMessageParams,
 ) {
-	defer func() {
-		l.wg.Done()
-
-		if e := recover(); e != nil {
-			stacks := debug.Stack()
-			slog.ErrorContext(ctx, "background process user message panic",
-				slog.Any("err", e),
-				slog.String("stack", string(stacks)),
-			)
-		}
-	}()
-
-	if !l.processCheckUserMessage(ctx, chat.Id, msgId) {
-		return
-	}
-
 	userId := pkgcontext.GetUserId(ctx)
 	sessionState := &chatSessionState{
 		id:               0, // accumulated id
@@ -313,26 +298,73 @@ func (l *Logic) processUserMessageTask(
 	}
 	ctx, sessionState.cancel = context.WithCancel(ctx)
 
-	if len(params.SourceIds) > 0 {
-		l.emitRetrievingStreamEvent(ctx, sessionState)
+	var (
+		doFinalizing            bool = true
+		answer                  *einoschema.Message
+		err                     error
+		errorContent            string = "服务繁忙，请稍后重试"
+		addSystemMessageWhenErr bool   = true
+	)
+
+	defer func() {
+		l.wg.Done()
+		if e := recover(); e != nil {
+			stacks := debug.Stack()
+			slog.ErrorContext(ctx, "background process user message panic",
+				slog.Any("err", e),
+				slog.String("stack", string(stacks)),
+			)
+			err = errors.WithStack(fmt.Errorf("panic: %v", e))
+			addSystemMessageWhenErr = false
+		}
+
+		if doFinalizing {
+			if err := l.finalizingProcess(
+				ctx,
+				sessionState,
+				answer,
+				err,
+				addSystemMessageWhenErr,
+				errorContent,
+			); err != nil {
+				slog.ErrorContext(ctx, "finalizing process failed",
+					slog.String("chat_id", chat.Id.String()),
+					slog.Any("err", err),
+				)
+			}
+		}
+	}()
+
+	if !l.processCheckUserMessage(ctx, chat.Id, msgId) {
+		addSystemMessageWhenErr = false
+		return
 	}
-	selectedSourcDocs, ok := l.processCheckSourceDocs(
+
+	if len(params.SourceIds) > 0 {
+		l.emitRetrievingStreamEvent(ctx, sessionState, true)
+	}
+	var queriedSourceDocs []*model.SourceDoc
+	queriedSourceDocs, err = l.processCheckSourceDocs(
 		ctx,
 		chat.NotebookId,
 		params.Prompt,
 		params.SourceIds,
 		taskId,
 	)
-	if !ok {
+	if err != nil {
+		addSystemMessageWhenErr = false
 		return
 	}
-	sessionState.sourceDocs = selectedSourcDocs
-	if len(selectedSourcDocs) > 0 {
-		l.emitRetrievingStreamEvent(ctx, sessionState)
+
+	sessionState.sourceDocs = queriedSourceDocs
+	if len(queriedSourceDocs) > 0 {
+		l.emitRetrievingStreamEvent(ctx, sessionState, true)
 	}
 
-	contextMsgs, ok := l.processCheckGetMessageContext(ctx, chat.Id)
-	if !ok {
+	var contextMsgs []*einoschema.Message
+	contextMsgs, err = l.processCheckGetMessageContext(ctx, chat.Id)
+	if err != nil {
+		addSystemMessageWhenErr = false
 		return
 	}
 
@@ -349,21 +381,9 @@ func (l *Logic) processUserMessageTask(
 	}
 
 	chatAgent := l.buildNewChatAgent(chatLLM, sessionState)
-	answer, err := chatAgent.Generate(ctx, contextMsgs)
+	answer, err = chatAgent.Generate(ctx, contextMsgs)
 	if err != nil {
 		slog.ErrorContext(ctx, "chat agent loop failed",
-			slog.String("chat_id", chat.Id.String()),
-			slog.Any("err", err),
-		)
-	}
-
-	if err := l.finalizingProcess(
-		ctx,
-		sessionState,
-		answer,
-		err,
-	); err != nil {
-		slog.ErrorContext(ctx, "finalizing process failed",
 			slog.String("chat_id", chat.Id.String()),
 			slog.Any("err", err),
 		)
@@ -392,14 +412,15 @@ func (l *Logic) processCheckUserMessage(ctx context.Context, chatId, msgId uuid.
 		}
 
 		slog.ErrorContext(ctx, "get message failed", logAttrs(err)...)
-		if _, err := l.chatBiz.AddAssistantSystemMessage(ctx,
-			&bizchat.AddAssistantSystemMessageCommand{
-				ChatId:  chatId,
-				UserId:  pkgcontext.GetUserId(ctx),
-				Content: "I'm sorry, I'm not able to process your request.",
-			}); err != nil {
-			slog.ErrorContext(ctx, "add assistant system message failed", logAttrs(err)...)
-		}
+		// 这里看起来没太大必要写一条错误信息进去
+		// if _, err := l.chatBiz.AddAssistantSystemMessage(ctx,
+		// 	&bizchat.AddAssistantSystemMessageCommand{
+		// 		ChatId:  chatId,
+		// 		UserId:  pkgcontext.GetUserId(ctx),
+		// 		Content: "I'm sorry, I'm not able to process your request.",
+		// 	}); err != nil {
+		// 	slog.ErrorContext(ctx, "add assistant system message failed", logAttrs(err)...)
+		// }
 		return false
 	}
 
@@ -414,19 +435,25 @@ func (l *Logic) processCheckUserMessage(ctx context.Context, chatId, msgId uuid.
 func (l *Logic) processCheckSourceDocs(
 	ctx context.Context,
 	notebookId uuid.UUID,
-	prompt string,
+	userPrompt string,
 	sourceIds []uuid.UUID,
 	taskId string,
-) ([]*model.SourceDoc, bool) {
+) ([]*model.SourceDoc, error) {
 	if len(sourceIds) == 0 {
-		return nil, true
+		return nil, nil
 	}
 
 	if l.isTaskAborted(ctx, taskId) {
-		return nil, false
+		return nil, errors.WithStack(fmt.Errorf("task %s is aborted", taskId))
 	}
 
-	sourceDocs, err := l.retrieveSourceDocs(ctx, notebookId, prompt, sourceIds, taskId)
+	sourceDocs, err := l.retrieveSourceDocs(
+		ctx,
+		notebookId,
+		userPrompt,
+		sourceIds,
+		taskId,
+	)
 	if err != nil {
 		slog.ErrorContext(ctx, "chat logic retrieve source docs failed",
 			slog.String("task_id", taskId),
@@ -434,16 +461,16 @@ func (l *Logic) processCheckSourceDocs(
 			slog.Any("err", err),
 		)
 
-		return nil, false
+		return nil, errors.WithMessage(err, "retrieve source docs failed")
 	}
 
-	return sourceDocs, true
+	return sourceDocs, nil
 }
 
 func (l *Logic) processCheckGetMessageContext(
 	ctx context.Context,
 	chatId uuid.UUID,
-) ([]*einoschema.Message, bool) {
+) ([]*einoschema.Message, error) {
 	eMsgs, err := l.chatBiz.ListContextMessages(ctx, chatId)
 	if err != nil {
 		slog.ErrorContext(ctx, "list context messages failed",
@@ -451,21 +478,24 @@ func (l *Logic) processCheckGetMessageContext(
 			slog.Any("err", err),
 		)
 
-		return nil, false
+		return nil, errors.WithMessage(err, "list context messages failed")
 	}
 
-	return eMsgs, true
+	return eMsgs, nil
 }
 
+// 结束任务处理 写入最终结果 并落库
 func (l *Logic) finalizingProcess(
 	ctx context.Context,
 	state *chatSessionState,
 	answerMsg *einoschema.Message,
-	answerErr error,
+	processErr error,
+	addSystemMessageWhenErr bool,
+	errorContent string,
 ) error {
-	if answerErr != nil {
-		if errors.Is(answerErr, context.Canceled) {
-			// 任务是手动取消的 不需要处理
+	if processErr != nil {
+		if errors.Is(processErr, context.Canceled) {
+			// 任务是外部手动取消的 不需要处理
 			slog.DebugContext(ctx,
 				fmt.Sprintf("task is canceled, task_id=%s, chat_id=%s",
 					state.taskId, state.chatId.String()),
@@ -475,27 +505,31 @@ func (l *Logic) finalizingProcess(
 
 		slog.WarnContext(ctx, "chat agent loop failed",
 			slog.String("chat_id", state.chatId.String()),
-			slog.Any("err", answerErr),
+			slog.Any("err", processErr),
 		)
 
-		const errorContent = "生成失败，请重试"
+		if errorContent == "" {
+			errorContent = "生成失败，请重试"
+		}
 
 		defer func() {
 			l.emitErrorFinishStreamEvent(ctx, state, errorContent, chatmodel.FinishReasonStop)
 			l.finalizingProcessClean(ctx, state)
 		}()
 
-		_, err := l.chatBiz.AddAssistantSystemMessage(ctx,
-			&bizchat.AddAssistantSystemMessageCommand{
-				ChatId:  state.chatId,
-				UserId:  state.userId,
-				Content: errorContent,
-			})
-		if err != nil {
-			slog.ErrorContext(ctx, "add assistant system message failed",
-				slog.String("chat_id", state.chatId.String()),
-				slog.Any("err", err),
-			)
+		if addSystemMessageWhenErr {
+			_, err := l.chatBiz.AddAssistantSystemMessage(ctx,
+				&bizchat.AddAssistantSystemMessageCommand{
+					ChatId:  state.chatId,
+					UserId:  state.userId,
+					Content: errorContent,
+				})
+			if err != nil {
+				slog.ErrorContext(ctx, "add assistant system message failed",
+					slog.String("chat_id", state.chatId.String()),
+					slog.Any("err", err),
+				)
+			}
 		}
 	}
 
@@ -715,14 +749,19 @@ func (l *Logic) emitStreamEvent(
 func (l *Logic) emitRetrievingStreamEvent(
 	ctx context.Context,
 	state *chatSessionState,
+	typing bool,
 ) {
 	timestamp := time.Now().Unix()
+	status := chatmodel.MessageStreamTyping
+	if !typing {
+		status = chatmodel.MessageStreamFinished
+	}
 	event := &chatmodel.MessageStreamEvent{
 		Id:        state.nextId(),
 		Timestamp: timestamp,
 		Phase: &chatmodel.MessageStreamPhaseData{
 			Type:   chatmodel.MessageStreamPhaseRetrieving,
-			Status: chatmodel.MessageStreamTyping,
+			Status: status,
 		},
 	}
 
@@ -887,6 +926,8 @@ func buildPhaseCitationFromSourceDocs(sourceDocs []*model.SourceDoc) []*chatmode
 		return nil
 	}
 
+	docsMap := slices.AsMapF(sourceDocs, func(doc *model.SourceDoc) string { return doc.Id })
+
 	items := make([]*chatmodel.PhaseCitationItem, 0, len(groupedSourceDocs))
 	for _, grouped := range groupedSourceDocs {
 		item := &chatmodel.PhaseCitationItem{
@@ -894,12 +935,21 @@ func buildPhaseCitationFromSourceDocs(sourceDocs []*model.SourceDoc) []*chatmode
 			Docs:     make([]*chatmodel.PhaseCitationDoc, 0, len(grouped.DocIds)),
 		}
 		for _, docID := range grouped.DocIds {
+			start, end := 0, 0
+			isSummary := true
+			doc, ok := docsMap[docID]
+			if ok {
+				start = doc.RunePos.GetStart()
+				end = doc.RunePos.GetEnd()
+				isSummary = doc.IsDerived()
+			}
+
 			item.Docs = append(item.Docs, &chatmodel.PhaseCitationDoc{
-				Id: docID,
+				Id:        docID,
+				IsSummary: isSummary,
 				Position: &chatmodel.PhaseCitationDocPosition{
-					// TODO 等文档记录了位置信息后这里需要重新填入
-					Start: 0,
-					End:   0,
+					Start: start,
+					End:   end,
 				},
 			})
 		}

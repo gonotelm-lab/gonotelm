@@ -13,6 +13,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
+	"github.com/gonotelm-lab/gonotelm/pkg/slices"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 
@@ -23,6 +24,7 @@ func (s *Server) registerSourcesRoutes(g *route.RouterGroup) {
 	g.POST("/source/:id/reload", s.RetrySourcePreparation) // retry source preparation
 	g.DELETE("/source/:id", s.DeleteSource)
 	g.GET("/source/:id/doc/:doc_id", s.GetSourceDoc)
+	g.GET("/source/:id/batch/docs", s.BatchGetSourceDocs)
 	g.GET("/source/:id/parsed/content", s.GetSourceParsedContent)
 	g.GET("/source/:id/parsed/tree", s.GetSourceParsedTree)
 	g.PUT("/source/:id/title", s.UpdateSourceTitle)
@@ -228,11 +230,63 @@ type GetSourceDocRequest struct {
 	DocId string    `path:"doc_id,required"`
 }
 
+type SourceDocPosition struct {
+	Start int `json:"start"`
+	End   int `json:"end"`
+
+	BytesStart int `json:"bytes_start"`
+	BytesEnd   int `json:"bytes_end"`
+}
+
 type GetSourceDocResponse struct {
 	SourceId    string `json:"source_id"`
 	DocId       string `json:"doc_id"`
 	SourceTitle string `json:"source_title"`
 	Content     string `json:"content"`
+
+	// 文档片段位置	rune offset 位置
+	Position *SourceDocPosition `json:"position,omitempty"`
+
+	// 是否为总结性文档片段
+	IsSummary bool `json:"is_summary"`
+	// 当文档为总结性文档片段时 该字段标识是从哪些文档片段总结而来
+	SummarizedFrom []string `json:"summarized_from,omitempty"`
+}
+
+func toGetSourceDocResponse(
+	sourceId string,
+	sourceTitle string,
+	doc *model.SourceDoc,
+) *GetSourceDocResponse {
+	if doc == nil {
+		return nil
+	}
+
+	summarizedFrom := make([]string, 0, len(doc.DerivedFrom))
+	for _, derivedFrom := range doc.DerivedFrom {
+		summarizedFrom = append(summarizedFrom, derivedFrom.String())
+	}
+
+	resp := &GetSourceDocResponse{
+		SourceId:       sourceId,
+		DocId:          doc.Id,
+		SourceTitle:    sourceTitle,
+		Content:        doc.Content,
+		IsSummary:      doc.IsDerived(),
+		SummarizedFrom: summarizedFrom,
+	}
+	if doc.RunePos != nil {
+		resp.Position = &SourceDocPosition{
+			Start: doc.RunePos.GetStart(),
+			End:   doc.RunePos.GetEnd(),
+		}
+	}
+	if doc.BytePos != nil {
+		resp.Position.BytesStart = doc.BytePos.GetStart()
+		resp.Position.BytesEnd = doc.BytePos.GetEnd()
+	}
+
+	return resp
 }
 
 // 获取来源的文档片段
@@ -244,7 +298,7 @@ func (s *Server) GetSourceDoc(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	doc, err := s.sourceLogic.GetSourceDoc(ctx, &logic.GetSourceDocParams{
+	result, err := s.sourceLogic.GetSourceDoc(ctx, &logic.GetSourceDocParams{
 		SourceId: req.Id,
 		DocId:    req.DocId,
 	})
@@ -253,11 +307,69 @@ func (s *Server) GetSourceDoc(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	http.OkResp(c, &GetSourceDocResponse{
-		SourceId:    doc.SourceId,
-		DocId:       doc.DocId,
-		SourceTitle: doc.SourceTitle,
-		Content:     doc.Content,
+	http.OkResp(c, toGetSourceDocResponse(result.SourceId, result.SourceTitle, result.Doc))
+}
+
+const maxBatchGetSourceDocsCount = 50
+
+type BatchGetSourceDocsRequest struct {
+	Id  uuid.UUID `path:"id,required"` // source id
+	Ids []string  `query:"ids,required"`
+}
+
+func (r *BatchGetSourceDocsRequest) Validate() error {
+	docIDs := make([]string, 0, len(r.Ids))
+	for _, item := range r.Ids {
+		for docID := range strings.SplitSeq(item, ",") {
+			docID = strings.TrimSpace(docID)
+			if docID == "" {
+				continue
+			}
+			docIDs = append(docIDs, docID)
+		}
+	}
+
+	if len(docIDs) == 0 {
+		return errors.ErrParams.Msg("ids is required")
+	}
+	if len(docIDs) > maxBatchGetSourceDocsCount {
+		return errors.ErrParams.Msgf("ids count exceeds limit: %d", maxBatchGetSourceDocsCount)
+	}
+
+	r.Ids = slices.Unique(docIDs)
+	return nil
+}
+
+type BatchGetSourceDocsResponse struct {
+	Docs []*GetSourceDocResponse `json:"docs"`
+}
+
+// 批量获取来源文档片段
+func (s *Server) BatchGetSourceDocs(ctx context.Context, c *app.RequestContext) {
+	var req BatchGetSourceDocsRequest
+	err := c.BindAndValidate(&req)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	result, err := s.sourceLogic.BatchGetSourceDocs(ctx,
+		&logic.BatchGetSourceDocsParams{
+			SourceId: req.Id,
+			DocIds:   req.Ids,
+		})
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	docs := make([]*GetSourceDocResponse, 0, len(result.Docs))
+	for _, doc := range result.Docs {
+		docs = append(docs, toGetSourceDocResponse(result.SourceId, result.SourceTitle, doc))
+	}
+
+	http.OkResp(c, &BatchGetSourceDocsResponse{
+		Docs: docs,
 	})
 }
 

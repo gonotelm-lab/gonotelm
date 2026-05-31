@@ -31,7 +31,11 @@ func NewFileObjectHandler(c HandlerConfig, objectStorage storage.Storage) *FileO
 	}
 }
 
-func (e *FileObjectHandler) Handle(ctx context.Context, s *model.Source) (*HandleResult, error) {
+func (e *FileObjectHandler) Handle(
+	ctx context.Context,
+	s *model.Source,
+	opts ...HandleOption,
+) (*HandleResult, error) {
 	fs := model.FileSourceContent{}
 	if err := decodeSourceContent(s.Content, &fs, "unmarshal file source content failed"); err != nil {
 		return nil, err
@@ -50,6 +54,7 @@ func (e *FileObjectHandler) Handle(ctx context.Context, s *model.Source) (*Handl
 		ctx,
 		s,
 		bytes.NewReader(objBody),
+		append([]HandleOption{}, opts...),
 		parseOpts,
 		transformOpts...,
 	)

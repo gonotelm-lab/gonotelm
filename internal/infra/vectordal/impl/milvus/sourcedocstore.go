@@ -32,10 +32,12 @@ const (
 	partitionCount  = 16 // DO NOT MODIFY THIS VALUE
 	partitionPrefix = "_p"
 
+	// Milvus filter template parameter keys, not collection field names.
 	notebookIDTemplateKey = "notebook_id"
 	sourceIDsTemplateKey  = "source_ids"
 	sourceIDTemplateKey   = "source_id"
-	docIDTemplateKey      = "doc_id"
+	idTemplateKey         = "doc_id"
+	idListTemplateKey     = "doc_ids"
 )
 
 var reservedSourceDocFields = slices.MapSet(schema.OutputFields)
@@ -200,7 +202,14 @@ func (s *SourceDocStoreImpl) BatchDelete(
 	}
 
 	partitionName := partitionNameByNotebookID(notebookID)
-	sourceIDs := normalizeSourceIDs(params.SourceId)
+	normalizedSourceIDs := slices.Unique(slices.Map(params.SourceId, strings.TrimSpace))
+	sourceIDs := normalizedSourceIDs[:0]
+	for _, sourceID := range normalizedSourceIDs {
+		if sourceID == "" {
+			continue
+		}
+		sourceIDs = append(sourceIDs, sourceID)
+	}
 	if len(sourceIDs) == 0 {
 		// empty source id list means no-op for safety.
 		return nil
@@ -260,7 +269,7 @@ func (s *SourceDocStoreImpl) Get(
 		`%s == {%s} && %s == {%s} && %s == {%s}`,
 		schema.FieldNotebookID, notebookIDTemplateKey,
 		schema.FieldSourceID, sourceIDTemplateKey,
-		schema.FieldID, docIDTemplateKey,
+		schema.FieldID, idTemplateKey,
 	)
 
 	opt := milvusclient.NewQueryOption(collectionName).
@@ -270,7 +279,7 @@ func (s *SourceDocStoreImpl) Get(
 		WithFilter(filterExpr).
 		WithTemplateParam(notebookIDTemplateKey, notebookID).
 		WithTemplateParam(sourceIDTemplateKey, sourceID).
-		WithTemplateParam(docIDTemplateKey, docID)
+		WithTemplateParam(idTemplateKey, docID)
 
 	rs, err := s.cli.Query(ctx, opt)
 	if err != nil {
@@ -288,6 +297,85 @@ func (s *SourceDocStoreImpl) Get(
 	return docs[0], nil
 }
 
+func (s *SourceDocStoreImpl) BatchGet(
+	ctx context.Context,
+	params *schema.SourceDocBatchGetParams,
+) ([]*schema.SourceDoc, error) {
+	if params == nil {
+		return nil, errors.ErrParams.Msg("batch get source doc params is nil")
+	}
+
+	notebookID := strings.TrimSpace(params.NotebookId)
+	sourceID := strings.TrimSpace(params.SourceId)
+	if notebookID == "" {
+		return nil, errors.ErrParams.Msg("notebook id is empty")
+	}
+	if sourceID == "" {
+		return nil, errors.ErrParams.Msg("source id is empty")
+	}
+
+	inputDocIDs := make([]string, 0, len(params.DocIds))
+	for _, docID := range params.DocIds {
+		docID = strings.TrimSpace(docID)
+		if docID == "" {
+			continue
+		}
+		inputDocIDs = append(inputDocIDs, docID)
+	}
+	if len(inputDocIDs) == 0 {
+		return []*schema.SourceDoc{}, nil
+	}
+
+	uniqueDocIDs := slices.Unique(inputDocIDs)
+	partitionName := partitionNameByNotebookID(notebookID)
+	filterExpr := fmt.Sprintf(
+		`%s == {%s} && %s == {%s} && %s in {%s}`,
+		schema.FieldNotebookID, notebookIDTemplateKey,
+		schema.FieldSourceID, sourceIDTemplateKey,
+		schema.FieldID, idListTemplateKey,
+	)
+
+	opt := milvusclient.NewQueryOption(collectionName).
+		WithPartitions(partitionName).
+		WithLimit(len(uniqueDocIDs)).
+		WithOutputFields(schema.OutputFields...).
+		WithFilter(filterExpr).
+		WithTemplateParam(notebookIDTemplateKey, notebookID).
+		WithTemplateParam(sourceIDTemplateKey, sourceID).
+		WithTemplateParam(idListTemplateKey, uniqueDocIDs)
+
+	rs, err := s.cli.Query(ctx, opt)
+	if err != nil {
+		return nil, errors.WithMessage(err, "batch query source docs failed")
+	}
+
+	docs, err := extractSourceDocsFromResultSet(ctx, rs)
+	if err != nil {
+		return nil, errors.WithMessage(err, "decode source docs query result failed")
+	}
+
+	docsByID := make(map[string]*schema.SourceDoc, len(docs))
+	for _, doc := range docs {
+		if doc == nil {
+			continue
+		}
+		docsByID[doc.Id] = doc
+	}
+
+	for _, docID := range uniqueDocIDs {
+		if _, ok := docsByID[docID]; !ok {
+			return nil, errors.ErrNoRecord.Msgf("source doc not found, doc_id=%s", docID)
+		}
+	}
+
+	orderedDocs := make([]*schema.SourceDoc, 0, len(inputDocIDs))
+	for _, docID := range inputDocIDs {
+		orderedDocs = append(orderedDocs, docsByID[docID])
+	}
+
+	return orderedDocs, nil
+}
+
 func (s *SourceDocStoreImpl) Query(
 	ctx context.Context,
 	params *schema.SourceDocQueryParams,
@@ -300,7 +388,14 @@ func (s *SourceDocStoreImpl) Query(
 	if notebookID == "" {
 		return nil, errors.ErrParams.Msg("notebook id is empty")
 	}
-	sourceIDs := normalizeSourceIDs(params.SourceIds)
+	normalizedSourceIDs := slices.Unique(slices.Map(params.SourceIds, strings.TrimSpace))
+	sourceIDs := normalizedSourceIDs[:0]
+	for _, sourceID := range normalizedSourceIDs {
+		if sourceID == "" {
+			continue
+		}
+		sourceIDs = append(sourceIDs, sourceID)
+	}
 	target := strings.TrimSpace(params.Target)
 	if target == "" {
 		return nil, errors.ErrParams.Msg("target is empty")
@@ -436,6 +531,68 @@ func (s *SourceDocStoreImpl) List(
 	return docs, nil
 }
 
+func (s *SourceDocStoreImpl) ListByChunkPos(
+	ctx context.Context,
+	params *schema.SourceDocListByChunkPosParams,
+) ([]*schema.SourceDoc, error) {
+	if params == nil {
+		return nil, errors.ErrParams.Msg("list by chunk pos params is nil")
+	}
+
+	notebookID := strings.TrimSpace(params.NotebookId)
+	if notebookID == "" {
+		return nil, errors.ErrParams.Msg("notebook id is empty")
+	}
+
+	sourceID := strings.TrimSpace(params.SourceId)
+	if sourceID == "" {
+		return nil, errors.ErrParams.Msg("source id is empty")
+	}
+
+	chunkPoses := slices.Unique(params.ChunkPoses)
+	if len(chunkPoses) == 0 {
+		return []*schema.SourceDoc{}, nil
+	}
+
+	partitionName := partitionNameByNotebookID(notebookID)
+	filterExpr := buildListByChunkPosFilterExpr(notebookID, sourceID, chunkPoses)
+	batchSize := resolveListBatchSize(params.BatchSize)
+
+	iter, err := s.cli.QueryIterator(
+		ctx,
+		milvusclient.NewQueryIteratorOption(collectionName).
+			WithPartitions(partitionName).
+			WithFilter(filterExpr).
+			WithOutputFields(schema.OutputFields...).
+			WithBatchSize(batchSize),
+	)
+	if err != nil {
+		return nil, errors.Wrapf(errors.ErrDatabase,
+			"create source doc by chunk pos query iterator failed, notebook_id=%q, source_id=%q, partition=%q, chunk_poses=%v, err=%v",
+			notebookID, sourceID, partitionName, chunkPoses, err,
+		)
+	}
+
+	docs := make([]*schema.SourceDoc, 0, batchSize)
+	for {
+		rs, err := iter.Next(ctx)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, errors.WithMessage(err, "iterate source docs by chunk pos failed")
+		}
+
+		batchDocs, err := extractSourceDocsFromResultSet(ctx, rs)
+		if err != nil {
+			return nil, errors.WithMessage(err, "decode source docs by chunk pos batch failed")
+		}
+		docs = append(docs, batchDocs...)
+	}
+
+	return docs, nil
+}
+
 func partitionNameByNotebookID(notebookID string) string {
 	h := fnv.New32a()
 	_, _ = h.Write([]byte(notebookID))
@@ -451,44 +608,38 @@ func buildQueryFilterExpr(hasSourceIDs bool) string {
 	return expr
 }
 
-func normalizeSourceIDs(sourceIDs []string) []string {
-	if len(sourceIDs) == 0 {
-		return nil
-	}
-	uniq := make(map[string]struct{}, len(sourceIDs))
-	out := make([]string, 0, len(sourceIDs))
-	for _, sourceID := range sourceIDs {
-		id := strings.TrimSpace(sourceID)
-		if id == "" {
-			continue
+func buildListByChunkPosFilterExpr(notebookID, sourceID string, chunkPoses []int32) string {
+	return fmt.Sprintf(
+		`%s == %q && %s == %q && %s in [%s]`,
+		schema.FieldNotebookID, notebookID,
+		schema.FieldSourceID, sourceID,
+		schema.FieldChunkPos, buildChunkPosesExpr(chunkPoses),
+	)
+}
+
+func buildChunkPosesExpr(chunkPoses []int32) string {
+	var expr strings.Builder
+	for i, chunkPos := range chunkPoses {
+		if i > 0 {
+			expr.WriteString(", ")
 		}
-		if _, ok := uniq[id]; ok {
-			continue
-		}
-		uniq[id] = struct{}{}
-		out = append(out, id)
+		fmt.Fprintf(&expr, "%d", chunkPos)
 	}
-	return out
+	return expr.String()
 }
 
 func resolveSearchLimit(limit int) int {
 	if limit <= 0 {
 		return defaultSearchLimit
 	}
-	if limit > maxSearchLimit {
-		return maxSearchLimit
-	}
-	return limit
+	return min(limit, maxSearchLimit)
 }
 
 func resolveListBatchSize(batchSize int) int {
 	if batchSize <= 0 {
 		return defaultListBatchSize
 	}
-	if batchSize > maxListBatchSize {
-		return maxListBatchSize
-	}
-	return batchSize
+	return min(batchSize, maxListBatchSize)
 }
 
 func extractSourceDocsFromResults(

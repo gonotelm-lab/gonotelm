@@ -197,8 +197,8 @@ func (f *FileSourceContent) From(b []byte) error {
 // Supported source file mime types
 const (
 	MimeTypePDF      = "application/pdf"
-	MimeTypeText     = "text/plain"
-	MimeTypeMarkdown = "text/markdown"
+	MimeTypeText     = "text/plain; charset=utf-8"
+	MimeTypeMarkdown = "text/markdown; charset=utf-8"
 	MimeTypeEPUB     = "application/epub+zip"
 	MimeTypeWord     = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 )

@@ -14,13 +14,16 @@ type DocTreeNode struct {
 	level int // 0-based, the deepest level is 0
 
 	// 表示文档在来源中所处的位置（和 core.ChunkPos 一致）。
-	// 当前分配策略下通常 pos<0 为派生节点、pos>=0 为原始切块，
+	// 当前分配策略下通常 pos<0 为派生节点、pos>=0 为非派生节点（非派生节点表示文本块内容来自原始来源）。
 	pos      int
 	children []*DocTreeNode
 
-	// 衍生自哪些叶子节点
-	// 如果是叶子节点 这个字段就是自己的id
+	// 衍生自哪些非派生节点
+	// 如果是非派生节点 这个字段就是自己的id
 	derivedFrom []string
+
+	// 只有使用ParseBuild时节点才有parse的metadata
+	parseMetadata *parseMetadata
 }
 
 func NewDocTreeNode(
@@ -79,6 +82,14 @@ func (n *DocTreeNode) DerivedFrom() []string {
 		return nil
 	}
 	return n.derivedFrom
+}
+
+func (n *DocTreeNode) ParseMetadata() *parseMetadata {
+	if n == nil {
+		return nil
+	}
+
+	return n.parseMetadata
 }
 
 type (

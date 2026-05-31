@@ -6,6 +6,7 @@ import (
 	bizchat "github.com/gonotelm-lab/gonotelm/internal/app/biz/chat"
 	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
+	sourcelogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/source"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	chatmodel "github.com/gonotelm-lab/gonotelm/internal/app/model/chat"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
@@ -17,17 +18,20 @@ type NotebookLogic struct {
 	notebookBiz *biznotebook.Biz
 	sourceBiz   *bizsource.Biz
 	chatBiz     *bizchat.Biz
+	sourceLogic *sourcelogic.SourceLogic
 }
 
 func NewNotebookLogic(
 	notebookBiz *biznotebook.Biz,
 	sourceBiz *bizsource.Biz,
 	chatBiz *bizchat.Biz,
+	sourceLogic *sourcelogic.SourceLogic,
 ) *NotebookLogic {
 	return &NotebookLogic{
 		notebookBiz: notebookBiz,
 		sourceBiz:   sourceBiz,
 		chatBiz:     chatBiz,
+		sourceLogic: sourceLogic,
 	}
 }
 
@@ -43,9 +47,9 @@ func (l *NotebookLogic) CreateNotebook(
 	userId := pkgcontext.GetUserId(ctx)
 	notebook, err := l.notebookBiz.CreateNotebook(
 		ctx, &biznotebook.CreateNotebookCommand{
-			Name:    params.Name,
-			OwnerId: userId,
-			Description:    params.Desc,
+			Name:        params.Name,
+			OwnerId:     userId,
+			Description: params.Desc,
 		})
 	if err != nil {
 		return nil, errors.WithMessage(err, "create notebook failed")
@@ -249,4 +253,34 @@ func (l *NotebookLogic) GetOrCreateNotebookChat(
 	}
 
 	return chat, nil
+}
+
+func (l *NotebookLogic) DeleteNotebook(
+	ctx context.Context,
+	id uuid.UUID,
+) error {
+	_, err := l.notebookBiz.GetNotebook(ctx, id)
+	if err != nil {
+		if errors.Is(err, biznotebook.ErrNotebookNotFound) {
+			return nil
+		}
+		return errors.WithMessagef(err, "get notebook failed before deleting, notebook_id=%s", id)
+	}
+
+	err = l.notebookBiz.DeleteNotebook(ctx, id)
+	if err != nil {
+		return errors.WithMessagef(err, "delete notebook failed, notebook_id=%s", id)
+	}
+
+	err = l.sourceLogic.DeleteSourcesByNotebook(ctx, id)
+	if err != nil {
+		return errors.WithMessagef(err, "delete notebook sources failed, notebook_id=%s", id)
+	}
+
+	err = l.chatBiz.DeleteChatsByNotebook(ctx, id)
+	if err != nil {
+		return errors.WithMessagef(err, "delete notebook chats failed, notebook_id=%s", id)
+	}
+
+	return nil
 }

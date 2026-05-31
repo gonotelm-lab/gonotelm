@@ -127,6 +127,102 @@ func TestSourceStoreListAndDeleteByNotebookId(t *testing.T) {
 	})
 }
 
+func TestSourceStoreBatchDelete(t *testing.T) {
+	Convey("SourceStore BatchDelete should delete target ids only", t, func() {
+		store := testSourceStore
+		ctx := t.Context()
+		notebookID := createNotebookForSourceTest(t, testDB)
+
+		oldBatchSize := sourceIDsQueryBatchSize
+		sourceIDsQueryBatchSize = 2
+		t.Cleanup(func() {
+			sourceIDsQueryBatchSize = oldBatchSize
+		})
+
+		src1 := &schema.Source{
+			Id:         dal.Id(uuid.NewV7()),
+			NotebookId: notebookID,
+			Kind:       "doc",
+			Status:     "ready",
+		}
+		src2 := &schema.Source{
+			Id:         dal.Id(uuid.NewV7()),
+			NotebookId: notebookID,
+			Kind:       "doc",
+			Status:     "ready",
+		}
+		src3 := &schema.Source{
+			Id:         dal.Id(uuid.NewV7()),
+			NotebookId: notebookID,
+			Kind:       "doc",
+			Status:     "ready",
+		}
+		srcKeep := &schema.Source{
+			Id:         dal.Id(uuid.NewV7()),
+			NotebookId: notebookID,
+			Kind:       "doc",
+			Status:     "ready",
+		}
+
+		So(store.Create(ctx, src1), ShouldBeNil)
+		So(store.Create(ctx, src2), ShouldBeNil)
+		So(store.Create(ctx, src3), ShouldBeNil)
+		So(store.Create(ctx, srcKeep), ShouldBeNil)
+		t.Cleanup(func() {
+			_ = testDB.WithContext(ctx).Where("notebook_id = ?", notebookID).Delete(&schema.Source{}).Error
+		})
+
+		err := store.BatchDelete(ctx, []dal.Id{src1.Id, src2.Id, src3.Id})
+		So(err, ShouldBeNil)
+
+		var deletedCount int64
+		err = testDB.WithContext(ctx).
+			Model(&schema.Source{}).
+			Where("id IN ?", []dal.Id{src1.Id, src2.Id, src3.Id}).
+			Count(&deletedCount).Error
+		So(err, ShouldBeNil)
+		So(deletedCount, ShouldEqual, int64(0))
+
+		var keptCount int64
+		err = testDB.WithContext(ctx).
+			Model(&schema.Source{}).
+			Where("id = ?", srcKeep.Id).
+			Count(&keptCount).Error
+		So(err, ShouldBeNil)
+		So(keptCount, ShouldEqual, int64(1))
+	})
+}
+
+func TestSourceStoreBatchDeleteEmpty(t *testing.T) {
+	Convey("SourceStore BatchDelete with empty ids should be noop", t, func() {
+		store := testSourceStore
+		ctx := t.Context()
+		notebookID := createNotebookForSourceTest(t, testDB)
+
+		src := &schema.Source{
+			Id:         dal.Id(uuid.NewV7()),
+			NotebookId: notebookID,
+			Kind:       "doc",
+			Status:     "ready",
+		}
+		So(store.Create(ctx, src), ShouldBeNil)
+		t.Cleanup(func() {
+			_ = testDB.WithContext(ctx).Where("notebook_id = ?", notebookID).Delete(&schema.Source{}).Error
+		})
+
+		err := store.BatchDelete(ctx, nil)
+		So(err, ShouldBeNil)
+
+		var count int64
+		err = testDB.WithContext(ctx).
+			Model(&schema.Source{}).
+			Where("id = ?", src.Id).
+			Count(&count).Error
+		So(err, ShouldBeNil)
+		So(count, ShouldEqual, int64(1))
+	})
+}
+
 func TestSourceStoreListAndCountIgnoreInited(t *testing.T) {
 	Convey("SourceStore list/count should ignore inited status", t, func() {
 		store := testSourceStore

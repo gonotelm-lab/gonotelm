@@ -406,7 +406,7 @@ func (l *SourceLogic) generateNotebookSummary(
 	}
 
 	// get all notebook sources
-	notebookSources, err := l.sourceBiz.GetAllNotebookSources(ctx, notebookId)
+	notebookSources, err := l.sourceBiz.FetchNotebookSources(ctx, notebookId)
 	if err != nil {
 		slog.ErrorContext(ctx, "get all notebook sources failed",
 			slog.String("notebook_id", notebookId.String()),

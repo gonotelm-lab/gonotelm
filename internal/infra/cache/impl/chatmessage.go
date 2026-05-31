@@ -67,6 +67,33 @@ func (c *ChatMessageContextCacheImpl) Destroy(
 	return nil
 }
 
+func (c *ChatMessageContextCacheImpl) BatchDestroy(
+	ctx context.Context,
+	chatIds []string,
+) error {
+	if len(chatIds) == 0 {
+		return nil
+	}
+
+	keys := make([]string, 0, len(chatIds))
+	for _, chatId := range chatIds {
+		if chatId == "" {
+			continue
+		}
+		keys = append(keys, c.keyGenerator(chatId))
+	}
+	if len(keys) == 0 {
+		return nil
+	}
+
+	err := c.rd.Del(ctx, keys...).Err()
+	if err != nil {
+		return errors.Wrapf(errors.ErrCache, "batch delete chat context message failed: %s", err.Error())
+	}
+
+	return nil
+}
+
 func (c *ChatMessageContextCacheImpl) ListAll(
 	ctx context.Context,
 	chatId string,

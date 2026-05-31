@@ -18,6 +18,7 @@ import (
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/mutex"
+	"github.com/gonotelm-lab/gonotelm/pkg/slices"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 
 	"github.com/bytedance/sonic"
@@ -399,7 +400,7 @@ func (l *SourceLogic) DeleteSource(ctx context.Context, sourceId uuid.UUID) erro
 		return errors.WithMessagef(err, "delete source failed, id=%s", sourceId)
 	}
 
-	if originSource != nil {
+	if originSource == nil {
 		return nil
 	}
 
@@ -407,6 +408,28 @@ func (l *SourceLogic) DeleteSource(ctx context.Context, sourceId uuid.UUID) erro
 	err = l.deleteSourceParsedContent(ctx, originSource)
 	if err != nil {
 		return errors.WithMessage(err, "delete source parsed content failed")
+	}
+
+	return nil
+}
+
+func (l *SourceLogic) DeleteSourcesByNotebook(
+	ctx context.Context,
+	notebookId uuid.UUID,
+) error {
+	decodedSources, err := l.sourceBiz.FetchNotebookDecodedSources(ctx, notebookId)
+	if err != nil {
+		return errors.WithMessagef(err, "fetch notebook decoded sources failed, notebook_id=%s", notebookId)
+	}
+
+	err = l.sourceBiz.DeleteSourcesByNotebook(ctx, notebookId)
+	if err != nil {
+		return errors.WithMessagef(err, "delete notebook sources failed, notebook_id=%s", notebookId)
+	}
+
+	err = l.deleteSourceParsedContents(ctx, decodedSources)
+	if err != nil {
+		return errors.WithMessagef(err, "batch delete source parsed content failed, notebook_id=%s", notebookId)
 	}
 
 	return nil
@@ -576,8 +599,31 @@ func (l *SourceLogic) deleteSourceParsedContent(
 		return nil
 	}
 
-	err := l.objectStorage.DeleteObject(ctx, &storage.DeleteObjectRequest{
-		Key: source.ParsedContent.StoreKey,
+	return l.deleteSourceParsedContents(ctx, []*model.DecodedSource{source})
+}
+
+func (l *SourceLogic) deleteSourceParsedContents(
+	ctx context.Context,
+	sources []*model.DecodedSource,
+) error {
+	storeKeys := make([]string, 0, len(sources))
+	for _, source := range sources {
+		if source == nil || source.ParsedContent == nil {
+			continue
+		}
+		if source.ParsedContent.StoreKey == "" {
+			continue
+		}
+		storeKeys = append(storeKeys, source.ParsedContent.StoreKey)
+	}
+
+	storeKeys = slices.Unique(storeKeys)
+	if len(storeKeys) == 0 {
+		return nil
+	}
+
+	err := l.objectStorage.BatchDeleteObject(ctx, &storage.BatchDeleteObjectRequest{
+		Keys: storeKeys,
 	})
 	if err != nil {
 		return errors.WithMessage(err, "delete source parsed content failed")

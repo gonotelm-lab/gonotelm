@@ -139,6 +139,43 @@ func (s *Storage) DeleteObject(
 	return nil
 }
 
+func (s *Storage) BatchDeleteObject(
+	ctx context.Context,
+	req *storage.BatchDeleteObjectRequest,
+) error {
+	if req == nil {
+		return errors.ErrParams.Msg("batch delete object request is nil")
+	}
+	if len(req.Keys) == 0 {
+		return nil
+	}
+
+	objectCh := make(chan minio.ObjectInfo)
+	go func() {
+		defer close(objectCh)
+		for _, key := range req.Keys {
+			if key == "" {
+				continue
+			}
+
+			select {
+			case <-ctx.Done():
+				return
+			case objectCh <- minio.ObjectInfo{Key: key}:
+			}
+		}
+	}()
+
+	errCh := s.client.RemoveObjects(ctx, s.bucket, objectCh, minio.RemoveObjectsOptions{})
+	for rmErr := range errCh {
+		if rmErr.Err != nil {
+			return errors.Wrapf(rmErr.Err, "minio batch delete object failed, key=%s", rmErr.ObjectName)
+		}
+	}
+
+	return nil
+}
+
 func (s *Storage) UploadObject(
 	ctx context.Context,
 	req *storage.UploadObjectRequest,

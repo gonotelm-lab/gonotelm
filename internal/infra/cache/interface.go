@@ -12,6 +12,7 @@ import (
 type ChatContextMessageCache interface {
 	Append(ctx context.Context, chatId string, messages []*schema.ChatContextMessage) error
 	Destroy(ctx context.Context, chatId string) error
+	BatchDestroy(ctx context.Context, chatIds []string) error
 	ListAll(ctx context.Context, chatId string) ([]*schema.ChatContextMessage, error)
 
 	// del + set all messages

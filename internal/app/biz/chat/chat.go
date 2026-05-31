@@ -474,3 +474,37 @@ func (b *Biz) ClearChatContext(
 
 	return nil
 }
+
+func (b *Biz) DeleteChatsByNotebook(
+	ctx context.Context,
+	notebookId Id,
+) error {
+	chats, err := b.chatStore.ListByNotebookId(ctx, notebookId)
+	if err != nil {
+		return errors.WithMessagef(err, "list chats by notebook failed, notebook_id=%s", notebookId)
+	}
+
+	chatIDs := make([]Id, 0, len(chats))
+	chatIDStrs := make([]string, 0, len(chats))
+	for _, chat := range chats {
+		chatIDs = append(chatIDs, chat.Id)
+		chatIDStrs = append(chatIDStrs, chat.Id.String())
+	}
+
+	err = b.messageStore.BatchDeleteByChatIds(ctx, chatIDs)
+	if err != nil {
+		return errors.WithMessagef(err, "batch delete chat messages failed, notebook_id=%s", notebookId)
+	}
+
+	err = b.contextStore.BatchDestroy(ctx, chatIDStrs)
+	if err != nil {
+		return errors.WithMessagef(err, "batch delete chat context failed, notebook_id=%s", notebookId)
+	}
+
+	err = b.chatStore.DeleteByNotebookId(ctx, notebookId)
+	if err != nil {
+		return errors.WithMessagef(err, "delete chats by notebook failed, notebook_id=%s", notebookId)
+	}
+
+	return nil
+}

@@ -165,7 +165,7 @@ func (b *Biz) ListDecodedSourcesByNotebook(
 }
 
 // 获取notebook的全部来源
-func (b *Biz) GetAllNotebookSources(
+func (b *Biz) FetchNotebookSources(
 	ctx context.Context,
 	notebookId uuid.UUID,
 ) ([]*model.Source, error) {
@@ -190,6 +190,42 @@ func (b *Biz) GetAllNotebookSources(
 	}
 
 	return allSources, nil
+}
+
+func (b *Biz) FetchNotebookDecodedSources(
+	ctx context.Context,
+	notebookId uuid.UUID,
+) ([]*model.DecodedSource, error) {
+	var (
+		limit             = 100
+		offset            = 0
+		allDecodedSources = make([]*model.DecodedSource, 0, limit)
+	)
+
+	for {
+		sources, err := b.ListDecodedSourcesByNotebook(ctx,
+			&ListDecodedSourcesByNotebookQuery{
+				NotebookId: notebookId,
+				Limit:      limit,
+				Offset:     offset,
+			})
+		if err != nil {
+			return nil, errors.WithMessagef(err,
+				"list notebook decoded sources failed, notebook_id=%s",
+				notebookId)
+		}
+		if len(sources) == 0 {
+			break
+		}
+
+		allDecodedSources = append(allDecodedSources, sources...)
+		if len(sources) < limit {
+			break
+		}
+		offset += limit
+	}
+
+	return allDecodedSources, nil
 }
 
 type CreateSourceCommand struct {
@@ -253,7 +289,7 @@ func (b *Biz) DeleteSource(ctx context.Context, sourceId uuid.UUID) (*model.Deco
 		}
 	}
 
-	err = b.sourceStore.DeleteById(ctx, sourceId)
+	err = b.sourceStore.BatchDelete(ctx, []uuid.UUID{sourceId})
 	if err != nil {
 		return nil, errors.WithMessagef(err, "store delete source failed, id=%s", sourceId)
 	}
@@ -280,6 +316,80 @@ func (b *Biz) DeleteSource(ctx context.Context, sourceId uuid.UUID) (*model.Deco
 	}
 
 	return source, nil
+}
+
+func (b *Biz) DeleteSourcesByNotebook(
+	ctx context.Context,
+	notebookId uuid.UUID,
+) error {
+	sources, err := b.FetchNotebookSources(ctx, notebookId)
+	if err != nil {
+		return errors.WithMessagef(err, "get notebook sources failed, notebook_id=%s", notebookId)
+	}
+
+	sourceIDs := make([]uuid.UUID, 0, len(sources))
+	sourceIDStrs := make([]string, 0, len(sources))
+	fileStoreKeys := make([]string, 0, len(sources))
+
+	for _, source := range sources {
+		sourceIDs = append(sourceIDs, source.Id)
+		sourceIDStrs = append(sourceIDStrs, source.Id.String())
+
+		if source.KindFile() && len(source.Content) != 0 {
+			fileContent := model.FileSourceContent{}
+			err = fileContent.From(source.Content)
+			if err != nil {
+				slog.WarnContext(ctx, "ignore parse source object key due invalid file source content",
+					slog.String("source_id", source.Id.String()),
+					slog.Any("err", errors.Wrapf(
+						errors.ErrSerde,
+						"unmarshal file source content failed before deleting source, source_id=%s",
+						source.Id,
+					)),
+				)
+			} else if fileContent.StoreKey != "" {
+				fileStoreKeys = append(fileStoreKeys, fileContent.StoreKey)
+			}
+		}
+
+	}
+
+	if len(sourceIDs) > 0 {
+		err = b.sourceStore.BatchDelete(ctx, sourceIDs)
+		if err != nil {
+			return errors.WithMessagef(err, "batch delete sources failed, notebook_id=%s", notebookId)
+		}
+
+		err = b.sourceDocStore.BatchDelete(ctx, &vecschema.SourceDocBatchDeleteParams{
+			NotebookId: notebookId.String(),
+			SourceId:   sourceIDStrs,
+		})
+		if err != nil {
+			return errors.WithMessagef(err, "delete source docs by notebook failed, notebook_id=%s", notebookId)
+		}
+	}
+
+	fileStoreKeys = slices.Unique(fileStoreKeys)
+	if len(fileStoreKeys) > 0 {
+		err = b.objectStorage.BatchDeleteObject(ctx, &storage.BatchDeleteObjectRequest{
+			Keys: fileStoreKeys,
+		})
+		if err != nil {
+			slog.WarnContext(ctx, "batch delete source objects failure",
+				slog.String("notebook_id", notebookId.String()),
+				slog.Int("key_count", len(fileStoreKeys)),
+				slog.Any("err", err),
+			)
+		}
+	}
+
+	// 兜底清理：确保未出现在分页结果中的来源记录也被删除（例如 inited 状态）。
+	err = b.sourceStore.DeleteByNotebookId(ctx, notebookId)
+	if err != nil {
+		return errors.WithMessagef(err, "delete sources by notebook failed, notebook_id=%s", notebookId)
+	}
+
+	return nil
 }
 
 type UpdateContentCommand struct {

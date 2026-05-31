@@ -18,6 +18,7 @@ func (s *Server) registerNotebooksRoutes(g *route.RouterGroup) {
 	g.GET("/notebook/list", s.ListNotebooks)
 	g.PUT("/notebook/:id/name", s.UpdateNotebookName)
 	g.POST("/notebook/:id/chat", s.GetOrCreateNotebookChat)
+	g.DELETE("/notebook/:id", s.DeleteNotebook)
 }
 
 type CreateNotebookRequest struct {
@@ -345,4 +346,25 @@ func (s *Server) GetOrCreateNotebookChat(ctx context.Context, c *app.RequestCont
 	http.OkResp(c, GetNotebookChatResponse{
 		ChatId: chat.Id.String(),
 	})
+}
+
+type DeleteNotebookRequest struct {
+	Id uuid.UUID `path:"id,required"`
+}
+
+func (s *Server) DeleteNotebook(ctx context.Context, c *app.RequestContext) {
+	var req DeleteNotebookRequest
+	err := c.BindAndValidate(&req)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	err = s.notebookLogic.DeleteNotebook(ctx, req.Id)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	http.OkResp(c, nil)
 }

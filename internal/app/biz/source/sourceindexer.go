@@ -69,7 +69,8 @@ func NewSourceIndexer(
 			embedder,
 			llmGateway,
 			func(_ context.Context) string { return string(conf.Global().Logic.Source.ModelProvider) },
-			func(_ context.Context) string { return conf.Global().Logic.Source.Model }),
+			func(_ context.Context) string { return conf.Global().Logic.Source.Model },
+		),
 	}
 }
 
@@ -98,13 +99,21 @@ func (b *SourceIndexer) Prepare(
 		slog.Int("estimated_token", estimatedToken),
 	)
 
+	var (
+		textChunks []string
+		vsDocs     []*vecschema.SourceDoc
+		log        string
+	)
 	if result.ParsedContentType == model.MimeTypeMarkdown {
 		// 对于有明显层级结构的markdown文档尝试使用语法树解析
+		textChunks, vsDocs, err = b.parseEmbedChunks(ctx, source, result)
+		log = "parse embed"
+	} else {
+		textChunks, vsDocs, err = b.mergeEmbedChunks(ctx, source, result)
+		log = "merge embed"
 	}
-
-	textChunks, vsDocs, err := b.embedChunks(ctx, source, result)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithMessagef(err, "%s chunks failed", log)
 	}
 
 	err = b.insertSourceDocs(ctx, vsDocs)
@@ -136,7 +145,70 @@ func (b *SourceIndexer) convertSource(
 	return result, nil
 }
 
-func (b *SourceIndexer) embedChunks(
+func (b *SourceIndexer) parseEmbedChunks(
+	ctx context.Context,
+	source *model.Source,
+	result *convertdoc.HandleResult,
+) ([]string, []*vecschema.SourceDoc, error) {
+	tree, err := b.docTreeBuilder.ParseBuild(
+		ctx,
+		result.ParsedContent,
+		indices.WithParseBuildEmbedBatch(b.embedBatchSize, b.embedMaxConcurrency),
+	)
+	if err != nil {
+		return nil, nil, errors.WithMessagef(err, "parse build failed")
+	}
+
+	nodes := tree.Nodes()
+	// ParseBuild 的派生关系以“叶子节点 pos 体系”为基准，这里先建立 id->pos 索引。
+	leafCount := 0
+	leafIDPosMapping := make(map[string]int, len(nodes))
+
+	chunkTexts := make([]string, 0, len(tree.Nodes()))
+	sourceDocs := make([]*vecschema.SourceDoc, 0, len(tree.Nodes()))
+	for _, node := range nodes {
+		chunkTexts = append(chunkTexts, node.Core().Content)
+		sourceDocs = append(sourceDocs, node.Core())
+		// 补上每个doc的元数据
+		node.Core().NotebookId = source.NotebookId.String()
+		node.Core().SourceId = source.Id.String()
+		node.Core().Owner = source.OwnerId
+
+		if node.IsLeaf() {
+			leafCount++
+			// 仅叶子节点参与 deriving bitmap 的位图坐标。
+			leafIDPosMapping[node.Core().Id] = node.Pos()
+		}
+	}
+
+	// 设置metadata
+	for _, node := range nodes {
+		if node.IsLeaf() {
+			continue
+		}
+		if derivingIds := node.DerivedFrom(); len(derivingIds) > 0 {
+			bm := bitmap.New(uint32(leafCount))
+			for _, derivingID := range derivingIds {
+				bitPos, ok := leafIDPosMapping[derivingID]
+				if ok {
+					bm.Set(uint32(bitPos))
+				}
+			}
+			childrenPos := make([]int, 0, len(node.Children()))
+			for _, child := range node.Children() {
+				childrenPos = append(childrenPos, child.Pos())
+			}
+
+			node.Core().PutMeta(sourceDocMetaDerivingPos, bm.String())
+			node.Core().PutMeta(sourceDocMetaLevel, int64(node.Level()))
+			node.Core().PutMeta(sourceDocMetaChildrenPos, childrenPos)
+		}
+	}
+
+	return chunkTexts, sourceDocs, nil
+}
+
+func (b *SourceIndexer) mergeEmbedChunks(
 	ctx context.Context,
 	source *model.Source,
 	result *convertdoc.HandleResult,

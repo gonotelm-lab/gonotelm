@@ -76,6 +76,20 @@ func (s *ChatStoreImpl) ListByOwnerId(
 	return rows, nil
 }
 
+func (s *ChatStoreImpl) ListByNotebookId(
+	ctx context.Context,
+	notebookId dal.Id,
+) ([]*schema.Chat, error) {
+	var rows []*schema.Chat
+	err := s.db.WithContext(ctx).
+		Where("notebook_id = ?", notebookId).
+		Find(&rows).Error
+	if err != nil {
+		return nil, sql.WrapErr(err)
+	}
+	return rows, nil
+}
+
 func (s *ChatStoreImpl) DeleteById(ctx context.Context, id dal.Id) error {
 	if err := s.db.WithContext(ctx).Where("id = ?", id).Delete(&schema.Chat{}).Error; err != nil {
 		return sql.WrapErr(err)

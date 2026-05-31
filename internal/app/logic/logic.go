@@ -51,19 +51,20 @@ func MustNewLogic(
 		panic(err)
 	}
 
-	notebookLogic := NewNotebookLogic(
-		notebookBiz,
-		sourceBiz,
-		chatBiz,
-	)
-
 	sourceLogic := sourcelogic.MustNewSourceLogic(
 		ctx,
 		infrastructures,
 		objectStorage,
-		notebookLogic.notebookBiz,
+		notebookBiz,
 		sourceBiz,
 		gateway,
+	)
+
+	notebookLogic := NewNotebookLogic(
+		notebookBiz,
+		sourceBiz,
+		chatBiz,
+		sourceLogic,
 	)
 
 	chatLogic := chatlogic.MustNewLogic(

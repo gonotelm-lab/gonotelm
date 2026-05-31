@@ -34,6 +34,8 @@ type ObjectGetter interface {
 type ObjectDeleter interface {
 	// 删除对象
 	DeleteObject(ctx context.Context, req *DeleteObjectRequest) error
+	// 批量删除对象
+	BatchDeleteObject(ctx context.Context, req *BatchDeleteObjectRequest) error
 }
 
 type ObjectUploader interface {
@@ -103,6 +105,10 @@ type GetObjectResponse struct {
 
 type DeleteObjectRequest struct {
 	Key string
+}
+
+type BatchDeleteObjectRequest struct {
+	Keys []string
 }
 
 type UploadObjectRequest struct {

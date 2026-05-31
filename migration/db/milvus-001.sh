@@ -47,7 +47,7 @@ export collectionSchema='{
             "fieldName": "content",
             "dataType": "VarChar",
             "elementTypeParams": {
-                "max_length": 2048,
+                "max_length": 65535,
                 "enable_analyzer": true
             }
         },

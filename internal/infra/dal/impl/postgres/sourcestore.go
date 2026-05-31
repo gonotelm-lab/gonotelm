@@ -84,8 +84,29 @@ func (s *SourceStoreImpl) ListByNotebookId(
 }
 
 func (s *SourceStoreImpl) DeleteById(ctx context.Context, id dal.Id) error {
-	if err := s.db.WithContext(ctx).Where("id = ?", id).Delete(&schema.Source{}).Error; err != nil {
-		return sql.WrapErr(err)
+	return s.BatchDelete(ctx, []dal.Id{id})
+}
+
+func (s *SourceStoreImpl) BatchDelete(ctx context.Context, ids []dal.Id) error {
+	if len(ids) == 0 {
+		return nil
+	}
+
+	_, err := batch.BatchMap(
+		ctx,
+		ids,
+		sourceIDsQueryBatchSize,
+		func(ctx context.Context, batchIDs []dal.Id) ([]struct{}, error) {
+			if err := s.db.WithContext(ctx).
+				Where("id IN ?", batchIDs).
+				Delete(&schema.Source{}).Error; err != nil {
+				return nil, sql.WrapErr(err)
+			}
+			return nil, nil
+		},
+	)
+	if err != nil {
+		return err
 	}
 
 	return nil

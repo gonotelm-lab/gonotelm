@@ -166,3 +166,12 @@ func (b *Biz) FillNotebookMeta(
 
 	return nil
 }
+
+func (b *Biz) DeleteNotebook(ctx context.Context, id uuid.UUID) error {
+	err := b.notebookStore.DeleteById(ctx, id)
+	if err != nil {
+		return errors.WithMessagef(err, "store delete notebook failed, id=%s", id)
+	}
+
+	return nil
+}

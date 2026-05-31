@@ -5,6 +5,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal/schema"
+	"github.com/gonotelm-lab/gonotelm/pkg/batch"
 	xerror "github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/sql"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
@@ -15,6 +16,8 @@ import (
 type ChatMessageStoreImpl struct {
 	db *gorm.DB
 }
+
+var chatIDsDeleteBatchSize = 1000
 
 var _ dal.ChatMessageStore = &ChatMessageStoreImpl{}
 
@@ -112,10 +115,29 @@ func (s *ChatMessageStoreImpl) ListByChatIdBeforeSeqNo(
 }
 
 func (s *ChatMessageStoreImpl) DeleteByChatId(ctx context.Context, chatId dal.Id) error {
-	if err := s.db.WithContext(ctx).
-		Where("chat_id = ?", chatId).
-		Delete(&schema.ChatMessage{}).Error; err != nil {
-		return sql.WrapErr(err)
+	return s.BatchDeleteByChatIds(ctx, []dal.Id{chatId})
+}
+
+func (s *ChatMessageStoreImpl) BatchDeleteByChatIds(ctx context.Context, chatIds []dal.Id) error {
+	if len(chatIds) == 0 {
+		return nil
+	}
+
+	_, err := batch.BatchMap(
+		ctx,
+		chatIds,
+		chatIDsDeleteBatchSize,
+		func(ctx context.Context, batchChatIDs []dal.Id) ([]struct{}, error) {
+			if err := s.db.WithContext(ctx).
+				Where("chat_id IN ?", batchChatIDs).
+				Delete(&schema.ChatMessage{}).Error; err != nil {
+				return nil, sql.WrapErr(err)
+			}
+			return nil, nil
+		},
+	)
+	if err != nil {
+		return err
 	}
 
 	return nil

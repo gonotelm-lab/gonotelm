@@ -31,6 +31,7 @@ type SourceStore interface {
 	CountByNotebookId(ctx context.Context, notebookId Id) (int64, error)
 	ListByNotebookId(ctx context.Context, notebookId Id, limit, offset int) ([]*schema.Source, error)
 	DeleteById(ctx context.Context, id Id) error
+	BatchDelete(ctx context.Context, ids []Id) error
 	DeleteByNotebookId(ctx context.Context, notebookId Id) error
 	UpdateStatus(ctx context.Context, params *schema.SourceUpdateStatusParams) error
 	Update(ctx context.Context, params *schema.SourceUpdateParams) error
@@ -45,6 +46,7 @@ type ChatStore interface {
 	Create(ctx context.Context, chat *schema.Chat) error
 	GetById(ctx context.Context, id Id) (*schema.Chat, error)
 	GetByNotebookIdAndOwnerId(ctx context.Context, notebookId Id, ownerId string) (*schema.Chat, error)
+	ListByNotebookId(ctx context.Context, notebookId Id) ([]*schema.Chat, error)
 	ListByOwnerId(ctx context.Context, ownerId string, limit, offset int) ([]*schema.Chat, error)
 	DeleteById(ctx context.Context, id Id) error
 	DeleteByNotebookId(ctx context.Context, notebookId Id) error
@@ -59,6 +61,7 @@ type ChatMessageStore interface {
 	// 按照seqno从大到小排序, 查询seq_no < beforeSeqNo的消息
 	ListByChatIdBeforeSeqNo(ctx context.Context, chatId Id, beforeSeqNo int64, limit int) ([]*schema.ChatMessage, error)
 	DeleteByChatId(ctx context.Context, chatId Id) error
+	BatchDeleteByChatIds(ctx context.Context, chatIds []Id) error
 }
 
 type DAL struct {

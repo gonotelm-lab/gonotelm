@@ -10,6 +10,10 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 
+func formatParsedContentStoreKey(sourceId, notebookId uuid.UUID) string {
+	return "parsed_file/" + notebookId.String() + "/" + sourceId.String()
+}
+
 func previewResponseContentType(mimeType string) string {
 	switch mimeType {
 	case model.MimeTypeText:

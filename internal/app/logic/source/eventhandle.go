@@ -17,7 +17,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infra/mq"
 	mqimpl "github.com/gonotelm-lab/gonotelm/internal/infra/mq/impl"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/mq/impl/kafka"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
 	"github.com/gonotelm-lab/gonotelm/pkg/batch"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
@@ -63,7 +62,7 @@ func mustNewMsgQueueConsumer(topic, groupId string) mq.Consumer {
 }
 
 // logic event handler
-func (l *SourceLogic) notifySourceEventMessage(
+func (l *Logic) notifySourceEventMessage(
 	ctx context.Context,
 	source *model.Source,
 	isRetry bool,
@@ -105,7 +104,7 @@ func (l *SourceLogic) notifySourceEventMessage(
 }
 
 // 消息队列消费 消费上传完成的任务 指定来源索引构建
-func (l *SourceLogic) handleSourceEventMessage(
+func (l *Logic) handleSourceEventMessage(
 	ctx context.Context,
 	msg mq.Message,
 ) error {
@@ -138,7 +137,11 @@ func (l *SourceLogic) handleSourceEventMessage(
 			)
 
 			// 本次处理失败
-			if uerr := l.sourceBiz.UpdateStatus(ctx, sourceEvent.Id, model.SourceStatusFailed); uerr != nil {
+			if uerr := l.sourceBiz.UpdateStatus(
+				ctx,
+				sourceEvent.Id,
+				model.SourceStatusFailed,
+			); uerr != nil {
 				slog.ErrorContext(ctx, "update source status failed after recover from a panicking",
 					slog.String("source_id", sourceEvent.Id.String()),
 					slog.Any("err", uerr),
@@ -165,9 +168,14 @@ func (l *SourceLogic) handleSourceEventMessage(
 			break
 		}
 	}
+
 	if isRetry {
 		// clear original
-		if err := l.sourceBiz.ClearSourceIndices(ctx, sourceEvent.NotebookId, sourceEvent.Id); err != nil {
+		if err := l.sourceBiz.ClearSourceIndices(
+			ctx,
+			sourceEvent.NotebookId,
+			sourceEvent.Id,
+		); err != nil {
 			slog.ErrorContext(ctx, "clear source indices failed",
 				slog.String("source_id", sourceEvent.Id.String()),
 				slog.Any("err", err),
@@ -175,7 +183,7 @@ func (l *SourceLogic) handleSourceEventMessage(
 		}
 
 		// delete parsed content if necessary
-		if err := l.deleteSourceParsedContent(ctx, source); err != nil {
+		if err := l.sourceBiz.DeleteParsedContent(ctx, source); err != nil {
 			slog.ErrorContext(ctx, "delete parsed content failed",
 				slog.String("source_id", sourceEvent.Id.String()),
 				slog.Any("err", err),
@@ -209,12 +217,24 @@ func (l *SourceLogic) handleSourceEventMessage(
 	var wg sync.WaitGroup
 	wg.Add(2)
 	l.wg.Go(func() {
-		l.uploadParsedContent(ctx, sourceEvent.Id, sourceEvent.NotebookId, result)
-		wg.Done()
+		defer wg.Done()
+		if err := l.sourceBiz.UploadParsedContent(ctx,
+			&bizsource.UploadParsedContentCommand{
+				SourceId:          sourceEvent.Id,
+				NotebookId:        sourceEvent.NotebookId,
+				ParsedContent:     result.ParsedContent,
+				ParsedContentType: result.ParsedContentType,
+			}); err != nil {
+			// 解析成功但是上传失败仅记录日志，不影响后续流程
+			slog.ErrorContext(ctx, "upload parsed content failed",
+				slog.String("source_id", sourceEvent.Id.String()),
+				slog.Any("err", err),
+			)
+		}
 	})
 	l.wg.Go(func() {
+		defer wg.Done()
 		l.generateSourceSummary(ctx, sourceEvent.Id, sourceEvent.NotebookId, result)
-		wg.Done()
 	})
 	wg.Wait()
 
@@ -231,47 +251,7 @@ func (l *SourceLogic) handleSourceEventMessage(
 	return nil
 }
 
-func (l *SourceLogic) uploadParsedContent(
-	ctx context.Context,
-	sourceId uuid.UUID,
-	notebookId uuid.UUID,
-	result *bizsource.PrepareSourceIndicesResult,
-) {
-	if result.ParsedContent == nil {
-		return
-	}
-
-	storeKey := formatSourceParsedContentStoreKey(sourceId, notebookId)
-	err := l.objectStorage.UploadObject(ctx, &storage.UploadObjectRequest{
-		Key:         storeKey,
-		Body:        result.ParsedContent,
-		ContentType: result.ParsedContentType,
-	})
-	// 解析成功 但是上传失败 仅打日志不影响后续流程
-	if err != nil {
-		slog.ErrorContext(ctx, "upload parsed content failed",
-			slog.String("source_id", sourceId.String()),
-			slog.Any("err", err),
-		)
-
-		return
-	}
-
-	err = l.sourceBiz.UpdateParsedContent(ctx, &bizsource.UpdateParsedContentCommand{
-		Id: sourceId,
-		Parsed: &model.ParsedSourceContent{
-			StoreKey: storeKey,
-		},
-	})
-	if err != nil {
-		slog.ErrorContext(ctx, "update source parsed content failed",
-			slog.String("source_id", sourceId.String()),
-			slog.Any("err", err),
-		)
-	}
-}
-
-func (l *SourceLogic) generateSourceSummary(
+func (l *Logic) generateSourceSummary(
 	ctx context.Context,
 	sourceId uuid.UUID,
 	notebookId uuid.UUID,
@@ -379,7 +359,7 @@ func (l *SourceLogic) generateSourceSummary(
 	}
 }
 
-func (l *SourceLogic) generateNotebookSummary(
+func (l *Logic) generateNotebookSummary(
 	ctx context.Context,
 	notebookId uuid.UUID,
 ) {

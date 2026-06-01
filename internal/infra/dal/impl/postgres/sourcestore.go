@@ -16,7 +16,7 @@ type SourceStoreImpl struct {
 	db *gorm.DB
 }
 
-var sourceIDsQueryBatchSize = 1000
+var sourceIDsQueryBatchSize = 500
 
 var _ dal.SourceStore = &SourceStoreImpl{}
 

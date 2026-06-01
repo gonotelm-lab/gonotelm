@@ -18,7 +18,6 @@ import (
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/mutex"
-	"github.com/gonotelm-lab/gonotelm/pkg/slices"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 
 	"github.com/bytedance/sonic"
@@ -43,7 +42,7 @@ type sourceEventMessage struct {
 	Status     model.SourceStatus `json:"status"`
 }
 
-type SourceLogic struct {
+type Logic struct {
 	rootCtx context.Context
 	redis   redis.UniversalClient
 
@@ -59,7 +58,7 @@ type SourceLogic struct {
 	wg sync.WaitGroup
 }
 
-func (l *SourceLogic) Close(ctx context.Context) {
+func (l *Logic) Close(ctx context.Context) {
 	if l.prepConsumer != nil {
 		if err := l.prepConsumer.Close(ctx); err != nil {
 			slog.WarnContext(ctx, "close source prep consumer failed", slog.Any("err", err))
@@ -74,15 +73,15 @@ func (l *SourceLogic) Close(ctx context.Context) {
 	l.wg.Wait()
 }
 
-func MustNewSourceLogic(
+func MustNewLogic(
 	rootCtx context.Context,
 	infras *infra.Instances,
 	objectStorage storage.Storage,
 	notebookBiz *biznotebook.Biz,
 	sourceBiz *bizsource.Biz,
 	llmGateway *gateway.Gateway,
-) *SourceLogic {
-	sl := &SourceLogic{
+) *Logic {
+	sl := &Logic{
 		rootCtx:       rootCtx,
 		objectStorage: objectStorage,
 		notebookBiz:   notebookBiz,
@@ -96,7 +95,7 @@ func MustNewSourceLogic(
 	return sl
 }
 
-func (l *SourceLogic) mustInitMsgQueue() {
+func (l *Logic) mustInitMsgQueue() {
 	// producer
 	l.prepProducer = mustNewMsgQueueProducer()
 	// consumer
@@ -111,7 +110,7 @@ type CreateSourceParams struct {
 	Url        *url.URL         // url kind
 }
 
-func (l *SourceLogic) CreateSource(
+func (l *Logic) CreateSource(
 	ctx context.Context,
 	params *CreateSourceParams,
 ) (*model.Source, error) {
@@ -168,7 +167,7 @@ func (l *SourceLogic) CreateSource(
 	return source, nil
 }
 
-func (l *SourceLogic) GetSource(
+func (l *Logic) GetSource(
 	ctx context.Context,
 	id uuid.UUID,
 ) (*model.Source, error) {
@@ -180,7 +179,7 @@ func (l *SourceLogic) GetSource(
 	return source, nil
 }
 
-func (l *SourceLogic) UpdateSourceTitle(
+func (l *Logic) UpdateSourceTitle(
 	ctx context.Context,
 	sourceId uuid.UUID,
 	title string,
@@ -228,7 +227,7 @@ type BatchGetSourceDocsParams struct {
 	DocIds   []string
 }
 
-func (l *SourceLogic) GetSourceDoc(
+func (l *Logic) GetSourceDoc(
 	ctx context.Context,
 	params *GetSourceDocParams,
 ) (*GetSourceDocResult, error) {
@@ -266,7 +265,7 @@ type BatchGetSourceDocsResult struct {
 	Docs        []*model.SourceDoc
 }
 
-func (l *SourceLogic) BatchGetSourceDocs(
+func (l *Logic) BatchGetSourceDocs(
 	ctx context.Context,
 	params *BatchGetSourceDocsParams,
 ) (*BatchGetSourceDocsResult, error) {
@@ -313,7 +312,7 @@ type UploadSourceResult struct {
 	Headers map[string]string `json:"headers"`
 }
 
-func (l *SourceLogic) UploadFileSource(
+func (l *Logic) UploadFileSource(
 	ctx context.Context,
 	params *UploadSourceParams,
 ) (*UploadSourceResult, error) {
@@ -369,7 +368,7 @@ func (l *SourceLogic) UploadFileSource(
 }
 
 // check source status and update if necessary
-func (l *SourceLogic) PollSourceStatus(
+func (l *Logic) PollSourceStatus(
 	ctx context.Context,
 	sourceId uuid.UUID,
 ) (model.SourceStatus, error) {
@@ -399,7 +398,7 @@ func (l *SourceLogic) PollSourceStatus(
 }
 
 // 失败时可以重新构建来源
-func (l *SourceLogic) RetrySourcePreparation(
+func (l *Logic) RetrySourcePreparation(
 	ctx context.Context,
 	sourceId uuid.UUID,
 ) error {
@@ -433,8 +432,8 @@ func (l *SourceLogic) RetrySourcePreparation(
 	return nil
 }
 
-func (l *SourceLogic) DeleteSource(ctx context.Context, sourceId uuid.UUID) error {
-	originSource, err := l.sourceBiz.DeleteSource(ctx, sourceId)
+func (l *Logic) DeleteSource(ctx context.Context, sourceId uuid.UUID) error {
+	_, err := l.sourceBiz.DeleteSource(ctx, sourceId)
 	if err != nil {
 		if errors.Is(err, bizsource.ErrSourceNotFound) {
 			return nil
@@ -443,36 +442,16 @@ func (l *SourceLogic) DeleteSource(ctx context.Context, sourceId uuid.UUID) erro
 		return errors.WithMessagef(err, "delete source failed, id=%s", sourceId)
 	}
 
-	if originSource == nil {
-		return nil
-	}
-
-	// delete parsed content
-	err = l.deleteSourceParsedContent(ctx, originSource)
-	if err != nil {
-		return errors.WithMessage(err, "delete source parsed content failed")
-	}
-
 	return nil
 }
 
-func (l *SourceLogic) DeleteSourcesByNotebook(
+func (l *Logic) DeleteSourcesByNotebook(
 	ctx context.Context,
 	notebookId uuid.UUID,
 ) error {
-	decodedSources, err := l.sourceBiz.FetchNotebookDecodedSources(ctx, notebookId)
-	if err != nil {
-		return errors.WithMessagef(err, "fetch notebook decoded sources failed, notebook_id=%s", notebookId)
-	}
-
-	err = l.sourceBiz.DeleteSourcesByNotebook(ctx, notebookId)
+	err := l.sourceBiz.DeleteNotebookSources(ctx, notebookId)
 	if err != nil {
 		return errors.WithMessagef(err, "delete notebook sources failed, notebook_id=%s", notebookId)
-	}
-
-	err = l.deleteSourceParsedContents(ctx, decodedSources)
-	if err != nil {
-		return errors.WithMessagef(err, "batch delete source parsed content failed, notebook_id=%s", notebookId)
 	}
 
 	return nil
@@ -483,7 +462,7 @@ type GetSourceParsedContentResult struct {
 	Url     string `json:"url,omitempty"`
 }
 
-func (l *SourceLogic) GetSourceParsedContent(
+func (l *Logic) GetSourceParsedContent(
 	ctx context.Context,
 	sourceId uuid.UUID,
 ) (*GetSourceParsedContentResult, error) {
@@ -535,7 +514,7 @@ func (l *SourceLogic) GetSourceParsedContent(
 	}, nil
 }
 
-func (l *SourceLogic) GetSourceParsedTree(
+func (l *Logic) GetSourceParsedTree(
 	ctx context.Context,
 	sourceId uuid.UUID,
 ) (*ParsedSourceDocTree, error) {
@@ -552,7 +531,7 @@ func (l *SourceLogic) GetSourceParsedTree(
 	return buildParsedSourceDocTree(tree), nil
 }
 
-func (l *SourceLogic) pollFileSourceStatus(
+func (l *Logic) pollFileSourceStatus(
 	ctx context.Context,
 	source *model.Source,
 ) (status model.SourceStatus, err error) {
@@ -605,7 +584,7 @@ func (l *SourceLogic) pollFileSourceStatus(
 	return
 }
 
-func (l *SourceLogic) updateFileSourceContent(
+func (l *Logic) updateFileSourceContent(
 	ctx context.Context,
 	source *model.Source,
 	fileContent *model.FileSourceContent,
@@ -628,51 +607,6 @@ func (l *SourceLogic) updateFileSourceContent(
 		Title:   fileContent.Filename,
 		Content: content,
 	})
-}
-
-func (l *SourceLogic) deleteSourceParsedContent(
-	ctx context.Context,
-	source *model.DecodedSource,
-) error {
-	if source == nil || source.ParsedContent == nil {
-		return nil
-	}
-
-	if source.ParsedContent.StoreKey == "" {
-		return nil
-	}
-
-	return l.deleteSourceParsedContents(ctx, []*model.DecodedSource{source})
-}
-
-func (l *SourceLogic) deleteSourceParsedContents(
-	ctx context.Context,
-	sources []*model.DecodedSource,
-) error {
-	storeKeys := make([]string, 0, len(sources))
-	for _, source := range sources {
-		if source == nil || source.ParsedContent == nil {
-			continue
-		}
-		if source.ParsedContent.StoreKey == "" {
-			continue
-		}
-		storeKeys = append(storeKeys, source.ParsedContent.StoreKey)
-	}
-
-	storeKeys = slices.Unique(storeKeys)
-	if len(storeKeys) == 0 {
-		return nil
-	}
-
-	err := l.objectStorage.BatchDeleteObject(ctx, &storage.BatchDeleteObjectRequest{
-		Keys: storeKeys,
-	})
-	if err != nil {
-		return errors.WithMessage(err, "delete source parsed content failed")
-	}
-
-	return nil
 }
 
 func checkSourceUploadable(source *model.Source) bool {

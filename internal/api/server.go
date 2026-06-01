@@ -5,6 +5,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/app/logic"
 	chatlogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/chat"
 	sourcelogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/source"
+	studiologic "github.com/gonotelm-lab/gonotelm/internal/app/logic/studio"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 	"github.com/gonotelm-lab/gonotelm/pkg/http/middleware"
@@ -14,8 +15,9 @@ type Server struct {
 	h *server.Hertz
 
 	notebookLogic *logic.NotebookLogic
-	sourceLogic   *sourcelogic.SourceLogic
+	sourceLogic   *sourcelogic.Logic
 	chatLogic     *chatlogic.Logic
+	studioLogic   *studiologic.Logic
 }
 
 func NewServer(logic *logic.Logic) *Server {
@@ -34,6 +36,7 @@ func NewServer(logic *logic.Logic) *Server {
 		notebookLogic: logic.NotebookLogic,
 		sourceLogic:   logic.SourceLogic,
 		chatLogic:     logic.ChatLogic,
+		studioLogic:   logic.StudioLogic,
 	}
 
 	s.registerRoutes()

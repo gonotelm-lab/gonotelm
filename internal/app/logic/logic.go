@@ -9,6 +9,7 @@ import (
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
 	chatlogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/chat"
 	sourcelogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/source"
+	studiologic "github.com/gonotelm-lab/gonotelm/internal/app/logic/studio"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infra"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
@@ -17,8 +18,9 @@ import (
 
 type Logic struct {
 	NotebookLogic *NotebookLogic
-	SourceLogic   *sourcelogic.SourceLogic
+	SourceLogic   *sourcelogic.Logic
 	ChatLogic     *chatlogic.Logic
+	StudioLogic   *studiologic.Logic
 }
 
 func MustNewLogic(
@@ -51,7 +53,7 @@ func MustNewLogic(
 		panic(err)
 	}
 
-	sourceLogic := sourcelogic.MustNewSourceLogic(
+	sourceLogic := sourcelogic.MustNewLogic(
 		ctx,
 		infrastructures,
 		objectStorage,
@@ -64,7 +66,6 @@ func MustNewLogic(
 		notebookBiz,
 		sourceBiz,
 		chatBiz,
-		sourceLogic,
 	)
 
 	chatLogic := chatlogic.MustNewLogic(
@@ -75,10 +76,17 @@ func MustNewLogic(
 		chatEventManager,
 	)
 
+	studioLogic := studiologic.NewLogic(
+		objectStorage,
+		sourceBiz,
+		notebookBiz,
+	)
+
 	return &Logic{
 		NotebookLogic: notebookLogic,
 		SourceLogic:   sourceLogic,
 		ChatLogic:     chatLogic,
+		StudioLogic:   studioLogic,
 	}
 }
 

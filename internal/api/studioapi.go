@@ -9,7 +9,7 @@ import (
 
 func (s *Server) registerStudioRoutes(g *route.RouterGroup) {
 	g.GET("/studio/task/:task_id/status", s.GetStudioTaskStatus)
-	g.POST("/studio/mindmap/task/create", s.CreateStudioMindmap)
+	g.POST("/studio/task/create/mindmap", s.CreateStudioMindmapTask)
 }
 
 type StudioCreateTaskRespnose struct {
@@ -20,5 +20,5 @@ type StudioCreateTaskRespnose struct {
 func (s *Server) GetStudioTaskStatus(ctx context.Context, c *app.RequestContext) {
 }
 
-func (s *Server) CreateStudioMindmap(ctx context.Context, c *app.RequestContext) {
+func (s *Server) CreateStudioMindmapTask(ctx context.Context, c *app.RequestContext) {
 }

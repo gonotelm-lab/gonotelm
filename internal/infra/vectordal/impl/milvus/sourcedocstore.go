@@ -33,11 +33,11 @@ const (
 	partitionPrefix = "_p"
 
 	// Milvus filter template parameter keys, not collection field names.
-	notebookIDTemplateKey = "notebook_id"
-	sourceIDsTemplateKey  = "source_ids"
-	sourceIDTemplateKey   = "source_id"
-	idTemplateKey         = "doc_id"
-	idListTemplateKey     = "doc_ids"
+	notebookIDTplKey = "notebook_id"
+	sourceIDsTplKey  = "source_ids"
+	sourceIDTplKey   = "source_id"
+	docIDTplKey      = "doc_id"
+	docIDsTplKey     = "doc_ids"
 )
 
 var reservedSourceDocFields = slices.MapSet(schema.OutputFields)
@@ -99,39 +99,39 @@ func (s *SourceDocStoreImpl) BatchInsert(
 		return nil
 	}
 
-	sourceMappings := make(map[string][]*schema.SourceDoc, len(docs))
+	docsByNotebookID := make(map[string][]*schema.SourceDoc, len(docs))
 	for _, doc := range docs {
 		notebookID := strings.TrimSpace(doc.NotebookId)
 		if notebookID == "" {
 			return errors.ErrParams.Msg("notebook id is empty in source doc")
 		}
-		sourceMappings[notebookID] = append(sourceMappings[notebookID], doc)
+		docsByNotebookID[notebookID] = append(docsByNotebookID[notebookID], doc)
 	}
 
-	// 每个notebookId有对应的partition
-	notebookIdSet := make(map[string]struct{}, len(sourceMappings))
-	// notebookId -> partitionName
-	notebookIdPartitionMappings := make(map[string]string, len(notebookIdSet))
-	for notebookID := range sourceMappings {
+	// 每个 notebookID 有对应的 partition
+	notebookIDs := make(map[string]struct{}, len(docsByNotebookID))
+	// notebookID -> partitionName
+	partitionByNotebookID := make(map[string]string, len(notebookIDs))
+	for notebookID := range docsByNotebookID {
 		partitionName := partitionNameByNotebookID(notebookID)
-		notebookIdPartitionMappings[notebookID] = partitionName
-		notebookIdSet[notebookID] = struct{}{}
+		partitionByNotebookID[notebookID] = partitionName
+		notebookIDs[notebookID] = struct{}{}
 	}
 
 	// 每个partition分别插入
 	// partitionName -> sourceDocs
-	sourceDocsByPartition := make(map[string][]*schema.SourceDoc, len(notebookIdSet))
-	for notebookID, partitionName := range notebookIdPartitionMappings {
-		sourceDocsByPartition[partitionName] = append(sourceDocsByPartition[partitionName], sourceMappings[notebookID]...)
+	sourceDocsByPartition := make(map[string][]*schema.SourceDoc, len(notebookIDs))
+	for notebookID, partitionName := range partitionByNotebookID {
+		sourceDocsByPartition[partitionName] = append(sourceDocsByPartition[partitionName], docsByNotebookID[notebookID]...)
 	}
 
 	eg, ctx := errgroup.WithContext(ctx)
 	for partitionName, sourceDocs := range sourceDocsByPartition {
 		eg.Go(func() error {
-			var gErr error
+			var runErr error
 			defer func() {
 				if e := recover(); e != nil {
-					gErr = errors.Wrapf(errors.ErrInner, "panic in safe do: %v", e)
+					runErr = errors.Wrapf(errors.ErrInner, "panic in safe do: %v", e)
 				}
 			}()
 
@@ -140,7 +140,7 @@ func (s *SourceDocStoreImpl) BatchInsert(
 				if doc == nil {
 					continue
 				}
-				row := buildSourceDocMilvusRow(doc)
+				row := buildDocRow(doc)
 				rows = append(rows, row)
 			}
 
@@ -148,7 +148,7 @@ func (s *SourceDocStoreImpl) BatchInsert(
 			opt.WithPartition(partitionName) // 不能链式使用 因为WithPartition返回colBase 导致后续类型不匹配
 			result, err := s.cli.Upsert(ctx, opt)
 			if err != nil {
-				gErr = errors.Wrapf(err, "upsert source docs to milvus failed, partition=%s", partitionName)
+				runErr = errors.Wrapf(err, "upsert source docs to milvus failed, partition=%s", partitionName)
 			}
 			if result.UpsertCount != int64(len(sourceDocs)) {
 				// log only
@@ -160,7 +160,7 @@ func (s *SourceDocStoreImpl) BatchInsert(
 				)
 			}
 
-			return gErr
+			return runErr
 		})
 	}
 
@@ -172,7 +172,7 @@ func (s *SourceDocStoreImpl) BatchInsert(
 	return nil
 }
 
-func buildSourceDocMilvusRow(doc *schema.SourceDoc) map[string]any {
+func buildDocRow(doc *schema.SourceDoc) map[string]any {
 	row := doc.AsMap()
 	for key, value := range doc.Meta {
 		k := strings.TrimSpace(key)
@@ -267,9 +267,9 @@ func (s *SourceDocStoreImpl) Get(
 	partitionName := partitionNameByNotebookID(notebookID)
 	filterExpr := fmt.Sprintf(
 		`%s == {%s} && %s == {%s} && %s == {%s}`,
-		schema.FieldNotebookID, notebookIDTemplateKey,
-		schema.FieldSourceID, sourceIDTemplateKey,
-		schema.FieldID, idTemplateKey,
+		schema.FieldNotebookID, notebookIDTplKey,
+		schema.FieldSourceID, sourceIDTplKey,
+		schema.FieldID, docIDTplKey,
 	)
 
 	opt := milvusclient.NewQueryOption(collectionName).
@@ -277,16 +277,16 @@ func (s *SourceDocStoreImpl) Get(
 		WithLimit(1).
 		WithOutputFields(schema.OutputFields...).
 		WithFilter(filterExpr).
-		WithTemplateParam(notebookIDTemplateKey, notebookID).
-		WithTemplateParam(sourceIDTemplateKey, sourceID).
-		WithTemplateParam(idTemplateKey, docID)
+		WithTemplateParam(notebookIDTplKey, notebookID).
+		WithTemplateParam(sourceIDTplKey, sourceID).
+		WithTemplateParam(docIDTplKey, docID)
 
 	rs, err := s.cli.Query(ctx, opt)
 	if err != nil {
 		return nil, errors.WithMessage(err, "query source doc failed")
 	}
 
-	docs, err := extractSourceDocsFromResultSet(ctx, rs)
+	docs, err := docsFromResultSet(ctx, rs)
 	if err != nil {
 		return nil, errors.WithMessage(err, "decode source doc query result failed")
 	}
@@ -330,9 +330,9 @@ func (s *SourceDocStoreImpl) BatchGet(
 	partitionName := partitionNameByNotebookID(notebookID)
 	filterExpr := fmt.Sprintf(
 		`%s == {%s} && %s == {%s} && %s in {%s}`,
-		schema.FieldNotebookID, notebookIDTemplateKey,
-		schema.FieldSourceID, sourceIDTemplateKey,
-		schema.FieldID, idListTemplateKey,
+		schema.FieldNotebookID, notebookIDTplKey,
+		schema.FieldSourceID, sourceIDTplKey,
+		schema.FieldID, docIDsTplKey,
 	)
 
 	opt := milvusclient.NewQueryOption(collectionName).
@@ -340,16 +340,16 @@ func (s *SourceDocStoreImpl) BatchGet(
 		WithLimit(len(uniqueDocIDs)).
 		WithOutputFields(schema.OutputFields...).
 		WithFilter(filterExpr).
-		WithTemplateParam(notebookIDTemplateKey, notebookID).
-		WithTemplateParam(sourceIDTemplateKey, sourceID).
-		WithTemplateParam(idListTemplateKey, uniqueDocIDs)
+		WithTemplateParam(notebookIDTplKey, notebookID).
+		WithTemplateParam(sourceIDTplKey, sourceID).
+		WithTemplateParam(docIDsTplKey, uniqueDocIDs)
 
 	rs, err := s.cli.Query(ctx, opt)
 	if err != nil {
 		return nil, errors.WithMessage(err, "batch query source docs failed")
 	}
 
-	docs, err := extractSourceDocsFromResultSet(ctx, rs)
+	docs, err := docsFromResultSet(ctx, rs)
 	if err != nil {
 		return nil, errors.WithMessage(err, "decode source docs query result failed")
 	}
@@ -402,19 +402,19 @@ func (s *SourceDocStoreImpl) Query(
 	}
 	hasEmbedding := len(params.Embedding) != 0
 
-	searchLimit := resolveSearchLimit(params.Limit)
+	searchLimit := clampSearchLimit(params.Limit)
 
 	partitionName := partitionNameByNotebookID(notebookID)
-	filterExpr := buildQueryFilterExpr(len(sourceIDs) > 0)
+	filterExpr := queryFilterExpr(len(sourceIDs) > 0)
 
 	var (
 		resultSets []milvusclient.ResultSet
 		err        error
 	)
 	applyFilter := func(req *milvusclient.AnnRequest) {
-		req.WithFilter(filterExpr).WithTemplateParam(notebookIDTemplateKey, notebookID)
+		req.WithFilter(filterExpr).WithTemplateParam(notebookIDTplKey, notebookID)
 		if len(sourceIDs) > 0 {
-			req.WithTemplateParam(sourceIDsTemplateKey, sourceIDs)
+			req.WithTemplateParam(sourceIDsTplKey, sourceIDs)
 		}
 	}
 
@@ -452,9 +452,9 @@ func (s *SourceDocStoreImpl) Query(
 		).WithANNSField(schema.FieldSparseContent).
 			WithPartitions(partitionName).
 			WithOutputFields(schema.OutputFields...)
-		opt.WithFilter(filterExpr).WithTemplateParam(notebookIDTemplateKey, notebookID)
+		opt.WithFilter(filterExpr).WithTemplateParam(notebookIDTplKey, notebookID)
 		if len(sourceIDs) > 0 {
-			opt.WithTemplateParam(sourceIDsTemplateKey, sourceIDs)
+			opt.WithTemplateParam(sourceIDsTplKey, sourceIDs)
 		}
 		resultSets, err = s.cli.Search(ctx, opt)
 		if err != nil {
@@ -462,7 +462,7 @@ func (s *SourceDocStoreImpl) Query(
 		}
 	}
 
-	docs, err := extractSourceDocsFromResults(ctx, resultSets)
+	docs, err := docsFromResults(ctx, resultSets)
 	if err != nil {
 		return nil, errors.WithMessage(err, "decode milvus query result failed")
 	}
@@ -494,7 +494,7 @@ func (s *SourceDocStoreImpl) List(
 		schema.FieldNotebookID, notebookID,
 		schema.FieldSourceID, sourceID,
 	)
-	batchSize := resolveListBatchSize(params.BatchSize)
+	batchSize := clampListBatchSize(params.BatchSize)
 
 	iter, err := s.cli.QueryIterator(
 		ctx,
@@ -521,7 +521,7 @@ func (s *SourceDocStoreImpl) List(
 			return nil, errors.WithMessage(err, "iterate source docs failed")
 		}
 
-		batchDocs, err := extractSourceDocsFromResultSet(ctx, rs)
+		batchDocs, err := docsFromResultSet(ctx, rs)
 		if err != nil {
 			return nil, errors.WithMessage(err, "decode source docs list batch failed")
 		}
@@ -555,8 +555,8 @@ func (s *SourceDocStoreImpl) ListByChunkPos(
 	}
 
 	partitionName := partitionNameByNotebookID(notebookID)
-	filterExpr := buildListByChunkPosFilterExpr(notebookID, sourceID, chunkPoses)
-	batchSize := resolveListBatchSize(params.BatchSize)
+	filterExpr := chunkPosFilterExpr(notebookID, sourceID, chunkPoses)
+	batchSize := clampListBatchSize(params.BatchSize)
 
 	iter, err := s.cli.QueryIterator(
 		ctx,
@@ -583,7 +583,7 @@ func (s *SourceDocStoreImpl) ListByChunkPos(
 			return nil, errors.WithMessage(err, "iterate source docs by chunk pos failed")
 		}
 
-		batchDocs, err := extractSourceDocsFromResultSet(ctx, rs)
+		batchDocs, err := docsFromResultSet(ctx, rs)
 		if err != nil {
 			return nil, errors.WithMessage(err, "decode source docs by chunk pos batch failed")
 		}
@@ -600,24 +600,24 @@ func partitionNameByNotebookID(notebookID string) string {
 	return fmt.Sprintf("%s%04d", partitionPrefix, idx)
 }
 
-func buildQueryFilterExpr(hasSourceIDs bool) string {
-	expr := fmt.Sprintf(`%s == {%s}`, schema.FieldNotebookID, notebookIDTemplateKey)
+func queryFilterExpr(hasSourceIDs bool) string {
+	expr := fmt.Sprintf(`%s == {%s}`, schema.FieldNotebookID, notebookIDTplKey)
 	if hasSourceIDs {
-		expr += fmt.Sprintf(` && %s in {%s}`, schema.FieldSourceID, sourceIDsTemplateKey)
+		expr += fmt.Sprintf(` && %s in {%s}`, schema.FieldSourceID, sourceIDsTplKey)
 	}
 	return expr
 }
 
-func buildListByChunkPosFilterExpr(notebookID, sourceID string, chunkPoses []int32) string {
+func chunkPosFilterExpr(notebookID, sourceID string, chunkPoses []int32) string {
 	return fmt.Sprintf(
 		`%s == %q && %s == %q && %s in [%s]`,
 		schema.FieldNotebookID, notebookID,
 		schema.FieldSourceID, sourceID,
-		schema.FieldChunkPos, buildChunkPosesExpr(chunkPoses),
+		schema.FieldChunkPos, chunkPosExpr(chunkPoses),
 	)
 }
 
-func buildChunkPosesExpr(chunkPoses []int32) string {
+func chunkPosExpr(chunkPoses []int32) string {
 	var expr strings.Builder
 	for i, chunkPos := range chunkPoses {
 		if i > 0 {
@@ -628,27 +628,27 @@ func buildChunkPosesExpr(chunkPoses []int32) string {
 	return expr.String()
 }
 
-func resolveSearchLimit(limit int) int {
+func clampSearchLimit(limit int) int {
 	if limit <= 0 {
 		return defaultSearchLimit
 	}
 	return min(limit, maxSearchLimit)
 }
 
-func resolveListBatchSize(batchSize int) int {
+func clampListBatchSize(batchSize int) int {
 	if batchSize <= 0 {
 		return defaultListBatchSize
 	}
 	return min(batchSize, maxListBatchSize)
 }
 
-func extractSourceDocsFromResults(
+func docsFromResults(
 	ctx context.Context,
 	resultSets []milvusclient.ResultSet,
 ) ([]*schema.SourceDoc, error) {
 	docs := make([]*schema.SourceDoc, 0, len(resultSets))
 	for _, rs := range resultSets {
-		setDocs, err := extractSourceDocsFromResultSet(ctx, rs)
+		setDocs, err := docsFromResultSet(ctx, rs)
 		if err != nil {
 			return nil, errors.WithMessage(err, "extract source docs from result set failed")
 		}
@@ -658,7 +658,7 @@ func extractSourceDocsFromResults(
 	return docs, nil
 }
 
-type sourceDocResultColumns struct {
+type docCols struct {
 	id         column.Column
 	notebookID column.Column
 	sourceID   column.Column
@@ -669,7 +669,7 @@ type sourceDocResultColumns struct {
 	dynamic    []column.Column
 }
 
-func extractSourceDocsFromResultSet(
+func docsFromResultSet(
 	ctx context.Context,
 	rs milvusclient.ResultSet,
 ) ([]*schema.SourceDoc, error) {
@@ -680,14 +680,14 @@ func extractSourceDocsFromResultSet(
 		return nil, nil
 	}
 
-	cols, err := getSourceDocResultColumns(rs)
+	cols, err := docColsFromResult(rs)
 	if err != nil {
 		return nil, errors.WithMessage(err, "get source doc result columns failed")
 	}
 
 	docs := make([]*schema.SourceDoc, 0, rs.ResultCount)
 	for i := 0; i < rs.ResultCount; i++ {
-		doc, err := buildSourceDocFromColumns(ctx, cols, i)
+		doc, err := docFromCols(ctx, cols, i)
 		if err != nil {
 			return nil, errors.WithMessagef(err, "build source doc from columns failed, index=%d", i)
 		}
@@ -697,8 +697,8 @@ func extractSourceDocsFromResultSet(
 	return docs, nil
 }
 
-func getSourceDocResultColumns(rs milvusclient.ResultSet) (*sourceDocResultColumns, error) {
-	cols := &sourceDocResultColumns{
+func docColsFromResult(rs milvusclient.ResultSet) (*docCols, error) {
+	cols := &docCols{
 		id:         rs.GetColumn(schema.FieldID),
 		notebookID: rs.GetColumn(schema.FieldNotebookID),
 		sourceID:   rs.GetColumn(schema.FieldSourceID),
@@ -721,7 +721,7 @@ func getSourceDocResultColumns(rs milvusclient.ResultSet) (*sourceDocResultColum
 		cols.dynamic = append(cols.dynamic, c)
 	}
 
-	if missing := missingSourceDocColumns(cols); len(missing) > 0 {
+	if missing := missingDocCols(cols); len(missing) > 0 {
 		return nil, errors.Wrapf(
 			errors.ErrSerde,
 			"missing required fields in search result, fields=%v",
@@ -732,7 +732,7 @@ func getSourceDocResultColumns(rs milvusclient.ResultSet) (*sourceDocResultColum
 	return cols, nil
 }
 
-func missingSourceDocColumns(cols *sourceDocResultColumns) []string {
+func missingDocCols(cols *docCols) []string {
 	missing := make([]string, 0, 6)
 	if cols.id == nil {
 		missing = append(missing, schema.FieldID)
@@ -755,9 +755,9 @@ func missingSourceDocColumns(cols *sourceDocResultColumns) []string {
 	return missing
 }
 
-func buildSourceDocFromColumns(
+func docFromCols(
 	ctx context.Context,
-	cols *sourceDocResultColumns,
+	cols *docCols,
 	index int,
 ) (*schema.SourceDoc, error) {
 	id, err := cols.id.GetAsString(index)
@@ -790,7 +790,7 @@ func buildSourceDocFromColumns(
 		}
 		chunkPos = int32(chunkPosInt64)
 	}
-	meta, err := buildSourceDocMeta(ctx, cols, index)
+	meta, err := docMeta(ctx, cols, index)
 	if err != nil {
 		slog.WarnContext(ctx,
 			"build source doc meta failed, fallback without meta",
@@ -811,9 +811,9 @@ func buildSourceDocFromColumns(
 	}, nil
 }
 
-func buildSourceDocMeta(
+func docMeta(
 	ctx context.Context,
-	cols *sourceDocResultColumns,
+	cols *docCols,
 	index int,
 ) (map[string]any, error) {
 	meta := make(map[string]any)

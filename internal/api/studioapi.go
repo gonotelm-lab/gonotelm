@@ -29,6 +29,10 @@ type CreateStudioMindmapTaskRequest struct {
 	SourceIds  []uuid.UUID `json:"source_ids,required"`
 }
 
+type CreateStudioMindmapTaskResponse struct {
+	Mindmap string `json:"mindmap"`
+}
+
 func (s *Server) CreateStudioMindmapTask(ctx context.Context, c *app.RequestContext) {
 	var req CreateStudioMindmapTaskRequest
 	err := c.BindAndValidate(&req)
@@ -37,7 +41,7 @@ func (s *Server) CreateStudioMindmapTask(ctx context.Context, c *app.RequestCont
 		return
 	}
 
-	err = s.studioLogic.CreateMindmap(ctx, &studiologic.CreateMindmapParams{
+	mindmap, err := s.studioLogic.CreateMindmap(ctx, &studiologic.CreateMindmapParams{
 		NotebookId: req.NotebookId,
 		SourceIds:  req.SourceIds,
 	})
@@ -46,5 +50,7 @@ func (s *Server) CreateStudioMindmapTask(ctx context.Context, c *app.RequestCont
 		return
 	}
 
-	http.OkResp(c, nil)
+	http.OkResp(c, CreateStudioMindmapTaskResponse{
+		Mindmap: mindmap,
+	})
 }

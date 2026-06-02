@@ -27,9 +27,9 @@ func NewServer(logic *logic.Logic) *Server {
 		server.WithExitWaitTime(conf.Global().Api.ExitWaitTimeout),
 		server.WithDisablePrintRoute(true),
 	)
-	hz.Use(middleware.LogRequest(
-		middleware.WithLogAllError(conf.Global().IsDev()),
-	))
+	hz.Use(
+		middleware.LogRequest(middleware.WithLogAllError(conf.Global().IsDev())),
+	)
 
 	s := &Server{
 		h:             hz,

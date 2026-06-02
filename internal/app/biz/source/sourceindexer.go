@@ -83,7 +83,7 @@ func (b *SourceIndexer) Prepare(
 	}
 
 	// 超过token限制的直接报错不处理
-	estimatedToken := token.EstimateToken(pkgstring.FromBytes(result.ParsedContent))
+	estimatedToken := token.Estimate(pkgstring.FromBytes(result.ParsedContent))
 	if estimatedToken > constants.MaxSourceTextContentToken {
 		return nil, errors.Wrapf(ErrSourceContentTooLong,
 			"source content too long, token count=%d, source_id=%s",

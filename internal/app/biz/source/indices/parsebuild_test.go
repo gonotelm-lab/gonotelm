@@ -124,11 +124,11 @@ func (m *parseBuildMockLLM) Inputs() []string {
 }
 
 func newParseBuildMockGateway(
-	providerType chat.Type,
+	providerType chat.Provider,
 	provider einomodel.ToolCallingChatModel,
 ) *gateway.Gateway {
 	gw := &gateway.Gateway{}
-	providers := map[chat.Type]einomodel.ToolCallingChatModel{
+	providers := map[chat.Provider]einomodel.ToolCallingChatModel{
 		providerType: provider,
 	}
 

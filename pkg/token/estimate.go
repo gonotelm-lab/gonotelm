@@ -3,7 +3,7 @@ package token
 import "unicode"
 
 // Simple token estimation
-func EstimateToken(text string) int {
+func Estimate(text string) int {
 	if text == "" {
 		return 0
 	}

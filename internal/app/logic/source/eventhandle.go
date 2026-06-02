@@ -296,7 +296,7 @@ func (l *Logic) generateSourceSummary(
 		batchSize,
 		maxConcurrency,
 		func(ctx context.Context, batch []string) ([]string, error) {
-			summaryPrompt, err := prompts.SummarizePromptMessage(
+			summaryPrompt, err := prompts.SummarizeMessage(
 				ctx, batch[0], userLang,
 			)
 			if err != nil {
@@ -330,7 +330,7 @@ func (l *Logic) generateSourceSummary(
 
 	// 给每个chunk的summary组合后再输出一句summary 作为整个source的summary
 	summarizingTexts := strings.Join(chunkSummaries, "\n")
-	summaryPrompt, err := prompts.SummarizePromptMessage(
+	summaryPrompt, err := prompts.SummarizeMessage(
 		ctx, summarizingTexts, userLang,
 	)
 	if err != nil {
@@ -404,7 +404,7 @@ func (l *Logic) generateNotebookSummary(
 
 	userLang := "" // TODO
 	// generate prompt message
-	msg, err := prompts.NotebookSummaryPromptMessage(
+	msg, err := prompts.NotebookSummaryMessage(
 		ctx, abstracts, userLang,
 	)
 	if err != nil {

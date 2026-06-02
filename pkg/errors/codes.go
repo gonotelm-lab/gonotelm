@@ -6,6 +6,7 @@ const (
 	CodeInvalidParams = 1000
 	CodeNoRecord      = 1001
 	CodeEmbedErr      = 1002
+	CodeLLMErr        = 1003
 )
 
 const (
@@ -28,6 +29,7 @@ const (
 	MsgInvalidParams = "invalid parameters"
 	MsgNoRecord      = "no record found"
 	MsgEmbedErr      = "embedding error"
+	MsgLLMErr        = "llm error"
 	MsgInnerErr      = "inner error"
 )
 
@@ -38,6 +40,7 @@ var (
 	ErrParams   = NewInnerError(statusOk, CodeInvalidParams, MsgInvalidParams)
 	ErrNoRecord = NewInnerError(statusOk, CodeNoRecord, MsgNoRecord)
 	ErrEmbed    = NewInnerError(statusOk, CodeEmbedErr, MsgEmbedErr)
+	ErrLLM      = NewInnerError(statusOk, CodeLLMErr, MsgLLMErr)
 )
 
 const (

@@ -12,7 +12,7 @@ var benchmarkMergeChunksSink []string
 func BenchmarkMergeChunksByTotalTextLength(b *testing.B) {
 	const chunkLen = 8000
 	unit := benchmarkChunk(chunkLen)
-	approx := token.EstimateToken(unit) * 8
+	approx := token.Estimate(unit) * 8
 	if approx <= 0 {
 		approx = 1
 	}

@@ -15,6 +15,10 @@ maxRound = 10
 modelProvider = "${ENV_GONOTELM_LOGIC_SOURCE_PROVIDER:-qwen}"
 model = "${ENV_GONOTELM_LOGIC_SOURCE_MODEL:-qwen3.5-27b}"
 
+[logic.studio.mindmap]
+modelProvider = "${ENV_GONOTELM_LOGIC_STUDIO_MINDMAP_PROVIDER:-deepseek}"
+model = "${ENV_GONOTELM_LOGIC_STUDIO_MINDMAP_MODEL:-deepseek-v4-flash}"
+
 [database]
 type = "postgres"
 host = "${ENV_GONOTELM_DB_HOST:-127.0.0.1}"

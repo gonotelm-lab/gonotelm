@@ -80,6 +80,7 @@ func MustNewLogic(
 		objectStorage,
 		sourceBiz,
 		notebookBiz,
+		gateway,
 	)
 
 	return &Logic{

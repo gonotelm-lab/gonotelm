@@ -23,7 +23,7 @@ func (v NotebookSummaryTemplateVars) PromptVars() map[string]any {
 	}
 
 	return map[string]any{
-		"Sources":    normalizeNotebookSummarySources(v.Sources),
+		"Sources":    normalizeStrings(v.Sources),
 		"MaxNameLen": v.MaxNameLen,
 		"MaxDescLen": v.MaxDescLen,
 	}
@@ -35,7 +35,7 @@ func NewNotebookSummaryTemplate(lang string) *NotebookSummaryTemplate {
 	return newTemplate[NotebookSummaryTemplateVars](templateNameNotebookSummary, lang)
 }
 
-func NotebookSummaryPromptMessage(
+func NotebookSummaryMessage(
 	ctx context.Context,
 	sources []string,
 	lang string,
@@ -49,8 +49,8 @@ func NotebookSummaryPromptMessage(
 	return msg, nil
 }
 
-func NotebookSummaryPrompt(sources []string, lang string) (string, error) {
-	msg, err := NotebookSummaryPromptMessage(context.Background(), sources, lang)
+func NotebookSummary(sources []string, lang string) (string, error) {
+	msg, err := NotebookSummaryMessage(context.Background(), sources, lang)
 	if err != nil {
 		return "", err
 	}
@@ -58,7 +58,7 @@ func NotebookSummaryPrompt(sources []string, lang string) (string, error) {
 	return msg.Content, nil
 }
 
-func normalizeNotebookSummarySources(sources []string) []string {
+func normalizeStrings(sources []string) []string {
 	normalized := make([]string, 0, len(sources))
 	for _, source := range sources {
 		text := strings.TrimSpace(source)

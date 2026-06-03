@@ -298,10 +298,11 @@ func (s *Server) GetSourceDoc(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	result, err := s.sourceLogic.GetSourceDoc(ctx, &logic.GetSourceDocParams{
-		SourceId: req.Id,
-		DocId:    req.DocId,
-	})
+	result, err := s.sourceLogic.GetSourceDoc(ctx,
+		&logic.GetSourceDocParams{
+			SourceId: req.Id,
+			DocId:    req.DocId,
+		})
 	if err != nil {
 		http.ErrResp(c, err)
 		return

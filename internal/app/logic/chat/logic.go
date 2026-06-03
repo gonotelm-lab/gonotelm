@@ -98,7 +98,8 @@ func (l *Logic) CreateUserMessage(
 	userId := pkgcontext.GetUserId(ctx)
 
 	if targetChat.OwnerId != userId {
-		return nil, errors.ErrParams.Msgf("chat not belong to user, chat_id=%s, user_id=%s", params.ChatId, userId)
+		return nil, errors.ErrParams.Msgf("chat not belong to user, chat_id=%s, user_id=%s",
+			params.ChatId, userId)
 	}
 
 	// check notebook

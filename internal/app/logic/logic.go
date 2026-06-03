@@ -76,7 +76,7 @@ func MustNewLogic(
 		chatEventManager,
 	)
 
-	studioLogic := studiologic.NewLogic(
+	studioLogic := studiologic.MustNewLogic(
 		objectStorage,
 		sourceBiz,
 		notebookBiz,

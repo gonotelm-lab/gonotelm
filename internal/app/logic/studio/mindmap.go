@@ -25,6 +25,19 @@ const (
 	mindmapAbstractMode = "abstract"
 )
 
+type GenerateMindmapTaskParams struct {
+	NotebookId uuid.UUID
+	SourceIds  []uuid.UUID
+}
+
+func (l *Logic) GenerateMindmapTask(
+	ctx context.Context,
+	params *GenerateMindmapTaskParams,
+) (uuid.UUID, error) {
+	// TODO
+	return uuid.NewV4(), nil
+}
+
 type CreateMindmapParams struct {
 	NotebookId uuid.UUID
 	SourceIds  []uuid.UUID

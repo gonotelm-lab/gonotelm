@@ -32,7 +32,7 @@ type Logic struct {
 	splitter   document.Transformer
 }
 
-func NewLogic(
+func MustNewLogic(
 	objectStorage storage.Storage,
 	sourceBiz *bizsource.Biz,
 	notebookBiz *biznotebook.Biz,

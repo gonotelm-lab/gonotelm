@@ -18,18 +18,18 @@ func TestArtifactTaskStoreCreate(t *testing.T) {
 	Convey("ArtifactTaskStore Create", t, func() {
 		store := testArtifactTaskStore
 		ctx := t.Context()
-		notebookID := uuid.NewV7().String()
+		notebookID := uuid.NewV7()
 
-		task := newArtifactTaskFixture(notebookID, "queued", 1000)
+		task := testTask(notebookID, "queued", 1000)
 		err := store.Create(ctx, task)
 		So(err, ShouldBeNil)
-		registerArtifactTaskCleanup(t, task.Id)
+		testCleanupTasks(t, task.Id)
 
 		var got schema.ArtifactTask
 		err = testDB.WithContext(ctx).Where("id = ?", task.Id).Take(&got).Error
 		So(err, ShouldBeNil)
-		So(normalizeUUID(got.Id), ShouldEqual, normalizeUUID(task.Id))
-		So(normalizeUUID(got.NotebookId), ShouldEqual, normalizeUUID(task.NotebookId))
+		So(got.Id, ShouldEqual, task.Id)
+		So(got.NotebookId, ShouldEqual, task.NotebookId)
 		So(got.Status, ShouldEqual, task.Status)
 		So(string(got.Payload), ShouldEqual, string(task.Payload))
 	})
@@ -39,17 +39,17 @@ func TestArtifactTaskStoreGetById(t *testing.T) {
 	Convey("ArtifactTaskStore GetById", t, func() {
 		store := testArtifactTaskStore
 		ctx := t.Context()
-		notebookID := uuid.NewV7().String()
+		notebookID := uuid.NewV7()
 
-		task := newArtifactTaskFixture(notebookID, "queued", 1000)
-		mustCreateArtifactTask(t, task)
-		registerArtifactTaskCleanup(t, task.Id)
+		task := testTask(notebookID, "queued", 1000)
+		testCreateTask(t, task)
+		testCleanupTasks(t, task.Id)
 
-		got, err := store.GetById(ctx, dal.Id(uuid.MustParseString(task.Id)))
+		got, err := store.GetById(ctx, task.Id)
 		So(err, ShouldBeNil)
 		So(got, ShouldNotBeNil)
-		So(normalizeUUID(task.Id), ShouldEqual, normalizeUUID(got.Id))
-		So(normalizeUUID(task.NotebookId), ShouldEqual, normalizeUUID(got.NotebookId))
+		So(task.Id, ShouldEqual, got.Id)
+		So(task.NotebookId, ShouldEqual, got.NotebookId)
 		So(got.Kind, ShouldEqual, task.Kind)
 		So(got.Status, ShouldEqual, task.Status)
 		So(got.UserId, ShouldEqual, task.UserId)
@@ -61,40 +61,42 @@ func TestArtifactTaskStorePageListByNotebookId(t *testing.T) {
 	Convey("ArtifactTaskStore PageListByNotebookId", t, func() {
 		store := testArtifactTaskStore
 		ctx := t.Context()
-		notebookID := uuid.NewV7().String()
-		otherNotebookID := uuid.NewV7().String()
+		notebookID := uuid.NewV7()
+		otherNotebookID := uuid.NewV7()
 
-		task1 := newArtifactTaskFixture(notebookID, "queued", 1000)
-		task2 := newArtifactTaskFixture(notebookID, "queued", 2000)
-		taskOtherNotebook := newArtifactTaskFixture(otherNotebookID, "queued", 1500)
-		mustCreateArtifactTask(t, task1)
-		mustCreateArtifactTask(t, task2)
-		mustCreateArtifactTask(t, taskOtherNotebook)
-		registerArtifactTaskCleanup(t, task1.Id, task2.Id, taskOtherNotebook.Id)
+		task1 := testTask(notebookID, "queued", 1000)
+		task2 := testTask(notebookID, "queued", 2000)
+		taskOtherNotebook := testTask(otherNotebookID, "queued", 1500)
+		testCreateTask(t, task1)
+		testCreateTask(t, task2)
+		testCreateTask(t, taskOtherNotebook)
+		testCleanupTasks(t, task1.Id, task2.Id, taskOtherNotebook.Id)
 
 		rows, err := store.PageListByNotebookId(
 			ctx,
-			dal.Id(uuid.MustParseString(notebookID)),
+			dal.Id(notebookID),
 			dal.Id(uuid.EmptyUUID()),
 			10,
 		)
 		So(err, ShouldBeNil)
 		So(len(rows), ShouldEqual, 2)
 
-		expectedIDs := []string{normalizeUUID(task1.Id), normalizeUUID(task2.Id)}
-		sort.Strings(expectedIDs)
-		So(normalizeUUID(rows[0].Id), ShouldEqual, expectedIDs[0])
-		So(normalizeUUID(rows[1].Id), ShouldEqual, expectedIDs[1])
+		expectedIDs := []uuid.UUID{task1.Id, task2.Id}
+		sort.Slice(expectedIDs, func(i, j int) bool {
+			return expectedIDs[i].String() < expectedIDs[j].String()
+		})
+		So(rows[0].Id, ShouldEqual, expectedIDs[0])
+		So(rows[1].Id, ShouldEqual, expectedIDs[1])
 
 		nextRows, err := store.PageListByNotebookId(
 			ctx,
-			dal.Id(uuid.MustParseString(notebookID)),
-			dal.Id(uuid.MustParseString(expectedIDs[0])),
+			dal.Id(notebookID),
+			dal.Id(expectedIDs[0]),
 			10,
 		)
 		So(err, ShouldBeNil)
 		So(len(nextRows), ShouldEqual, 1)
-		So(normalizeUUID(nextRows[0].Id), ShouldEqual, expectedIDs[1])
+		So(nextRows[0].Id, ShouldEqual, expectedIDs[1])
 	})
 }
 
@@ -102,21 +104,23 @@ func TestArtifactTaskStoreClaimTask(t *testing.T) {
 	Convey("ArtifactTaskStore ClaimTask", t, func() {
 		store := testArtifactTaskStore
 		ctx := t.Context()
-		notebookID := uuid.NewV7().String()
+		notebookID := uuid.NewV7()
 
-		firstPending := newArtifactTaskFixture(notebookID, "queued", 1000)
-		secondPending := newArtifactTaskFixture(notebookID, "queued", 2000)
-		mustCreateArtifactTask(t, firstPending)
-		mustCreateArtifactTask(t, secondPending)
-		registerArtifactTaskCleanup(t, firstPending.Id, secondPending.Id)
+		firstPending := testTask(notebookID, "queued", 1000)
+		secondPending := testTask(notebookID, "queued", 2000)
+		testCreateTask(t, firstPending)
+		testCreateTask(t, secondPending)
+		testCleanupTasks(t, firstPending.Id, secondPending.Id)
 
-		claimed, ok, err := store.ClaimTask(
+		claimed, ok, err := store.Claim(
 			ctx,
 			"queued",
+			0,
 			&schema.ArtifactTaskClaimParams{
 				NewStatus: "running",
 				UpdatedAt: 3000,
 				RunId:     "runner-1",
+				Mode:      0,
 			},
 		)
 		So(err, ShouldBeNil)
@@ -126,31 +130,49 @@ func TestArtifactTaskStoreClaimTask(t *testing.T) {
 		expectedClaimed := firstPending
 		if secondPending.CreatedAt < firstPending.CreatedAt ||
 			(secondPending.CreatedAt == firstPending.CreatedAt &&
-				normalizeUUID(secondPending.Id) < normalizeUUID(firstPending.Id)) {
+				secondPending.Id.String() < firstPending.Id.String()) {
 			expectedClaimed = secondPending
 		}
-		So(normalizeUUID(claimed.Id), ShouldEqual, normalizeUUID(expectedClaimed.Id))
+		So(claimed.Id, ShouldEqual, expectedClaimed.Id)
 
 		claimedAfterUpdate, err := store.GetById(ctx,
-			dal.Id(uuid.MustParseString(expectedClaimed.Id)))
+			dal.Id(expectedClaimed.Id))
 		So(err, ShouldBeNil)
 		So(claimedAfterUpdate.Status, ShouldEqual, "running")
 		So(claimedAfterUpdate.RunId, ShouldEqual, "runner-1")
 		So(claimedAfterUpdate.LockNo, ShouldEqual, expectedClaimed.LockNo+1)
 		So(claimedAfterUpdate.UpdatedAt, ShouldEqual, int64(3000))
 
-		noClaimed, noTaskOK, noTaskErr := store.ClaimTask(
+		noClaimed, noTaskOK, noTaskErr := store.Claim(
 			ctx,
 			"missing",
+			0,
 			&schema.ArtifactTaskClaimParams{
 				NewStatus: "running",
 				UpdatedAt: 4000,
 				RunId:     "runner-2",
+				Mode:      0,
 			},
 		)
 		So(noClaimed, ShouldBeNil)
 		So(noTaskOK, ShouldBeFalse)
 		So(noTaskErr, ShouldBeNil)
+
+		// expired_at must be greater than lastExpiredAt.
+		expClaim, expOK, expErr := store.Claim(
+			ctx,
+			"queued",
+			secondPending.ExpiredAt,
+			&schema.ArtifactTaskClaimParams{
+				NewStatus: "running",
+				UpdatedAt: 5000,
+				RunId:     "runner-3",
+				Mode:      0,
+			},
+		)
+		So(expClaim, ShouldBeNil)
+		So(expOK, ShouldBeFalse)
+		So(expErr, ShouldBeNil)
 	})
 }
 
@@ -158,11 +180,11 @@ func TestArtifactTaskStoreClaimTaskConcurrentContention(t *testing.T) {
 	Convey("ArtifactTaskStore ClaimTask concurrent contention", t, func() {
 		store := testArtifactTaskStore
 		ctx := t.Context()
-		notebookID := uuid.NewV7().String()
+		notebookID := uuid.NewV7()
 
-		pendingTask := newArtifactTaskFixture(notebookID, "queued", 1000)
-		mustCreateArtifactTask(t, pendingTask)
-		registerArtifactTaskCleanup(t, pendingTask.Id)
+		pendingTask := testTask(notebookID, "queued", 1000)
+		testCreateTask(t, pendingTask)
+		testCleanupTasks(t, pendingTask.Id)
 
 		callbackName := "test:artifact_task_claim_block_update_" + uuid.NewV7().String()
 		enteredCh := make(chan struct{}, 2)
@@ -194,13 +216,229 @@ func TestArtifactTaskStoreClaimTaskConcurrentContention(t *testing.T) {
 		}
 		resultCh := make(chan claimResult, 2)
 		claim := func(runID string) {
-			task, ok, err := store.ClaimTask(
+			task, ok, err := store.Claim(
 				ctx,
 				"queued",
+				0,
 				&schema.ArtifactTaskClaimParams{
 					NewStatus: "running",
 					UpdatedAt: 3000,
 					RunId:     runID,
+					Mode:      0,
+				},
+			)
+			resultCh <- claimResult{task: task, ok: ok, err: err, runId: runID}
+		}
+
+		go claim("runner-a")
+		waitEntered := func() {
+			select {
+			case <-enteredCh:
+			case <-time.After(3 * time.Second):
+				t.Fatalf("wait entered update callback timeout")
+			}
+		}
+		waitResult := func() claimResult {
+			select {
+			case item := <-resultCh:
+				return item
+			case <-time.After(3 * time.Second):
+				t.Fatalf("wait claim result timeout")
+				return claimResult{}
+			}
+		}
+
+		waitEntered()
+		go claim("runner-b")
+
+		// skip-locked mode: when first claimant holds row lock in transaction,
+		// second claimant should skip the locked row and return quickly.
+		firstResult := waitResult()
+		So(firstResult.runId, ShouldEqual, "runner-b")
+		So(firstResult.err, ShouldBeNil)
+		So(firstResult.ok, ShouldBeFalse)
+		So(firstResult.task, ShouldBeNil)
+
+		releaseUpdate()
+		secondResult := waitResult()
+		So(secondResult.runId, ShouldEqual, "runner-a")
+		So(secondResult.err, ShouldBeNil)
+		So(secondResult.ok, ShouldBeTrue)
+		So(secondResult.task, ShouldNotBeNil)
+		So(secondResult.task.Id, ShouldEqual, pendingTask.Id)
+
+		got, err := store.GetById(ctx, dal.Id(pendingTask.Id))
+		So(err, ShouldBeNil)
+		So(got.Status, ShouldEqual, "running")
+		So(got.LockNo, ShouldEqual, int32(1))
+		So(got.RunId, ShouldEqual, "runner-a")
+	})
+}
+
+func TestArtifactTaskStoreClaimTaskConcurrentTwoRowsSkipLock(t *testing.T) {
+	Convey("ArtifactTaskStore ClaimTask concurrent claim different rows skip locked", t, func() {
+		store := testArtifactTaskStore
+		ctx := t.Context()
+		notebookID := uuid.NewV7()
+
+		firstPending := testTask(notebookID, "queued", 1000)
+		secondPending := testTask(notebookID, "queued", 2000)
+		testCreateTask(t, firstPending)
+		testCreateTask(t, secondPending)
+		testCleanupTasks(t, firstPending.Id, secondPending.Id)
+
+		callbackName := "test:artifact_task_claim_block_update_two_rows_skip_locked_" + uuid.NewV7().String()
+		enteredCh := make(chan struct{}, 2)
+		releaseCh := make(chan struct{})
+		var releaseOnce sync.Once
+		releaseUpdate := func() {
+			releaseOnce.Do(func() {
+				close(releaseCh)
+			})
+		}
+		err := testDB.Callback().Update().Before("gorm:update").Register(callbackName, func(tx *gorm.DB) {
+			if tx.Statement.Table != (schema.ArtifactTask{}).TableName() {
+				return
+			}
+			enteredCh <- struct{}{}
+			<-releaseCh
+		})
+		So(err, ShouldBeNil)
+		t.Cleanup(func() {
+			releaseUpdate()
+			_ = testDB.Callback().Update().Remove(callbackName)
+		})
+
+		type claimResult struct {
+			task  *schema.ArtifactTask
+			ok    bool
+			err   error
+			runId string
+		}
+		resultCh := make(chan claimResult, 2)
+		claim := func(runID string) {
+			task, ok, err := store.Claim(
+				ctx,
+				"queued",
+				0,
+				&schema.ArtifactTaskClaimParams{
+					NewStatus: "running",
+					UpdatedAt: 3000,
+					RunId:     runID,
+					Mode:      0,
+				},
+			)
+			resultCh <- claimResult{task: task, ok: ok, err: err, runId: runID}
+		}
+
+		waitEntered := func() {
+			select {
+			case <-enteredCh:
+			case <-time.After(3 * time.Second):
+				t.Fatalf("wait entered update callback timeout")
+			}
+		}
+		waitResult := func() claimResult {
+			select {
+			case item := <-resultCh:
+				return item
+			case <-time.After(3 * time.Second):
+				t.Fatalf("wait claim result timeout")
+				return claimResult{}
+			}
+		}
+
+		go claim("runner-a")
+		waitEntered()
+		go claim("runner-b")
+		waitEntered()
+		releaseUpdate()
+
+		firstResult := waitResult()
+		secondResult := waitResult()
+		So(firstResult.err, ShouldBeNil)
+		So(secondResult.err, ShouldBeNil)
+		So(firstResult.ok, ShouldBeTrue)
+		So(secondResult.ok, ShouldBeTrue)
+		So(firstResult.task, ShouldNotBeNil)
+		So(secondResult.task, ShouldNotBeNil)
+		So(firstResult.task.Id, ShouldNotEqual, secondResult.task.Id)
+
+		claimedIDs := map[uuid.UUID]bool{
+			firstResult.task.Id:  true,
+			secondResult.task.Id: true,
+		}
+		So(claimedIDs[firstPending.Id], ShouldBeTrue)
+		So(claimedIDs[secondPending.Id], ShouldBeTrue)
+
+		gotFirst, err := store.GetById(ctx, dal.Id(firstPending.Id))
+		So(err, ShouldBeNil)
+		gotSecond, err := store.GetById(ctx, dal.Id(secondPending.Id))
+		So(err, ShouldBeNil)
+
+		So(gotFirst.Status, ShouldEqual, "running")
+		So(gotSecond.Status, ShouldEqual, "running")
+		So(gotFirst.LockNo, ShouldEqual, int32(1))
+		So(gotSecond.LockNo, ShouldEqual, int32(1))
+
+		runIDs := map[string]bool{
+			gotFirst.RunId:  true,
+			gotSecond.RunId: true,
+		}
+		So(runIDs["runner-a"], ShouldBeTrue)
+		So(runIDs["runner-b"], ShouldBeTrue)
+	})
+}
+
+func TestArtifactTaskStoreClaimTaskConcurrentVersionLock(t *testing.T) {
+	Convey("ArtifactTaskStore ClaimTask concurrent contention version lock mode", t, func() {
+		store := testArtifactTaskStore
+		ctx := t.Context()
+		notebookID := uuid.NewV7()
+
+		pendingTask := testTask(notebookID, "queued", 1000)
+		testCreateTask(t, pendingTask)
+		testCleanupTasks(t, pendingTask.Id)
+
+		callbackName := "test:artifact_task_claim_block_update_version_mode_" + uuid.NewV7().String()
+		enteredCh := make(chan struct{}, 2)
+		releaseCh := make(chan struct{})
+		var releaseOnce sync.Once
+		releaseUpdate := func() {
+			releaseOnce.Do(func() {
+				close(releaseCh)
+			})
+		}
+		err := testDB.Callback().Update().Before("gorm:update").Register(callbackName, func(tx *gorm.DB) {
+			if tx.Statement.Table != (schema.ArtifactTask{}).TableName() {
+				return
+			}
+			enteredCh <- struct{}{}
+			<-releaseCh
+		})
+		So(err, ShouldBeNil)
+		t.Cleanup(func() {
+			releaseUpdate()
+			_ = testDB.Callback().Update().Remove(callbackName)
+		})
+
+		type claimResult struct {
+			task  *schema.ArtifactTask
+			ok    bool
+			err   error
+			runId string
+		}
+		resultCh := make(chan claimResult, 2)
+		claim := func(runID string) {
+			task, ok, err := store.Claim(
+				ctx,
+				"queued",
+				0,
+				&schema.ArtifactTaskClaimParams{
+					NewStatus: "running",
+					UpdatedAt: 3000,
+					RunId:     runID,
+					Mode:      1,
 				},
 			)
 			resultCh <- claimResult{task: task, ok: ok, err: err, runId: runID}
@@ -226,6 +464,7 @@ func TestArtifactTaskStoreClaimTaskConcurrentContention(t *testing.T) {
 			}
 		}
 
+		// version-lock mode: both workers can read the same row then race on update.
 		waitEntered()
 		waitEntered()
 		releaseUpdate()
@@ -241,6 +480,7 @@ func TestArtifactTaskStoreClaimTaskConcurrentContention(t *testing.T) {
 			if item.ok {
 				successCount++
 				So(item.task, ShouldNotBeNil)
+				So(item.task.Id, ShouldEqual, pendingTask.Id)
 				winnerRunID = item.runId
 				continue
 			}
@@ -248,7 +488,7 @@ func TestArtifactTaskStoreClaimTaskConcurrentContention(t *testing.T) {
 		}
 		So(successCount, ShouldEqual, 1)
 
-		got, err := store.GetById(ctx, dal.Id(uuid.MustParseString(pendingTask.Id)))
+		got, err := store.GetById(ctx, dal.Id(pendingTask.Id))
 		So(err, ShouldBeNil)
 		So(got.Status, ShouldEqual, "running")
 		So(got.LockNo, ShouldEqual, int32(1))
@@ -260,16 +500,16 @@ func TestArtifactTaskStoreUpdateStatus(t *testing.T) {
 	Convey("ArtifactTaskStore UpdateStatus", t, func() {
 		store := testArtifactTaskStore
 		ctx := t.Context()
-		notebookID := uuid.NewV7().String()
+		notebookID := uuid.NewV7()
 
-		runningTask := newArtifactTaskFixture(notebookID, "running", 1000)
-		runningTask.RunId = "runner_" + uuid.NewV7().String()
-		mustCreateArtifactTask(t, runningTask)
-		registerArtifactTaskCleanup(t, runningTask.Id)
+		runningTask := testTask(notebookID, "running", 1000)
+		runningTask.RunId = "runner_" + uuid.NewV7().String()[:16]
+		testCreateTask(t, runningTask)
+		testCleanupTasks(t, runningTask.Id)
 
 		updated, err := store.UpdateStatus(
 			ctx,
-			dal.Id(uuid.MustParseString(runningTask.Id)),
+			dal.Id(runningTask.Id),
 			runningTask.RunId,
 			"running",
 			&schema.ArtifactTaskUpdateStatusParams{
@@ -280,7 +520,7 @@ func TestArtifactTaskStoreUpdateStatus(t *testing.T) {
 		So(err, ShouldBeNil)
 		So(updated, ShouldBeTrue)
 
-		got, err := store.GetById(ctx, dal.Id(uuid.MustParseString(runningTask.Id)))
+		got, err := store.GetById(ctx, dal.Id(runningTask.Id))
 		So(err, ShouldBeNil)
 		So(got.Status, ShouldEqual, "completed")
 		So(got.RunId, ShouldEqual, runningTask.RunId)
@@ -292,16 +532,16 @@ func TestArtifactTaskStoreUpdateStatusNoMatch(t *testing.T) {
 	Convey("ArtifactTaskStore UpdateStatus no match", t, func() {
 		store := testArtifactTaskStore
 		ctx := t.Context()
-		notebookID := uuid.NewV7().String()
+		notebookID := uuid.NewV7()
 
-		task := newArtifactTaskFixture(notebookID, "running", 1000)
-		task.RunId = "runner_" + uuid.NewV7().String()
-		mustCreateArtifactTask(t, task)
-		registerArtifactTaskCleanup(t, task.Id)
+		task := testTask(notebookID, "running", 1000)
+		task.RunId = "runner_" + uuid.NewV7().String()[:16]
+		testCreateTask(t, task)
+		testCleanupTasks(t, task.Id)
 
 		updated, err := store.UpdateStatus(
 			ctx,
-			dal.Id(uuid.MustParseString(task.Id)),
+			dal.Id(task.Id),
 			"wrong-runner",
 			"running",
 			&schema.ArtifactTaskUpdateStatusParams{
@@ -312,7 +552,7 @@ func TestArtifactTaskStoreUpdateStatusNoMatch(t *testing.T) {
 		So(err, ShouldBeNil)
 		So(updated, ShouldBeFalse)
 
-		got, err := store.GetById(ctx, dal.Id(uuid.MustParseString(task.Id)))
+		got, err := store.GetById(ctx, dal.Id(task.Id))
 		So(err, ShouldBeNil)
 		So(got.Status, ShouldEqual, "running")
 		So(got.RunId, ShouldEqual, task.RunId)
@@ -324,16 +564,16 @@ func TestArtifactTaskStoreUpdateResult(t *testing.T) {
 	Convey("ArtifactTaskStore UpdateResult", t, func() {
 		store := testArtifactTaskStore
 		ctx := t.Context()
-		notebookID := uuid.NewV7().String()
+		notebookID := uuid.NewV7()
 
-		task := newArtifactTaskFixture(notebookID, "running", 1000)
-		task.RunId = "runner_" + uuid.NewV7().String()
-		mustCreateArtifactTask(t, task)
-		registerArtifactTaskCleanup(t, task.Id)
+		task := testTask(notebookID, "running", 1000)
+		task.RunId = "runner_" + uuid.NewV7().String()[:16]
+		testCreateTask(t, task)
+		testCleanupTasks(t, task.Id)
 
 		updated, err := store.UpdateResult(
 			ctx,
-			dal.Id(uuid.MustParseString(task.Id)),
+			dal.Id(task.Id),
 			task.RunId,
 			"running",
 			&schema.ArtifactTaskUpdateResultParams{
@@ -346,7 +586,7 @@ func TestArtifactTaskStoreUpdateResult(t *testing.T) {
 		So(err, ShouldBeNil)
 		So(updated, ShouldBeTrue)
 
-		got, err := store.GetById(ctx, dal.Id(uuid.MustParseString(task.Id)))
+		got, err := store.GetById(ctx, dal.Id(task.Id))
 		So(err, ShouldBeNil)
 		So(got.Status, ShouldEqual, "completed")
 		So(got.ResultKind, ShouldEqual, "mindmap_json")
@@ -359,16 +599,16 @@ func TestArtifactTaskStoreUpdateResultNoMatch(t *testing.T) {
 	Convey("ArtifactTaskStore UpdateResult no match", t, func() {
 		store := testArtifactTaskStore
 		ctx := t.Context()
-		notebookID := uuid.NewV7().String()
+		notebookID := uuid.NewV7()
 
-		task := newArtifactTaskFixture(notebookID, "running", 1000)
-		task.RunId = "runner_" + uuid.NewV7().String()
-		mustCreateArtifactTask(t, task)
-		registerArtifactTaskCleanup(t, task.Id)
+		task := testTask(notebookID, "running", 1000)
+		task.RunId = "runner_" + uuid.NewV7().String()[:16]
+		testCreateTask(t, task)
+		testCleanupTasks(t, task.Id)
 
 		updated, err := store.UpdateResult(
 			ctx,
-			dal.Id(uuid.MustParseString(task.Id)),
+			dal.Id(task.Id),
 			task.RunId,
 			"queued",
 			&schema.ArtifactTaskUpdateResultParams{
@@ -381,7 +621,7 @@ func TestArtifactTaskStoreUpdateResultNoMatch(t *testing.T) {
 		So(err, ShouldBeNil)
 		So(updated, ShouldBeFalse)
 
-		got, err := store.GetById(ctx, dal.Id(uuid.MustParseString(task.Id)))
+		got, err := store.GetById(ctx, dal.Id(task.Id))
 		So(err, ShouldBeNil)
 		So(got.Status, ShouldEqual, "running")
 		So(got.ResultKind, ShouldEqual, "")
@@ -394,30 +634,30 @@ func TestArtifactTaskStoreSetExpiredTasksStatus(t *testing.T) {
 	Convey("ArtifactTaskStore SetExpiredTasksStatus", t, func() {
 		store := testArtifactTaskStore
 		ctx := t.Context()
-		notebookID := uuid.NewV7().String()
+		notebookID := uuid.NewV7()
 
-		targetTask := newArtifactTaskFixture(notebookID, "running", 1000)
-		targetTask.ExpiredAt = 2000
-		targetTask.UpdatedAt = 1000
+		expInIDs := testTask(notebookID, "running", 1000)
+		expInIDs.ExpiredAt = 500
+		expInIDs.UpdatedAt = 1000
 
-		notExpiredTask := newArtifactTaskFixture(notebookID, "running", 1000)
-		notExpiredTask.ExpiredAt = 500
-		notExpiredTask.UpdatedAt = 1000
+		aliveTask := testTask(notebookID, "running", 1000)
+		aliveTask.ExpiredAt = 2000
+		aliveTask.UpdatedAt = 1000
 
-		notInIDsTask := newArtifactTaskFixture(notebookID, "running", 1000)
-		notInIDsTask.ExpiredAt = 3000
-		notInIDsTask.UpdatedAt = 1000
+		expOutIDs := testTask(notebookID, "running", 1000)
+		expOutIDs.ExpiredAt = 300
+		expOutIDs.UpdatedAt = 1000
 
-		mustCreateArtifactTask(t, targetTask)
-		mustCreateArtifactTask(t, notExpiredTask)
-		mustCreateArtifactTask(t, notInIDsTask)
-		registerArtifactTaskCleanup(t, targetTask.Id, notExpiredTask.Id, notInIDsTask.Id)
+		testCreateTask(t, expInIDs)
+		testCreateTask(t, aliveTask)
+		testCreateTask(t, expOutIDs)
+		testCleanupTasks(t, expInIDs.Id, aliveTask.Id, expOutIDs.Id)
 
 		err := store.SetExpiredTasksStatus(
 			ctx,
 			[]dal.Id{
-				dal.Id(uuid.MustParseString(targetTask.Id)),
-				dal.Id(uuid.MustParseString(notExpiredTask.Id)),
+				dal.Id(expInIDs.Id),
+				dal.Id(aliveTask.Id),
 			},
 			"timeout",
 			4000,
@@ -425,20 +665,20 @@ func TestArtifactTaskStoreSetExpiredTasksStatus(t *testing.T) {
 		)
 		So(err, ShouldBeNil)
 
-		gotTarget, err := store.GetById(ctx, dal.Id(uuid.MustParseString(targetTask.Id)))
+		gotExpIn, err := store.GetById(ctx, dal.Id(expInIDs.Id))
 		So(err, ShouldBeNil)
-		So(gotTarget.Status, ShouldEqual, "timeout")
-		So(gotTarget.UpdatedAt, ShouldEqual, int64(4000))
+		So(gotExpIn.Status, ShouldEqual, "timeout")
+		So(gotExpIn.UpdatedAt, ShouldEqual, int64(4000))
 
-		gotNotExpired, err := store.GetById(ctx, dal.Id(uuid.MustParseString(notExpiredTask.Id)))
+		gotAlive, err := store.GetById(ctx, dal.Id(aliveTask.Id))
 		So(err, ShouldBeNil)
-		So(gotNotExpired.Status, ShouldEqual, "running")
-		So(gotNotExpired.UpdatedAt, ShouldEqual, int64(1000))
+		So(gotAlive.Status, ShouldEqual, "running")
+		So(gotAlive.UpdatedAt, ShouldEqual, int64(1000))
 
-		gotNotInIDs, err := store.GetById(ctx, dal.Id(uuid.MustParseString(notInIDsTask.Id)))
+		gotExpOut, err := store.GetById(ctx, dal.Id(expOutIDs.Id))
 		So(err, ShouldBeNil)
-		So(gotNotInIDs.Status, ShouldEqual, "running")
-		So(gotNotInIDs.UpdatedAt, ShouldEqual, int64(1000))
+		So(gotExpOut.Status, ShouldEqual, "running")
+		So(gotExpOut.UpdatedAt, ShouldEqual, int64(1000))
 	})
 }
 
@@ -446,19 +686,19 @@ func TestArtifactTaskStorePageListExpiredTasks(t *testing.T) {
 	Convey("ArtifactTaskStore PageListExpiredTasks", t, func() {
 		store := testArtifactTaskStore
 		ctx := t.Context()
-		notebookID := uuid.NewV7().String()
+		notebookID := uuid.NewV7()
 
-		expiredTask1 := newArtifactTaskFixture(notebookID, "running", 1000)
-		expiredTask1.ExpiredAt = 2000
-		expiredTask2 := newArtifactTaskFixture(notebookID, "running", 1000)
-		expiredTask2.ExpiredAt = 3000
-		notExpiredTask := newArtifactTaskFixture(notebookID, "running", 1000)
-		notExpiredTask.ExpiredAt = 500
+		expiredTask1 := testTask(notebookID, "running", 1000)
+		expiredTask1.ExpiredAt = 500
+		expiredTask2 := testTask(notebookID, "running", 1000)
+		expiredTask2.ExpiredAt = 1000
+		notExpiredTask := testTask(notebookID, "running", 1000)
+		notExpiredTask.ExpiredAt = 3000
 
-		mustCreateArtifactTask(t, expiredTask1)
-		mustCreateArtifactTask(t, expiredTask2)
-		mustCreateArtifactTask(t, notExpiredTask)
-		registerArtifactTaskCleanup(t, expiredTask1.Id, expiredTask2.Id, notExpiredTask.Id)
+		testCreateTask(t, expiredTask1)
+		testCreateTask(t, expiredTask2)
+		testCreateTask(t, notExpiredTask)
+		testCleanupTasks(t, expiredTask1.Id, expiredTask2.Id, notExpiredTask.Id)
 
 		rows, err := store.PageListExpiredTasks(
 			ctx,
@@ -469,27 +709,29 @@ func TestArtifactTaskStorePageListExpiredTasks(t *testing.T) {
 		So(err, ShouldBeNil)
 		So(len(rows), ShouldEqual, 2)
 
-		expectedIDs := []string{normalizeUUID(expiredTask1.Id), normalizeUUID(expiredTask2.Id)}
-		sort.Strings(expectedIDs)
-		So(normalizeUUID(rows[0].Id), ShouldEqual, expectedIDs[0])
-		So(normalizeUUID(rows[1].Id), ShouldEqual, expectedIDs[1])
+		expectedIDs := []uuid.UUID{expiredTask1.Id, expiredTask2.Id}
+		sort.Slice(expectedIDs, func(i, j int) bool {
+			return expectedIDs[i].String() < expectedIDs[j].String()
+		})
+		So(rows[0].Id, ShouldEqual, expectedIDs[0])
+		So(rows[1].Id, ShouldEqual, expectedIDs[1])
 
 		nextRows, err := store.PageListExpiredTasks(
 			ctx,
-			dal.Id(uuid.MustParseString(expectedIDs[0])),
+			dal.Id(expectedIDs[0]),
 			10,
 			1000,
 		)
 		So(err, ShouldBeNil)
 		So(len(nextRows), ShouldEqual, 1)
-		So(normalizeUUID(nextRows[0].Id), ShouldEqual, expectedIDs[1])
-		So(nextRows[0].ExpiredAt >= 1000, ShouldBeTrue)
+		So(nextRows[0].Id, ShouldEqual, expectedIDs[1])
+		So(nextRows[0].ExpiredAt <= 1000, ShouldBeTrue)
 	})
 }
 
-func newArtifactTaskFixture(notebookID, status string, createdAt int64) *schema.ArtifactTask {
+func testTask(notebookID uuid.UUID, status string, createdAt int64) *schema.ArtifactTask {
 	return &schema.ArtifactTask{
-		Id:         uuid.NewV7().String(),
+		Id:         uuid.NewV7(),
 		NotebookId: notebookID,
 		Kind:       "mindmap",
 		Status:     status,
@@ -504,20 +746,16 @@ func newArtifactTaskFixture(notebookID, status string, createdAt int64) *schema.
 	}
 }
 
-func mustCreateArtifactTask(t *testing.T, task *schema.ArtifactTask) {
+func testCreateTask(t *testing.T, task *schema.ArtifactTask) {
 	t.Helper()
 	if err := testDB.WithContext(t.Context()).Create(task).Error; err != nil {
 		t.Fatalf("insert artifact task fixture failed: %v", err)
 	}
 }
 
-func normalizeUUID(raw string) string {
-	return uuid.MustParseString(raw).String()
-}
-
-func registerArtifactTaskCleanup(t *testing.T, ids ...string) {
+func testCleanupTasks(t *testing.T, ids ...uuid.UUID) {
 	t.Helper()
-	copiedIDs := append([]string(nil), ids...)
+	copiedIDs := append([]uuid.UUID(nil), ids...)
 	t.Cleanup(func() {
 		if len(copiedIDs) == 0 {
 			return

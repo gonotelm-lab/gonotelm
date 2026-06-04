@@ -7,10 +7,14 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/bytedance/sonic"
+	"github.com/gonotelm-lab/gonotelm/internal/app/biz/artifact"
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
+	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/app/prompts"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/safe"
 	pkgslices "github.com/gonotelm-lab/gonotelm/pkg/slices"
@@ -25,17 +29,32 @@ const (
 	mindmapAbstractMode = "abstract"
 )
 
-type GenerateMindmapTaskParams struct {
+type generateMindmapTaskParams struct {
 	NotebookId uuid.UUID
 	SourceIds  []uuid.UUID
 }
 
-func (l *Logic) GenerateMindmapTask(
+func (l *Logic) generateMindmapTask(
 	ctx context.Context,
-	params *GenerateMindmapTaskParams,
+	params *generateMindmapTaskParams,
 ) (uuid.UUID, error) {
-	// TODO
-	return uuid.NewV4(), nil
+	userId := pkgcontext.GetUserId(ctx)
+	payload, err := sonic.Marshal(params)
+	if err != nil {
+		return uuid.EmptyUUID(), errors.Wrapf(errors.ErrSerde, "marshal mindmap params err=%v", err)
+	}
+
+	taskId, err := l.artifactBiz.CreateTask(ctx, &artifact.CreateTaskCommand{
+		NotebookId: params.NotebookId,
+		Kind:       model.ArtifactKindMindmap,
+		UserId:     userId,
+		Payload:    payload,
+	})
+	if err != nil {
+		return uuid.EmptyUUID(), errors.WithMessagef(err, "create mindmap task failed, notebook_id=%s", params.NotebookId)
+	}
+
+	return taskId, nil
 }
 
 type CreateMindmapParams struct {
@@ -43,7 +62,7 @@ type CreateMindmapParams struct {
 	SourceIds  []uuid.UUID
 }
 
-func (l *Logic) CreateMindmap(
+func (l *Logic) createMindmap(
 	ctx context.Context,
 	params *CreateMindmapParams,
 ) (string, error) {

@@ -9,6 +9,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/sql"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type ArtifactTaskStoreImpl struct {
@@ -58,9 +59,85 @@ func (a *ArtifactTaskStoreImpl) PageListByNotebookId(
 	return tasks, nil
 }
 
-func (a *ArtifactTaskStoreImpl) ClaimTask(
+func (a *ArtifactTaskStoreImpl) Claim(
 	ctx context.Context,
 	oldStatus string,
+	now int64,
+	params *schema.ArtifactTaskClaimParams,
+) (*schema.ArtifactTask, bool, error) {
+	if params.Mode == 0 {
+		return a.claimWithSkipLockMode(ctx, oldStatus, now, params)
+	}
+
+	return a.claimWithVersionLockMode(ctx, oldStatus, now, params)
+}
+
+func (a *ArtifactTaskStoreImpl) claimWithSkipLockMode(
+	ctx context.Context,
+	oldStatus string,
+	lastExpiredAt int64,
+	params *schema.ArtifactTaskClaimParams,
+) (*schema.ArtifactTask, bool, error) {
+	var (
+		task    schema.ArtifactTask
+		claimed = false
+	)
+
+	err := a.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 1. select * from %s where xxx for update skip locked
+		tx = tx.WithContext(ctx)
+		err := tx.Clauses(clause.Locking{
+			Strength: clause.LockingStrengthUpdate,    // UPDATE
+			Options:  clause.LockingOptionsSkipLocked, // SKIP LOCKED
+		}).Where("expired_at > ?", lastExpiredAt).
+			Where("status = ?", oldStatus).
+			Order("created_at ASC").
+			Order("id ASC").
+			Limit(1).
+			Take(&task).Error
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil
+			}
+
+			return sql.WrapErr(err)
+		}
+
+		// 2. update selected row
+		result := tx.Model(&task).
+			Where("id = ?", task.Id).
+			Where("status = ?", task.Status).
+			Where("lock_no = ?", task.LockNo).
+			Updates(map[string]any{
+				"status":     params.NewStatus,
+				"run_id":     params.RunId,
+				"updated_at": params.UpdatedAt,
+				"lock_no":    task.LockNo + 1,
+			})
+		if result.Error != nil {
+			return sql.WrapErr(result.Error)
+		}
+		if result.RowsAffected != 0 {
+			claimed = true
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, false, err
+	}
+
+	if !claimed {
+		return nil, false, nil
+	}
+
+	return &task, claimed, nil
+}
+
+func (a *ArtifactTaskStoreImpl) claimWithVersionLockMode(
+	ctx context.Context,
+	oldStatus string,
+	lastExpiredAt int64,
 	params *schema.ArtifactTaskClaimParams,
 ) (*schema.ArtifactTask, bool, error) {
 	// 1. get first
@@ -68,6 +145,7 @@ func (a *ArtifactTaskStoreImpl) ClaimTask(
 	// select * from %s where status = :old_status order by created_at asc, id asc limit 1
 	query := a.db.WithContext(ctx).
 		Model(&schema.ArtifactTask{}).
+		Where("expired_at > ?", lastExpiredAt).
 		Where("status = ?", oldStatus).
 		Order("created_at ASC").
 		Order("id ASC").
@@ -103,6 +181,25 @@ func (a *ArtifactTaskStoreImpl) ClaimTask(
 	}
 
 	return &task, true, nil
+}
+
+func (a *ArtifactTaskStoreImpl) SetStatus(
+	ctx context.Context,
+	id dal.Id,
+	newStatus string,
+	updatedAt int64,
+) error {
+	if err := a.db.WithContext(ctx).
+		Model(&schema.ArtifactTask{}).
+		Where("id = ?", id).
+		Updates(map[string]any{
+			"status":     newStatus,
+			"updated_at": updatedAt,
+		}).Error; err != nil {
+		return sql.WrapErr(err)
+	}
+
+	return nil
 }
 
 func (a *ArtifactTaskStoreImpl) UpdateStatus(
@@ -182,12 +279,12 @@ func (a *ArtifactTaskStoreImpl) SetExpiredTasksStatus(
 	ids []dal.Id,
 	newStatus string,
 	updatedAt int64,
-	targetExpiredAt int64,
+	now int64,
 ) error {
 	if err := a.db.WithContext(ctx).
 		Model(&schema.ArtifactTask{}).
 		Where("id IN ?", ids).
-		Where("expired_at >= ?", targetExpiredAt).
+		Where("expired_at <= ?", now).
 		Updates(map[string]any{
 			"status":     newStatus,
 			"updated_at": updatedAt,
@@ -202,12 +299,12 @@ func (a *ArtifactTaskStoreImpl) PageListExpiredTasks(
 	ctx context.Context,
 	cursor dal.Id,
 	limit int,
-	targetExpiredAt int64,
+	now int64,
 ) ([]*schema.ArtifactTask, error) {
 	var tasks []*schema.ArtifactTask
 	if err := a.db.WithContext(ctx).
 		Model(&schema.ArtifactTask{}).
-		Where("expired_at >= ?", targetExpiredAt).
+		Where("expired_at <= ?", now).
 		Where("id > ?", cursor).
 		Order("id ASC").
 		Limit(limit).

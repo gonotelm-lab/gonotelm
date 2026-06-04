@@ -14,15 +14,20 @@ import (
 )
 
 func (s *Server) registerStudioRoutes(g *route.RouterGroup) {
-	g.GET("/studio/artifact/:artifact_id/status", s.GetStudioArtifactStatus)
+	g.GET("/studio/artifact/:task_id/status", s.GetStudioArtifactStatus)
 	g.POST("/studio/artifact/generate", s.GenerateStudioArtifact)
 }
 
 type GetStudioArtifactStatusRequest struct {
-	ArtifactId uuid.UUID `path:"artifact_id,required"`
+	TaskId uuid.UUID `path:"task_id,required"`
 }
 
-type GetStudioArtifactStatusResponse struct{}
+type GetStudioArtifactStatusResponse struct {
+	TaskId string `json:"task_id"`
+	Status string `json:"status"`
+	// TODO add more result fields here
+	Result string `json:"result"`
+}
 
 func (s *Server) GetStudioArtifactStatus(ctx context.Context, c *app.RequestContext) {
 	var req GetStudioArtifactStatusRequest
@@ -31,6 +36,18 @@ func (s *Server) GetStudioArtifactStatus(ctx context.Context, c *app.RequestCont
 		http.ErrResp(c, err)
 		return
 	}
+
+	task, err := s.studioLogic.GetArtifactTask(ctx, req.TaskId)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	http.OkResp(c, GetStudioArtifactStatusResponse{
+		TaskId: task.Id.String(),
+		Status: task.Status.String(),
+	})
+
 }
 
 type GenerateStudioArtifactRequest struct {
@@ -49,7 +66,7 @@ func (r *GenerateStudioArtifactRequest) Validate() error {
 }
 
 type GenerateStudioArtifactResponse struct {
-	Mindmap string `json:"mindmap"`
+	TaskId string `json:"task_id"`
 }
 
 func (s *Server) GenerateStudioArtifact(ctx context.Context, c *app.RequestContext) {
@@ -60,22 +77,18 @@ func (s *Server) GenerateStudioArtifact(ctx context.Context, c *app.RequestConte
 		return
 	}
 
-	var mindmap string
-	switch req.Kind {
-	case model.ArtifactKindMindmap:
-		mindmap, err = s.studioLogic.CreateMindmap(ctx,
-			&studiologic.CreateMindmapParams{
-				NotebookId: req.NotebookId,
-				SourceIds:  req.SourceIds,
-			})
-	}
-
+	resp, err := s.studioLogic.GenerateArtifact(ctx,
+		&studiologic.GenerateArtifactParams{
+			NotebookId: req.NotebookId,
+			Kind:       req.Kind,
+			SourceIds:  req.SourceIds,
+		})
 	if err != nil {
 		http.ErrResp(c, err)
 		return
 	}
 
 	http.OkResp(c, GenerateStudioArtifactResponse{
-		Mindmap: mindmap,
+		TaskId: resp.String(),
 	})
 }

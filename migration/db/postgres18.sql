@@ -92,12 +92,12 @@ CREATE TABLE artifact_tasks (
   result BYTEA,
   result_kind VARCHAR(16) NOT NULL DEFAULT '',
   user_id VARCHAR(255) NOT NULL DEFAULT '',
-  run_id VARCHAR(128) NOT NULL DEFAULT '',
+  run_id VARCHAR(36) NOT NULL DEFAULT '',
   lock_no INTEGER NOT NULL DEFAULT 0,
   payload BYTEA,
   created_at BIGINT NOT NULL DEFAULT 0,
   updated_at BIGINT NOT NULL DEFAULT 0,
-  expired_at BIGINT NOT NULL DEFAULT 0
+  expired_at BIGINT NOT NULL DEFAULT 0,
 );
 
 CREATE INDEX idx_artifact_tasks_notebook_id ON artifact_tasks (notebook_id);

@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	bizartifact "github.com/gonotelm-lab/gonotelm/internal/app/biz/artifact"
 	bizchat "github.com/gonotelm-lab/gonotelm/internal/app/biz/chat"
 	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
@@ -35,6 +36,7 @@ func MustNewLogic(
 			infrastructures.Dal.ChatStore,
 			infrastructures.Dal.ChatMessageStore,
 			infrastructures.Cache.ChatMessageContextCache)
+		artifactBiz      = bizartifact.New(infrastructures.Dal.ArtifactTaskStore)
 		chatEventManager = bizchat.NewChatEventManager(infrastructures.Cache.ChatMessageStreamCache)
 	)
 
@@ -80,6 +82,7 @@ func MustNewLogic(
 		objectStorage,
 		sourceBiz,
 		notebookBiz,
+		artifactBiz,
 		gateway,
 	)
 

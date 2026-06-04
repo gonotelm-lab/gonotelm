@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/cloudwego/eino/components/document"
+	bizartifact "github.com/gonotelm-lab/gonotelm/internal/app/biz/artifact"
 	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
@@ -27,6 +28,7 @@ type Logic struct {
 
 	sourceBiz   *bizsource.Biz
 	notebookBiz *biznotebook.Biz
+	artifactBiz *bizartifact.Biz
 
 	llmGateway *gateway.Gateway
 	splitter   document.Transformer
@@ -36,6 +38,7 @@ func MustNewLogic(
 	objectStorage storage.Storage,
 	sourceBiz *bizsource.Biz,
 	notebookBiz *biznotebook.Biz,
+	artifactBiz *bizartifact.Biz,
 	llmGateway *gateway.Gateway,
 ) *Logic {
 	splitter, err := recursive.NewSplitter(context.TODO(), &recursive.Config{
@@ -50,21 +53,47 @@ func MustNewLogic(
 		objectStorage: objectStorage,
 		sourceBiz:     sourceBiz,
 		notebookBiz:   notebookBiz,
+		artifactBiz:   artifactBiz,
 		llmGateway:    llmGateway,
 		splitter:      splitter,
 	}
 }
 
-func (l *Logic) helpGetNotebook(ctx context.Context, notebookId uuid.UUID) (*model.Notebook, error) {
-	notebook, err := l.notebookBiz.GetNotebook(ctx, notebookId)
+type GenerateArtifactParams struct {
+	NotebookId uuid.UUID
+	Kind       model.ArtifactKind
+	SourceIds  []uuid.UUID
+}
+
+func (l *Logic) GenerateArtifact(
+	ctx context.Context,
+	params *GenerateArtifactParams,
+) (uuid.UUID, error) {
+	switch params.Kind {
+	case model.ArtifactKindMindmap:
+		return l.generateMindmapTask(ctx, &generateMindmapTaskParams{
+			NotebookId: params.NotebookId,
+			SourceIds:  params.SourceIds,
+		})
+	default:
+		return uuid.EmptyUUID(), errors.ErrParams.Msgf("unsupported artifact kind: %s", params.Kind)
+	}
+}
+
+func (l *Logic) GetArtifactTask(
+	ctx context.Context,
+	taskId uuid.UUID,
+) (*model.ArtifactTask, error) {
+	task, err := l.artifactBiz.GetTask(ctx, taskId)
 	if err != nil {
-		if errors.Is(err, biznotebook.ErrNotebookNotFound) {
-			return nil, errors.ErrParams.Msgf("notebook not found, notebook_id=%s", notebookId)
+		if errors.Is(err, bizartifact.ErrTaskNotFound) {
+			return nil, errors.ErrParams.Msgf("task not found, task_id=%s", taskId)
 		}
-		return nil, errors.WithMessage(err, "get notebook failed")
+
+		return nil, errors.WithMessage(err, "get artifact task failed")
 	}
 
-	return notebook, nil
+	return task, nil
 }
 
 func (l *Logic) helpGetSourcesParsedContent(
@@ -110,4 +139,16 @@ func (l *Logic) helpGetSourcesParsedContent(
 	}
 
 	return contents, nil
+}
+
+func (l *Logic) helpGetNotebook(ctx context.Context, notebookId uuid.UUID) (*model.Notebook, error) {
+	notebook, err := l.notebookBiz.GetNotebook(ctx, notebookId)
+	if err != nil {
+		if errors.Is(err, biznotebook.ErrNotebookNotFound) {
+			return nil, errors.ErrParams.Msgf("notebook not found, notebook_id=%s", notebookId)
+		}
+		return nil, errors.WithMessage(err, "get notebook failed")
+	}
+
+	return notebook, nil
 }

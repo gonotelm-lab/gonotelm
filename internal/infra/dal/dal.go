@@ -82,10 +82,14 @@ type ArtifactTaskStore interface {
 	// 返回值：task, true, nil => 成功认领
 	// 返回值：nil, false, nil => 没有任务可认领，且没有错误
 	// 返回值：nil, false, err => 出错
-	ClaimTask(ctx context.Context,
+	Claim(ctx context.Context,
 		oldStatus string,
+		now int64,
 		params *schema.ArtifactTaskClaimParams,
 	) (*schema.ArtifactTask, bool, error)
+
+	// 强行设置任务状态
+	SetStatus(ctx context.Context, id Id, newStatus string, updatedAt int64) error
 
 	// 更新任务状态
 	UpdateStatus(
@@ -114,7 +118,7 @@ type ArtifactTaskStore interface {
 		ids []Id,
 		newStatus string,
 		updatedAt int64,
-		targetExpiredAt int64, // expired_at >= target
+		now int64,
 	) error
 
 	// 列出过期的任务
@@ -122,7 +126,7 @@ type ArtifactTaskStore interface {
 		ctx context.Context,
 		cursor Id, // id > cursor
 		limit int,
-		targetExpiredAt int64, // expired_at >= target
+		now int64,
 	) ([]*schema.ArtifactTask, error)
 }
 

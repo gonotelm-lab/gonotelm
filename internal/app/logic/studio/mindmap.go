@@ -18,6 +18,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/safe"
 	pkgslices "github.com/gonotelm-lab/gonotelm/pkg/slices"
+	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 	"github.com/gonotelm-lab/gonotelm/pkg/token"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 
@@ -29,9 +30,36 @@ const (
 	mindmapAbstractMode = "abstract"
 )
 
+type mindmapCreator struct {
+	l *Logic
+}
+
+var _ taskHandler = &mindmapCreator{}
+
+func (c *mindmapCreator) handle(ctx context.Context, task *model.ArtifactTask) (*taskHandleResult, error) {
+	var params generateMindmapTaskParams
+	err := sonic.Unmarshal(task.Payload, &params)
+	if err != nil {
+		return nil, errors.Wrapf(errors.ErrSerde, "unmarshal generate mindmap task params err=%v", err)
+	}
+
+	mindmap, err := c.l.createMindmap(ctx, &createMindmapParams{
+		NotebookId: params.NotebookId,
+		SourceIds:  params.SourceIds,
+	})
+	if err != nil {
+		return nil, errors.Wrapf(errors.ErrInner, "create mindmap failed, err=%v", err)
+	}
+
+	return &taskHandleResult{
+		result:     pkgstring.AsBytes(mindmap),
+		resultKind: model.ArtifactResultKindInline,
+	}, nil
+}
+
 type generateMindmapTaskParams struct {
-	NotebookId uuid.UUID
-	SourceIds  []uuid.UUID
+	NotebookId uuid.UUID   `json:"notebook_id"`
+	SourceIds  []uuid.UUID `json:"source_ids"`
 }
 
 func (l *Logic) generateMindmapTask(
@@ -51,21 +79,19 @@ func (l *Logic) generateMindmapTask(
 		Payload:    payload,
 	})
 	if err != nil {
-		return uuid.EmptyUUID(), errors.WithMessagef(err, "create mindmap task failed, notebook_id=%s", params.NotebookId)
+		return uuid.EmptyUUID(), errors.WithMessagef(err,
+			"create mindmap task failed, notebook_id=%s", params.NotebookId)
 	}
 
 	return taskId, nil
 }
 
-type CreateMindmapParams struct {
+type createMindmapParams struct {
 	NotebookId uuid.UUID
 	SourceIds  []uuid.UUID
 }
 
-func (l *Logic) createMindmap(
-	ctx context.Context,
-	params *CreateMindmapParams,
-) (string, error) {
+func (l *Logic) createMindmap(ctx context.Context, params *createMindmapParams) (string, error) {
 	// check notebook
 	notebook, err := l.helpGetNotebook(ctx, params.NotebookId)
 	if err != nil {

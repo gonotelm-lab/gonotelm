@@ -71,6 +71,12 @@ type ArtifactTaskStore interface {
 	// 根据id获取任务
 	GetById(ctx context.Context, id Id) (*schema.ArtifactTask, error)
 
+	// 获取任务状态
+	GetStatusById(ctx context.Context, id Id) (string, error)
+
+	// 按照created_at DESC分页获取
+	ListByNotebookId(ctx context.Context, notebookId Id, limit, offset int) ([]*schema.ArtifactTask, error)
+
 	// 按照NotebookId分页获取
 	PageListByNotebookId(
 		ctx context.Context,

@@ -34,10 +34,11 @@ func New(t Type, cfg *sql.Config) (*dal.DAL, error) {
 		return &dal.DAL{
 			Closer: closer,
 
-			NotebookStore:    postgres.NewNotebookStoreImpl(db),
-			SourceStore:      postgres.NewSourceStoreImpl(db),
-			ChatStore:        postgres.NewChatStoreImpl(db),
-			ChatMessageStore: postgres.NewChatMessageStoreImpl(db),
+			NotebookStore:     postgres.NewNotebookStoreImpl(db),
+			SourceStore:       postgres.NewSourceStoreImpl(db),
+			ChatStore:         postgres.NewChatStoreImpl(db),
+			ChatMessageStore:  postgres.NewChatMessageStoreImpl(db),
+			ArtifactTaskStore: postgres.NewArtifactTaskStoreImpl(db),
 		}, nil
 	}
 

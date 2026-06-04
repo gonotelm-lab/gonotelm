@@ -14,7 +14,7 @@ type taskHandleResult struct {
 }
 
 type taskHandler interface {
-	doHandle(ctx context.Context, task *model.ArtifactTask) (*taskHandleResult, error)
+	handle(ctx context.Context, task *model.ArtifactTask) (*taskHandleResult, error)
 }
 
 type taskDispatcher struct {
@@ -26,13 +26,22 @@ func newTaskDispatcher(handlers map[model.ArtifactKind]taskHandler) *taskDispatc
 }
 
 func (d *taskDispatcher) register(kind model.ArtifactKind, handler taskHandler) {
+	if handler == nil {
+		return
+	}
+
 	d.handlers[kind] = handler
 }
 
 func (d *taskDispatcher) dispatch(ctx context.Context, task *model.ArtifactTask) (*taskHandleResult, error) {
-	result, err := d.handlers[task.Kind].doHandle(ctx, task)
+	handler, ok := d.handlers[task.Kind]
+	if !ok {
+		return nil, fmt.Errorf("dispatcher not found handler, kind=%s", task.Kind)
+	}
+
+	result, err := handler.handle(ctx, task)
 	if err != nil {
-		return nil, fmt.Errorf("dispatcher not found handler, kind=%s, err=%w", task.Kind, err)
+		return nil, fmt.Errorf("dispatch task failed, kind=%s, err=%w", task.Kind, err)
 	}
 
 	return result, nil

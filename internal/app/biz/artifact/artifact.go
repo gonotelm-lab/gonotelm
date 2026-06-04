@@ -15,9 +15,7 @@ const (
 	defaultTaskExpiration = time.Minute * 30
 )
 
-var (
-	ErrTaskNotFound = errors.ErrParams.Msgf("task not found")
-)
+var ErrTaskNotFound = errors.ErrParams.Msgf("task not found")
 
 type Biz struct {
 	taskStore dal.ArtifactTaskStore
@@ -82,6 +80,47 @@ func (b *Biz) GetTask(ctx context.Context, id uuid.UUID) (*model.ArtifactTask, e
 	return model.NewArtifactTaskFrom(task), nil
 }
 
+func (b *Biz) GetTaskStatus(ctx context.Context, id uuid.UUID) (model.ArtifactStatus, error) {
+	status, err := b.taskStore.GetStatusById(ctx, id)
+	if err != nil {
+		if errors.Is(err, errors.ErrNoRecord) {
+			return "", ErrTaskNotFound
+		}
+
+		return "", errors.WithMessagef(err, "get artifact task status failed, id=%s", id)
+	}
+
+	return model.ArtifactStatus(status), nil
+}
+
+type ListTasksByNotebookQuery struct {
+	NotebookId uuid.UUID
+	Limit      int
+	Offset     int
+}
+
+func (b *Biz) ListTasksByNotebook(
+	ctx context.Context,
+	query *ListTasksByNotebookQuery,
+) ([]*model.ArtifactTask, error) {
+	rows, err := b.taskStore.ListByNotebookId(
+		ctx,
+		query.NotebookId,
+		query.Limit,
+		query.Offset,
+	)
+	if err != nil {
+		return nil, errors.WithMessage(err, "list tasks by notebook failed")
+	}
+
+	tasks := make([]*model.ArtifactTask, 0, len(rows))
+	for _, row := range rows {
+		tasks = append(tasks, model.NewArtifactTaskFrom(row))
+	}
+
+	return tasks, nil
+}
+
 func (b *Biz) TryClaimTask(ctx context.Context) (*model.ArtifactTask, bool, error) {
 	var (
 		oldStatus = model.ArtifactStatusPending.String()
@@ -100,8 +139,10 @@ func (b *Biz) TryClaimTask(ctx context.Context) (*model.ArtifactTask, bool, erro
 		},
 	)
 	if err != nil {
-		return nil, false, errors.WithMessagef(err,
-			"claim artifact task failed")
+		return nil, false, errors.WithMessagef(err, "claim artifact task failed")
+	}
+	if !claimed {
+		return nil, false, nil
 	}
 
 	return model.NewArtifactTaskFrom(task), claimed, nil

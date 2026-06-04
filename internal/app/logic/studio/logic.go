@@ -11,6 +11,7 @@ import (
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
+	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
 	"github.com/gonotelm-lab/gonotelm/pkg/eino-ext/chunker/recursive"
@@ -24,17 +25,21 @@ import (
 )
 
 type Logic struct {
-	objectStorage storage.Storage
+	ctx context.Context
 
 	sourceBiz   *bizsource.Biz
 	notebookBiz *biznotebook.Biz
 	artifactBiz *bizartifact.Biz
 
-	llmGateway *gateway.Gateway
-	splitter   document.Transformer
+	objectStorage storage.Storage
+	llmGateway    *gateway.Gateway
+	splitter      document.Transformer
+
+	loop *taskLoop
 }
 
 func MustNewLogic(
+	ctx context.Context,
 	objectStorage storage.Storage,
 	sourceBiz *bizsource.Biz,
 	notebookBiz *biznotebook.Biz,
@@ -49,7 +54,8 @@ func MustNewLogic(
 		panic(err)
 	}
 
-	return &Logic{
+	l := &Logic{
+		ctx:           ctx,
 		objectStorage: objectStorage,
 		sourceBiz:     sourceBiz,
 		notebookBiz:   notebookBiz,
@@ -57,6 +63,32 @@ func MustNewLogic(
 		llmGateway:    llmGateway,
 		splitter:      splitter,
 	}
+
+	// start background work
+	l.initBackgroundWorks()
+
+	return l
+}
+
+func (l *Logic) initBackgroundWorks() {
+	dispatcher := newTaskDispatcher(map[model.ArtifactKind]taskHandler{
+		model.ArtifactKindMindmap: &mindmapCreator{l: l},
+	})
+
+	cfg := conf.Global().Logic.Studio.TaskConfig
+
+	l.loop = newTaskLoop(l.ctx, taskLoopConfig{
+		numClaimers:        cfg.NumClaimers,
+		scanInterval:       cfg.ScanInterval,
+		numOfWorkGroup:     cfg.NumOfWorkGroup,
+		numWorkersPerGroup: cfg.NumWorkersPerGroup,
+	}, l.artifactBiz, dispatcher)
+	l.loop.start()
+}
+
+func (l *Logic) Close(ctx context.Context) {
+	l.loop.stop()
+	l.loop.wait()
 }
 
 type GenerateArtifactParams struct {
@@ -80,10 +112,22 @@ func (l *Logic) GenerateArtifact(
 	}
 }
 
+func (l *Logic) GetArtifactTaskStatus(
+	ctx context.Context,
+	taskId uuid.UUID,
+) (model.ArtifactStatus, error) {
+	status, err := l.artifactBiz.GetTaskStatus(ctx, taskId)
+	if err != nil {
+		return "", errors.WithMessage(err, "get artifact task status failed")
+	}
+
+	return status, nil
+}
+
 func (l *Logic) GetArtifactTask(
 	ctx context.Context,
 	taskId uuid.UUID,
-) (*model.ArtifactTask, error) {
+) (*Artifact, error) {
 	task, err := l.artifactBiz.GetTask(ctx, taskId)
 	if err != nil {
 		if errors.Is(err, bizartifact.ErrTaskNotFound) {
@@ -93,7 +137,93 @@ func (l *Logic) GetArtifactTask(
 		return nil, errors.WithMessage(err, "get artifact task failed")
 	}
 
-	return task, nil
+	artifact, err := NewArtifact(task)
+	if err != nil {
+		return nil, errors.WithMessage(err, "new artifact from task failed")
+	}
+
+	if task.Status.Completed() {
+		if artifact.ResultKind.Storage() {
+			// 补充content url
+			resp, err := l.objectStorage.PresignedGetObject(ctx,
+				&storage.PresignedGetObjectRequest{
+					Key:         artifact.ContentKey,
+					ContentType: artifact.ContentType,
+				})
+			if err != nil {
+				return nil, errors.WithMessage(err, "get content url failed")
+			}
+			artifact.ContentUrl = resp.Url
+		}
+	}
+
+	return artifact, nil
+}
+
+type ListNotebookArtifactsParams struct {
+	NotebookId uuid.UUID
+	Limit      int
+	Offset     int
+}
+
+type ListNotebookArtifactsResult struct {
+	Artifacts []*Artifact
+	HasMore   bool
+}
+
+func (l *Logic) ListNotebookArtifacts(
+	ctx context.Context,
+	params *ListNotebookArtifactsParams,
+) (*ListNotebookArtifactsResult, error) {
+	_, err := l.helpGetNotebook(ctx, params.NotebookId)
+	if err != nil {
+		return nil, err
+	}
+
+	fetchLimit := params.Limit + 1 // for has_more check
+	tasks, err := l.artifactBiz.ListTasksByNotebook(ctx,
+		&bizartifact.ListTasksByNotebookQuery{
+			NotebookId: params.NotebookId,
+			Limit:      fetchLimit,
+			Offset:     params.Offset,
+		},
+	)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "list notebook artifact tasks failed, notebook_id=%s", params.NotebookId)
+	}
+
+	hasMore := len(tasks) > params.Limit
+	if hasMore {
+		tasks = tasks[:params.Limit]
+	}
+
+	artifacts := make([]*Artifact, 0, len(tasks))
+	for _, task := range tasks {
+		artifact, err := NewArtifact(task)
+		if err != nil {
+			return nil, errors.WithMessagef(err, "new artifact from task failed, task_id=%s", task.Id)
+		}
+
+		if task.Status.Completed() && artifact.ResultKind.Storage() {
+			resp, err := l.objectStorage.PresignedGetObject(ctx,
+				&storage.PresignedGetObjectRequest{
+					Key:         artifact.ContentKey,
+					ContentType: artifact.ContentType,
+				},
+			)
+			if err != nil {
+				return nil, errors.WithMessagef(err, "get content url failed, task_id=%s", task.Id)
+			}
+			artifact.ContentUrl = resp.Url
+		}
+
+		artifacts = append(artifacts, artifact)
+	}
+
+	return &ListNotebookArtifactsResult{
+		Artifacts: artifacts,
+		HasMore:   hasMore,
+	}, nil
 }
 
 func (l *Logic) helpGetSourcesParsedContent(

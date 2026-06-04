@@ -41,6 +41,38 @@ func (a *ArtifactTaskStoreImpl) GetById(ctx context.Context, id dal.Id) (*schema
 	return &task, nil
 }
 
+func (a *ArtifactTaskStoreImpl) GetStatusById(ctx context.Context, id dal.Id) (string, error) {
+	var task schema.ArtifactTask
+	if err := a.db.WithContext(ctx).
+		Model(&schema.ArtifactTask{}).
+		Where("id = ?", id).
+		Select("status").
+		Take(&task).Error; err != nil {
+		return "", sql.WrapErr(err)
+	}
+
+	return task.Status, nil
+}
+
+func (a *ArtifactTaskStoreImpl) ListByNotebookId(
+	ctx context.Context,
+	notebookId dal.Id,
+	limit, offset int,
+) ([]*schema.ArtifactTask, error) {
+	var tasks []*schema.ArtifactTask
+	if err := a.db.WithContext(ctx).
+		Where("notebook_id = ?", notebookId).
+		Order("created_at DESC").
+		Order("id DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&tasks).Error; err != nil {
+		return nil, sql.WrapErr(err)
+	}
+
+	return tasks, nil
+}
+
 func (a *ArtifactTaskStoreImpl) PageListByNotebookId(
 	ctx context.Context,
 	notebookId dal.Id,

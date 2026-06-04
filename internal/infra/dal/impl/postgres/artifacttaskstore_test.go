@@ -57,6 +57,32 @@ func TestArtifactTaskStoreGetById(t *testing.T) {
 	})
 }
 
+func TestArtifactTaskStoreGetStatusById(t *testing.T) {
+	Convey("ArtifactTaskStore GetStatusById", t, func() {
+		store := testArtifactTaskStore
+		ctx := t.Context()
+		notebookID := uuid.NewV7()
+
+		task := testTask(notebookID, "queued", 1000)
+		testCreateTask(t, task)
+		testCleanupTasks(t, task.Id)
+
+		status, err := store.GetStatusById(ctx, task.Id)
+		So(err, ShouldBeNil)
+		So(status, ShouldEqual, "queued")
+	})
+}
+
+func TestArtifactTaskStoreGetStatusByIdNotFound(t *testing.T) {
+	Convey("ArtifactTaskStore GetStatusById not found", t, func() {
+		store := testArtifactTaskStore
+		ctx := t.Context()
+
+		_, err := store.GetStatusById(ctx, uuid.NewV7())
+		So(err, ShouldNotBeNil)
+	})
+}
+
 func TestArtifactTaskStorePageListByNotebookId(t *testing.T) {
 	Convey("ArtifactTaskStore PageListByNotebookId", t, func() {
 		store := testArtifactTaskStore
@@ -97,6 +123,47 @@ func TestArtifactTaskStorePageListByNotebookId(t *testing.T) {
 		So(err, ShouldBeNil)
 		So(len(nextRows), ShouldEqual, 1)
 		So(nextRows[0].Id, ShouldEqual, expectedIDs[1])
+	})
+}
+
+func TestArtifactTaskStoreListByNotebookId(t *testing.T) {
+	Convey("ArtifactTaskStore ListByNotebookId", t, func() {
+		store := testArtifactTaskStore
+		ctx := t.Context()
+		notebookID := uuid.NewV7()
+		otherNotebookID := uuid.NewV7()
+
+		taskOld := testTask(notebookID, "queued", 1000)
+		taskNew := testTask(notebookID, "queued", 3000)
+		taskMid := testTask(notebookID, "queued", 2000)
+		taskOtherNotebook := testTask(otherNotebookID, "queued", 4000)
+		testCreateTask(t, taskOld)
+		testCreateTask(t, taskNew)
+		testCreateTask(t, taskMid)
+		testCreateTask(t, taskOtherNotebook)
+		testCleanupTasks(t, taskOld.Id, taskNew.Id, taskMid.Id, taskOtherNotebook.Id)
+
+		rows, err := store.ListByNotebookId(
+			ctx,
+			dal.Id(notebookID),
+			2,
+			0,
+		)
+		So(err, ShouldBeNil)
+		So(len(rows), ShouldEqual, 2)
+		So(rows[0].Id, ShouldEqual, taskNew.Id)
+		So(rows[1].Id, ShouldEqual, taskMid.Id)
+		So(rows[0].CreatedAt >= rows[1].CreatedAt, ShouldBeTrue)
+
+		nextRows, err := store.ListByNotebookId(
+			ctx,
+			dal.Id(notebookID),
+			2,
+			2,
+		)
+		So(err, ShouldBeNil)
+		So(len(nextRows), ShouldEqual, 1)
+		So(nextRows[0].Id, ShouldEqual, taskOld.Id)
 	})
 }
 

@@ -2,7 +2,7 @@ deployEnv = "dev"
 
 [api]
 port = 7099
-exitWaitTimeout = "${ENV_GONOTELM_API_EXIT_WAIT_TIMEOUT:-10s}"
+exitWaitTimeout = "${ENV_GONOTELM_API_EXIT_WAIT_TIMEOUT:-30s}"
 
 [logic]
 

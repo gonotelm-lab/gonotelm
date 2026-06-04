@@ -61,4 +61,11 @@ type StudioLogicConfig struct {
 		ModelProvider chat.Provider `toml:"modelProvider"`
 		Model         string        `toml:"model"`
 	} `toml:"mindmap"`
+
+	TaskConfig struct {
+		NumClaimers        int           `toml:"numClaimers"`
+		ScanInterval       time.Duration `toml:"scanInterval"`
+		NumOfWorkGroup     int           `toml:"numOfWorkGroup"`
+		NumWorkersPerGroup int           `toml:"numWorkersPerGroup"`
+	} `toml:"taskConfig"`
 }

@@ -49,12 +49,13 @@ func (c *taskLoopConfig) normalize() {
 }
 
 type taskLoop struct {
-	ctx      context.Context
-	cfg      taskLoopConfig
-	close    chan struct{}
-	claimers sync.WaitGroup
-	workers  sync.WaitGroup
-	g        *ants.MultiPool
+	ctx       context.Context
+	cfg       taskLoopConfig
+	closeOnce sync.Once
+	close     chan struct{}
+	claimers  sync.WaitGroup
+	workers   sync.WaitGroup
+	g         *ants.MultiPool
 
 	taskBiz    *bizartifact.Biz
 	dispatcher *taskDispatcher
@@ -101,11 +102,10 @@ func (t *taskLoop) claimLoop() {
 				slog.Any("err", err),
 				slog.String("stack", string(debug.Stack())),
 			)
-
-			t.claimers.Done()
-			ticker.Stop()
-			slog.InfoContext(t.ctx, "task claim loop stopped", slog.String("claimer", claimerId))
 		}
+		t.claimers.Done()
+		ticker.Stop()
+		slog.InfoContext(t.ctx, "task claim loop stopped", slog.String("claimer", claimerId))
 	}()
 
 	for {
@@ -122,11 +122,15 @@ func (t *taskLoop) claimLoop() {
 			}
 
 			if claimed {
-				t.g.Submit(func() {
-					t.workers.Add(1)
+				t.workers.Add(1)
+				if err := t.g.Submit(func() {
 					t.handleWork(newTask)
 					t.workers.Done()
-				})
+				}); err != nil {
+					slog.ErrorContext(t.ctx, "task claim loop submit work failed", slog.Any("err", err))
+					_ = t.taskBiz.FailTask(t.ctx, newTask.Id, newTask.RunId) // 提交任务失败的话当作失败处理
+					t.workers.Done()
+				}
 			}
 		}
 	}
@@ -134,7 +138,9 @@ func (t *taskLoop) claimLoop() {
 
 // 停止接受任务
 func (t *taskLoop) stop() {
-	close(t.close)
+	t.closeOnce.Do(func() {
+		close(t.close)
+	})
 }
 
 // 关闭后等待所有任务完成
@@ -165,6 +171,13 @@ func (t *taskLoop) handleWork(task *model.ArtifactTask) {
 
 	result, err := t.dispatcher.dispatch(t.ctx, task)
 	if err != nil {
+		slog.ErrorContext(t.ctx, "task handle work dispatch failed",
+			slog.Any("err", err),
+			slog.String("task_id", task.Id.String()),
+			slog.String("task_status", task.Status.String()),
+			slog.String("task_kind", task.Kind.String()),
+			slog.String("task_run_id", task.RunId),
+		)
 		if err := t.taskBiz.FailTask(t.ctx, task.Id, task.RunId); err != nil {
 			slog.ErrorContext(t.ctx, "task handle work fail task failed", slog.Any("err", err))
 		}
@@ -179,5 +192,11 @@ func (t *taskLoop) handleWork(task *model.ArtifactTask) {
 		ResultKind: result.resultKind,
 	}); err != nil {
 		slog.ErrorContext(t.ctx, "task handle work complete task failed", slog.Any("err", err))
+		return
 	}
+
+	slog.DebugContext(t.ctx, "task handle work completed",
+		slog.String("task_id", task.Id.String()),
+		slog.String("task_kind", task.Kind.String()),
+	)
 }

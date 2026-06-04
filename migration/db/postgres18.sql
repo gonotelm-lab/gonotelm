@@ -97,7 +97,7 @@ CREATE TABLE artifact_tasks (
   payload BYTEA,
   created_at BIGINT NOT NULL DEFAULT 0,
   updated_at BIGINT NOT NULL DEFAULT 0,
-  expired_at BIGINT NOT NULL DEFAULT 0,
+  expired_at BIGINT NOT NULL DEFAULT 0
 );
 
 CREATE INDEX idx_artifact_tasks_notebook_id ON artifact_tasks (notebook_id);

@@ -15,39 +15,78 @@ import (
 
 func (s *Server) registerStudioRoutes(g *route.RouterGroup) {
 	g.GET("/studio/artifact/:task_id/status", s.GetStudioArtifactStatus)
+	g.GET("/studio/artifact/:task_id/result", s.GetStudioArtifactResult)
 	g.POST("/studio/artifact/generate", s.GenerateStudioArtifact)
+	g.POST("/studio/artifact/:task_id/delete", s.DeleteStudioArtifact)
+	g.POST("/studio/artifact/:task_id/retry", s.RetryStudioArtifactTask)
+	g.POST("/studio/artifact/:task_id/cancel", s.CancelStudioArtifactTask)
 }
 
-type GetStudioArtifactStatusRequest struct {
+type GetStudioArtifactRequest struct {
 	TaskId uuid.UUID `path:"task_id,required"`
 }
 
 type GetStudioArtifactStatusResponse struct {
-	TaskId string `json:"task_id"`
-	Status string `json:"status"`
-	// TODO add more result fields here
-	Result string `json:"result"`
+	TaskId string               `json:"task_id"`
+	Status model.ArtifactStatus `json:"status"`
 }
 
 func (s *Server) GetStudioArtifactStatus(ctx context.Context, c *app.RequestContext) {
-	var req GetStudioArtifactStatusRequest
+	var req GetStudioArtifactRequest
 	err := c.BindAndValidate(&req)
 	if err != nil {
 		http.ErrResp(c, err)
 		return
 	}
 
-	task, err := s.studioLogic.GetArtifactTask(ctx, req.TaskId)
+	status, err := s.studioLogic.GetArtifactTaskStatus(ctx, req.TaskId)
 	if err != nil {
 		http.ErrResp(c, err)
 		return
 	}
 
 	http.OkResp(c, GetStudioArtifactStatusResponse{
-		TaskId: task.Id.String(),
-		Status: task.Status.String(),
+		TaskId: req.TaskId.String(),
+		Status: status,
 	})
+}
 
+type ArtifactResult struct {
+	NotebookId string               `json:"notebook_id"`
+	TaskId     string               `json:"task_id"`
+	Status     model.ArtifactStatus `json:"status"`
+
+	// content解释
+	//
+	// 如果contentKind=inline, 则content为inline内容
+	// 如果contentKind=storage, 则contentUrl为产物的链接 需要请求这个链接才能获取产物
+	Content     string                   `json:"content,omitempty"`
+	ContentUrl  string                   `json:"content_url,omitempty"`
+	ContentKind model.ArtifactResultKind `json:"content_kind"` // inline | storage
+}
+
+func (s *Server) GetStudioArtifactResult(ctx context.Context, c *app.RequestContext) {
+	var req GetStudioArtifactRequest
+	err := c.BindAndValidate(&req)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	artifact, err := s.studioLogic.GetArtifactTask(ctx, req.TaskId)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	http.OkResp(c, ArtifactResult{
+		NotebookId:  artifact.NotebookId.String(),
+		TaskId:      req.TaskId.String(),
+		Status:      artifact.Status,
+		Content:     artifact.Content,
+		ContentUrl:  artifact.ContentUrl,
+		ContentKind: artifact.ResultKind,
+	})
 }
 
 type GenerateStudioArtifactRequest struct {
@@ -91,4 +130,13 @@ func (s *Server) GenerateStudioArtifact(ctx context.Context, c *app.RequestConte
 	http.OkResp(c, GenerateStudioArtifactResponse{
 		TaskId: resp.String(),
 	})
+}
+
+func (s *Server) DeleteStudioArtifact(ctx context.Context, c *app.RequestContext) {
+}
+
+func (s *Server) RetryStudioArtifactTask(ctx context.Context, c *app.RequestContext) {
+}
+
+func (s *Server) CancelStudioArtifactTask(ctx context.Context, c *app.RequestContext) {
 }

@@ -79,6 +79,7 @@ func MustNewLogic(
 	)
 
 	studioLogic := studiologic.MustNewLogic(
+		ctx,
 		objectStorage,
 		sourceBiz,
 		notebookBiz,
@@ -101,6 +102,9 @@ func (l *Logic) Close(ctx context.Context) {
 	})
 	wg.Go(func() {
 		l.ChatLogic.Close(ctx)
+	})
+	wg.Go(func() {
+		l.StudioLogic.Close(ctx)
 	})
 
 	wg.Wait()

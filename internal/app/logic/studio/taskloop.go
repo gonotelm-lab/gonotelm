@@ -185,6 +185,22 @@ func (t *taskLoop) handleWork(task *model.ArtifactTask) {
 		return
 	}
 
+	// get again
+	status, err := t.taskBiz.GetTaskStatus(t.ctx, task.Id)
+	if err != nil {
+		slog.ErrorContext(t.ctx, "task handle work get task status failed", slog.Any("err", err))
+	} else {
+		if status.Cancelled() {
+			slog.DebugContext(t.ctx, "target task is already cancelled, skip..",
+				slog.String("task_id", task.Id.String()),
+				slog.String("task_run_id", task.RunId),
+				slog.String("task_kind", task.Kind.String()),
+				slog.String("task_status", status.String()),
+			)
+			return
+		}
+	}
+
 	if err := t.taskBiz.CompleteTask(t.ctx, &bizartifact.CompleteTaskCommand{
 		TaskId:     task.Id,
 		RunId:      task.RunId,

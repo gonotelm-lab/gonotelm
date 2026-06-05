@@ -258,7 +258,7 @@ func (l *Logic) DeleteArtifact(
 	return nil
 }
 
-// 重试任务 只有失败的任务才可以重试
+// 重试任务 只有失败和取消的任务才可以重试
 func (l *Logic) RetryArtifactTask(
 	ctx context.Context,
 	taskId uuid.UUID,
@@ -268,11 +268,11 @@ func (l *Logic) RetryArtifactTask(
 		return errors.WithMessage(err, "get artifact task failed")
 	}
 
-	if !task.Status.Failed() {
+	if !task.Status.Failed() && !task.Status.Cancelled() {
 		return errors.ErrParams.Msgf("can not retry non-failed task, task_id=%s", taskId)
 	}
 
-	err = l.artifactBiz.RetryFailedTask(ctx, taskId)
+	err = l.artifactBiz.RetryTask(ctx, taskId)
 	if err != nil {
 		return errors.WithMessage(err, "retry artifact task failed")
 	}

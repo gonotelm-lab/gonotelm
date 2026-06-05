@@ -98,17 +98,24 @@ type ArtifactTaskStore interface {
 	) (*schema.ArtifactTask, bool, error)
 
 	// 强行设置任务状态
+	//
+	// 当前任务状态为oldStatus时设置新状态
 	SetStatus(ctx context.Context,
 		id Id,
-		newStatus, oldStatus string,
+		newStatus string,
+		oldStatuses []string,
 		updatedAt int64,
+		expiredAt int64, // -1 means no change
 	) error
 
 	// 批量设置任务状态
+	// 当前任务状态为oldStatus时设置新状态
 	BatchSetStatus(ctx context.Context,
 		ids []Id,
-		newStatus, oldStatus string,
+		newStatus string,
+		oldStatuses []string,
 		updatedAt int64,
+		expiredAt int64, // -1 means no change
 	) error
 
 	// 更新任务状态
@@ -151,9 +158,6 @@ type ArtifactTaskStore interface {
 		limit int,
 		now int64,
 	) ([]*schema.ArtifactTask, error)
-
-	// 重置任务状态
-	Reset(ctx context.Context, id Id, newStatus string, updatedAt, expiredAt int64) error
 }
 
 type DAL struct {

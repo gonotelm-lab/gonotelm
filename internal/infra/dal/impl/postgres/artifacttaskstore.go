@@ -233,17 +233,26 @@ func (a *ArtifactTaskStoreImpl) claimWithVersionLockMode(
 func (a *ArtifactTaskStoreImpl) SetStatus(
 	ctx context.Context,
 	id dal.Id,
-	newStatus, oldStatus string,
+	newStatus string,
+	oldStatuses []string,
 	updatedAt int64,
+	expiredAt int64, // -1 means no change
 ) error {
-	if err := a.db.WithContext(ctx).
+	updates := map[string]any{
+		"status":     newStatus,
+		"updated_at": updatedAt,
+	}
+	if expiredAt != -1 {
+		updates["expired_at"] = expiredAt
+	}
+
+	tx := a.db.WithContext(ctx).
 		Model(&schema.ArtifactTask{}).
-		Where("id = ?", id).
-		Where("status = ?", oldStatus).
-		Updates(map[string]any{
-			"status":     newStatus,
-			"updated_at": updatedAt,
-		}).Error; err != nil {
+		Where("id = ?", id)
+	if len(oldStatuses) > 0 {
+		tx = tx.Where("status IN ?", oldStatuses)
+	}
+	if err := tx.Updates(updates).Error; err != nil {
 		return sql.WrapErr(err)
 	}
 
@@ -253,17 +262,26 @@ func (a *ArtifactTaskStoreImpl) SetStatus(
 func (a *ArtifactTaskStoreImpl) BatchSetStatus(
 	ctx context.Context,
 	ids []dal.Id,
-	newStatus, oldStatus string,
+	newStatus string,
+	oldStatuses []string,
 	updatedAt int64,
+	expiredAt int64, // -1 means no change
 ) error {
-	if err := a.db.WithContext(ctx).
+	updates := map[string]any{
+		"status":     newStatus,
+		"updated_at": updatedAt,
+	}
+	if expiredAt != -1 {
+		updates["expired_at"] = expiredAt
+	}
+
+	tx := a.db.WithContext(ctx).
 		Model(&schema.ArtifactTask{}).
-		Where("id IN ?", ids).
-		Where("status = ?", oldStatus).
-		Updates(map[string]any{
-			"status":     newStatus,
-			"updated_at": updatedAt,
-		}).Error; err != nil {
+		Where("id IN ?", ids)
+	if len(oldStatuses) > 0 {
+		tx = tx.Where("status IN ?", oldStatuses)
+	}
+	if err := tx.Updates(updates).Error; err != nil {
 		return sql.WrapErr(err)
 	}
 
@@ -401,24 +419,4 @@ func (a *ArtifactTaskStoreImpl) PageListExpiredTasks(
 	}
 
 	return tasks, nil
-}
-
-func (a *ArtifactTaskStoreImpl) Reset(
-	ctx context.Context,
-	id dal.Id,
-	newStatus string,
-	updatedAt int64,
-	expiredAt int64,
-) error {
-	if err := a.db.WithContext(ctx).
-		Model(&schema.ArtifactTask{}).
-		Where("id = ?", id).
-		Updates(map[string]any{
-			"status":     newStatus,
-			"updated_at": updatedAt,
-			"expired_at": expiredAt,
-		}).Error; err != nil {
-		return sql.WrapErr(err)
-	}
-	return nil
 }

@@ -563,6 +563,67 @@ func TestArtifactTaskStoreClaimTaskConcurrentVersionLock(t *testing.T) {
 	})
 }
 
+func TestArtifactTaskStoreSetStatus(t *testing.T) {
+	Convey("ArtifactTaskStore SetStatus", t, func() {
+		store := testArtifactTaskStore
+		ctx := t.Context()
+		notebookID := uuid.NewV7()
+
+		task := testTask(notebookID, "queued", 1000)
+		testCreateTask(t, task)
+		testCleanupTasks(t, task.Id)
+
+		err := store.SetStatus(ctx, dal.Id(task.Id), "running", 2000)
+		So(err, ShouldBeNil)
+
+		got, err := store.GetById(ctx, dal.Id(task.Id))
+		So(err, ShouldBeNil)
+		So(got.Status, ShouldEqual, "running")
+		So(got.UpdatedAt, ShouldEqual, int64(2000))
+		So(got.LockNo, ShouldEqual, int32(0))
+		So(got.RunId, ShouldEqual, "")
+	})
+}
+
+func TestArtifactTaskStoreBatchSetStatus(t *testing.T) {
+	Convey("ArtifactTaskStore BatchSetStatus", t, func() {
+		store := testArtifactTaskStore
+		ctx := t.Context()
+		notebookID := uuid.NewV7()
+
+		task1 := testTask(notebookID, "queued", 1000)
+		task2 := testTask(notebookID, "queued", 2000)
+		taskOut := testTask(notebookID, "queued", 3000)
+		testCreateTask(t, task1)
+		testCreateTask(t, task2)
+		testCreateTask(t, taskOut)
+		testCleanupTasks(t, task1.Id, task2.Id, taskOut.Id)
+
+		err := store.BatchSetStatus(
+			ctx,
+			[]dal.Id{dal.Id(task1.Id), dal.Id(task2.Id)},
+			"timeout",
+			4000,
+		)
+		So(err, ShouldBeNil)
+
+		got1, err := store.GetById(ctx, dal.Id(task1.Id))
+		So(err, ShouldBeNil)
+		So(got1.Status, ShouldEqual, "timeout")
+		So(got1.UpdatedAt, ShouldEqual, int64(4000))
+
+		got2, err := store.GetById(ctx, dal.Id(task2.Id))
+		So(err, ShouldBeNil)
+		So(got2.Status, ShouldEqual, "timeout")
+		So(got2.UpdatedAt, ShouldEqual, int64(4000))
+
+		gotOut, err := store.GetById(ctx, dal.Id(taskOut.Id))
+		So(err, ShouldBeNil)
+		So(gotOut.Status, ShouldEqual, "queued")
+		So(gotOut.UpdatedAt, ShouldEqual, taskOut.UpdatedAt)
+	})
+}
+
 func TestArtifactTaskStoreUpdateStatus(t *testing.T) {
 	Convey("ArtifactTaskStore UpdateStatus", t, func() {
 		store := testArtifactTaskStore

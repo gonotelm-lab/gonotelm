@@ -14,15 +14,42 @@ import (
 )
 
 func (s *Server) registerStudioRoutes(g *route.RouterGroup) {
-	g.GET("/studio/artifact/:task_id/status", s.GetStudioArtifactStatus)
-	g.GET("/studio/artifact/:task_id/result", s.GetStudioArtifactResult)
+	artifactGroup := g.Group("/studio/artifact/:task_id")
+	artifactGroup.Use(s.checkArtifactUserMiddleware)
+	{
+		artifactGroup.GET("/status", s.GetStudioArtifactStatus)
+		artifactGroup.GET("/result", s.GetStudioArtifactResult)
+		artifactGroup.POST("/delete", s.DeleteStudioArtifact)
+		artifactGroup.POST("/retry", s.RetryStudioArtifactTask)
+		artifactGroup.POST("/cancel", s.CancelStudioArtifactTask)
+	}
+
 	g.POST("/studio/artifact/generate", s.GenerateStudioArtifact)
-	g.POST("/studio/artifact/:task_id/delete", s.DeleteStudioArtifact)
-	g.POST("/studio/artifact/:task_id/retry", s.RetryStudioArtifactTask)
-	g.POST("/studio/artifact/:task_id/cancel", s.CancelStudioArtifactTask)
 }
 
-type GetStudioArtifactRequest struct {
+func (s *Server) checkArtifactUserMiddleware(ctx context.Context, c *app.RequestContext) {
+	taskId := c.Param("task_id")
+	if taskId == "" {
+		http.ErrResp(c, errors.ErrParams.Msgf("task_id is required"))
+		return
+	}
+
+	tid, err := uuid.ParseString(taskId)
+	if err != nil {
+		http.ErrResp(c, errors.ErrParams.Msgf("invalid task_id: %s", taskId))
+		return
+	}
+
+	err = s.studioLogic.CheckArtifactTaskUserId(ctx, tid)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	c.Next(ctx)
+}
+
+type ArtifactTaskIdRequest struct {
 	TaskId uuid.UUID `path:"task_id,required"`
 }
 
@@ -32,7 +59,7 @@ type GetStudioArtifactStatusResponse struct {
 }
 
 func (s *Server) GetStudioArtifactStatus(ctx context.Context, c *app.RequestContext) {
-	var req GetStudioArtifactRequest
+	var req ArtifactTaskIdRequest
 	err := c.BindAndValidate(&req)
 	if err != nil {
 		http.ErrResp(c, err)
@@ -66,7 +93,7 @@ type ArtifactResult struct {
 }
 
 func (s *Server) GetStudioArtifactResult(ctx context.Context, c *app.RequestContext) {
-	var req GetStudioArtifactRequest
+	var req ArtifactTaskIdRequest
 	err := c.BindAndValidate(&req)
 	if err != nil {
 		http.ErrResp(c, err)
@@ -133,6 +160,20 @@ func (s *Server) GenerateStudioArtifact(ctx context.Context, c *app.RequestConte
 }
 
 func (s *Server) DeleteStudioArtifact(ctx context.Context, c *app.RequestContext) {
+	var req ArtifactTaskIdRequest
+	err := c.BindAndValidate(&req)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	err = s.studioLogic.DeleteArtifact(ctx, req.TaskId)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	http.OkResp(c, nil)
 }
 
 func (s *Server) RetryStudioArtifactTask(ctx context.Context, c *app.RequestContext) {

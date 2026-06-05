@@ -21,7 +21,8 @@ type taskDispatcher struct {
 	handlers map[model.ArtifactKind]taskHandler
 }
 
-func newTaskDispatcher(handlers map[model.ArtifactKind]taskHandler) *taskDispatcher {
+func newTaskDispatcher() *taskDispatcher {
+	handlers := make(map[model.ArtifactKind]taskHandler)
 	return &taskDispatcher{handlers: handlers}
 }
 

@@ -41,6 +41,21 @@ func (a *ArtifactTaskStoreImpl) GetById(ctx context.Context, id dal.Id) (*schema
 	return &task, nil
 }
 
+func (a *ArtifactTaskStoreImpl) GetByNotebookIdAndId(
+	ctx context.Context,
+	notebookId, id dal.Id,
+) (*schema.ArtifactTask, error) {
+	var task schema.ArtifactTask
+	if err := a.db.WithContext(ctx).
+		Where("notebook_id = ?", notebookId).
+		Where("id = ?", id).
+		Take(&task).Error; err != nil {
+		return nil, sql.WrapErr(err)
+	}
+
+	return &task, nil
+}
+
 func (a *ArtifactTaskStoreImpl) GetStatusById(ctx context.Context, id dal.Id) (string, error) {
 	var task schema.ArtifactTask
 	if err := a.db.WithContext(ctx).
@@ -234,6 +249,25 @@ func (a *ArtifactTaskStoreImpl) SetStatus(
 	return nil
 }
 
+func (a *ArtifactTaskStoreImpl) BatchSetStatus(
+	ctx context.Context,
+	ids []dal.Id,
+	newStatus string,
+	updatedAt int64,
+) error {
+	if err := a.db.WithContext(ctx).
+		Model(&schema.ArtifactTask{}).
+		Where("id IN ?", ids).
+		Updates(map[string]any{
+			"status":     newStatus,
+			"updated_at": updatedAt,
+		}).Error; err != nil {
+		return sql.WrapErr(err)
+	}
+
+	return nil
+}
+
 func (a *ArtifactTaskStoreImpl) UpdateStatus(
 	ctx context.Context,
 	id dal.Id,
@@ -304,6 +338,26 @@ func (a *ArtifactTaskStoreImpl) DeleteById(ctx context.Context, id dal.Id) error
 	}
 
 	return nil
+}
+
+func (a *ArtifactTaskStoreImpl) DeleteByIdAndNotStatus(
+	ctx context.Context,
+	id dal.Id,
+	status string,
+) (bool, error) {
+	result := a.db.WithContext(ctx).
+		Where("id = ?", id).
+		Where("status != ?", status).
+		Delete(&schema.ArtifactTask{})
+	if result.Error != nil {
+		return false, sql.WrapErr(result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func (a *ArtifactTaskStoreImpl) SetExpiredTasksStatus(

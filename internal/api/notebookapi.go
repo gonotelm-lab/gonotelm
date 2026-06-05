@@ -8,19 +8,42 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/app/logic"
 	studiologic "github.com/gonotelm-lab/gonotelm/internal/app/logic/studio"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
+	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 
 func (s *Server) registerNotebooksRoutes(g *route.RouterGroup) {
 	g.POST("/notebook", s.CreateNotebook)
-	g.GET("/notebook/:id", s.GetNotebook)
-	g.GET("/notebook/:id/source/list", s.ListNotebookSources)
 	g.GET("/notebook/list", s.ListNotebooks)
-	g.PUT("/notebook/:id/name", s.UpdateNotebookName)
-	g.POST("/notebook/:id/chat", s.GetOrCreateNotebookChat)
-	g.DELETE("/notebook/:id", s.DeleteNotebook)
-	g.GET("/notebook/:id/studio/artifact/list", s.ListNotebookStudioArtifacts)
+
+	notebookIdGroup := g.Group("/notebook/:id")
+	notebookIdGroup.Use(s.checkNotebookUserId)
+	{
+		notebookIdGroup.GET("", s.GetNotebook)
+		notebookIdGroup.DELETE("", s.DeleteNotebook)
+		notebookIdGroup.PUT("/name", s.UpdateNotebookName)
+		notebookIdGroup.POST("/chat", s.GetOrCreateNotebookChat)
+		notebookIdGroup.GET("/source/list", s.ListNotebookSources)
+		notebookIdGroup.GET("/studio/artifact/list", s.ListNotebookStudioArtifacts)
+	}
+}
+
+func (s *Server) checkNotebookUserId(ctx context.Context, c *app.RequestContext) {
+	notebookId := c.Param("id")
+	nid, err := uuid.ParseString(notebookId)
+	if err != nil {
+		http.ErrResp(c, errors.ErrParams.Msgf("invalid notebook_id: %s", notebookId))
+		return
+	}
+
+	err = s.notebookLogic.CheckNotebookUserId(ctx, nid)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	c.Next(ctx)
 }
 
 type CreateNotebookRequest struct {

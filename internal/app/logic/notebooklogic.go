@@ -280,3 +280,15 @@ func (l *NotebookLogic) DeleteNotebook(
 
 	return nil
 }
+
+func (l *NotebookLogic) CheckNotebookUserId(ctx context.Context, id uuid.UUID) error {
+	userId := pkgcontext.GetUserId(ctx)
+	notebookUserId, err := l.notebookBiz.GetNotebookUser(ctx, id)
+	if err != nil {
+		return errors.WithMessagef(err, "get notebook user failed, notebook_id=%s", id)
+	}
+	if notebookUserId != userId {
+		return errors.ErrPermission.Msgf("notebook access denied, notebook_id=%s", id)
+	}
+	return nil
+}

@@ -2,12 +2,14 @@ package artifact
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/safe"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 
@@ -15,7 +17,10 @@ const (
 	defaultTaskExpiration = time.Minute * 30
 )
 
-var ErrTaskNotFound = errors.ErrParams.Msgf("task not found")
+var (
+	ErrTaskNotFound          = errors.ErrParams.Msgf("task not found")
+	ErrCantDeleteRunningTask = errors.ErrParams.Msgf("cannot delete running task")
+)
 
 type Biz struct {
 	taskStore dal.ArtifactTaskStore
@@ -67,6 +72,22 @@ func (b *Biz) DeleteTask(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
+func (b *Biz) DeleteNotRunningTask(
+	ctx context.Context,
+	id uuid.UUID,
+) error {
+	ok, err := b.taskStore.DeleteByIdAndNotStatus(ctx, id, model.ArtifactStatusRunning.String())
+	if err != nil {
+		return errors.WithMessagef(err,
+			"delete not running artifact task failed, id=%s", id)
+	}
+	if !ok {
+		return ErrCantDeleteRunningTask
+	}
+
+	return nil
+}
+
 func (b *Biz) GetTask(ctx context.Context, id uuid.UUID) (*model.ArtifactTask, error) {
 	task, err := b.taskStore.GetById(ctx, id)
 	if err != nil {
@@ -77,7 +98,10 @@ func (b *Biz) GetTask(ctx context.Context, id uuid.UUID) (*model.ArtifactTask, e
 		return nil, errors.WithMessagef(err, "get artifact task failed, id=%s", id)
 	}
 
-	return model.NewArtifactTaskFrom(task), nil
+	ret := model.NewArtifactTaskFrom(task)
+	b.lazySetTaskExpiredStatus(ctx, []*model.ArtifactTask{ret})
+
+	return ret, nil
 }
 
 func (b *Biz) GetTaskStatus(ctx context.Context, id uuid.UUID) (model.ArtifactStatus, error) {
@@ -117,6 +141,7 @@ func (b *Biz) ListTasksByNotebook(
 	for _, row := range rows {
 		tasks = append(tasks, model.NewArtifactTaskFrom(row))
 	}
+	b.lazySetTaskExpiredStatus(ctx, tasks)
 
 	return tasks, nil
 }
@@ -193,10 +218,51 @@ func (b *Biz) CompleteTask(ctx context.Context, cmd *CompleteTaskCommand) error 
 	return nil
 }
 
-func taskRunId() string {
-	return uuid.NewV4().String()
+func (b *Biz) GetArtifactTaskUser(ctx context.Context, taskId uuid.UUID) (string, error) {
+	task, err := b.GetTask(ctx, taskId)
+	if err != nil {
+		return "", errors.WithMessagef(err, "get artifact task user failed, task_id=%s", taskId)
+	}
+
+	return task.UserId, nil
 }
 
-func getUnixMilli() int64 {
-	return time.Now().UnixMilli()
+func (b *Biz) lazySetTaskExpiredStatus(
+	ctx context.Context,
+	tasks []*model.ArtifactTask,
+) {
+	now := getUnixMilli()
+	expiredTasks := make([]*model.ArtifactTask, 0, len(tasks))
+	for _, task := range tasks {
+		if (task.Status.Running() || task.Status.Pending()) && task.ExpiredAt <= now {
+			expiredTasks = append(expiredTasks, task)
+		}
+	}
+
+	if len(expiredTasks) == 0 {
+		return
+	}
+
+	for _, task := range expiredTasks {
+		task.Status = model.ArtifactStatusExpired
+	}
+
+	// reset task status to expired in backgound
+	newCtx := context.WithoutCancel(ctx)
+	safe.Go(newCtx, func() {
+		ids := make([]dal.Id, 0, len(expiredTasks))
+		for _, task := range expiredTasks {
+			ids = append(ids, task.Id)
+		}
+		err := b.taskStore.SetExpiredTasksStatus(
+			newCtx,
+			ids,
+			model.ArtifactStatusExpired.String(),
+			now,
+			now,
+		)
+		if err != nil {
+			slog.ErrorContext(newCtx, "set expired tasks status failed", "error", err)
+		}
+	})
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/eino-ext/chunker/recursive"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/safe"
@@ -21,6 +22,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/token"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 
+	"github.com/bytedance/sonic"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -71,9 +73,8 @@ func MustNewLogic(
 }
 
 func (l *Logic) initBackgroundWorks() {
-	dispatcher := newTaskDispatcher(map[model.ArtifactKind]taskHandler{
-		model.ArtifactKindMindmap: &mindmapCreator{l: l},
-	})
+	dispatcher := newTaskDispatcher()
+	dispatcher.register(model.ArtifactKindMindmap, &mindmapGenerator{l: l})
 
 	cfg := conf.Global().Logic.Studio.TaskConfig
 
@@ -101,6 +102,17 @@ func (l *Logic) GenerateArtifact(
 	ctx context.Context,
 	params *GenerateArtifactParams,
 ) (uuid.UUID, error) {
+	// check notebook and user
+	notebook, err := l.helpGetNotebook(ctx, params.NotebookId)
+	if err != nil {
+		return uuid.EmptyUUID(), err
+	}
+
+	userId := pkgcontext.GetUserId(ctx)
+	if notebook.OwnerId != userId {
+		return uuid.EmptyUUID(), errors.ErrPermission.Msgf("notebook access denied, notebook_id=%s", params.NotebookId)
+	}
+
 	switch params.Kind {
 	case model.ArtifactKindMindmap:
 		return l.generateMindmapTask(ctx, &generateMindmapTaskParams{
@@ -226,6 +238,41 @@ func (l *Logic) ListNotebookArtifacts(
 	}, nil
 }
 
+func (l *Logic) DeleteArtifact(
+	ctx context.Context,
+	taskId uuid.UUID,
+) error {
+	task, err := l.artifactBiz.GetTask(ctx, taskId)
+	if err != nil {
+		return errors.WithMessage(err, "get artifact task failed")
+	}
+	if task.Status.Running() {
+		return errors.ErrParams.Msgf("cannot delete running artifact task, task_id=%s", taskId)
+	}
+
+	err = l.artifactBiz.DeleteNotRunningTask(ctx, taskId)
+	if err != nil {
+		return errors.WithMessage(err, "delete artifact task failed")
+	}
+
+	return nil
+}
+
+// 权限校验 检查任务是否属于当前用户
+func (l *Logic) CheckArtifactTaskUserId(ctx context.Context, taskId uuid.UUID) error {
+	userId := pkgcontext.GetUserId(ctx)
+	taskUserId, err := l.artifactBiz.GetArtifactTaskUser(ctx, taskId)
+	if err != nil {
+		return errors.WithMessage(err, "get artifact task user failed")
+	}
+
+	if taskUserId != userId {
+		return errors.ErrPermission.Msgf("artifact task access denied, task_id=%s", taskId)
+	}
+
+	return nil
+}
+
 func (l *Logic) helpGetSourcesParsedContent(
 	ctx context.Context,
 	sources []*model.DecodedSource,
@@ -281,4 +328,28 @@ func (l *Logic) helpGetNotebook(ctx context.Context, notebookId uuid.UUID) (*mod
 	}
 
 	return notebook, nil
+}
+
+func (l *Logic) generateMindmapTask(
+	ctx context.Context,
+	params *generateMindmapTaskParams,
+) (uuid.UUID, error) {
+	userId := pkgcontext.GetUserId(ctx)
+	payload, err := sonic.Marshal(params)
+	if err != nil {
+		return uuid.EmptyUUID(), errors.Wrapf(errors.ErrSerde, "marshal mindmap params err=%v", err)
+	}
+
+	taskId, err := l.artifactBiz.CreateTask(ctx, &bizartifact.CreateTaskCommand{
+		NotebookId: params.NotebookId,
+		Kind:       model.ArtifactKindMindmap,
+		UserId:     userId,
+		Payload:    payload,
+	})
+	if err != nil {
+		return uuid.EmptyUUID(), errors.WithMessagef(err,
+			"create mindmap task failed, notebook_id=%s", params.NotebookId)
+	}
+
+	return taskId, nil
 }

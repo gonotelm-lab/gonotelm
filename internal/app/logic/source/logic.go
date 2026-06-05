@@ -531,6 +531,20 @@ func (l *Logic) GetSourceParsedTree(
 	return buildParsedSourceDocTree(tree), nil
 }
 
+func (l *Logic) CheckSourceUserId(ctx context.Context, sourceId uuid.UUID) error {
+	sourceUserId, err := l.sourceBiz.GetSourceUser(ctx, sourceId)
+	if err != nil {
+		return errors.WithMessagef(err, "get source user failed, source_id=%s", sourceId)
+	}
+
+	userId := pkgcontext.GetUserId(ctx)
+	if sourceUserId != userId {
+		return errors.ErrPermission.Msgf("source access denied, source_id=%s", sourceId)
+	}
+
+	return nil
+}
+
 func (l *Logic) pollFileSourceStatus(
 	ctx context.Context,
 	source *model.Source,

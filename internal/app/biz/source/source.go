@@ -1111,3 +1111,12 @@ func (s *Biz) PopulateSourceDocs(
 
 	return nil
 }
+
+func (b *Biz) GetSourceUser(ctx context.Context, sourceId uuid.UUID) (string, error) {
+	source, err := b.GetSource(ctx, sourceId)
+	if err != nil {
+		return "", errors.WithMessagef(err, "get source user failed, source_id=%s", sourceId)
+	}
+
+	return source.OwnerId, nil
+}

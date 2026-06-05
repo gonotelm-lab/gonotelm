@@ -175,3 +175,12 @@ func (b *Biz) DeleteNotebook(ctx context.Context, id uuid.UUID) error {
 
 	return nil
 }
+
+func (b *Biz) GetNotebookUser(ctx context.Context, id uuid.UUID) (string, error) {
+	notebook, err := b.GetNotebook(ctx, id)
+	if err != nil {
+		return "", errors.WithMessagef(err, "get notebook user failed, id=%s", id)
+	}
+
+	return notebook.OwnerId, nil
+}

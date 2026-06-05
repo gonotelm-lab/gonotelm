@@ -8,13 +8,11 @@ import (
 	"strings"
 
 	"github.com/bytedance/sonic"
-	"github.com/gonotelm-lab/gonotelm/internal/app/biz/artifact"
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/app/prompts"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
-	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/safe"
 	pkgslices "github.com/gonotelm-lab/gonotelm/pkg/slices"
@@ -30,23 +28,28 @@ const (
 	mindmapAbstractMode = "abstract"
 )
 
-type mindmapCreator struct {
+type mindmapGenerator struct {
 	l *Logic
 }
 
-var _ taskHandler = &mindmapCreator{}
+var _ taskHandler = &mindmapGenerator{}
 
-func (c *mindmapCreator) handle(ctx context.Context, task *model.ArtifactTask) (*taskHandleResult, error) {
+type generateMindmapTaskParams struct {
+	NotebookId uuid.UUID   `json:"notebook_id"`
+	SourceIds  []uuid.UUID `json:"source_ids"`
+}
+
+func (m *mindmapGenerator) handle(
+	ctx context.Context,
+	task *model.ArtifactTask,
+) (*taskHandleResult, error) {
 	var params generateMindmapTaskParams
 	err := sonic.Unmarshal(task.Payload, &params)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrSerde, "unmarshal generate mindmap task params err=%v", err)
 	}
 
-	mindmap, err := c.l.createMindmap(ctx, &createMindmapParams{
-		NotebookId: params.NotebookId,
-		SourceIds:  params.SourceIds,
-	})
+	mindmap, err := m.generate(ctx, params.NotebookId, params.SourceIds)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "create mindmap failed, err=%v", err)
 	}
@@ -57,52 +60,22 @@ func (c *mindmapCreator) handle(ctx context.Context, task *model.ArtifactTask) (
 	}, nil
 }
 
-type generateMindmapTaskParams struct {
-	NotebookId uuid.UUID   `json:"notebook_id"`
-	SourceIds  []uuid.UUID `json:"source_ids"`
-}
-
-func (l *Logic) generateMindmapTask(
+func (m *mindmapGenerator) generate(
 	ctx context.Context,
-	params *generateMindmapTaskParams,
-) (uuid.UUID, error) {
-	userId := pkgcontext.GetUserId(ctx)
-	payload, err := sonic.Marshal(params)
-	if err != nil {
-		return uuid.EmptyUUID(), errors.Wrapf(errors.ErrSerde, "marshal mindmap params err=%v", err)
-	}
-
-	taskId, err := l.artifactBiz.CreateTask(ctx, &artifact.CreateTaskCommand{
-		NotebookId: params.NotebookId,
-		Kind:       model.ArtifactKindMindmap,
-		UserId:     userId,
-		Payload:    payload,
-	})
-	if err != nil {
-		return uuid.EmptyUUID(), errors.WithMessagef(err,
-			"create mindmap task failed, notebook_id=%s", params.NotebookId)
-	}
-
-	return taskId, nil
-}
-
-type createMindmapParams struct {
-	NotebookId uuid.UUID
-	SourceIds  []uuid.UUID
-}
-
-func (l *Logic) createMindmap(ctx context.Context, params *createMindmapParams) (string, error) {
+	notebookId uuid.UUID,
+	sourceIds []uuid.UUID,
+) (string, error) {
 	// check notebook
-	notebook, err := l.helpGetNotebook(ctx, params.NotebookId)
+	notebook, err := m.l.helpGetNotebook(ctx, notebookId)
 	if err != nil {
 		return "", errors.WithMessage(err, "get notebook failed")
 	}
 
 	// check source ids ready
-	sources, err := l.sourceBiz.BatchGetDecodedSources(
+	sources, err := m.l.sourceBiz.BatchGetDecodedSources(
 		ctx,
 		notebook.Id,
-		params.SourceIds,
+		sourceIds,
 	)
 	if err != nil {
 		return "", errors.WithMessage(err, "batch get decoded sources failed")
@@ -112,11 +85,11 @@ func (l *Logic) createMindmap(ctx context.Context, params *createMindmapParams) 
 	if lenSources == 0 {
 		return "", errors.ErrParams.Msgf(
 			"no sources found, notebook_id=%s, source_ids=%v",
-			notebook.Id, params.SourceIds,
+			notebook.Id, sourceIds,
 		)
 	}
 
-	parsedContents, err := l.helpGetSourcesParsedContent(ctx, sources)
+	parsedContents, err := m.l.helpGetSourcesParsedContent(ctx, sources)
 	if err != nil {
 		return "", errors.WithMessagef(err,
 			"get sources parsed content failed, notebook_id=%s",
@@ -137,13 +110,13 @@ func (l *Logic) createMindmap(ctx context.Context, params *createMindmapParams) 
 	}
 
 	if totalTokens <= constants.MindmapMaxOnceToken {
-		return l.oneshotCreateMindmap(ctx, params.NotebookId, parsedContents, "")
+		return m.oneshotCreateMindmap(ctx, notebookId, parsedContents, "")
 	}
 
-	return l.twoshotCreateMindmap(ctx, params.NotebookId, parsedContents, tokensCounts)
+	return m.twoshotCreateMindmap(ctx, notebookId, parsedContents, tokensCounts)
 }
 
-func (l *Logic) oneshotCreateMindmap(
+func (m *mindmapGenerator) oneshotCreateMindmap(
 	ctx context.Context,
 	notebookId uuid.UUID,
 	contents map[uuid.UUID]string,
@@ -170,7 +143,7 @@ func (l *Logic) oneshotCreateMindmap(
 			"failed to get mindmap template message, mode=%s, err=%v", mode, err)
 	}
 
-	model, err := l.llmGateway.GetProvider(
+	model, err := m.l.llmGateway.GetProvider(
 		conf.Global().Logic.Studio.Mindmap.ModelProvider,
 	)
 	if err != nil {
@@ -213,7 +186,7 @@ func (l *Logic) oneshotCreateMindmap(
 	return "", errors.Wrap(errors.ErrLLM, "failed to generate studio mindmap")
 }
 
-func (l *Logic) twoshotCreateMindmap(
+func (m *mindmapGenerator) twoshotCreateMindmap(
 	ctx context.Context,
 	notebookId uuid.UUID,
 	contents map[uuid.UUID]string,
@@ -281,7 +254,7 @@ func (l *Logic) twoshotCreateMindmap(
 				ccs.WriteString(c.content)
 				ccs.WriteByte('\n')
 			}
-			splits, err := l.splitter.Transform(ctx,
+			splits, err := m.l.splitter.Transform(ctx,
 				pkgslices.FromSingle(&einoschema.Document{
 					Content: ccs.String(),
 				}))
@@ -327,7 +300,7 @@ func (l *Logic) twoshotCreateMindmap(
 		}
 	}
 	// step2
-	mindmap, err := l.oneshotCreateMindmap(
+	mindmap, err := m.oneshotCreateMindmap(
 		ctx,
 		notebookId,
 		abstractContents,

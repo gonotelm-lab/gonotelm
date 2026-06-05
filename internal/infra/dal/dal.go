@@ -71,6 +71,9 @@ type ArtifactTaskStore interface {
 	// 根据id获取任务
 	GetById(ctx context.Context, id Id) (*schema.ArtifactTask, error)
 
+	// 根据notebookId和id获取任务
+	GetByNotebookIdAndId(ctx context.Context, notebookId, id Id) (*schema.ArtifactTask, error)
+
 	// 获取任务状态
 	GetStatusById(ctx context.Context, id Id) (string, error)
 
@@ -97,6 +100,9 @@ type ArtifactTaskStore interface {
 	// 强行设置任务状态
 	SetStatus(ctx context.Context, id Id, newStatus string, updatedAt int64) error
 
+	// 批量设置任务状态
+	BatchSetStatus(ctx context.Context, ids []Id, newStatus string, updatedAt int64) error
+
 	// 更新任务状态
 	UpdateStatus(
 		ctx context.Context,
@@ -117,6 +123,9 @@ type ArtifactTaskStore interface {
 
 	// 删除任务
 	DeleteById(ctx context.Context, id Id) error
+
+	// 根据id和状态删除任务
+	DeleteByIdAndNotStatus(ctx context.Context, id Id, status string) (bool, error)
 
 	// 更新过期的任务状态
 	SetExpiredTasksStatus(

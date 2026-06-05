@@ -573,7 +573,7 @@ func TestArtifactTaskStoreSetStatus(t *testing.T) {
 		testCreateTask(t, task)
 		testCleanupTasks(t, task.Id)
 
-		err := store.SetStatus(ctx, dal.Id(task.Id), "running", 2000)
+		err := store.SetStatus(ctx, dal.Id(task.Id), "running", "queued", 2000)
 		So(err, ShouldBeNil)
 
 		got, err := store.GetById(ctx, dal.Id(task.Id))
@@ -602,7 +602,7 @@ func TestArtifactTaskStoreBatchSetStatus(t *testing.T) {
 		err := store.BatchSetStatus(
 			ctx,
 			[]dal.Id{dal.Id(task1.Id), dal.Id(task2.Id)},
-			"timeout",
+			"timeout", "queued",
 			4000,
 		)
 		So(err, ShouldBeNil)

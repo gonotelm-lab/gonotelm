@@ -258,6 +258,49 @@ func (l *Logic) DeleteArtifact(
 	return nil
 }
 
+// 重试任务 只有失败的任务才可以重试
+func (l *Logic) RetryArtifactTask(
+	ctx context.Context,
+	taskId uuid.UUID,
+) error {
+	task, err := l.artifactBiz.GetTask(ctx, taskId)
+	if err != nil {
+		return errors.WithMessage(err, "get artifact task failed")
+	}
+
+	if !task.Status.Failed() {
+		return errors.ErrParams.Msgf("can not retry non-failed task, task_id=%s", taskId)
+	}
+
+	err = l.artifactBiz.RetryFailedTask(ctx, taskId)
+	if err != nil {
+		return errors.WithMessage(err, "retry artifact task failed")
+	}
+
+	return nil
+}
+
+func (l *Logic) CancelArtifactTask(
+	ctx context.Context,
+	taskId uuid.UUID,
+) error {
+	task, err := l.artifactBiz.GetTask(ctx, taskId)
+	if err != nil {
+		return errors.WithMessage(err, "get artifact task failed")
+	}
+
+	if !task.Status.Running() {
+		return errors.ErrParams.Msgf("can not cancel non-running task, task_id=%s", taskId)
+	}
+
+	err = l.artifactBiz.CancelRunningTask(ctx, taskId)
+	if err != nil {
+		return errors.WithMessage(err, "cancel artifact task failed")
+	}
+
+	return nil
+}
+
 // 权限校验 检查任务是否属于当前用户
 func (l *Logic) CheckArtifactTaskUserId(ctx context.Context, taskId uuid.UUID) error {
 	userId := pkgcontext.GetUserId(ctx)

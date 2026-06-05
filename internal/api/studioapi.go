@@ -177,7 +177,35 @@ func (s *Server) DeleteStudioArtifact(ctx context.Context, c *app.RequestContext
 }
 
 func (s *Server) RetryStudioArtifactTask(ctx context.Context, c *app.RequestContext) {
+	var req ArtifactTaskIdRequest
+	err := c.BindAndValidate(&req)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	err = s.studioLogic.RetryArtifactTask(ctx, req.TaskId)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	http.OkResp(c, nil)
 }
 
 func (s *Server) CancelStudioArtifactTask(ctx context.Context, c *app.RequestContext) {
+	var req ArtifactTaskIdRequest
+	err := c.BindAndValidate(&req)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	err = s.studioLogic.CancelArtifactTask(ctx, req.TaskId)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	http.OkResp(c, nil)
 }

@@ -227,6 +227,42 @@ func (b *Biz) GetArtifactTaskUser(ctx context.Context, taskId uuid.UUID) (string
 	return task.UserId, nil
 }
 
+func (b *Biz) RetryFailedTask(ctx context.Context, taskId uuid.UUID) error {
+	// 重置status=pending状态
+	// 重置状态+重置过期时间
+	now := time.Now()
+	expiredAt := now.Add(defaultTaskExpiration)
+	err := b.taskStore.Reset(ctx,
+		taskId,
+		model.ArtifactStatusPending.String(),
+		now.UnixMilli(),
+		expiredAt.UnixMilli(),
+	)
+	if err != nil {
+		return errors.WithMessagef(err, "reset artifact task failed, task_id=%s", taskId)
+	}
+
+	return nil
+}
+
+// 取消任务
+func (b *Biz) CancelRunningTask(ctx context.Context, taskId uuid.UUID) error {
+	// 直接设置status
+	now := time.Now()
+	err := b.taskStore.SetStatus(
+		ctx,
+		taskId,
+		model.ArtifactStatusCancelled.String(),
+		model.ArtifactStatusRunning.String(),
+		now.UnixMilli(),
+	)
+	if err != nil {
+		return errors.WithMessagef(err, "cancel artifact task failed, task_id=%s", taskId)
+	}
+
+	return nil
+}
+
 func (b *Biz) lazySetTaskExpiredStatus(
 	ctx context.Context,
 	tasks []*model.ArtifactTask,

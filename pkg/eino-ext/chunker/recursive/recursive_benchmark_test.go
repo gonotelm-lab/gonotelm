@@ -19,7 +19,7 @@ func BenchmarkRecursiveSplitterComparison(b *testing.B) {
 	chunkSize := 500
 	overlapSize := 75
 	separators := []string{"\n\n", "\n", ". ", "? ", "! ", "。", "？", "！", "，", ", "}
-	lenFunc := token.EstimateToken
+	lenFunc := token.Estimate
 
 	cases := []struct {
 		name    string

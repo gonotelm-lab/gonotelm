@@ -11,17 +11,17 @@ import (
 )
 
 // 管理项目中的多个提供商的LLM模型，根据配置选择不同的模型
-// 
+//
 // TODO 可以在此Gateway中统一管控模型：比如模型动态增减、token消耗记数、监控追踪等
 type Gateway struct {
 	mu sync.RWMutex
 
-	providers map[chat.Type]einomodel.ToolCallingChatModel
+	providers map[chat.Provider]einomodel.ToolCallingChatModel
 }
 
 func New(cfg *chat.ProviderConfig) (*Gateway, error) {
 	gw := &Gateway{
-		providers: make(map[chat.Type]einomodel.ToolCallingChatModel),
+		providers: make(map[chat.Provider]einomodel.ToolCallingChatModel),
 	}
 
 	// 初始化模型实例
@@ -61,7 +61,7 @@ func (g *Gateway) initProviders(cfg *chat.ProviderConfig) error {
 }
 
 func (g *Gateway) GetProvider(
-	providerType chat.Type,
+	providerType chat.Provider,
 ) (einomodel.ToolCallingChatModel, error) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()

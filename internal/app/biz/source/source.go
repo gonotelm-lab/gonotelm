@@ -83,6 +83,27 @@ func (b *Biz) GetSource(ctx context.Context, sourceId uuid.UUID) (*model.Source,
 	return model.NewSourceFrom(source), nil
 }
 
+func (b *Biz) BatchGetSources(
+	ctx context.Context,
+	notebookId uuid.UUID, sourceIds []uuid.UUID,
+) ([]*model.Source, error) {
+	rows, err := b.sourceStore.ListByNotebookIdAndIds(
+		ctx,
+		notebookId,
+		sourceIds,
+	)
+	if err != nil {
+		return nil, errors.WithMessage(err, "store list sources failed")
+	}
+
+	sources := make([]*model.Source, 0, len(rows))
+	for _, row := range rows {
+		sources = append(sources, model.NewSourceFrom(row))
+	}
+
+	return sources, nil
+}
+
 func (b *Biz) GetDecodedSource(ctx context.Context, sourceId uuid.UUID) (*model.DecodedSource, error) {
 	rawSource, err := b.GetSource(ctx, sourceId)
 	if err != nil {
@@ -95,6 +116,28 @@ func (b *Biz) GetDecodedSource(ctx context.Context, sourceId uuid.UUID) (*model.
 	}
 
 	return decodedSource, nil
+}
+
+func (b *Biz) BatchGetDecodedSources(
+	ctx context.Context,
+	notebookId uuid.UUID,
+	sourceIds []uuid.UUID,
+) ([]*model.DecodedSource, error) {
+	sources, err := b.BatchGetSources(ctx, notebookId, sourceIds)
+	if err != nil {
+		return nil, errors.WithMessage(err, "batch get sources failed")
+	}
+
+	decodedSources := make([]*model.DecodedSource, 0, len(sources))
+	for _, source := range sources {
+		decodedSource, err := model.NewDecodedSource(source)
+		if err != nil {
+			return nil, errors.WithMessagef(err, "new decoded source failed, source_id=%s", source.Id)
+		}
+		decodedSources = append(decodedSources, decodedSource)
+	}
+
+	return decodedSources, nil
 }
 
 func (b *Biz) CountSourcesByNotebook(
@@ -275,7 +318,7 @@ func (b *Biz) DeleteSource(ctx context.Context, sourceId uuid.UUID) (*model.Deco
 		return nil, errors.WithMessagef(err, "get source failed before deleting, id=%s", sourceId)
 	}
 
-	var fileStoreKey string
+	storeKeys := make([]string, 0, 2)
 	if source.KindFile() && len(source.Content) != 0 {
 		fileContent := model.FileSourceContent{}
 		err = fileContent.From(source.Content)
@@ -287,9 +330,12 @@ func (b *Biz) DeleteSource(ctx context.Context, sourceId uuid.UUID) (*model.Deco
 					"unmarshal file source content failed before deleting source, source_id=%s",
 					sourceId,
 				)))
-		} else {
-			fileStoreKey = fileContent.StoreKey
+		} else if fileContent.StoreKey != "" {
+			storeKeys = append(storeKeys, fileContent.StoreKey)
 		}
+	}
+	if source.ParsedContent != nil && source.ParsedContent.StoreKey != "" {
+		storeKeys = append(storeKeys, source.ParsedContent.StoreKey)
 	}
 
 	err = b.sourceStore.BatchDelete(ctx, []uuid.UUID{sourceId})
@@ -305,14 +351,15 @@ func (b *Biz) DeleteSource(ctx context.Context, sourceId uuid.UUID) (*model.Deco
 		return nil, errors.WithMessagef(err, "delete source docs failed, source_id=%s", sourceId)
 	}
 
-	if fileStoreKey != "" {
-		err = b.objectStorage.DeleteObject(ctx, &storage.DeleteObjectRequest{
-			Key: fileStoreKey,
+	storeKeys = slices.Unique(storeKeys)
+	if len(storeKeys) > 0 {
+		err = b.objectStorage.BatchDeleteObject(ctx, &storage.BatchDeleteObjectRequest{
+			Keys: storeKeys,
 		})
 		if err != nil {
 			slog.WarnContext(ctx, "delete source object failure",
 				slog.String("source_id", sourceId.String()),
-				slog.String("key", fileStoreKey),
+				slog.Int("key_count", len(storeKeys)),
 				slog.Any("err", err),
 			)
 		}
@@ -321,7 +368,7 @@ func (b *Biz) DeleteSource(ctx context.Context, sourceId uuid.UUID) (*model.Deco
 	return source, nil
 }
 
-func (b *Biz) DeleteSourcesByNotebook(
+func (b *Biz) DeleteNotebookSources(
 	ctx context.Context,
 	notebookId uuid.UUID,
 ) error {
@@ -330,61 +377,14 @@ func (b *Biz) DeleteSourcesByNotebook(
 		return errors.WithMessagef(err, "get notebook sources failed, notebook_id=%s", notebookId)
 	}
 
-	sourceIDs := make([]uuid.UUID, 0, len(sources))
-	sourceIDStrs := make([]string, 0, len(sources))
-	fileStoreKeys := make([]string, 0, len(sources))
+	targets := buildDeleteTargets(ctx, sources)
 
-	for _, source := range sources {
-		sourceIDs = append(sourceIDs, source.Id)
-		sourceIDStrs = append(sourceIDStrs, source.Id.String())
-
-		if source.KindFile() && len(source.Content) != 0 {
-			fileContent := model.FileSourceContent{}
-			err = fileContent.From(source.Content)
-			if err != nil {
-				slog.WarnContext(ctx, "ignore parse source object key due invalid file source content",
-					slog.String("source_id", source.Id.String()),
-					slog.Any("err", errors.Wrapf(
-						errors.ErrSerde,
-						"unmarshal file source content failed before deleting source, source_id=%s",
-						source.Id,
-					)),
-				)
-			} else if fileContent.StoreKey != "" {
-				fileStoreKeys = append(fileStoreKeys, fileContent.StoreKey)
-			}
-		}
-
+	err = b.deleteRowsAndDocs(ctx, notebookId, targets.sourceIDs)
+	if err != nil {
+		return err
 	}
 
-	if len(sourceIDs) > 0 {
-		err = b.sourceStore.BatchDelete(ctx, sourceIDs)
-		if err != nil {
-			return errors.WithMessagef(err, "batch delete sources failed, notebook_id=%s", notebookId)
-		}
-
-		err = b.sourceDocStore.BatchDelete(ctx, &vecschema.SourceDocBatchDeleteParams{
-			NotebookId: notebookId.String(),
-			SourceId:   sourceIDStrs,
-		})
-		if err != nil {
-			return errors.WithMessagef(err, "delete source docs by notebook failed, notebook_id=%s", notebookId)
-		}
-	}
-
-	fileStoreKeys = slices.Unique(fileStoreKeys)
-	if len(fileStoreKeys) > 0 {
-		err = b.objectStorage.BatchDeleteObject(ctx, &storage.BatchDeleteObjectRequest{
-			Keys: fileStoreKeys,
-		})
-		if err != nil {
-			slog.WarnContext(ctx, "batch delete source objects failure",
-				slog.String("notebook_id", notebookId.String()),
-				slog.Int("key_count", len(fileStoreKeys)),
-				slog.Any("err", err),
-			)
-		}
-	}
+	b.deleteObjects(ctx, notebookId, targets.objectStoreKeys)
 
 	// 兜底清理：确保未出现在分页结果中的来源记录也被删除（例如 inited 状态）。
 	err = b.sourceStore.DeleteByNotebookId(ctx, notebookId)
@@ -393,6 +393,132 @@ func (b *Biz) DeleteSourcesByNotebook(
 	}
 
 	return nil
+}
+
+// deleteTargets 汇总一次删除所需的记录与对象键。
+type deleteTargets struct {
+	sourceIDs       []uuid.UUID
+	objectStoreKeys []string
+}
+
+// buildDeleteTargets 单次遍历收集 source ids、doc ids 与对象键。
+func buildDeleteTargets(
+	ctx context.Context,
+	sources []*model.Source,
+) *deleteTargets {
+	targets := &deleteTargets{
+		sourceIDs:       make([]uuid.UUID, 0, len(sources)),
+		objectStoreKeys: make([]string, 0, len(sources)*2),
+	}
+
+	for _, source := range sources {
+		if source == nil {
+			continue
+		}
+		targets.sourceIDs = append(targets.sourceIDs, source.Id)
+		targets.objectStoreKeys = append(
+			targets.objectStoreKeys,
+			collectObjectKeys(ctx, source)...,
+		)
+	}
+
+	targets.objectStoreKeys = slices.Unique(targets.objectStoreKeys)
+	return targets
+}
+
+// collectObjectKeys 从单个 source 中提取文件与 parsed content 的对象键。
+func collectObjectKeys(ctx context.Context, source *model.Source) []string {
+	if source == nil {
+		return nil
+	}
+
+	keys := make([]string, 0, 2)
+	if source.KindFile() && len(source.Content) != 0 {
+		fileContent := model.FileSourceContent{}
+		err := fileContent.From(source.Content)
+		if err != nil {
+			slog.WarnContext(ctx, "ignore parse source object key due invalid file source content",
+				slog.String("source_id", source.Id.String()),
+				slog.Any("err", errors.Wrapf(
+					errors.ErrSerde,
+					"unmarshal file source content failed before deleting source, source_id=%s",
+					source.Id,
+				)),
+			)
+		} else if fileContent.StoreKey != "" {
+			keys = append(keys, fileContent.StoreKey)
+		}
+	}
+	if len(source.ParsedContent) != 0 {
+		parsedContent := model.ParsedSourceContent{}
+		err := sonic.Unmarshal(source.ParsedContent, &parsedContent)
+		if err != nil {
+			slog.WarnContext(ctx, "ignore parse source parsed content key due invalid parsed content",
+				slog.String("source_id", source.Id.String()),
+				slog.Any("err", errors.Wrapf(
+					errors.ErrSerde,
+					"unmarshal parsed source content failed before deleting source, source_id=%s",
+					source.Id,
+				)),
+			)
+		} else if parsedContent.StoreKey != "" {
+			keys = append(keys, parsedContent.StoreKey)
+		}
+	}
+
+	return keys
+}
+
+// deleteRowsAndDocs 是强一致删除路径：记录与向量索引必须删除成功。
+func (b *Biz) deleteRowsAndDocs(
+	ctx context.Context,
+	notebookId uuid.UUID,
+	sourceIDs []uuid.UUID,
+) error {
+	if len(sourceIDs) == 0 {
+		return nil
+	}
+	sourceIDStrs := make([]string, 0, len(sourceIDs))
+	for _, sourceID := range sourceIDs {
+		sourceIDStrs = append(sourceIDStrs, sourceID.String())
+	}
+
+	err := b.sourceStore.BatchDelete(ctx, sourceIDs)
+	if err != nil {
+		return errors.WithMessagef(err, "batch delete sources failed, notebook_id=%s", notebookId)
+	}
+
+	err = b.sourceDocStore.BatchDelete(ctx, &vecschema.SourceDocBatchDeleteParams{
+		NotebookId: notebookId.String(),
+		SourceId:   sourceIDStrs,
+	})
+	if err != nil {
+		return errors.WithMessagef(err, "delete source docs by notebook failed, notebook_id=%s", notebookId)
+	}
+
+	return nil
+}
+
+// deleteObjects 是 best-effort 清理：失败仅记录日志，不中断主流程。
+func (b *Biz) deleteObjects(
+	ctx context.Context,
+	notebookId uuid.UUID,
+	objectStoreKeys []string,
+) {
+	if len(objectStoreKeys) == 0 {
+		return
+	}
+
+	err := b.objectStorage.BatchDeleteObject(ctx, &storage.BatchDeleteObjectRequest{
+		Keys: objectStoreKeys,
+	})
+	if err != nil {
+		slog.WarnContext(ctx, "batch delete source objects failure",
+			slog.String("notebook_id", notebookId.String()),
+			slog.Int("key_count", len(objectStoreKeys)),
+			slog.Any("err", err),
+		)
+	}
 }
 
 type UpdateContentCommand struct {
@@ -448,6 +574,72 @@ func (b *Biz) UpdateParsedContent(ctx context.Context, cmd *UpdateParsedContentC
 	})
 	if err != nil {
 		return errors.WithMessagef(err, "store update source parsed content failed, source_id=%s", cmd.Id)
+	}
+
+	return nil
+}
+
+type UploadParsedContentCommand struct {
+	SourceId          uuid.UUID
+	NotebookId        uuid.UUID
+	ParsedContent     []byte
+	ParsedContentType string
+}
+
+func (b *Biz) UploadParsedContent(ctx context.Context, cmd *UploadParsedContentCommand) error {
+	if len(cmd.ParsedContent) == 0 {
+		return nil
+	}
+
+	storeKey := formatParsedContentStoreKey(cmd.SourceId, cmd.NotebookId)
+	err := b.objectStorage.UploadObject(ctx, &storage.UploadObjectRequest{
+		Key:         storeKey,
+		Body:        cmd.ParsedContent,
+		ContentType: cmd.ParsedContentType,
+	})
+	if err != nil {
+		return errors.WithMessagef(err, "upload source parsed content failed, source_id=%s", cmd.SourceId)
+	}
+
+	err = b.UpdateParsedContent(ctx, &UpdateParsedContentCommand{
+		Id: cmd.SourceId,
+		Parsed: &model.ParsedSourceContent{
+			StoreKey: storeKey,
+		},
+	})
+	if err != nil {
+		return errors.WithMessagef(err,
+			"update source parsed content failed after upload, source_id=%s",
+			cmd.SourceId,
+		)
+	}
+
+	return nil
+}
+
+func (b *Biz) DeleteParsedContent(ctx context.Context, source *model.DecodedSource) error {
+	if source == nil || source.ParsedContent == nil {
+		return nil
+	}
+
+	if source.ParsedContent.StoreKey != "" {
+		err := b.objectStorage.BatchDeleteObject(ctx, &storage.BatchDeleteObjectRequest{
+			Keys: []string{source.ParsedContent.StoreKey},
+		})
+		if err != nil {
+			return errors.WithMessagef(err, "delete source parsed content failed, source_id=%s", source.Id)
+		}
+	}
+
+	err := b.UpdateParsedContent(ctx, &UpdateParsedContentCommand{
+		Id:     source.Id,
+		Parsed: nil,
+	})
+	if err != nil {
+		return errors.WithMessagef(err,
+			"clear source parsed content metadata failed, source_id=%s",
+			source.Id,
+		)
 	}
 
 	return nil
@@ -523,11 +715,11 @@ func (b *Biz) CheckSourceIdsReady(
 	ctx context.Context,
 	query *CheckSourceIdsReadyQuery,
 ) ([]uuid.UUID, error) {
-	qids := slices.Unique(query.SourceIds)
+	sourceIds := slices.Unique(query.SourceIds)
 	rows, err := b.sourceStore.ListByNotebookIdAndIds(
 		ctx,
 		query.NotebookId,
-		qids,
+		sourceIds,
 	)
 	if err != nil {
 		return nil, errors.WithMessage(err, "store list sources failed")
@@ -918,4 +1110,13 @@ func (s *Biz) PopulateSourceDocs(
 	}
 
 	return nil
+}
+
+func (b *Biz) GetSourceUser(ctx context.Context, sourceId uuid.UUID) (string, error) {
+	source, err := b.GetSource(ctx, sourceId)
+	if err != nil {
+		return "", errors.WithMessagef(err, "get source user failed, source_id=%s", sourceId)
+	}
+
+	return source.OwnerId, nil
 }

@@ -6,7 +6,6 @@ import (
 	bizchat "github.com/gonotelm-lab/gonotelm/internal/app/biz/chat"
 	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
-	sourcelogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/source"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	chatmodel "github.com/gonotelm-lab/gonotelm/internal/app/model/chat"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
@@ -18,20 +17,17 @@ type NotebookLogic struct {
 	notebookBiz *biznotebook.Biz
 	sourceBiz   *bizsource.Biz
 	chatBiz     *bizchat.Biz
-	sourceLogic *sourcelogic.SourceLogic
 }
 
 func NewNotebookLogic(
 	notebookBiz *biznotebook.Biz,
 	sourceBiz *bizsource.Biz,
 	chatBiz *bizchat.Biz,
-	sourceLogic *sourcelogic.SourceLogic,
 ) *NotebookLogic {
 	return &NotebookLogic{
 		notebookBiz: notebookBiz,
 		sourceBiz:   sourceBiz,
 		chatBiz:     chatBiz,
-		sourceLogic: sourceLogic,
 	}
 }
 
@@ -272,7 +268,7 @@ func (l *NotebookLogic) DeleteNotebook(
 		return errors.WithMessagef(err, "delete notebook failed, notebook_id=%s", id)
 	}
 
-	err = l.sourceLogic.DeleteSourcesByNotebook(ctx, id)
+	err = l.sourceBiz.DeleteNotebookSources(ctx, id)
 	if err != nil {
 		return errors.WithMessagef(err, "delete notebook sources failed, notebook_id=%s", id)
 	}
@@ -282,5 +278,17 @@ func (l *NotebookLogic) DeleteNotebook(
 		return errors.WithMessagef(err, "delete notebook chats failed, notebook_id=%s", id)
 	}
 
+	return nil
+}
+
+func (l *NotebookLogic) CheckNotebookUserId(ctx context.Context, id uuid.UUID) error {
+	userId := pkgcontext.GetUserId(ctx)
+	notebookUserId, err := l.notebookBiz.GetNotebookUser(ctx, id)
+	if err != nil {
+		return errors.WithMessagef(err, "get notebook user failed, notebook_id=%s", id)
+	}
+	if notebookUserId != userId {
+		return errors.ErrPermission.Msgf("notebook access denied, notebook_id=%s", id)
+	}
 	return nil
 }

@@ -18,12 +18,12 @@ func MergeChunks(chunks []string, approxChunkLength int) []string {
 
 	merged := make([]string, 0, len(chunks))
 	start := 0
-	currentToken := token.EstimateToken(chunks[0])
+	currentToken := token.Estimate(chunks[0])
 	currentBytes := len(chunks[0])
 
 	for i := 1; i < len(chunks); i++ {
 		chunk := chunks[i]
-		chunkToken := token.EstimateToken(chunk)
+		chunkToken := token.Estimate(chunk)
 
 		if currentToken+chunkToken <= approxChunkLength {
 			currentToken += chunkToken

@@ -11,7 +11,7 @@ import (
 
 // BuildThinkingOption builds per-request model options for thinking behavior.
 func BuildThinkingOption(
-	providerType Type,
+	providerType Provider,
 	enableThinking bool,
 ) einomodel.Option {
 	switch providerType {

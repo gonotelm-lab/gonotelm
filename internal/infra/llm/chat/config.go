@@ -8,16 +8,16 @@ import (
 	"github.com/cloudwego/eino-ext/components/model/qwen"
 )
 
-type Type string
+type Provider string
 
-func (t Type) String() string {
+func (t Provider) String() string {
 	return string(t)
 }
 
 const (
-	Openai   Type = "openai"
-	DeepSeek Type = "deepseek"
-	Qwen     Type = "qwen"
+	Openai   Provider = "openai"
+	DeepSeek Provider = "deepseek"
+	Qwen     Provider = "qwen"
 )
 
 type ProviderConfig struct {

@@ -2,15 +2,43 @@ package errors
 
 import "net/http"
 
+// Errors that should return 200 status code
 const (
 	CodeInvalidParams = 1000
 	CodeNoRecord      = 1001
 	CodeEmbedErr      = 1002
+	CodeLLMErr        = 1003
+)
+
+const (
+	MsgInvalidParams = "INVALID_PARAMETERS"
+	MsgNoRecord      = "NO_RECORD_FOUND"
+	MsgEmbedErr      = "EMBEDDING_ERROR"
+	MsgLLMErr        = "LLM_ERROR"
+)
+
+var (
+	statusOk = http.StatusOK
+
+	ErrParams   = NewInnerError(statusOk, CodeInvalidParams, MsgInvalidParams)
+	ErrNoRecord = NewInnerError(statusOk, CodeNoRecord, MsgNoRecord)
+	ErrEmbed    = NewInnerError(statusOk, CodeEmbedErr, MsgEmbedErr)
+	ErrLLM      = NewInnerError(statusOk, CodeLLMErr, MsgLLMErr)
 )
 
 const (
 	CodeUnauthorized = 2000
 	CodePermission   = 2001
+)
+
+const (
+	MsgUnauthorized = "UNAUTHORIZED"
+	MsgPermission   = "PERMISSION_DENIED"
+)
+
+var (
+	ErrUnauthorized = NewInnerError(http.StatusUnauthorized, CodeUnauthorized, MsgUnauthorized)
+	ErrPermission   = NewInnerError(http.StatusForbidden, CodePermission, MsgPermission)
 )
 
 const (
@@ -25,38 +53,13 @@ const (
 )
 
 const (
-	MsgInvalidParams = "invalid parameters"
-	MsgNoRecord      = "no record found"
-	MsgEmbedErr      = "embedding error"
-	MsgInnerErr      = "inner error"
-)
-
-// Errors that should return 200 status code
-var (
-	statusOk = http.StatusOK
-
-	ErrParams   = NewInnerError(statusOk, CodeInvalidParams, MsgInvalidParams)
-	ErrNoRecord = NewInnerError(statusOk, CodeNoRecord, MsgNoRecord)
-	ErrEmbed    = NewInnerError(statusOk, CodeEmbedErr, MsgEmbedErr)
-)
-
-const (
-	MsgUnauthorized = "unauthorized"
-	MsgPermission   = "permission denied"
-)
-
-var (
-	ErrUnauthorized = NewInnerError(http.StatusUnauthorized, CodeUnauthorized, MsgUnauthorized)
-	ErrPermission   = NewInnerError(http.StatusForbidden, CodePermission, MsgPermission)
-)
-
-const (
-	MsgDatabaseErr = "database error"
-	MsgSerdeErr    = "serde error"
-	MsgStorageErr  = "storage error"
-	MsgMsgQueueErr = "message queue error"
-	MsgCacheErr    = "cache error"
-	MsgUnknownErr  = "unknown error"
+	MsgDatabaseErr = "DATABASE_ERROR"
+	MsgSerdeErr    = "SERDE_ERROR"
+	MsgStorageErr  = "STORAGE_ERROR"
+	MsgMsgQueueErr = "MESSAGE_QUEUE_ERROR"
+	MsgCacheErr    = "CACHE_ERROR"
+	MsgUnknownErr  = "UNKNOWN_ERROR"
+	MsgInnerErr    = "INNER_ERROR"
 )
 
 // Internal errors that should return 5xx status code

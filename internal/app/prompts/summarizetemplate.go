@@ -39,7 +39,7 @@ func NewSummarizeTemplate(lang string) *SummarizeTemplate {
 	return newTemplate[SummarizeTemplateVars](templateNameSummarize, lang)
 }
 
-func SummarizePromptMessage(ctx context.Context, text, lang string) (*schema.Message, error) {
+func SummarizeMessage(ctx context.Context, text, lang string) (*schema.Message, error) {
 	tmpl := NewSummarizeTemplate(lang)
 	msg, err := tmpl.Message(ctx, SummarizeTemplateVars{Text: text})
 	if err != nil {
@@ -49,8 +49,8 @@ func SummarizePromptMessage(ctx context.Context, text, lang string) (*schema.Mes
 	return msg, nil
 }
 
-func SummarizePrompt(text, lang string) (string, error) {
-	msg, err := SummarizePromptMessage(context.Background(), text, lang)
+func Summarize(text, lang string) (string, error) {
+	msg, err := SummarizeMessage(context.Background(), text, lang)
 	if err != nil {
 		return "", err
 	}

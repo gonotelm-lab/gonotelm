@@ -11,10 +11,11 @@ import (
 )
 
 var (
-	testDB               *gorm.DB
-	testNotebookStore    *NotebookStoreImpl
-	testSourceStore      *SourceStoreImpl
-	testChatMessageStore *ChatMessageStoreImpl
+	testDB                *gorm.DB
+	testNotebookStore     *NotebookStoreImpl
+	testSourceStore       *SourceStoreImpl
+	testChatMessageStore  *ChatMessageStoreImpl
+	testArtifactTaskStore *ArtifactTaskStoreImpl
 )
 
 func TestMain(m *testing.M) {
@@ -33,6 +34,7 @@ func TestMain(m *testing.M) {
 	testNotebookStore = NewNotebookStoreImpl(testDB)
 	testSourceStore = NewSourceStoreImpl(testDB)
 	testChatMessageStore = NewChatMessageStoreImpl(testDB)
+	testArtifactTaskStore = NewArtifactTaskStoreImpl(testDB)
 
 	m.Run()
 

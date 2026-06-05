@@ -2,7 +2,7 @@ deployEnv = "dev"
 
 [api]
 port = 7099
-exitWaitTimeout = "${ENV_GONOTELM_API_EXIT_WAIT_TIMEOUT:-10s}"
+exitWaitTimeout = "${ENV_GONOTELM_API_EXIT_WAIT_TIMEOUT:-30s}"
 
 [logic]
 
@@ -14,6 +14,10 @@ maxRound = 10
 [logic.source]
 modelProvider = "${ENV_GONOTELM_LOGIC_SOURCE_PROVIDER:-qwen}"
 model = "${ENV_GONOTELM_LOGIC_SOURCE_MODEL:-qwen3.5-27b}"
+
+[logic.studio.mindmap]
+modelProvider = "${ENV_GONOTELM_LOGIC_STUDIO_MINDMAP_PROVIDER:-deepseek}"
+model = "${ENV_GONOTELM_LOGIC_STUDIO_MINDMAP_MODEL:-deepseek-v4-flash}"
 
 [database]
 type = "postgres"

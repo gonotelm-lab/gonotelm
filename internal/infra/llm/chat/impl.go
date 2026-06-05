@@ -12,7 +12,7 @@ import (
 
 func New(
 	ctx context.Context,
-	providerType Type,
+	providerType Provider,
 	cfg *ProviderConfig,
 ) (model.ToolCallingChatModel, error) {
 	if cfg == nil {

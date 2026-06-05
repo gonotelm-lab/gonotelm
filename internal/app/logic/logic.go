@@ -4,11 +4,13 @@ import (
 	"context"
 	"sync"
 
+	bizartifact "github.com/gonotelm-lab/gonotelm/internal/app/biz/artifact"
 	bizchat "github.com/gonotelm-lab/gonotelm/internal/app/biz/chat"
 	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
 	chatlogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/chat"
 	sourcelogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/source"
+	studiologic "github.com/gonotelm-lab/gonotelm/internal/app/logic/studio"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infra"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
@@ -17,8 +19,9 @@ import (
 
 type Logic struct {
 	NotebookLogic *NotebookLogic
-	SourceLogic   *sourcelogic.SourceLogic
+	SourceLogic   *sourcelogic.Logic
 	ChatLogic     *chatlogic.Logic
+	StudioLogic   *studiologic.Logic
 }
 
 func MustNewLogic(
@@ -33,6 +36,7 @@ func MustNewLogic(
 			infrastructures.Dal.ChatStore,
 			infrastructures.Dal.ChatMessageStore,
 			infrastructures.Cache.ChatMessageContextCache)
+		artifactBiz      = bizartifact.New(infrastructures.Dal.ArtifactTaskStore)
 		chatEventManager = bizchat.NewChatEventManager(infrastructures.Cache.ChatMessageStreamCache)
 	)
 
@@ -51,7 +55,7 @@ func MustNewLogic(
 		panic(err)
 	}
 
-	sourceLogic := sourcelogic.MustNewSourceLogic(
+	sourceLogic := sourcelogic.MustNewLogic(
 		ctx,
 		infrastructures,
 		objectStorage,
@@ -64,7 +68,6 @@ func MustNewLogic(
 		notebookBiz,
 		sourceBiz,
 		chatBiz,
-		sourceLogic,
 	)
 
 	chatLogic := chatlogic.MustNewLogic(
@@ -75,10 +78,20 @@ func MustNewLogic(
 		chatEventManager,
 	)
 
+	studioLogic := studiologic.MustNewLogic(
+		ctx,
+		objectStorage,
+		sourceBiz,
+		notebookBiz,
+		artifactBiz,
+		gateway,
+	)
+
 	return &Logic{
 		NotebookLogic: notebookLogic,
 		SourceLogic:   sourceLogic,
 		ChatLogic:     chatLogic,
+		StudioLogic:   studioLogic,
 	}
 }
 
@@ -89,6 +102,9 @@ func (l *Logic) Close(ctx context.Context) {
 	})
 	wg.Go(func() {
 		l.ChatLogic.Close(ctx)
+	})
+	wg.Go(func() {
+		l.StudioLogic.Close(ctx)
 	})
 
 	wg.Wait()

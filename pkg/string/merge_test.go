@@ -41,7 +41,7 @@ func TestMergeChunksKeepOversizedChunk(t *testing.T) {
 	largeChunk := strings.Repeat("Rust ownership and borrowing. ", 120)
 	chunks := []string{"a", largeChunk, "b"}
 
-	got := MergeChunks(chunks, token.EstimateToken("a")+1)
+	got := MergeChunks(chunks, token.Estimate("a")+1)
 	want := []string{"a", largeChunk, "b"}
 
 	if !reflect.DeepEqual(got, want) {
@@ -52,7 +52,7 @@ func TestMergeChunksKeepOversizedChunk(t *testing.T) {
 func TestMergeChunksLargeText(t *testing.T) {
 	const chunkCount = 2500
 	unit := strings.Repeat("Rust 所有权与生命周期 ownership and lifetime. ", 24)
-	approx := token.EstimateToken(unit) * 8
+	approx := token.Estimate(unit) * 8
 	if approx <= 0 {
 		approx = 1
 	}

@@ -19,15 +19,42 @@ import (
 
 func (s *Server) registerSourcesRoutes(g *route.RouterGroup) {
 	g.POST("/source", s.CreateSource)
-	g.POST("/source/:id/file/upload", s.UploadFileSource)
-	g.POST("/source/:id/status", s.PollSourceStatus)       // check source processing status
-	g.POST("/source/:id/reload", s.RetrySourcePreparation) // retry source preparation
-	g.DELETE("/source/:id", s.DeleteSource)
-	g.GET("/source/:id/doc/:doc_id", s.GetSourceDoc)
-	g.GET("/source/:id/batch/docs", s.BatchGetSourceDocs)
-	g.GET("/source/:id/parsed/content", s.GetSourceParsedContent)
-	g.GET("/source/:id/parsed/tree", s.GetSourceParsedTree)
-	g.PUT("/source/:id/title", s.UpdateSourceTitle)
+
+	sourceIdGroup := g.Group("/source/:id")
+	sourceIdGroup.Use(s.checkSourceUserMiddleware)
+	{
+		sourceIdGroup.POST("/file/upload", s.UploadFileSource)
+		sourceIdGroup.POST("/status", s.PollSourceStatus)       // check source processing status
+		sourceIdGroup.POST("/reload", s.RetrySourcePreparation) // retry source preparation
+		sourceIdGroup.DELETE("/", s.DeleteSource)
+		sourceIdGroup.GET("/doc/:doc_id", s.GetSourceDoc)
+		sourceIdGroup.GET("/batch/docs", s.BatchGetSourceDocs)
+		sourceIdGroup.GET("/parsed/content", s.GetSourceParsedContent)
+		sourceIdGroup.GET("/parsed/tree", s.GetSourceParsedTree)
+		sourceIdGroup.PUT("/title", s.UpdateSourceTitle)
+	}
+}
+
+func (s *Server) checkSourceUserMiddleware(ctx context.Context, c *app.RequestContext) {
+	sourceId := c.Param("id")
+	if sourceId == "" {
+		http.ErrResp(c, errors.ErrParams.Msgf("source_id is required"))
+		return
+	}
+
+	sid, err := uuid.ParseString(sourceId)
+	if err != nil {
+		http.ErrResp(c, errors.ErrParams.Msgf("invalid source_id: %s", sourceId))
+		return
+	}
+
+	err = s.sourceLogic.CheckSourceUserId(ctx, sid)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	c.Next(ctx)
 }
 
 type CreateSourceRequest struct {
@@ -298,10 +325,11 @@ func (s *Server) GetSourceDoc(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	result, err := s.sourceLogic.GetSourceDoc(ctx, &logic.GetSourceDocParams{
-		SourceId: req.Id,
-		DocId:    req.DocId,
-	})
+	result, err := s.sourceLogic.GetSourceDoc(ctx,
+		&logic.GetSourceDocParams{
+			SourceId: req.Id,
+			DocId:    req.DocId,
+		})
 	if err != nil {
 		http.ErrResp(c, err)
 		return

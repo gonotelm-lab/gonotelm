@@ -25,14 +25,6 @@ func formatSourceStoreKey(
 }
 
 // Format:
-// parsed_file/{{notebook_id}}/{{source_id}}
-func formatSourceParsedContentStoreKey(
-	sourceId, notebookId uuid.UUID,
-) string {
-	return fmt.Sprintf("parsed_file/%s/%s", notebookId.String(), sourceId.String())
-}
-
-// Format:
 func formatSourceCreateCacheKey(notebookId uuid.UUID) string {
 	return fmt.Sprintf("gonotelm:source:create:lock:%s", notebookId.String())
 }

@@ -220,7 +220,7 @@ func (h *baseHandler) transform(
 
 func defaultDocTransformer(c HandlerConfig) []document.Transformer {
 	return []document.Transformer{
-		transformer.NewChunkTransformer(c.ChunkSize, c.OverlapSize, token.EstimateToken),
+		transformer.NewChunkTransformer(c.ChunkSize, c.OverlapSize, token.Estimate),
 	}
 }
 

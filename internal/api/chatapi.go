@@ -31,7 +31,7 @@ func (s *Server) registerChatRoutes(g *route.RouterGroup) {
 
 type ChatCreateMessageRequest struct {
 	Id             uuid.UUID   `path:"id,required"`
-	Prompt         string      `json:"prompt,required"`
+	Prompt         string      `json:"prompt"`
 	SourceIds      []uuid.UUID `json:"source_ids"`
 	EnableThinking bool        `json:"enable_thinking"`
 	Style          string      `json:"style"`
@@ -41,6 +41,10 @@ type ChatCreateMessageRequest struct {
 func (r *ChatCreateMessageRequest) Validate() error {
 	if r.Style == "" {
 		r.Style = string(chatmodel.ChatStyleDefault)
+	}
+
+	if len(r.Prompt) == 0 {
+		return errors.ErrParams.Msg("prompt is required")
 	}
 
 	if !chatmodel.ChatStyle(r.Style).IsValid() {

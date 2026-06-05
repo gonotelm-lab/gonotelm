@@ -120,7 +120,7 @@ func defaultParseBuildOptions() *parseBuildOptions {
 		maxNodeToken: defaultParseBuildMaxNodeToken,
 		overlapToken: defaultParseBuildMaxNodeToken / 6,
 		separators:   append([]string(nil), defaultParseBuildSeparators...),
-		tokenLenFn:   token.EstimateToken,
+		tokenLenFn:   token.Estimate,
 	}
 }
 
@@ -193,7 +193,7 @@ func buildParseBuildOptions(opts ...ParseBuildOption) (*parseBuildOptions, error
 		cfg.overlapToken = cfg.maxNodeToken / 6
 	}
 	if cfg.tokenLenFn == nil {
-		cfg.tokenLenFn = token.EstimateToken
+		cfg.tokenLenFn = token.Estimate
 	}
 	if len(cfg.separators) == 0 {
 		cfg.separators = append([]string(nil), defaultParseBuildSeparators...)
@@ -332,7 +332,7 @@ func (b *DocTreeBuilder) ParseBuild(
 
 	err = b.generateRootTitle(ctx, vroot)
 	if err != nil {
-		return nil, errors.Wrapf(errors.ErrInner, "generate vroot title failed, err=%v", err)
+		return nil, errors.Wrap(err, "generate vroot title failed")
 	}
 
 	// 3) 对超限节点做递归分裂（会保留/下放结构并同步 span）。
@@ -374,7 +374,7 @@ func (b *DocTreeBuilder) generateRootTitle(ctx context.Context, vroot *markdownD
 	}
 	titleContent := strings.Join(slices.Unique(titles), "\n")
 
-	providerType := chat.Type(b.providerSelector(ctx))
+	providerType := chat.Provider(b.providerSelector(ctx))
 	provider, err := b.gateway.GetProvider(providerType)
 	if err != nil {
 		return errors.Wrapf(errors.ErrInner, "get provider failed, err=%v", err)
@@ -382,14 +382,14 @@ func (b *DocTreeBuilder) generateRootTitle(ctx context.Context, vroot *markdownD
 
 	model := b.modelSelector(ctx)
 	llmOption := chat.BuildLLMModelOption(model)
-	msg, err := prompts.SummarizePromptMessage(ctx, titleContent, "")
+	msg, err := prompts.SummarizeMessage(ctx, titleContent, "")
 	if err != nil {
 		return errors.Wrapf(errors.ErrInner, "render summarize prompt failed, err=%v", err)
 	}
 
 	genResp, err := provider.Generate(ctx, []*einoschema.Message{msg}, llmOption)
 	if err != nil {
-		return errors.Wrapf(errors.ErrInner, "generate vroot summary failed, err=%v", err)
+		return errors.Wrapf(errors.ErrLLM, "generate vroot summary failed, err=%v", err)
 	}
 	summary := strings.TrimSpace(genResp.Content)
 	if summary == "" {

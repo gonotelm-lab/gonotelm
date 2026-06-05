@@ -83,3 +83,38 @@ COMMENT ON COLUMN chat_messages.msg_type IS 'message type: 0-normal, 1-system';
 COMMENT ON COLUMN chat_messages.content IS 'message content';
 COMMENT ON COLUMN chat_messages.seq_no IS 'message sequence number(unix nano)';
 COMMENT ON COLUMN chat_messages.extra IS 'message extra information';
+
+CREATE TABLE artifact_tasks (
+  id UUID PRIMARY KEY DEFAULT uuidv7(),
+  notebook_id UUID NOT NULL DEFAULT uuidv7(),
+  kind VARCHAR(16) NOT NULL DEFAULT '',
+  status VARCHAR(16) NOT NULL DEFAULT '',
+  result BYTEA,
+  result_kind VARCHAR(16) NOT NULL DEFAULT '',
+  user_id VARCHAR(255) NOT NULL DEFAULT '',
+  run_id VARCHAR(36) NOT NULL DEFAULT '',
+  lock_no INTEGER NOT NULL DEFAULT 0,
+  payload BYTEA,
+  created_at BIGINT NOT NULL DEFAULT 0,
+  updated_at BIGINT NOT NULL DEFAULT 0,
+  expired_at BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE INDEX idx_artifact_tasks_notebook_id ON artifact_tasks (notebook_id);
+CREATE INDEX idx_artifact_tasks_status_created_at ON artifact_tasks (status, created_at);
+CREATE INDEX idx_artifact_tasks_expired_at ON artifact_tasks (expired_at);
+
+COMMENT ON TABLE artifact_tasks IS 'studio artifact tasks table';
+COMMENT ON COLUMN artifact_tasks.id IS 'artifact task id, primary key';
+COMMENT ON COLUMN artifact_tasks.notebook_id IS 'associated notebook id';
+COMMENT ON COLUMN artifact_tasks.kind IS 'artifact task kind';
+COMMENT ON COLUMN artifact_tasks.status IS 'artifact task processing state';
+COMMENT ON COLUMN artifact_tasks.result IS 'artifact task result';
+COMMENT ON COLUMN artifact_tasks.result_kind IS 'artifact task result kind';
+COMMENT ON COLUMN artifact_tasks.user_id IS 'artifact task user id';
+COMMENT ON COLUMN artifact_tasks.updated_at IS 'artifact task updated time (unix ms)';
+COMMENT ON COLUMN artifact_tasks.run_id IS 'artifact task run id';
+COMMENT ON COLUMN artifact_tasks.lock_no IS 'artifact task lock number for locking';
+COMMENT ON COLUMN artifact_tasks.payload IS 'artifact task payload';
+COMMENT ON COLUMN artifact_tasks.created_at IS 'artifact task created time (unix ms)';
+COMMENT ON COLUMN artifact_tasks.expired_at IS 'task expired time (unix ms)';

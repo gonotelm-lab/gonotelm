@@ -64,13 +64,110 @@ type ChatMessageStore interface {
 	BatchDeleteByChatIds(ctx context.Context, chatIds []Id) error
 }
 
+type ArtifactTaskStore interface {
+	// 创建任务
+	Create(ctx context.Context, task *schema.ArtifactTask) error
+
+	// 根据id获取任务
+	GetById(ctx context.Context, id Id) (*schema.ArtifactTask, error)
+
+	// 根据notebookId和id获取任务
+	GetByNotebookIdAndId(ctx context.Context, notebookId, id Id) (*schema.ArtifactTask, error)
+
+	// 获取任务状态
+	GetStatusById(ctx context.Context, id Id) (string, error)
+
+	// 按照created_at DESC分页获取
+	ListByNotebookId(ctx context.Context, notebookId Id, limit, offset int) ([]*schema.ArtifactTask, error)
+
+	// 按照NotebookId分页获取
+	PageListByNotebookId(
+		ctx context.Context,
+		notebookId Id,
+		cursor Id, limit int,
+	) ([]*schema.ArtifactTask, error)
+
+	// 认领任务
+	// 返回值：task, true, nil => 成功认领
+	// 返回值：nil, false, nil => 没有任务可认领，且没有错误
+	// 返回值：nil, false, err => 出错
+	Claim(ctx context.Context,
+		oldStatus string,
+		now int64,
+		params *schema.ArtifactTaskClaimParams,
+	) (*schema.ArtifactTask, bool, error)
+
+	// 强行设置任务状态
+	//
+	// 当前任务状态为oldStatus时设置新状态
+	SetStatus(ctx context.Context,
+		id Id,
+		newStatus string,
+		oldStatuses []string,
+		updatedAt int64,
+		expiredAt int64, // -1 means no change
+	) error
+
+	// 批量设置任务状态
+	// 当前任务状态为oldStatus时设置新状态
+	BatchSetStatus(ctx context.Context,
+		ids []Id,
+		newStatus string,
+		oldStatuses []string,
+		updatedAt int64,
+		expiredAt int64, // -1 means no change
+	) error
+
+	// 更新任务状态
+	UpdateStatus(
+		ctx context.Context,
+		id Id,
+		runId string,
+		oldStatus string,
+		params *schema.ArtifactTaskUpdateStatusParams,
+	) (bool, error)
+
+	// 更新任务结果
+	UpdateResult(
+		ctx context.Context,
+		id Id,
+		runId string,
+		oldStatus string,
+		params *schema.ArtifactTaskUpdateResultParams,
+	) (bool, error)
+
+	// 删除任务
+	DeleteById(ctx context.Context, id Id) error
+
+	// 根据id和状态删除任务
+	DeleteByIdAndNotStatus(ctx context.Context, id Id, status string) (bool, error)
+
+	// 更新过期的任务状态
+	SetExpiredTasksStatus(
+		ctx context.Context,
+		ids []Id,
+		newStatus string,
+		updatedAt int64,
+		now int64,
+	) error
+
+	// 列出过期的任务
+	PageListExpiredTasks(
+		ctx context.Context,
+		cursor Id, // id > cursor
+		limit int,
+		now int64,
+	) ([]*schema.ArtifactTask, error)
+}
+
 type DAL struct {
 	Closer misc.Closer
 
-	NotebookStore    NotebookStore
-	SourceStore      SourceStore
-	ChatStore        ChatStore
-	ChatMessageStore ChatMessageStore
+	NotebookStore     NotebookStore
+	SourceStore       SourceStore
+	ChatStore         ChatStore
+	ChatMessageStore  ChatMessageStore
+	ArtifactTaskStore ArtifactTaskStore
 }
 
 func (d *DAL) Close(ctx context.Context) error {

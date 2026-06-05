@@ -74,10 +74,10 @@ func TestRecursiveChunker_RecursivelySplitsLargeUnits(t *testing.T) {
 	}
 }
 
-func TestRecursiveChunker_DoesNotCutSingleOversizedSentence(t *testing.T) {
+func TestRecursiveChunker_SplitsOversizedTextWhenNoSeparator(t *testing.T) {
 	transformer, err := NewSplitter(context.Background(), &Config{
 		ChunkSize:   5,
-		OverlapSize: 2,
+		OverlapSize: 0,
 		Separators:  []string{". "},
 		KeepType:    KeepTypeEnd,
 		LenFunc:     func(s string) int { return len(s) },
@@ -87,14 +87,14 @@ func TestRecursiveChunker_DoesNotCutSingleOversizedSentence(t *testing.T) {
 	}
 
 	docs, err := transformer.Transform(context.Background(), []*schema.Document{
-		{ID: "doc", Content: "single sentence without separator"},
+		{ID: "doc", Content: "abcdefghijk"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	got := contentsOf(docs)
-	want := []string{"single sentence without separator"}
+	want := []string{"abcde", "fghij", "k"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("chunks mismatch\n got: %#v\nwant: %#v", got, want)
 	}
@@ -154,7 +154,7 @@ func TestChunkTransformer_Transform_Recusrive(t *testing.T) {
 		&einorecursive.Config{
 			ChunkSize:   chunkSize,
 			OverlapSize: overlapSize,
-			LenFunc:     token.EstimateToken,
+			LenFunc:     token.Estimate,
 			Separators:  []string{"\n\n", "\n", ".", ",", " ", "", "?", "!", "，", "。", "？", "！"},
 		})
 
@@ -182,7 +182,7 @@ func TestChunkTransformer_Transform_Recusrive_New(t *testing.T) {
 	rt, _ := NewSplitter(t.Context(), &Config{
 		ChunkSize:   chunkSize,
 		OverlapSize: overlapSize,
-		LenFunc:     token.EstimateToken,
+		LenFunc:     token.Estimate,
 		KeepType:    KeepTypeEnd,
 		Separators:  []string{"\n\n", "\n", ".", " ", "", "?", "!", "。", "？", "！"},
 	})

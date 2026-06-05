@@ -238,7 +238,7 @@ func (b *DocTreeBuilder) extractNodes(
 	nodes []*DocTreeNode,
 	targetLevel int,
 ) (*DocTreeNode, error) {
-	providerType := chat.Type(b.providerSelector(ctx))
+	providerType := chat.Provider(b.providerSelector(ctx))
 	provider, err := b.gateway.GetProvider(providerType)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "get provider failed, err=%v", err)
@@ -250,20 +250,20 @@ func (b *DocTreeBuilder) extractNodes(
 		tbd.WriteString(node.core.Content)
 		tbd.WriteString("\n")
 	}
-	msg, err := prompts.SummarizePromptMessage(ctx, tbd.String(), "")
+	msg, err := prompts.SummarizeMessage(ctx, tbd.String(), "")
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "render summarize prompt failed, err=%v", err)
 	}
 	genResp, err := provider.Generate(ctx, []*einoschema.Message{msg}, llmOption)
 	if err != nil {
-		return nil, errors.Wrapf(errors.ErrInner, "generate summary failed, err=%v", err)
+		return nil, errors.Wrapf(errors.ErrLLM, "generate summary failed, err=%v", err)
 	}
 
 	summary := genResp.Content
 	// gen embedding
 	embedResp, err := b.embedder.EmbedStrings(ctx, []string{summary})
 	if err != nil {
-		return nil, errors.Wrapf(errors.ErrInner, "embed summary failed, err=%v", err)
+		return nil, errors.Wrapf(errors.ErrEmbed, "embed summary failed, err=%v", err)
 	}
 	if len(embedResp) == 0 {
 		return nil, errors.Wrapf(errors.ErrInner, "embed summary failed, embedResp is empty")

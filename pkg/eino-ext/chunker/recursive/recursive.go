@@ -165,8 +165,12 @@ func (c *recursiveChunker) splitToUnits(
 			if part.start >= part.end {
 				continue
 			}
-			if part.length <= c.chunkSize || len(nextSeparators) == 0 {
+			if part.length <= c.chunkSize {
 				units = append(units, part)
+				continue
+			}
+			if len(nextSeparators) == 0 {
+				units = append(units, c.splitOversizedUnit(source, part.start, part.end)...)
 				continue
 			}
 
@@ -179,7 +183,12 @@ func (c *recursiveChunker) splitToUnits(
 		}
 	}
 
-	return []textUnit{c.newTextUnit(source, start, end)}
+	unit := c.newTextUnit(source, start, end)
+	if unit.length <= c.chunkSize {
+		return []textUnit{unit}
+	}
+
+	return c.splitOversizedUnit(source, start, end)
 }
 
 func (c *recursiveChunker) splitBySeparator(
@@ -308,6 +317,73 @@ func (c *recursiveChunker) newTextUnit(
 		start:  start,
 		end:    end,
 	}
+}
+
+func (c *recursiveChunker) splitOversizedUnit(
+	source string,
+	start int,
+	end int,
+) []textUnit {
+	if start >= end {
+		return nil
+	}
+
+	units := make([]textUnit, 0)
+	for left := start; left < end; {
+		right := c.maxChunkEndByLen(source, left, end)
+		if right <= left {
+			// 在 lenFunc 约束无法容纳任意完整 rune 时，至少向前推进一个 rune，避免死循环。
+			right = nextRuneBoundary(source, left, end)
+		}
+
+		units = append(units, c.newTextUnit(source, left, right))
+		left = right
+	}
+
+	return units
+}
+
+func (c *recursiveChunker) maxChunkEndByLen(source string, start int, end int) int {
+	boundaries := runeBoundaries(source, start, end)
+	lo, hi := 1, len(boundaries)-1
+	best := start
+
+	for lo <= hi {
+		mid := lo + (hi-lo)/2
+		candidateEnd := boundaries[mid]
+		candidateLen := c.lenFunc(source[start:candidateEnd])
+		if candidateLen <= c.chunkSize {
+			best = candidateEnd
+			lo = mid + 1
+			continue
+		}
+		hi = mid - 1
+	}
+
+	return best
+}
+
+func runeBoundaries(source string, start int, end int) []int {
+	bounds := make([]int, 0, end-start+1)
+	bounds = append(bounds, start)
+	for idx := range source[start:end] {
+		if idx == 0 {
+			continue
+		}
+		bounds = append(bounds, start+idx)
+	}
+	bounds = append(bounds, end)
+	return bounds
+}
+
+func nextRuneBoundary(source string, start int, end int) int {
+	for idx := range source[start:end] {
+		if idx == 0 {
+			continue
+		}
+		return start + idx
+	}
+	return end
 }
 
 func (c *recursiveChunker) packUnits(

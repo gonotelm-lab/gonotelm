@@ -6,19 +6,44 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/route"
 	"github.com/gonotelm-lab/gonotelm/internal/app/logic"
+	studiologic "github.com/gonotelm-lab/gonotelm/internal/app/logic/studio"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
+	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 
 func (s *Server) registerNotebooksRoutes(g *route.RouterGroup) {
 	g.POST("/notebook", s.CreateNotebook)
-	g.GET("/notebook/:id", s.GetNotebook)
-	g.GET("/notebook/:id/source/list", s.ListNotebookSources)
 	g.GET("/notebook/list", s.ListNotebooks)
-	g.PUT("/notebook/:id/name", s.UpdateNotebookName)
-	g.POST("/notebook/:id/chat", s.GetOrCreateNotebookChat)
-	g.DELETE("/notebook/:id", s.DeleteNotebook)
+
+	notebookIdGroup := g.Group("/notebook/:id")
+	notebookIdGroup.Use(s.checkNotebookUserId)
+	{
+		notebookIdGroup.GET("", s.GetNotebook)
+		notebookIdGroup.DELETE("", s.DeleteNotebook)
+		notebookIdGroup.PUT("/name", s.UpdateNotebookName)
+		notebookIdGroup.POST("/chat", s.GetOrCreateNotebookChat)
+		notebookIdGroup.GET("/source/list", s.ListNotebookSources)
+		notebookIdGroup.GET("/studio/artifact/list", s.ListNotebookStudioArtifacts)
+	}
+}
+
+func (s *Server) checkNotebookUserId(ctx context.Context, c *app.RequestContext) {
+	notebookId := c.Param("id")
+	nid, err := uuid.ParseString(notebookId)
+	if err != nil {
+		http.ErrResp(c, errors.ErrParams.Msgf("invalid notebook_id: %s", notebookId))
+		return
+	}
+
+	err = s.notebookLogic.CheckNotebookUserId(ctx, nid)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	c.Next(ctx)
 }
 
 type CreateNotebookRequest struct {
@@ -367,4 +392,71 @@ func (s *Server) DeleteNotebook(ctx context.Context, c *app.RequestContext) {
 	}
 
 	http.OkResp(c, nil)
+}
+
+type ListNotebookStudioArtifactsRequest struct {
+	Id     uuid.UUID `path:"id,required"`
+	Limit  int       `query:"limit"      validate:"omitempty,min=1,max=50"`
+	Offset int       `query:"offset"     validate:"min=0"`
+}
+
+const (
+	defaultNotebookStudioArtifactsLimit = 50
+)
+
+func (r *ListNotebookStudioArtifactsRequest) Validate() error {
+	if r.Limit == 0 {
+		r.Limit = defaultNotebookStudioArtifactsLimit
+	}
+	return nil
+}
+
+type NotebookStudioArtifactResponse struct {
+	Artifacts []*ArtifactResult `json:"artifacts"`
+	Limit     int               `json:"limit"`
+	Offset    int               `json:"offset"`
+	HasMore   bool              `json:"has_more"`
+}
+
+func (s *Server) ListNotebookStudioArtifacts(ctx context.Context, c *app.RequestContext) {
+	var req ListNotebookStudioArtifactsRequest
+	err := c.BindAndValidate(&req)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	result, err := s.studioLogic.ListNotebookArtifacts(ctx,
+		&studiologic.ListNotebookArtifactsParams{
+			NotebookId: req.Id,
+			Limit:      req.Limit,
+			Offset:     req.Offset,
+		})
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	http.OkResp(c, NotebookStudioArtifactResponse{
+		Artifacts: toNotebookStudioArtifactResults(result.Artifacts),
+		Limit:     req.Limit,
+		Offset:    req.Offset,
+		HasMore:   result.HasMore,
+	})
+}
+
+func toNotebookStudioArtifactResults(artifacts []*studiologic.Artifact) []*ArtifactResult {
+	results := make([]*ArtifactResult, 0, len(artifacts))
+	for _, artifact := range artifacts {
+		results = append(results, &ArtifactResult{
+			NotebookId:  artifact.NotebookId.String(),
+			TaskId:      artifact.Id.String(),
+			Status:      artifact.Status,
+			Content:     artifact.Content,
+			ContentUrl:  artifact.ContentUrl,
+			ContentKind: artifact.ResultKind,
+		})
+	}
+
+	return results
 }

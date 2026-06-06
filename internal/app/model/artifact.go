@@ -84,6 +84,7 @@ type ArtifactTask struct {
 	NotebookId Id
 	Kind       ArtifactKind
 	Status     ArtifactStatus
+	Title      string
 	Result     []byte
 	ResultKind ArtifactResultKind
 	UserId     string
@@ -101,6 +102,7 @@ func NewArtifactTaskFrom(task *schema.ArtifactTask) *ArtifactTask {
 		NotebookId: task.NotebookId,
 		Kind:       ArtifactKind(task.Kind),
 		Status:     ArtifactStatus(task.Status),
+		Title:      task.Title,
 		Result:     task.Result,
 		ResultKind: ArtifactResultKind(task.ResultKind),
 		UserId:     task.UserId,

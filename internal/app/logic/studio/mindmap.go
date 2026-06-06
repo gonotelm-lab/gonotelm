@@ -39,6 +39,11 @@ type generateMindmapTaskParams struct {
 	SourceIds  []uuid.UUID `json:"source_ids"`
 }
 
+type mindmapExpectation struct {
+	Title   string `json:"title"`
+	Mindmap string `json:"mindmap"`
+}
+
 func (m *mindmapGenerator) handle(
 	ctx context.Context,
 	task *model.ArtifactTask,
@@ -49,14 +54,15 @@ func (m *mindmapGenerator) handle(
 		return nil, errors.Wrapf(errors.ErrSerde, "unmarshal generate mindmap task params err=%v", err)
 	}
 
-	mindmap, err := m.generate(ctx, params.NotebookId, params.SourceIds)
+	expect, err := m.generate(ctx, params.NotebookId, params.SourceIds)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "create mindmap failed, err=%v", err)
 	}
 
 	return &taskHandleResult{
-		result:     pkgstring.AsBytes(mindmap),
+		result:     pkgstring.AsBytes(expect.Mindmap),
 		resultKind: model.ArtifactResultKindInline,
+		title:      expect.Title,
 	}, nil
 }
 
@@ -64,11 +70,11 @@ func (m *mindmapGenerator) generate(
 	ctx context.Context,
 	notebookId uuid.UUID,
 	sourceIds []uuid.UUID,
-) (string, error) {
+) (*mindmapExpectation, error) {
 	// check notebook
 	notebook, err := m.l.helpGetNotebook(ctx, notebookId)
 	if err != nil {
-		return "", errors.WithMessage(err, "get notebook failed")
+		return nil, errors.WithMessage(err, "get notebook failed")
 	}
 
 	// check source ids ready
@@ -78,12 +84,12 @@ func (m *mindmapGenerator) generate(
 		sourceIds,
 	)
 	if err != nil {
-		return "", errors.WithMessage(err, "batch get decoded sources failed")
+		return nil, errors.WithMessage(err, "batch get decoded sources failed")
 	}
 
 	lenSources := len(sources)
 	if lenSources == 0 {
-		return "", errors.ErrParams.Msgf(
+		return nil, errors.ErrParams.Msgf(
 			"no sources found, notebook_id=%s, source_ids=%v",
 			notebook.Id, sourceIds,
 		)
@@ -91,13 +97,13 @@ func (m *mindmapGenerator) generate(
 
 	parsedContents, err := m.l.helpGetSourcesParsedContent(ctx, sources)
 	if err != nil {
-		return "", errors.WithMessagef(err,
+		return nil, errors.WithMessagef(err,
 			"get sources parsed content failed, notebook_id=%s",
 			notebook.Id,
 		)
 	}
 	if len(parsedContents) == 0 {
-		return "", errors.ErrParams.Msg("empty source contents")
+		return nil, errors.ErrParams.Msg("empty source contents")
 	}
 
 	// 思维导图是对所有选中来源的整体探索 所以还是需要全量给到LLM进行处理
@@ -121,7 +127,7 @@ func (m *mindmapGenerator) oneshotCreateMindmap(
 	notebookId uuid.UUID,
 	contents map[uuid.UUID]string,
 	mode string,
-) (string, error) {
+) (*mindmapExpectation, error) {
 	tmps := make([]string, 0, len(contents))
 	for _, v := range contents {
 		tmps = append(tmps, v)
@@ -139,7 +145,7 @@ func (m *mindmapGenerator) oneshotCreateMindmap(
 		msg, err = prompts.StudioMindmapContentMessage(ctx, tmps, lang)
 	}
 	if err != nil {
-		return "", errors.Wrapf(errors.ErrInner,
+		return nil, errors.Wrapf(errors.ErrInner,
 			"failed to get mindmap template message, mode=%s, err=%v", mode, err)
 	}
 
@@ -147,7 +153,7 @@ func (m *mindmapGenerator) oneshotCreateMindmap(
 		conf.Global().Logic.Studio.Mindmap.ModelProvider,
 	)
 	if err != nil {
-		return "", errors.Wrapf(errors.ErrInner, "failed to get studio mindmap model, err=%v", err)
+		return nil, errors.Wrapf(errors.ErrInner, "failed to get studio mindmap model, err=%v", err)
 	}
 
 	msgs := pkgslices.FromSingle(msg)
@@ -157,21 +163,30 @@ func (m *mindmapGenerator) oneshotCreateMindmap(
 	for idx := range retryTimes {
 		llmResp, err := model.Generate(ctx, msgs, llmOption)
 		if err != nil {
-			return "", errors.Wrapf(errors.ErrLLM,
+			return nil, errors.Wrapf(errors.ErrLLM,
 				"failed to generate studio mindmap, retry=%d, err=%v",
 				idx, err,
 			)
 		}
 
-		content := llmResp.Content
-		if !prompts.CheckStudioMindmapResult(content) {
+		var expect mindmapExpectation
+		err = sonic.Unmarshal(pkgstring.AsBytes(llmResp.Content), &expect)
+		if err != nil || !prompts.CheckStudioMindmapResult(expect.Mindmap) {
 			// 给多一次机会
+			var builder strings.Builder
+			builder.WriteString("你刚才生成的思维导图不符合要求的格式，请重新输出，这个是你当前生成的结果:\n")
+			builder.WriteString(llmResp.Content)
+			builder.WriteString("\n\n")
+			if err != nil {
+				fmt.Fprintf(&builder, "原因：你输出的不是合法JSON，错误信息：%v\n\n", err)
+			} else {
+				builder.WriteString("原因：你输出的思维导图不符合要求的格式\n\n")
+			}
+			builder.WriteString("请严格按照格式要求重新输出，不要输出任何解释性文字")
+
 			compensateMsg := &einoschema.Message{
-				Role: einoschema.User,
-				Content: fmt.Sprintf(
-					"你刚才生成的思维导图不符合要求的格式，请重新输出，这个是你当前生成的结果:\n%s\n\n请严格按照格式要求重新输出",
-					content,
-				),
+				Role:    einoschema.User,
+				Content: builder.String(),
 			}
 			msgs = append(msgs, compensateMsg)
 
@@ -180,10 +195,10 @@ func (m *mindmapGenerator) oneshotCreateMindmap(
 			continue
 		}
 
-		return content, nil
+		return &expect, nil
 	}
 
-	return "", errors.Wrap(errors.ErrLLM, "failed to generate studio mindmap")
+	return nil, errors.Wrap(errors.ErrLLM, "failed to generate studio mindmap")
 }
 
 func (m *mindmapGenerator) twoshotCreateMindmap(
@@ -191,7 +206,7 @@ func (m *mindmapGenerator) twoshotCreateMindmap(
 	notebookId uuid.UUID,
 	contents map[uuid.UUID]string,
 	tokensCounts map[uuid.UUID]int,
-) (string, error) {
+) (*mindmapExpectation, error) {
 	type contentInfo struct {
 		id         uuid.UUID
 		content    string
@@ -259,7 +274,7 @@ func (m *mindmapGenerator) twoshotCreateMindmap(
 					Content: ccs.String(),
 				}))
 			if err != nil {
-				return "", errors.WithMessagef(err, "split content failed, id=%s", batch.contents[0].id)
+				return nil, errors.WithMessagef(err, "split content failed, id=%s", batch.contents[0].id)
 			}
 
 			for _, split := range splits {
@@ -290,7 +305,7 @@ func (m *mindmapGenerator) twoshotCreateMindmap(
 	}
 	err := eg.Wait()
 	if err != nil {
-		return "", errors.WithMessage(err, "split contents failed")
+		return nil, errors.WithMessage(err, "split contents failed")
 	}
 
 	abstractContents := make(map[uuid.UUID]string, len(resps))
@@ -300,15 +315,15 @@ func (m *mindmapGenerator) twoshotCreateMindmap(
 		}
 	}
 	// step2
-	mindmap, err := m.oneshotCreateMindmap(
+	expect, err := m.oneshotCreateMindmap(
 		ctx,
 		notebookId,
 		abstractContents,
 		mindmapAbstractMode,
 	)
 	if err != nil {
-		return "", errors.WithMessage(err, "generate abstract mindmap failed")
+		return nil, errors.WithMessage(err, "generate abstract mindmap failed")
 	}
 
-	return mindmap, nil
+	return expect, nil
 }

@@ -5,11 +5,13 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/safe"
+	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 
@@ -192,16 +194,19 @@ func (b *Biz) FailTask(ctx context.Context, taskId uuid.UUID, runId string) erro
 type CompleteTaskCommand struct {
 	TaskId     uuid.UUID
 	RunId      string
+	Title      string
 	Result     []byte
 	ResultKind model.ArtifactResultKind
 }
 
 // 设置指定的任务成功并且设置结果
 func (b *Biz) CompleteTask(ctx context.Context, cmd *CompleteTaskCommand) error {
+	title :=pkgstring.TruncateRune(cmd.Title, constants.MaxArtifactTitleLength)
 	_, err := b.taskStore.UpdateResult(ctx, cmd.TaskId, cmd.RunId,
 		model.ArtifactStatusRunning.String(),
 		&schema.ArtifactTaskUpdateResultParams{
 			NewStatus:  model.ArtifactStatusCompleted.String(),
+			Title:      title,
 			Result:     cmd.Result,
 			ResultKind: cmd.ResultKind.String(),
 			UpdatedAt:  getUnixMilli(),

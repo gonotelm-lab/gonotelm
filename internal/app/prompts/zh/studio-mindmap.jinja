@@ -47,27 +47,27 @@
 
 ## 输出格式约束（必须遵守）
 
-- 只输出一个 Mermaid 代码块，不要任何解释性文字。
-- 代码块语言标记必须是 `mermaid`。
-- 必须使用 `mindmap` 语法，首行为 `mindmap`。
-- 根节点格式固定为：`root((主题))`。
+- 只输出一个 JSON 对象，不要任何解释性文字，不要 Markdown 代码块。
+- JSON 结构固定为：`{"title":"","mindmap":"xxx"}`。
+- `title` 由模型生成，长度必须为 10-30 字，概括该思维导图主题。
+- `mindmap` 必须是字符串，内容必须是完整 Mermaid 代码块文本：以 ```mermaid 开始，以 ``` 结束。
+- `mindmap` 代码块内必须使用 `mindmap` 语法，且首行为 `mindmap`。
+- `mindmap` 代码块内根节点格式固定为：`root((主题))`。
+- `mindmap` 代码块内缩进必须使用空格：每一层固定增加 2 个空格，禁止使用 Tab，同层节点保持对齐。
 - 节点文本避免特殊符号，优先使用简洁中文短语。
+- 输出必须是合法 JSON；`mindmap` 中换行请使用 `\n`。
 
 若无输入文档，输出以下最小结构：
-```mermaid
-mindmap
-  root((信息不足))
+```json
+{"title":"信息不足主题导图总览","mindmap":"```mermaid\nmindmap\n  root((信息不足))\n```"}
 ```
 
 输出示例（仅示例结构，不要复用具体内容）：
-```mermaid
-mindmap
-  root((主题))
-    维度A
-      要点1
-      要点2
-    维度B
-      要点3
+```json
+{
+  "title": "Rust核心知识结构化思维导图",
+  "mindmap": "```mermaid\nmindmap\n  root((主题))\n    维度A\n      要点1\n      要点2\n    维度B\n      要点3\n```"
+}
 ```
 
 {% if Mode == "abstract" %}

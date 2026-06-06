@@ -438,25 +438,9 @@ func (s *Server) ListNotebookStudioArtifacts(ctx context.Context, c *app.Request
 	}
 
 	http.OkResp(c, NotebookStudioArtifactResponse{
-		Artifacts: toNotebookStudioArtifactResults(result.Artifacts),
+		Artifacts: toArtifactResults(result.Artifacts),
 		Limit:     req.Limit,
 		Offset:    req.Offset,
 		HasMore:   result.HasMore,
 	})
-}
-
-func toNotebookStudioArtifactResults(artifacts []*studiologic.Artifact) []*ArtifactResult {
-	results := make([]*ArtifactResult, 0, len(artifacts))
-	for _, artifact := range artifacts {
-		results = append(results, &ArtifactResult{
-			NotebookId:  artifact.NotebookId.String(),
-			TaskId:      artifact.Id.String(),
-			Status:      artifact.Status,
-			Content:     artifact.Content,
-			ContentUrl:  artifact.ContentUrl,
-			ContentKind: artifact.ResultKind,
-		})
-	}
-
-	return results
 }

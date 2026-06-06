@@ -89,6 +89,7 @@ CREATE TABLE artifact_tasks (
   notebook_id UUID NOT NULL DEFAULT uuidv7(),
   kind VARCHAR(16) NOT NULL DEFAULT '',
   status VARCHAR(16) NOT NULL DEFAULT '',
+  title VARCHAR(128) NOT NULL DEFAULT '',
   result BYTEA,
   result_kind VARCHAR(16) NOT NULL DEFAULT '',
   user_id VARCHAR(255) NOT NULL DEFAULT '',
@@ -109,6 +110,7 @@ COMMENT ON COLUMN artifact_tasks.id IS 'artifact task id, primary key';
 COMMENT ON COLUMN artifact_tasks.notebook_id IS 'associated notebook id';
 COMMENT ON COLUMN artifact_tasks.kind IS 'artifact task kind';
 COMMENT ON COLUMN artifact_tasks.status IS 'artifact task processing state';
+COMMENT ON COLUMN artifact_tasks.title IS 'artifact task title';
 COMMENT ON COLUMN artifact_tasks.result IS 'artifact task result';
 COMMENT ON COLUMN artifact_tasks.result_kind IS 'artifact task result kind';
 COMMENT ON COLUMN artifact_tasks.user_id IS 'artifact task user id';

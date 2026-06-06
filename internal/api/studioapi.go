@@ -82,6 +82,9 @@ type ArtifactResult struct {
 	NotebookId string               `json:"notebook_id"`
 	TaskId     string               `json:"task_id"`
 	Status     model.ArtifactStatus `json:"status"`
+	Title      string               `json:"title"`
+	SourceIds  []uuid.UUID          `json:"source_ids,omitempty"`
+	Timestamp  int64                `json:"timestamp"` // unix timestamp
 
 	// content解释
 	//
@@ -106,14 +109,7 @@ func (s *Server) GetStudioArtifactResult(ctx context.Context, c *app.RequestCont
 		return
 	}
 
-	http.OkResp(c, ArtifactResult{
-		NotebookId:  artifact.NotebookId.String(),
-		TaskId:      req.TaskId.String(),
-		Status:      artifact.Status,
-		Content:     artifact.Content,
-		ContentUrl:  artifact.ContentUrl,
-		ContentKind: artifact.ResultKind,
-	})
+	http.OkResp(c, toArtifactResult(artifact))
 }
 
 type GenerateStudioArtifactRequest struct {
@@ -208,4 +204,27 @@ func (s *Server) CancelStudioArtifactTask(ctx context.Context, c *app.RequestCon
 	}
 
 	http.OkResp(c, nil)
+}
+
+func toArtifactResult(artifact *studiologic.Artifact) *ArtifactResult {
+	return &ArtifactResult{
+		NotebookId:  artifact.NotebookId.String(),
+		TaskId:      artifact.Id.String(),
+		Status:      artifact.Status,
+		Title:       artifact.Title,
+		SourceIds:   artifact.SourceIds,
+		Timestamp:   artifact.Timestamp,
+		Content:     artifact.Content,
+		ContentUrl:  artifact.ContentUrl,
+		ContentKind: artifact.ResultKind,
+	}
+}
+
+func toArtifactResults(artifacts []*studiologic.Artifact) []*ArtifactResult {
+	results := make([]*ArtifactResult, 0, len(artifacts))
+	for _, artifact := range artifacts {
+		results = append(results, toArtifactResult(artifact))
+	}
+
+	return results
 }

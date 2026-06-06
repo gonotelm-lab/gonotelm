@@ -9,6 +9,7 @@ type ArtifactTask struct {
 	Status     string    `gorm:"column:status"`      // 任务状态
 	Result     []byte    `gorm:"column:result"`      // 任务结果
 	ResultKind string    `gorm:"column:result_kind"` // 任务结果类型
+	Title      string    `gorm:"column:title"`       // 生成的任务标题
 	UserId     string    `gorm:"column:user_id"`     // 用户id
 	RunId      string    `gorm:"column:run_id"`      // 消费者id
 	LockNo     int32     `gorm:"column:lock_no"`     // 乐观锁版本号
@@ -36,6 +37,7 @@ type ArtifactTaskUpdateStatusParams struct {
 
 type ArtifactTaskUpdateResultParams struct {
 	NewStatus  string // set status = :new_status
+	Title      string // set title = :title
 	Result     []byte // set result = :result
 	ResultKind string // set result_kind = :result_kind
 	UpdatedAt  int64  // set updated_at = :updated_at

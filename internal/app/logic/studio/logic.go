@@ -149,7 +149,7 @@ func (l *Logic) GetArtifactTask(
 		return nil, errors.WithMessage(err, "get artifact task failed")
 	}
 
-	artifact, err := NewArtifact(task)
+	artifact, err := constractArtifact(task)
 	if err != nil {
 		return nil, errors.WithMessage(err, "new artifact from task failed")
 	}
@@ -211,7 +211,7 @@ func (l *Logic) ListNotebookArtifacts(
 
 	artifacts := make([]*Artifact, 0, len(tasks))
 	for _, task := range tasks {
-		artifact, err := NewArtifact(task)
+		artifact, err := constractArtifact(task)
 		if err != nil {
 			return nil, errors.WithMessagef(err, "new artifact from task failed, task_id=%s", task.Id)
 		}

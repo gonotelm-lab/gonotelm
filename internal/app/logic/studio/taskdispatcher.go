@@ -11,6 +11,7 @@ import (
 type taskHandleResult struct {
 	result     []byte
 	resultKind model.ArtifactResultKind
+	title      string
 }
 
 type taskHandler interface {

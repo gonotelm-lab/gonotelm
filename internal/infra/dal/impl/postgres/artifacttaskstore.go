@@ -335,6 +335,7 @@ func (a *ArtifactTaskStoreImpl) UpdateResult(
 		Where("run_id = ?", runId).
 		Updates(map[string]any{
 			"status":      params.NewStatus,
+			"title":       params.Title,
 			"result":      params.Result,
 			"result_kind": params.ResultKind,
 			"updated_at":  params.UpdatedAt,

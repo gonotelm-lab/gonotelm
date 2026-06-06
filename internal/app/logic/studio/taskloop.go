@@ -204,6 +204,7 @@ func (t *taskLoop) handleWork(task *model.ArtifactTask) {
 	if err := t.taskBiz.CompleteTask(t.ctx, &bizartifact.CompleteTaskCommand{
 		TaskId:     task.Id,
 		RunId:      task.RunId,
+		Title:      result.title,
 		Result:     result.result,
 		ResultKind: result.resultKind,
 	}); err != nil {

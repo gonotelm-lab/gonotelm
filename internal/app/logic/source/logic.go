@@ -458,6 +458,10 @@ func (l *Logic) DeleteSourcesByNotebook(
 	return nil
 }
 
+type GetSourceParsedContentParams struct {
+	Download bool
+}
+
 type GetSourceParsedContentResult struct {
 	Content string `json:"content,omitempty"`
 	Url     string `json:"url,omitempty"`
@@ -466,6 +470,7 @@ type GetSourceParsedContentResult struct {
 func (l *Logic) GetSourceParsedContent(
 	ctx context.Context,
 	sourceId uuid.UUID,
+	params *GetSourceParsedContentParams,
 ) (*GetSourceParsedContentResult, error) {
 	source, err := l.sourceBiz.GetDecodedSource(ctx, sourceId)
 	if err != nil {
@@ -492,6 +497,7 @@ func (l *Logic) GetSourceParsedContent(
 		}, nil
 	}
 
+	// 处理parsed content放在对象存储的情况
 	var storeKey string
 	if source.ParsedContent != nil {
 		storeKey = source.ParsedContent.StoreKey
@@ -501,11 +507,14 @@ func (l *Logic) GetSourceParsedContent(
 		// slog.WarnContext(ctx, "parsed content store key is empty", "source_id", sourceId)
 		return &GetSourceParsedContentResult{}, nil
 	}
-
-	resp, err := l.objectStorage.PresignedGetObject(ctx,
-		&storage.PresignedGetObjectRequest{
-			Key: storeKey,
-		})
+	req := &storage.PresignedGetObjectRequest{
+		Key: storeKey,
+	}
+	if params != nil && params.Download {
+		req.Attachment = true
+		req.AttachmentFilename = source.Title + ".md"
+	}
+	resp, err := l.objectStorage.PresignedGetObject(ctx, req)
 	if err != nil {
 		return nil, errors.WithMessage(err, "get presigned get object failed")
 	}

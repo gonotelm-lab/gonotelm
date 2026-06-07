@@ -20,6 +20,7 @@ import (
 	vecschema "github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/bitmap"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/safe"
 	"github.com/gonotelm-lab/gonotelm/pkg/slices"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 
@@ -29,9 +30,9 @@ import (
 )
 
 var (
-	ErrSourceNotFound             = errors.New("source not found")
-	ErrSourceContentTooLong       = errors.New("source content too long")
-	ErrSourceCountExceedsMaxCount = errors.New("source count exceeds max count")
+	ErrSourceNotFound             = errors.ErrParams.Msg("source not found")
+	ErrSourceContentTooLong       = errors.ErrParams.Msg("source content too long")
+	ErrSourceCountExceedsMaxCount = errors.ErrParams.Msg("source count exceeds max count")
 )
 
 type Biz struct {
@@ -188,8 +189,21 @@ func (b *Biz) ListDecodedSourcesByNotebook(
 			return nil, errors.WithMessagef(err, "new source with content failed, source_id=%s", source.Id)
 		}
 
-		// if source is file, replace storekey with url link
-		if sc.Kind.IsFile() {
+		sourcesWithContents = append(sourcesWithContents, sc)
+	}
+
+	// 文件来源的预签名地址并发拉取，减少列表接口整体耗时。
+	var wg sync.WaitGroup
+	for i := range sourcesWithContents {
+		sc := sourcesWithContents[i]
+		if !sc.Kind.IsFile() {
+			continue
+		}
+
+		wg.Add(1)
+		safe.Go(ctx, func() {
+			defer wg.Done()
+
 			req := &storage.PresignedGetObjectRequest{
 				Key:         sc.ContentFile.StoreKey,
 				Inline:      true,
@@ -197,15 +211,18 @@ func (b *Biz) ListDecodedSourcesByNotebook(
 			}
 			resp, err := b.objectStorage.PresignedGetObject(ctx, req)
 			if err != nil {
-				// we don't need to break for error here
-				slog.ErrorContext(ctx, "get file source object url failed", slog.Any("err", err))
-			} else {
-				sc.ContentFile.Url = resp.Url
+				// 对单个来源失败仅记录日志，不影响整体列表返回。
+				slog.ErrorContext(ctx, "get file source object url failed",
+					slog.String("source_id", sc.Id.String()),
+					slog.Any("err", err),
+				)
+				return
 			}
-		}
 
-		sourcesWithContents = append(sourcesWithContents, sc)
+			sc.ContentFile.Url = resp.Url
+		})
 	}
+	wg.Wait()
 
 	return sourcesWithContents, nil
 }

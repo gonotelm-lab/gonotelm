@@ -84,7 +84,18 @@ type PresignedGetObjectRequest struct {
 	Key string
 
 	// Inline indicates browser-friendly preview response disposition.
+	//
+	// Either Inline or Attachment is set. If both are set, Attachment takes precedence.
 	Inline bool
+
+	// Attachment indicates download response disposition.
+	// Content-Disposition: attachment; filename="filename.ext"
+	// 
+	// Either Inline or Attachment is set. If both are set, Attachment takes precedence.
+	Attachment bool
+
+	// set content-disposition filename
+	AttachmentFilename string
 
 	// ContentType overrides response content type for presigned preview.
 	ContentType string

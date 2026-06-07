@@ -3,6 +3,7 @@ package minio
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -283,6 +284,14 @@ func (s *Storage) PresignedGetObject(
 	if req.Inline {
 		params.Set("response-content-disposition", "inline")
 	}
+	if req.Attachment {
+		disposition := "attachment"
+		if req.AttachmentFilename != "" {
+			disposition += fmt.Sprintf(`; filename="%s"`, req.AttachmentFilename)
+		}
+		params.Set("response-content-disposition", disposition)
+	}
+	
 	if req.ContentType != "" {
 		params.Set("response-content-type", req.ContentType)
 	}

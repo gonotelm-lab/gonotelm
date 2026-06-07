@@ -402,7 +402,8 @@ func (s *Server) BatchGetSourceDocs(ctx context.Context, c *app.RequestContext) 
 }
 
 type GetSourceParsedContentRequest struct {
-	Id uuid.UUID `path:"id,required"`
+	Id       uuid.UUID `path:"id,required"`
+	Download bool      `query:"download,optional"`
 }
 
 type GetSourceParsedContentResponse struct {
@@ -419,7 +420,10 @@ func (s *Server) GetSourceParsedContent(ctx context.Context, c *app.RequestConte
 		return
 	}
 
-	resp, err := s.sourceLogic.GetSourceParsedContent(ctx, req.Id)
+	resp, err := s.sourceLogic.GetSourceParsedContent(ctx, req.Id,
+		&logic.GetSourceParsedContentParams{
+			Download: req.Download,
+		})
 	if err != nil {
 		http.ErrResp(c, err)
 		return

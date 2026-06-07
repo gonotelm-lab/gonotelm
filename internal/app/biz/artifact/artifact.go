@@ -20,7 +20,7 @@ const (
 )
 
 var (
-	ErrTaskNotFound          = errors.ErrParams.Msgf("task not found")
+	ErrTaskNotFound          = errors.ErrParams.Msgf("artifact task not found")
 	ErrCantDeleteRunningTask = errors.ErrParams.Msgf("cannot delete running task")
 )
 

@@ -112,7 +112,7 @@ func (m *reportGenerator) generate(
 	}
 
 	// generate title again
-	title, err := m.generateTitle(ctx, llmModel, modelOption, expect.Report)
+	title, err := m.generateTitle(ctx, llmModel, modelOption, expect.Report, agent.GetAccumulatedMessages())
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "generate title failed, err=%v", err)
 	}
@@ -126,21 +126,29 @@ func (m *reportGenerator) generateTitle(
 	llmModel eino.ToolCallingChatModel,
 	modelOption eino.Option,
 	report string,
+	previousMsgs []*einoschema.Message,
 ) (string, error) {
 	title := ""
-	summaryMsg, err := prompts.TitleMakerMessage(ctx, report, "")
+	titleMakerMsg, err := prompts.TitleMakerMessage(ctx, report, "")
 	if err != nil {
 		slog.ErrorContext(ctx, "generate title maker message failed", slog.Any("err", err))
 	} else {
-		result, err := llmModel.Generate(ctx, slices.FromSingle(summaryMsg), modelOption)
+		msgs := make([]*einoschema.Message, 0, 1+len(previousMsgs))
+		msgs = append(msgs, previousMsgs...)
+		msgs = append(msgs, titleMakerMsg)
+		result, err := llmModel.Generate(ctx, msgs, modelOption)
 		if err == nil {
 			title = strings.Split(result.Content, "\n")[0]
 		} else {
 			slog.ErrorContext(ctx, "generate title failed", slog.Any("err", err))
 			// take the first sentence as title
-			title = strings.Split(summaryMsg.Content, "\n")[0]
+			idx := strings.Index(report, "\n")
+			if idx > 0 {
+				title = strings.TrimSpace(report[:idx])
+			}
 		}
 	}
+	
 	title = pkgstring.TruncateRune(title, constants.MaxNotebookNameLength)
 	title = strings.TrimSpace(title)
 
@@ -159,7 +167,7 @@ func (m *reportGenerator) beforeAgentRoundHook(
 		// 注入一条msg
 		msgs = append(msgs, &einoschema.Message{
 			Role:    einoschema.User,
-			Content: "IMPORTANT: 这轮输出是你最后一轮输出，请直接输出最终结果，不需要再进行工具调用，按照你已有的信息输出最终结果",
+			Content: "IMPORTANT: 这轮输出是你最后一轮输出，请直接输出最终结果，**不需要再进行工具调用**，按照你已有的信息输出最终结果",
 		})
 	}
 

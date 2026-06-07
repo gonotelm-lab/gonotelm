@@ -10,8 +10,10 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 
+const parsedContentStorePrefix = "parsed_file/"
+
 func formatParsedContentStoreKey(sourceId, notebookId uuid.UUID) string {
-	return "parsed_file/" + notebookId.String() + "/" + sourceId.String()
+	return parsedContentStorePrefix + notebookId.String() + "/" + sourceId.String()
 }
 
 func previewResponseContentType(mimeType string) string {

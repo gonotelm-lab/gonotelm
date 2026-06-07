@@ -11,7 +11,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 
-var ErrNotebookNotFound = errors.New("notebook not found")
+var ErrNotebookNotFound = errors.ErrParams.Msg("notebook not found")
 
 type Biz struct {
 	notebookStore dal.NotebookStore

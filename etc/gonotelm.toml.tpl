@@ -4,21 +4,6 @@ deployEnv = "dev"
 port = 7099
 exitWaitTimeout = "${ENV_GONOTELM_API_EXIT_WAIT_TIMEOUT:-30s}"
 
-[logic]
-
-[logic.chat]
-modelProvider = "${ENV_GONOTELM_LOGIC_CHAT_PROVIDER:-qwen}"
-model = "${ENV_GONOTELM_LOGIC_CHAT_MODEL:-glm-5.1}"
-maxRound = 10
-
-[logic.source]
-modelProvider = "${ENV_GONOTELM_LOGIC_SOURCE_PROVIDER:-qwen}"
-model = "${ENV_GONOTELM_LOGIC_SOURCE_MODEL:-qwen3.5-27b}"
-
-[logic.studio.mindmap]
-modelProvider = "${ENV_GONOTELM_LOGIC_STUDIO_MINDMAP_PROVIDER:-deepseek}"
-model = "${ENV_GONOTELM_LOGIC_STUDIO_MINDMAP_MODEL:-deepseek-v4-flash}"
-
 [database]
 type = "postgres"
 host = "${ENV_GONOTELM_DB_HOST:-127.0.0.1}"
@@ -66,6 +51,30 @@ consumerCommitInterval = "${ENV_GONOTELM_KAFKA_CONSUMER_COMMIT_INTERVAL:-0s}"
 
 [logging]
 level = "${ENV_GONOTELM_LOG_LEVEL:-debug}"
+
+[logic]
+
+[logic.chat]
+modelProvider = "${ENV_GONOTELM_LOGIC_CHAT_PROVIDER:-qwen}"
+model = "${ENV_GONOTELM_LOGIC_CHAT_MODEL:-glm-5.1}"
+maxRound = 10
+
+[logic.source]
+modelProvider = "${ENV_GONOTELM_LOGIC_SOURCE_PROVIDER:-qwen}"
+model = "${ENV_GONOTELM_LOGIC_SOURCE_MODEL:-qwen3.5-27b}"
+
+[logic.source.bizCache]
+eviction = "${ENV_GONOTELM_LOGIC_SOURCE_BIZCACHE_EVICTION:-15m}"
+maxMB = ${ENV_GONOTELM_LOGIC_SOURCE_BIZCACHE_MAX_MB:-1024}
+
+[logic.studio.mindmap]
+modelProvider = "${ENV_GONOTELM_LOGIC_STUDIO_MINDMAP_PROVIDER:-deepseek}"
+model = "${ENV_GONOTELM_LOGIC_STUDIO_MINDMAP_MODEL:-deepseek-v4-flash}"
+
+[logic.studio.report]
+maxRound = ${ENV_GONOTELM_LOGIC_STUDIO_REPORT_MAX_ROUND:-50}
+modelProvider = "${ENV_GONOTELM_LOGIC_STUDIO_REPORT_PROVIDER:-deepseek}"
+model = "${ENV_GONOTELM_LOGIC_STUDIO_REPORT_MODEL:-deepseek-v4-flash}"
 
 [chunking]
 size = ${ENV_GONOTELM_CHUNKING_SIZE:-500}

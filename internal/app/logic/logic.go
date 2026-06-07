@@ -29,21 +29,20 @@ func MustNewLogic(
 	infrastructures *infra.Instances,
 	objectStorage storage.Storage,
 ) *Logic {
-	// biz instances initialization
-	var (
-		notebookBiz = biznotebook.New(infrastructures.Dal.NotebookStore)
-		chatBiz     = bizchat.New(
-			infrastructures.Dal.ChatStore,
-			infrastructures.Dal.ChatMessageStore,
-			infrastructures.Cache.ChatMessageContextCache)
-		artifactBiz      = bizartifact.New(infrastructures.Dal.ArtifactTaskStore)
-		chatEventManager = bizchat.NewChatEventManager(infrastructures.Cache.ChatMessageStreamCache)
-	)
-
 	gateway, err := gateway.New(&conf.Global().Provider)
 	if err != nil {
 		panic(err)
 	}
+
+	// biz instances initialization
+	notebookBiz := biznotebook.New(infrastructures.Dal.NotebookStore)
+	chatBiz := bizchat.New(
+		infrastructures.Dal.ChatStore,
+		infrastructures.Dal.ChatMessageStore,
+		infrastructures.Cache.ChatMessageContextCache)
+	artifactBiz := bizartifact.New(infrastructures.Dal.ArtifactTaskStore)
+	chatEventManager := bizchat.NewChatEventManager(
+		infrastructures.Cache.ChatMessageStreamCache)
 
 	sourceBiz, err := bizsource.New(
 		objectStorage,
@@ -51,6 +50,16 @@ func MustNewLogic(
 		infrastructures.VectorDal.SourceDocStore,
 		gateway,
 	)
+	if err != nil {
+		panic(err)
+	}
+
+	sourceBizForAgent, err := bizsource.NewBizForAgent(ctx,
+		sourceBiz,
+		bizsource.BizForAgentConfig{
+			SourceCacheEviction: conf.Global().Logic.Source.BizCache.Eviction,
+			SourceCacheMaxMB:    conf.Global().Logic.Source.BizCache.MaxMB,
+		})
 	if err != nil {
 		panic(err)
 	}
@@ -82,6 +91,7 @@ func MustNewLogic(
 		ctx,
 		objectStorage,
 		sourceBiz,
+		sourceBizForAgent,
 		notebookBiz,
 		artifactBiz,
 		gateway,

@@ -43,7 +43,7 @@ func (d *taskDispatcher) dispatch(ctx context.Context, task *model.ArtifactTask)
 
 	result, err := handler.handle(ctx, task)
 	if err != nil {
-		return nil, fmt.Errorf("dispatch task failed, kind=%s, err=%w", task.Kind, err)
+		return nil, fmt.Errorf("handle task failed, kind=%s, err=%w", task.Kind, err)
 	}
 
 	return result, nil

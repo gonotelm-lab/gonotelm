@@ -23,6 +23,8 @@ const (
 	templateNameSummarize       templateName = "summarize"
 	templateNameNotebookSummary templateName = "notebook-summary"
 	templateNameStudioMindmap   templateName = "studio-mindmap"
+	templateNameStudioReport    templateName = "studio-report"
+	templateNameTitlleMaker     templateName = "titlle-maker"
 )
 
 //go:embed */*.jinja

@@ -6,10 +6,12 @@ type ArtifactKind string
 
 const (
 	ArtifactKindMindmap ArtifactKind = "mindmap"
+	ArtifactKindReport  ArtifactKind = "report"
 )
 
 var validArtifactKinds = map[ArtifactKind]struct{}{
 	ArtifactKindMindmap: {},
+	ArtifactKindReport:  {},
 }
 
 func (k ArtifactKind) String() string {

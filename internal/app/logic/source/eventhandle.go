@@ -18,6 +18,7 @@ import (
 	mqimpl "github.com/gonotelm-lab/gonotelm/internal/infra/mq/impl"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/mq/impl/kafka"
 	"github.com/gonotelm-lab/gonotelm/pkg/batch"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
@@ -72,6 +73,7 @@ func (l *Logic) notifySourceEventMessage(
 		NotebookId: source.NotebookId,
 		Kind:       source.Kind,
 		Status:     source.Status,
+		UserId:     source.OwnerId,
 	}
 	value, err := sonic.Marshal(sourceEvent)
 	if err != nil {
@@ -121,9 +123,8 @@ func (l *Logic) handleSourceEventMessage(
 		return errors.Wrapf(err, "parse source id failed, key=%s", string(key))
 	}
 
-	slog.DebugContext(ctx, "received and handling source prep message",
-		slog.String("msg_key", sourceId.String()),
-	)
+	ctx = pkgcontext.WithUserId(ctx, sourceEvent.UserId)
+	slog.DebugContext(ctx, "received and handling source prep message", slog.String("msg_key", sourceId.String()))
 	err = sonic.Unmarshal(val, &sourceEvent)
 	if err != nil {
 		return errors.Wrap(err, "handle prep message unmarshal failed")

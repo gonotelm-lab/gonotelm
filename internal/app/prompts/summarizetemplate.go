@@ -48,12 +48,3 @@ func SummarizeMessage(ctx context.Context, text, lang string) (*schema.Message, 
 
 	return msg, nil
 }
-
-func Summarize(text, lang string) (string, error) {
-	msg, err := SummarizeMessage(context.Background(), text, lang)
-	if err != nil {
-		return "", err
-	}
-
-	return msg.Content, nil
-}

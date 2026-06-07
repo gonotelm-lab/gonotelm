@@ -18,7 +18,7 @@ const (
 	defaultAgentRound = 20
 )
 
-type AgentConfig[T any] struct {
+type AgentConfig[State any] struct {
 	MaxRound int
 
 	// 带工具的大模型
@@ -30,14 +30,14 @@ type AgentConfig[T any] struct {
 	tools map[string]einotool.InvokableTool
 
 	// 一般可以在此hook中注入系统提示词等操作 如果超过上下文还可以进行上下文压缩等操作
-	BeforeChat  AgentBeforeChatHook[T]
-	BeforeRound AgentBeforeRoundHook[T]
+	BeforeChat  AgentBeforeChatHook[State]
+	BeforeRound AgentBeforeRoundHook[State]
 
-	MsgAppender func(ctx context.Context, state T, newMsgs []*einoschema.Message)
+	MsgAppender func(ctx context.Context, state State, newMsgs []*einoschema.Message)
 
-	OnReasoning    AgentStreamingHook[T]
-	OnReasoningEnd AgentStreamingHook[T]
-	OnContent      AgentStreamingHook[T]
+	OnReasoning    AgentStreamingHook[State]
+	OnReasoningEnd AgentStreamingHook[State]
+	OnContent      AgentStreamingHook[State]
 }
 
 type AgentBeforeChatHook[T any] func(
@@ -56,30 +56,69 @@ type AgentStreamingHook[T any] func(
 ) error
 
 // agent for chat logic
-type Agent[T any] struct {
-	cfg   AgentConfig[T]
-	state T
+type Agent[State any] struct {
+	cfg   AgentConfig[State]
+	state State
+
+	accMsgs []*einoschema.Message // 累计的历史消息
 }
 
-func NewAgent[T any](cfg AgentConfig[T], state T) *Agent[T] {
+func New[State any](cfg AgentConfig[State], state State) *Agent[State] {
 	if cfg.MaxRound <= 0 {
 		cfg.MaxRound = defaultAgentRound
 	}
 
-	return &Agent[T]{cfg: cfg, state: state}
+	return &Agent[State]{cfg: cfg, state: state}
 }
 
-func (a *Agent[T]) BindTools(tools map[string]einotool.InvokableTool) {
+func (a *Agent[State]) BindTools(tools map[string]einotool.InvokableTool) error {
 	a.cfg.tools = tools
+	toolInfos := make([]*einoschema.ToolInfo, 0, len(tools))
+	for _, tool := range tools {
+		toolInfo, err := tool.Info(context.Background())
+		if err != nil {
+			continue
+		}
+		toolInfos = append(toolInfos, toolInfo)
+	}
+
+	toolLLM, err := a.cfg.LLM.WithTools(toolInfos)
+	if err != nil {
+		return errors.Wrapf(errors.ErrInner, "bind tools failed: %v", err)
+	}
+	a.cfg.LLM = toolLLM
+
+	return nil
 }
 
-func (a *Agent[T]) Generate(
+func (a *Agent[State]) GetAccumulatedMessages() []*einoschema.Message {
+	return a.accMsgs
+}
+
+func (a *Agent[State]) setAccumulatedMessages(msgs []*einoschema.Message) {
+	if len(msgs) == 0 {
+		a.accMsgs = nil
+		return
+	}
+	a.accMsgs = append(a.accMsgs[:0], msgs...)
+}
+
+func (a *Agent[State]) appendAccumulatedMessages(msgs ...*einoschema.Message) {
+	if len(msgs) == 0 {
+		return
+	}
+	a.accMsgs = append(a.accMsgs, msgs...)
+}
+
+// 与模型交互 并返回最终的回答
+func (a *Agent[State]) React(
 	ctx context.Context,
 	msgs []*einoschema.Message,
 ) (*einoschema.Message, error) {
 	if len(msgs) == 0 {
 		return nil, errors.ErrParams.Msg("no messages to chat")
 	}
+	a.setAccumulatedMessages(msgs)
 
 	if a.cfg.BeforeChat != nil {
 		newMsgs, err := a.cfg.BeforeChat(ctx, a.state, msgs)
@@ -87,6 +126,7 @@ func (a *Agent[T]) Generate(
 			return nil, errors.WithMessage(err, "before chat failed")
 		}
 		msgs = newMsgs
+		a.setAccumulatedMessages(msgs)
 	}
 
 	for round := range a.cfg.MaxRound {
@@ -96,6 +136,7 @@ func (a *Agent[T]) Generate(
 				return nil, errors.WithMessagef(err, "before round %d failed", round)
 			}
 			msgs = newMsgs
+			a.setAccumulatedMessages(msgs)
 		}
 
 		stream, err := a.cfg.LLM.Stream(ctx, msgs, a.cfg.Options...)
@@ -134,13 +175,21 @@ func (a *Agent[T]) Generate(
 				if msg.ResponseMeta.FinishReason == chat.FinishReasonToolCalls {
 					// 需要处理工具调用
 					toolMsgs := a.handleToolCalls(ctx, msg.ToolCalls)
-					newMsgs := make([]*einoschema.Message, 0, 1+len(toolMsgs))
-					newMsgs = append(newMsgs, msg)
-					newMsgs = append(newMsgs, toolMsgs...)
-					a.cfg.MsgAppender(ctx, a.state, newMsgs)
+					roundMsgs := make([]*einoschema.Message, 0, 1+len(toolMsgs))
+					roundMsgs = append(roundMsgs, msg)
+					roundMsgs = append(roundMsgs, toolMsgs...)
+					msgs = append(msgs, roundMsgs...)
+					a.appendAccumulatedMessages(roundMsgs...)
+					if a.cfg.MsgAppender != nil {
+						a.cfg.MsgAppender(ctx, a.state, roundMsgs)
+					}
 				} else {
 					// 认为已经结束
-					a.cfg.MsgAppender(ctx, a.state, []*einoschema.Message{msg})
+					msgs = append(msgs, msg)
+					a.appendAccumulatedMessages(msg)
+					if a.cfg.MsgAppender != nil {
+						a.cfg.MsgAppender(ctx, a.state, []*einoschema.Message{msg})
+					}
 					finished = true
 					finishedMsg = msg
 				}
@@ -161,7 +210,7 @@ func (a *Agent[T]) Generate(
 }
 
 // 处理工具调用 并且以message的格式返回工具调用的结果
-func (a *Agent[T]) handleToolCalls(
+func (a *Agent[State]) handleToolCalls(
 	ctx context.Context,
 	toolCalls []einoschema.ToolCall,
 ) []*einoschema.Message {
@@ -182,6 +231,12 @@ func (a *Agent[T]) handleToolCalls(
 				ToolName:   tc.Function.Name,
 			}
 
+			slog.DebugContext(ctx, "handling tool call",
+				slog.String("tool_name", tc.Function.Name),
+				slog.String("tool_call_id", tc.ID),
+				slog.String("tool_call_arguments", string(tc.Function.Arguments)),
+			)
+
 			defer func() {
 				if e := recover(); e != nil {
 					slog.ErrorContext(ctx, "handle tool call panic", slog.Any("err", e))
@@ -192,16 +247,19 @@ func (a *Agent[T]) handleToolCalls(
 				}
 			}()
 
-			if a.cfg.tools != nil {
-				if invokable, ok := a.cfg.tools[tc.Function.Name]; !ok {
-					results[idx].Content = fmt.Sprintf("tool %s not found", tc.Function.Name)
+			if a.cfg.tools == nil {
+				results[idx].Content = "no tools bound"
+				return
+			}
+
+			if invokable, ok := a.cfg.tools[tc.Function.Name]; !ok {
+				results[idx].Content = fmt.Sprintf("tool %s not found", tc.Function.Name)
+			} else {
+				result, err := invokable.InvokableRun(ctx, tc.Function.Arguments)
+				if err != nil {
+					results[idx].Content = fmt.Sprintf("tool call failed: %v", err)
 				} else {
-					result, err := invokable.InvokableRun(ctx, tc.Function.Arguments)
-					if err != nil {
-						results[idx].Content = fmt.Sprintf("tool call failed: %v", err)
-					} else {
-						results[idx].Content = result
-					}
+					results[idx].Content = result
 				}
 			}
 		})

@@ -42,11 +42,11 @@ type PhaseCitationItem struct {
 }
 
 type PhaseCitationDoc struct {
-	Id        string                    `json:"id,omitempty"`
+	Id string `json:"id,omitempty"`
 
 	// 是否为总结性引用片段（对应派生/非派生节点）
 	// is_summary=true => 来自派生节点; is_summary=false => 来自非派生节点
-	IsSummary bool                      `json:"is_summary` 
+	IsSummary bool                      `json:"is_summary"`
 	Position  *PhaseCitationDocPosition `json:"position,omitempty"`
 }
 

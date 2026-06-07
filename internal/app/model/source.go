@@ -218,6 +218,7 @@ type DecodedSource struct {
 	ContentUrl  *UrlSourceContent  `json:"content_url,omitempty"`
 	ContentFile *FileSourceContent `json:"content_file,omitempty"`
 
+	// 解析后的内容 storeKey用于获取解析后的内容
 	ParsedContent *ParsedSourceContent `json:"parsed_content,omitempty"`
 }
 

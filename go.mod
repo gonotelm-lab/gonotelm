@@ -1,11 +1,13 @@
 module github.com/gonotelm-lab/gonotelm
 
-go 1.25.0
+go 1.25.4
 
 require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.0
 	github.com/a8m/envsubst v1.4.2
+	github.com/agiledragon/gomonkey/v2 v2.14.0
+	github.com/allegro/bigcache/v3 v3.1.0
 	github.com/bytedance/sonic v1.15.0
 	github.com/cloudwego/eino v0.8.11
 	github.com/cloudwego/eino-ext/components/document/parser/docx v0.0.0-20260424065505-3b3b8b5db0d0
@@ -25,6 +27,7 @@ require (
 	github.com/cloudwego/eino-ext/components/model/openai v0.1.13
 	github.com/cloudwego/eino-ext/components/model/qwen v0.1.9
 	github.com/cloudwego/hertz v0.10.4
+	github.com/coregx/coregex v0.12.21
 	github.com/go-playground/validator/v10 v10.30.2
 	github.com/go-redsync/redsync/v4 v4.16.0
 	github.com/golang/snappy v1.0.0
@@ -79,6 +82,7 @@ require (
 	github.com/cockroachdb/redact v1.1.3 // indirect
 	github.com/cohesion-org/deepseek-go v1.3.4 // indirect
 	github.com/containerd/cgroups/v3 v3.0.3 // indirect
+	github.com/coregx/ahocorasick v0.2.1 // indirect
 	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect

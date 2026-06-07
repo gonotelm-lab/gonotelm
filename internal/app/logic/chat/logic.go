@@ -21,7 +21,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
-	"github.com/gonotelm-lab/gonotelm/pkg/slices"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 
 	einomodel "github.com/cloudwego/eino/components/model"
@@ -382,7 +381,7 @@ func (l *Logic) processUserMessageTask(
 	}
 
 	chatAgent := l.buildNewChatAgent(chatLLM, sessionState)
-	answer, err = chatAgent.Generate(ctx, contextMsgs)
+	answer, err = chatAgent.React(ctx, contextMsgs)
 	if err != nil {
 		slog.ErrorContext(ctx, "chat agent loop failed",
 			slog.String("chat_id", chat.Id.String()),
@@ -538,7 +537,7 @@ func (l *Logic) finalizingProcess(
 		return nil
 	}
 
-	extra := buildMessageExtraFromSourceDocs(state.sourceDocs)
+	extra := buildMessageExtra(state.sourceDocs)
 
 	// 拿出全部结果 整合成最终结果后落库
 	// 最终的结果落库
@@ -624,9 +623,7 @@ func (l *Logic) buildNewChatAgent(
 		OnContent:      l.agentOnContentHook,
 	}
 
-	agent := bizagent.NewAgent(agentConfig, sessionState)
-
-	// TODO bind tools if needed
+	agent := bizagent.New(agentConfig, sessionState)
 
 	return agent
 }
@@ -705,7 +702,14 @@ func (l *Logic) agentBeforeRoundHook(
 	state *chatSessionState,
 	msgs []*einoschema.Message,
 ) ([]*einoschema.Message, error) {
-	// TODO 如果只剩下最后一轮 要求模型马上输出最终结果
+	// 如果只剩下最后一轮 要求模型马上输出最终结果
+	if round >= conf.Global().Logic.Chat.GetMaxRound()-1 {
+		// 注入一条msg
+		msgs = append(msgs, &einoschema.Message{
+			Role:    einoschema.User,
+			Content: "这轮输出是你最后一轮输出，请直接输出最终结果，不需要再进行工具调用，按照你已有的信息输出最终结果",
+		})
+	}
 
 	return msgs, nil
 }
@@ -766,7 +770,7 @@ func (l *Logic) emitRetrievingStreamEvent(
 		},
 	}
 
-	event.Phase.Citation = buildPhaseCitationFromSourceDocs(state.sourceDocs)
+	event.Phase.Citation = buildPhaseCitation(state.sourceDocs)
 	if event.Phase.Citation != nil {
 		event.Phase.Status = chatmodel.MessageStreamFinished
 	}
@@ -860,146 +864,4 @@ func (l *Logic) emitErrorFinishStreamEvent(
 	}
 
 	l.emitStreamEvent(ctx, state, event)
-}
-
-type groupedSourceDocCitation struct {
-	SourceId string
-	DocIds   []string
-}
-
-func groupSourceDocsForCitation(sourceDocs []*model.SourceDoc) []*groupedSourceDocCitation {
-	if len(sourceDocs) == 0 {
-		return nil
-	}
-
-	groups := make([]*groupedSourceDocCitation, 0, len(sourceDocs))
-	for _, sourceDoc := range sourceDocs {
-		if sourceDoc == nil {
-			continue
-		}
-
-		sourceID := sourceDoc.SourceId.String()
-		groupIdx := -1
-		for idx, group := range groups {
-			if group.SourceId == sourceID {
-				groupIdx = idx
-				break
-			}
-		}
-		if groupIdx < 0 {
-			groups = append(groups, &groupedSourceDocCitation{
-				SourceId: sourceID,
-				DocIds:   make([]string, 0, 1),
-			})
-			groupIdx = len(groups) - 1
-		}
-
-		if sourceDoc.Id != "" {
-			groups[groupIdx].DocIds = append(groups[groupIdx].DocIds, sourceDoc.Id)
-		}
-	}
-
-	return groups
-}
-
-func buildMessageExtraFromSourceDocs(sourceDocs []*model.SourceDoc) *chatmodel.MessageExtra {
-	groupedSourceDocs := groupSourceDocsForCitation(sourceDocs)
-	if len(groupedSourceDocs) == 0 {
-		return nil
-	}
-
-	citations := make([]*chatmodel.Citation, 0, len(groupedSourceDocs))
-	for _, grouped := range groupedSourceDocs {
-		citations = append(citations, &chatmodel.Citation{
-			SourceId: grouped.SourceId,
-			DocIds:   grouped.DocIds,
-		})
-	}
-
-	return &chatmodel.MessageExtra{
-		Citation: citations,
-	}
-}
-
-func buildPhaseCitationFromSourceDocs(sourceDocs []*model.SourceDoc) []*chatmodel.PhaseCitationItem {
-	groupedSourceDocs := groupSourceDocsForCitation(sourceDocs)
-	if len(groupedSourceDocs) == 0 {
-		return nil
-	}
-
-	docsMap := slices.AsMapF(sourceDocs, func(doc *model.SourceDoc) string { return doc.Id })
-
-	items := make([]*chatmodel.PhaseCitationItem, 0, len(groupedSourceDocs))
-	for _, grouped := range groupedSourceDocs {
-		item := &chatmodel.PhaseCitationItem{
-			SourceId: grouped.SourceId,
-			Docs:     make([]*chatmodel.PhaseCitationDoc, 0, len(grouped.DocIds)),
-		}
-		for _, docID := range grouped.DocIds {
-			start, end := 0, 0
-			isSummary := true
-			doc, ok := docsMap[docID]
-			if ok {
-				start = doc.RunePos.GetStart()
-				end = doc.RunePos.GetEnd()
-				isSummary = doc.IsDerived()
-			}
-
-			item.Docs = append(item.Docs, &chatmodel.PhaseCitationDoc{
-				Id:        docID,
-				IsSummary: isSummary,
-				Position: &chatmodel.PhaseCitationDocPosition{
-					Start: start,
-					End:   end,
-				},
-			})
-		}
-		items = append(items, item)
-	}
-
-	return items
-}
-
-func buildChatTemplateVars(state *chatSessionState) prompts.ChatTemplateVars {
-	sourceDocs := state.sourceDocs
-	templateVars := prompts.ChatTemplateVars{}
-
-	for _, sourceDoc := range sourceDocs {
-		if sourceDoc == nil {
-			continue
-		}
-
-		sourceID := sourceDoc.SourceId.String()
-		groupIdx := -1
-		for idx, group := range templateVars.SelectedSources {
-			if group.SourceID == sourceID {
-				groupIdx = idx
-				break
-			}
-		}
-		if groupIdx < 0 {
-			templateVars.SelectedSources = append(templateVars.SelectedSources,
-				prompts.ChatSelectedSourceGroup{
-					SourceIndex: int64(len(templateVars.SelectedSources)),
-					SourceID:    sourceID,
-				})
-			groupIdx = len(templateVars.SelectedSources) - 1
-		}
-		docIndex := int64(len(templateVars.SelectedSources[groupIdx].Docs))
-
-		templateVars.SelectedSources[groupIdx].Docs = append(
-			templateVars.SelectedSources[groupIdx].Docs,
-			prompts.ChatSelectedSourceDoc{
-				DocIndex: docIndex,
-				DocID:    sourceDoc.Id,
-				Content:  sourceDoc.Content,
-				Score:    sourceDoc.Score,
-			},
-		)
-	}
-
-	templateVars.Style = state.chatStyle
-	templateVars.AnswerLength = state.chatAnswerLength
-
-	return templateVars
 }

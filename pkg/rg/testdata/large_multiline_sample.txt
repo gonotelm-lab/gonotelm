@@ -1,0 +1,131 @@
+# Rust Tutorial Production Notes
+
+This document stores raw notes for a long-form rust lesson video.
+It is plain markdown text and intentionally verbose for grep tests.
+
+## Goals
+- Explain ownership with practical stories
+- Explain borrowing with readable examples
+- Explain lifetimes without scary wording
+
+## Audience
+- Backend engineers moving from python to rust
+- Students who already know basic syntax
+- Reviewers preparing subtitles and chapter cards
+
+## Recording Checklist
+- Verify microphone level
+- Verify subtitle template
+- Verify chapter title style
+
+## Segment Catalog
+
+- Segment: Ownership Basics
+  Start: 00:00
+  Duration: 10 minutes
+- Segment: Borrow Checker in Practice
+  Start: 10:00
+  Duration: 20 minutes
+- Segment: Lifetime Patterns
+  Start: 30:00
+  Duration: 18 minutes
+
+## Voice Tone
+Use short sentences and active voice.
+Avoid slang and avoid ambiguous pronouns.
+
+## Rendering Constraints
+Target frame rate: 30 fps
+Target resolution: 1920x1080
+Target voice style: calm
+
+## Subtitle Strategy
+Break lines at natural pauses.
+Keep one idea per subtitle card.
+Repeat key terms for retention.
+
+## Closing
+Repeat three key ideas before ending.
+Invite viewers to try one mini exercise.
+
+## Appendix A: Terminology List
+- ownership: value has one clear owner at a time.
+- borrowing: temporary access without moving ownership.
+- mutable borrow: writable reference with exclusivity.
+- immutable borrow: read-only reference with sharing.
+- lifetime: scope relation that keeps references safe.
+- move semantics: transfer of ownership between bindings.
+- shadowing: rebind variable name with new value.
+- pattern matching: branch logic through destructuring.
+- trait bound: capability requirement on generic type.
+- iterator: lazy sequence abstraction.
+- closure: function value capturing environment.
+- panic: unrecoverable runtime failure signal.
+- result: explicit success or error return.
+- option: explicit some or none value.
+- slice: view over continuous sequence.
+- module: namespace and visibility boundary.
+- crate: compilation unit and package output.
+- cargo: build and dependency workflow tool.
+- clippy: linting helper for code quality.
+- rustfmt: formatting tool for consistent style.
+
+## Appendix B: FAQ Draft
+- Q01: Why start with ownership before lifetimes.
+- A01: Ownership gives the base model for all references.
+- Q02: Why use many short chapters.
+- A02: Short chapters reduce cognitive load and improve recall.
+- Q03: Why repeat key words in every recap.
+- A03: Repetition improves retention for dense topics.
+- Q04: Why avoid too many metaphors.
+- A04: Literal explanations reduce ambiguity.
+- Q05: Why keep one action item per chapter.
+- A05: One action item is easier to execute consistently.
+- Q06: Why mention failure modes early.
+- A06: Early failure awareness reduces frustration.
+- Q07: Why include subtitle strategy in notes.
+- A07: Subtitle quality directly affects comprehension speed.
+- Q08: Why target calm voice style.
+- A08: Calm delivery helps process complex constraints.
+- Q09: Why discuss trade-offs repeatedly.
+- A09: Trade-offs frame decision quality for real projects.
+- Q10: Why end with a mini exercise.
+- A10: Immediate practice turns passive viewing into learning.
+
+## Appendix C: Review Checklist
+- Review 01: heading hierarchy remains consistent.
+- Review 02: chapter names stay concise.
+- Review 03: durations are balanced.
+- Review 04: vocabulary is consistent.
+- Review 05: subtitle lines are readable.
+- Review 06: recap bullets remain parallel.
+- Review 07: transitions are short and clear.
+- Review 08: examples stay practical.
+- Review 09: opening goals are measurable.
+- Review 10: ending summary matches goals.
+- Review 11: no duplicate chapter identifiers.
+- Review 12: no ambiguous pronouns in key definitions.
+- Review 13: no overloaded sentences in recaps.
+- Review 14: each chapter has one clear takeaway.
+- Review 15: FAQ answers are direct and short.
+- Review 16: terminology section has no contradictions.
+- Review 17: markdown structure is stable.
+- Review 18: all durations include units.
+- Review 19: all bullet lists keep same style.
+- Review 20: final practice prompt is actionable.
+
+## Appendix D: 中文 English Mixed
+- 中文目标: 让 grep 在 bilingual 场景下也稳定命中.
+- English goal: keep regex behavior deterministic with mixed scripts.
+- 中文示例: 所有权 ownership 是 rust 学习的第一关.
+- English example: borrowing rules are strict but predictable.
+- 中文问题: lifetime 为什么看起来复杂.
+- English answer: lifetimes describe relations, not clock time.
+- 中文提醒: 避免使用含糊代词, keep references explicit.
+- English reminder: use short sentences for subtitle clarity.
+- 中文场景: 视频章节可能同时出现 "借用" and "borrow checker".
+- English scenario: chapter cards may mix zh and en keywords.
+- 中文结论: 混排文本应当保持术语一致.
+- English conclusion: keep term mapping stable across sections.
+- 中文附注: 这部分用于测试 unicode + ascii 混合匹配.
+- English note: this section helps verify mixed-language regex queries.

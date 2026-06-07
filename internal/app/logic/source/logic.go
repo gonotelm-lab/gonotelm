@@ -40,6 +40,7 @@ type sourceEventMessage struct {
 	NotebookId uuid.UUID          `json:"notebook_id"`
 	Kind       model.SourceKind   `json:"kind"`
 	Status     model.SourceStatus `json:"status"`
+	UserId     string             `json:"user_id"`
 }
 
 type Logic struct {

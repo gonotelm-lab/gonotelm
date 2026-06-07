@@ -81,6 +81,7 @@ func (s *Server) GetStudioArtifactStatus(ctx context.Context, c *app.RequestCont
 type ArtifactResult struct {
 	NotebookId string               `json:"notebook_id"`
 	TaskId     string               `json:"task_id"`
+	Kind       model.ArtifactKind   `json:"kind"`
 	Status     model.ArtifactStatus `json:"status"`
 	Title      string               `json:"title"`
 	SourceIds  []uuid.UUID          `json:"source_ids,omitempty"`
@@ -211,6 +212,7 @@ func toArtifactResult(artifact *studiologic.Artifact) *ArtifactResult {
 		NotebookId:  artifact.NotebookId.String(),
 		TaskId:      artifact.Id.String(),
 		Status:      artifact.Status,
+		Kind:        artifact.Kind,
 		Title:       artifact.Title,
 		SourceIds:   artifact.SourceIds,
 		Timestamp:   artifact.Timestamp,

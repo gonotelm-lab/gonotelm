@@ -54,6 +54,11 @@ func (c *ChatLogicConfig) GetMaxRound() int {
 type SourceLogicConfig struct {
 	ModelProvider chat.Provider `toml:"modelProvider"`
 	Model         string        `toml:"model"`
+
+	BizCache struct {
+		Eviction time.Duration `toml:"eviction"`
+		MaxMB    int           `toml:"maxMB"`
+	} `toml:"bizCache"`
 }
 
 type StudioLogicConfig struct {
@@ -61,6 +66,12 @@ type StudioLogicConfig struct {
 		ModelProvider chat.Provider `toml:"modelProvider"`
 		Model         string        `toml:"model"`
 	} `toml:"mindmap"`
+
+	Report struct {
+		MaxRound      int           `toml:"maxRound"`
+		ModelProvider chat.Provider `toml:"modelProvider"`
+		Model         string        `toml:"model"`
+	} `toml:"report"`
 
 	TaskConfig struct {
 		NumClaimers        int           `toml:"numClaimers"`

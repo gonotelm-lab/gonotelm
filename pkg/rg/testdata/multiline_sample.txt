@@ -1,0 +1,118 @@
+# Quick Multiline Fixture
+
+This fixture is plain markdown text.
+It exists for regex behavior tests only.
+
+## Topic Summary
+- Topic: ownership
+- Topic: borrowing
+- Topic: lifetimes
+
+## Teaching Notes
+Use short sections and repeat key words.
+Keep one idea per sentence.
+Avoid noisy punctuation.
+
+## Segment Draft
+- Segment: Intro
+  Start: 00:00
+  Duration: 05 minutes
+- Segment: Borrow Rules
+  Start: 05:00
+  Duration: 12 minutes
+- Segment: Lifetime Hints
+  Start: 17:00
+  Duration: 09 minutes
+
+## Closing Notes
+Ask learners to write one small rust function.
+Ask learners to explain ownership in one line.
+
+## Extended Outline
+- Note 01: use one concise sentence per subtitle card.
+- Note 02: keep chapter names under eight words.
+- Note 03: repeat ownership terms in recap sections.
+- Note 04: keep voice tempo stable in dense sections.
+- Note 05: avoid introducing two new concepts together.
+- Note 06: add one short pause before each key point.
+- Note 07: mention common beginner mistakes explicitly.
+- Note 08: connect rules to practical debugging stories.
+- Note 09: use direct verbs instead of abstract nouns.
+- Note 10: end each chapter with one action item.
+- Note 11: align chapter transitions with visual cues.
+- Note 12: avoid long parenthetical explanations.
+- Note 13: prefer concrete examples over metaphors.
+- Note 14: summarize constraints before showing fixes.
+- Note 15: keep terminology consistent across chapters.
+- Note 16: define one new term at a time.
+- Note 17: avoid rhetorical questions in dense segments.
+- Note 18: label each recap with one bold keyword.
+- Note 19: keep sentence length within subtitle limits.
+- Note 20: state expected output before explanation.
+- Note 21: clarify edge cases with plain language.
+- Note 22: use chapter markers for quick review.
+- Note 23: keep section openings focused and short.
+- Note 24: confirm assumptions before each exercise.
+- Note 25: avoid nested bullet lists in slides.
+- Note 26: present one failure mode per example.
+- Note 27: repeat naming rules in every recap.
+- Note 28: keep examples relevant to backend tasks.
+- Note 29: reduce filler phrases in transitions.
+- Note 30: separate rules from exceptions clearly.
+- Note 31: emphasize ownership transfer vocabulary.
+- Note 32: keep borrowing examples symmetrical.
+- Note 33: align pacing with reading complexity.
+- Note 34: restate goals after major transitions.
+- Note 35: track terms that frequently confuse viewers.
+- Note 36: keep summary bullets parallel in style.
+- Note 37: mention trade-offs without overloading detail.
+- Note 38: avoid introducing tool details too early.
+- Note 39: keep chapter intros under twenty seconds.
+- Note 40: place review prompts at stable intervals.
+- Note 41: recap lifetime hints with one sentence.
+- Note 42: separate syntax details from reasoning.
+- Note 43: prefer explicit examples for references.
+- Note 44: avoid switching notation mid chapter.
+- Note 45: mention memory safety benefits briefly.
+- Note 46: keep subtitles synchronized with pauses.
+- Note 47: reinforce key contrasts with pairs.
+- Note 48: clarify mutable versus immutable choices.
+- Note 49: avoid dense jargon in closing remarks.
+- Note 50: restate learning path at the end.
+- Note 51: keep chapter durations balanced.
+- Note 52: verify audience expectations per segment.
+- Note 53: include one mini challenge per topic.
+- Note 54: avoid examples that require hidden context.
+- Note 55: use stable naming in every scenario.
+- Note 56: call out pitfalls before solutions.
+- Note 57: keep narration aligned with chapter cards.
+- Note 58: avoid repetitive transition phrases.
+- Note 59: keep grammar simple for non-native readers.
+- Note 60: use practical APIs in demonstrations.
+- Note 61: reinforce review cadence every five minutes.
+- Note 62: keep chapter checkpoints visible.
+- Note 63: avoid speculative language in definitions.
+- Note 64: present one confidence check per recap.
+- Note 65: connect lifetimes to ownership recap.
+- Note 66: reduce overlap between chapter endings.
+- Note 67: keep voice emphasis on verbs and outcomes.
+- Note 68: mention expected learner confusion points.
+- Note 69: keep terminology list updated weekly.
+- Note 70: avoid overusing abbreviations in narration.
+- Note 71: clarify when a rule is strict.
+- Note 72: include one reflective prompt per chapter.
+- Note 73: keep final recap under one minute.
+- Note 74: align closing summary with chapter goals.
+- Note 75: end with one clear next practice step.
+
+## Bilingual Notes
+- 中文说明: 这一段用于测试中英文混合匹配能力.
+- English note: this line validates mixed-language search.
+- 中文术语: 所有权 ownership, 借用 borrowing, 生命周期 lifetime.
+- English terms: mutable borrow, immutable borrow, move semantics.
+- 中文提醒: 字幕行长要稳定, avoid very long wrapped lines.
+- English reminder: keep pacing calm and wording precise.
+- 中文问题: 为什么要先讲 ownership 再讲 lifetime.
+- English answer: because reference safety depends on ownership model.
+- 中文结论: 先建立心智模型, 再扩展到复杂场景.
+- English conclusion: model first, details second.

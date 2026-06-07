@@ -9,8 +9,10 @@ import (
 
 	bizartifact "github.com/gonotelm-lab/gonotelm/internal/app/biz/artifact"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/log"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
+
 	"github.com/panjf2000/ants/v2"
 )
 
@@ -160,38 +162,45 @@ func (t *taskLoop) handleWork(task *model.ArtifactTask) {
 				slog.String("task_status", task.Status.String()),
 				slog.String("task_kind", task.Kind.String()),
 			)
+
+			// mark failed
+			if err := t.taskBiz.FailTask(t.ctx, task.Id, task.RunId); err != nil {
+				slog.ErrorContext(t.ctx, "task handle work fail task failed", slog.Any("err", err))
+			}
 		}
 	}()
 
-	slog.DebugContext(t.ctx, "task handle work started",
+	ctx := pkgcontext.WithUserId(t.ctx, task.UserId)
+
+	slog.DebugContext(ctx, "task handle work started",
 		slog.String("task_id", task.Id.String()),
 		slog.String("task_status", task.Status.String()),
 		slog.String("task_kind", task.Kind.String()),
 	)
 
-	result, err := t.dispatcher.dispatch(t.ctx, task)
+	result, err := t.dispatcher.dispatch(ctx, task)
 	if err != nil {
-		slog.ErrorContext(t.ctx, "task handle work dispatch failed",
+		slog.ErrorContext(ctx, "task handle work dispatch failed",
 			slog.Any("err", err),
 			slog.String("task_id", task.Id.String()),
 			slog.String("task_status", task.Status.String()),
 			slog.String("task_kind", task.Kind.String()),
 			slog.String("task_run_id", task.RunId),
 		)
-		if err := t.taskBiz.FailTask(t.ctx, task.Id, task.RunId); err != nil {
-			slog.ErrorContext(t.ctx, "task handle work fail task failed", slog.Any("err", err))
+		if err := t.taskBiz.FailTask(ctx, task.Id, task.RunId); err != nil {
+			slog.ErrorContext(ctx, "task handle work fail task failed", slog.Any("err", err))
 		}
 
 		return
 	}
 
 	// get again
-	status, err := t.taskBiz.GetTaskStatus(t.ctx, task.Id)
+	status, err := t.taskBiz.GetTaskStatus(ctx, task.Id)
 	if err != nil {
-		slog.ErrorContext(t.ctx, "task handle work get task status failed", slog.Any("err", err))
+		slog.ErrorContext(ctx, "task handle work get task status failed", slog.Any("err", err))
 	} else {
 		if status.Cancelled() {
-			slog.DebugContext(t.ctx, "target task is already cancelled, skip..",
+			slog.DebugContext(ctx, "target task is already cancelled, skip..",
 				slog.String("task_id", task.Id.String()),
 				slog.String("task_run_id", task.RunId),
 				slog.String("task_kind", task.Kind.String()),
@@ -201,18 +210,18 @@ func (t *taskLoop) handleWork(task *model.ArtifactTask) {
 		}
 	}
 
-	if err := t.taskBiz.CompleteTask(t.ctx, &bizartifact.CompleteTaskCommand{
+	if err := t.taskBiz.CompleteTask(ctx, &bizartifact.CompleteTaskCommand{
 		TaskId:     task.Id,
 		RunId:      task.RunId,
 		Title:      result.title,
 		Result:     result.result,
 		ResultKind: result.resultKind,
 	}); err != nil {
-		slog.ErrorContext(t.ctx, "task handle work complete task failed", slog.Any("err", err))
+		slog.ErrorContext(ctx, "task handle work complete task failed", slog.Any("err", err))
 		return
 	}
 
-	slog.DebugContext(t.ctx, "task handle work completed",
+	slog.DebugContext(ctx, "task handle work completed",
 		slog.String("task_id", task.Id.String()),
 		slog.String("task_kind", task.Kind.String()),
 	)

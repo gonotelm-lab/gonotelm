@@ -13,6 +13,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/app/prompts"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/safe"
 	pkgslices "github.com/gonotelm-lab/gonotelm/pkg/slices"
@@ -20,12 +21,14 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/token"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 
+	einomodel "github.com/cloudwego/eino/components/model"
 	einoschema "github.com/cloudwego/eino/schema"
 	"golang.org/x/sync/errgroup"
 )
 
 const (
 	mindmapAbstractMode = "abstract"
+	mindmapContentMode  = "content"
 )
 
 type mindmapGenerator struct {
@@ -35,8 +38,7 @@ type mindmapGenerator struct {
 var _ taskHandler = &mindmapGenerator{}
 
 type generateMindmapTaskParams struct {
-	NotebookId uuid.UUID   `json:"notebook_id"`
-	SourceIds  []uuid.UUID `json:"source_ids"`
+	*commonTaskParams
 }
 
 type mindmapExpectation struct {
@@ -54,7 +56,7 @@ func (m *mindmapGenerator) handle(
 		return nil, errors.Wrapf(errors.ErrSerde, "unmarshal generate mindmap task params err=%v", err)
 	}
 
-	expect, err := m.generate(ctx, params.NotebookId, params.SourceIds)
+	expect, err := m.generate(ctx, &params)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "create mindmap failed, err=%v", err)
 	}
@@ -68,11 +70,10 @@ func (m *mindmapGenerator) handle(
 
 func (m *mindmapGenerator) generate(
 	ctx context.Context,
-	notebookId uuid.UUID,
-	sourceIds []uuid.UUID,
+	params *generateMindmapTaskParams,
 ) (*mindmapExpectation, error) {
 	// check notebook
-	notebook, err := m.l.helpGetNotebook(ctx, notebookId)
+	notebook, err := m.l.helpGetNotebook(ctx, params.NotebookId)
 	if err != nil {
 		return nil, errors.WithMessage(err, "get notebook failed")
 	}
@@ -81,7 +82,7 @@ func (m *mindmapGenerator) generate(
 	sources, err := m.l.sourceBiz.BatchGetDecodedSources(
 		ctx,
 		notebook.Id,
-		sourceIds,
+		params.SourceIds,
 	)
 	if err != nil {
 		return nil, errors.WithMessage(err, "batch get decoded sources failed")
@@ -91,7 +92,7 @@ func (m *mindmapGenerator) generate(
 	if lenSources == 0 {
 		return nil, errors.ErrParams.Msgf(
 			"no sources found, notebook_id=%s, source_ids=%v",
-			notebook.Id, sourceIds,
+			notebook.Id, params.SourceIds,
 		)
 	}
 
@@ -116,10 +117,26 @@ func (m *mindmapGenerator) generate(
 	}
 
 	if totalTokens <= constants.MindmapMaxOnceToken {
-		return m.oneshotCreateMindmap(ctx, notebookId, parsedContents, "")
+		return m.oneshotCreateMindmap(ctx, params.NotebookId, parsedContents, "")
 	}
 
-	return m.twoshotCreateMindmap(ctx, notebookId, parsedContents, tokensCounts)
+	return m.twoshotCreateMindmap(ctx, params.NotebookId, parsedContents, tokensCounts)
+}
+
+func (m *mindmapGenerator) llmModelWithOption() (
+	einomodel.ToolCallingChatModel,
+	[]einomodel.Option,
+	error,
+) {
+	model, err := m.l.llmGateway.GetProvider(
+		conf.Global().Logic.Studio.Mindmap.ModelProvider,
+	)
+	if err != nil {
+		return nil, nil, errors.Wrapf(errors.ErrInner, "failed to get studio mindmap model, err=%v", err)
+	}
+	llmOption := llmchat.BuildLLMModelOption(conf.Global().Logic.Studio.Mindmap.Model)
+
+	return model, []einomodel.Option{llmOption}, nil
 }
 
 func (m *mindmapGenerator) oneshotCreateMindmap(
@@ -149,19 +166,16 @@ func (m *mindmapGenerator) oneshotCreateMindmap(
 			"failed to get mindmap template message, mode=%s, err=%v", mode, err)
 	}
 
-	model, err := m.l.llmGateway.GetProvider(
-		conf.Global().Logic.Studio.Mindmap.ModelProvider,
-	)
+	model, llmOptions, err := m.llmModelWithOption()
 	if err != nil {
-		return nil, errors.Wrapf(errors.ErrInner, "failed to get studio mindmap model, err=%v", err)
+		return nil, errors.Wrapf(errors.ErrInner, "failed to get studio mindmap model and options, err=%v", err)
 	}
-
 	msgs := pkgslices.FromSingle(msg)
 
-	llmOption := llmchat.BuildLLMModelOption(conf.Global().Logic.Studio.Mindmap.Model)
 	const retryTimes = 3
+	ctx = pkgcontext.WithBizType(ctx, pkgcontext.StudioMindmapScene)
 	for idx := range retryTimes {
-		llmResp, err := model.Generate(ctx, msgs, llmOption)
+		llmResp, err := model.Generate(ctx, msgs, llmOptions...)
 		if err != nil {
 			return nil, errors.Wrapf(errors.ErrLLM,
 				"failed to generate studio mindmap, retry=%d, err=%v",
@@ -207,6 +221,64 @@ func (m *mindmapGenerator) twoshotCreateMindmap(
 	contents map[uuid.UUID]string,
 	tokensCounts map[uuid.UUID]int,
 ) (*mindmapExpectation, error) {
+	batches, err := m.splitContentBatches(ctx, contents, tokensCounts)
+	if err != nil {
+		return nil, errors.WithMessage(err, "split content batches failed")
+	}
+
+	// step1
+	eg, ctx2 := errgroup.WithContext(ctx)
+	resps := make([]string, len(batches))
+	for idx, batch := range batches {
+		eg.Go(safe.Do(ctx2, func() error {
+			// 生成每个batch的思维导图
+			mindmap, err := m.oneshotCreateMindmap(ctx,
+				notebookId,
+				map[uuid.UUID]string{uuid.NewV4(): batch.contents[0]},
+				mindmapContentMode,
+			)
+			if err != nil {
+				return errors.Wrapf(errors.ErrLLM, "generate mindmap failed, err=%v", err)
+			}
+
+			resps[idx] = mindmap.Mindmap
+			return nil
+		}))
+	}
+	err = eg.Wait()
+	if err != nil {
+		return nil, errors.WithMessage(err, "generate separate mindmap failed")
+	}
+
+	abstractContents := make(map[uuid.UUID]string, len(resps))
+	for _, r := range resps {
+		if r != "" {
+			abstractContents[uuid.NewV4()] = r
+		}
+	}
+	// step2
+	expect, err := m.oneshotCreateMindmap(
+		ctx,
+		notebookId,
+		abstractContents,
+		mindmapAbstractMode,
+	)
+	if err != nil {
+		return nil, errors.WithMessage(err, "generate abstract mindmap failed")
+	}
+
+	return expect, nil
+}
+
+type batchContent struct {
+	contents []string
+}
+
+func (m *mindmapGenerator) splitContentBatches(
+	ctx context.Context,
+	contents map[uuid.UUID]string,
+	tokensCounts map[uuid.UUID]int,
+) ([]*batchContent, error) {
 	type contentInfo struct {
 		id         uuid.UUID
 		content    string
@@ -256,10 +328,6 @@ func (m *mindmapGenerator) twoshotCreateMindmap(
 		}
 	}
 
-	type batchContent struct {
-		contents []string
-	}
-
 	finalBatches := make([]*batchContent, 0, len(batches))
 	for _, batch := range batches {
 		if batch.totalTokens > constants.MindmapMaxOnceToken {
@@ -289,41 +357,5 @@ func (m *mindmapGenerator) twoshotCreateMindmap(
 		}
 	}
 
-	// step1
-	eg, ctx2 := errgroup.WithContext(ctx)
-	resps := make([]string, len(finalBatches))
-	for idx, batch := range finalBatches {
-		eg.Go(safe.Do(ctx2, func() error {
-			resp, err := prompts.StudioMindmapContentMessage(ctx, batch.contents, "")
-			if err != nil {
-				return errors.Wrapf(errors.ErrLLM, "generate mindmap content failed, err=%v", err)
-			}
-
-			resps[idx] = resp.Content
-			return nil
-		}))
-	}
-	err := eg.Wait()
-	if err != nil {
-		return nil, errors.WithMessage(err, "split contents failed")
-	}
-
-	abstractContents := make(map[uuid.UUID]string, len(resps))
-	for _, r := range resps {
-		if r != "" {
-			abstractContents[uuid.NewV4()] = r
-		}
-	}
-	// step2
-	expect, err := m.oneshotCreateMindmap(
-		ctx,
-		notebookId,
-		abstractContents,
-		mindmapAbstractMode,
-	)
-	if err != nil {
-		return nil, errors.WithMessage(err, "generate abstract mindmap failed")
-	}
-
-	return expect, nil
+	return finalBatches, nil
 }

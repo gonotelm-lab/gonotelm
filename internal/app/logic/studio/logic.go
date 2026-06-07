@@ -29,9 +29,10 @@ import (
 type Logic struct {
 	ctx context.Context
 
-	sourceBiz   *bizsource.Biz
-	notebookBiz *biznotebook.Biz
-	artifactBiz *bizartifact.Biz
+	sourceBiz         *bizsource.Biz
+	sourceBizForAgent *bizsource.BizForAgent
+	notebookBiz       *biznotebook.Biz
+	artifactBiz       *bizartifact.Biz
 
 	objectStorage storage.Storage
 	llmGateway    *gateway.Gateway
@@ -44,6 +45,7 @@ func MustNewLogic(
 	ctx context.Context,
 	objectStorage storage.Storage,
 	sourceBiz *bizsource.Biz,
+	sourceBizForAgent *bizsource.BizForAgent,
 	notebookBiz *biznotebook.Biz,
 	artifactBiz *bizartifact.Biz,
 	llmGateway *gateway.Gateway,
@@ -57,13 +59,14 @@ func MustNewLogic(
 	}
 
 	l := &Logic{
-		ctx:           ctx,
-		objectStorage: objectStorage,
-		sourceBiz:     sourceBiz,
-		notebookBiz:   notebookBiz,
-		artifactBiz:   artifactBiz,
-		llmGateway:    llmGateway,
-		splitter:      splitter,
+		ctx:               ctx,
+		objectStorage:     objectStorage,
+		sourceBiz:         sourceBiz,
+		sourceBizForAgent: sourceBizForAgent,
+		notebookBiz:       notebookBiz,
+		artifactBiz:       artifactBiz,
+		llmGateway:        llmGateway,
+		splitter:          splitter,
 	}
 
 	// start background work
@@ -75,6 +78,7 @@ func MustNewLogic(
 func (l *Logic) initBackgroundWorks() {
 	dispatcher := newTaskDispatcher()
 	dispatcher.register(model.ArtifactKindMindmap, &mindmapGenerator{l: l})
+	dispatcher.register(model.ArtifactKindReport, &reportGenerator{l: l})
 
 	cfg := conf.Global().Logic.Studio.TaskConfig
 
@@ -116,8 +120,17 @@ func (l *Logic) GenerateArtifact(
 	switch params.Kind {
 	case model.ArtifactKindMindmap:
 		return l.generateMindmapTask(ctx, &generateMindmapTaskParams{
-			NotebookId: params.NotebookId,
-			SourceIds:  params.SourceIds,
+			commonTaskParams: &commonTaskParams{
+				NotebookId: params.NotebookId,
+				SourceIds:  params.SourceIds,
+			},
+		})
+	case model.ArtifactKindReport:
+		return l.generateReportTask(ctx, &generateReportTaskParams{
+			commonTaskParams: &commonTaskParams{
+				NotebookId: params.NotebookId,
+				SourceIds:  params.SourceIds,
+			},
 		})
 	default:
 		return uuid.EmptyUUID(), errors.ErrParams.Msgf("unsupported artifact kind: %s", params.Kind)
@@ -373,26 +386,46 @@ func (l *Logic) helpGetNotebook(ctx context.Context, notebookId uuid.UUID) (*mod
 	return notebook, nil
 }
 
+func (l *Logic) generateTask(
+	ctx context.Context,
+	notebookId uuid.UUID,
+	payload []byte,
+	kind model.ArtifactKind,
+) (uuid.UUID, error) {
+	userId := pkgcontext.GetUserId(ctx)
+	taskId, err := l.artifactBiz.CreateTask(ctx, &bizartifact.CreateTaskCommand{
+		NotebookId: notebookId,
+		Kind:       kind,
+		UserId:     userId,
+		Payload:    payload,
+	})
+	if err != nil {
+		return uuid.EmptyUUID(), errors.WithMessagef(err, "create task failed, notebook_id=%s", notebookId)
+	}
+
+	return taskId, nil
+}
+
 func (l *Logic) generateMindmapTask(
 	ctx context.Context,
 	params *generateMindmapTaskParams,
 ) (uuid.UUID, error) {
-	userId := pkgcontext.GetUserId(ctx)
 	payload, err := sonic.Marshal(params)
 	if err != nil {
 		return uuid.EmptyUUID(), errors.Wrapf(errors.ErrSerde, "marshal mindmap params err=%v", err)
 	}
 
-	taskId, err := l.artifactBiz.CreateTask(ctx, &bizartifact.CreateTaskCommand{
-		NotebookId: params.NotebookId,
-		Kind:       model.ArtifactKindMindmap,
-		UserId:     userId,
-		Payload:    payload,
-	})
+	return l.generateTask(ctx, params.NotebookId, payload, model.ArtifactKindMindmap)
+}
+
+func (l *Logic) generateReportTask(
+	ctx context.Context,
+	params *generateReportTaskParams,
+) (uuid.UUID, error) {
+	payload, err := sonic.Marshal(params)
 	if err != nil {
-		return uuid.EmptyUUID(), errors.WithMessagef(err,
-			"create mindmap task failed, notebook_id=%s", params.NotebookId)
+		return uuid.EmptyUUID(), errors.Wrapf(errors.ErrSerde, "marshal report params err=%v", err)
 	}
 
-	return taskId, nil
+	return l.generateTask(ctx, params.NotebookId, payload, model.ArtifactKindReport)
 }

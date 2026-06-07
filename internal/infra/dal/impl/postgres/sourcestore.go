@@ -181,8 +181,8 @@ func (s *SourceStoreImpl) UpdateParsedContent(
 		Model(&schema.Source{}).
 		Where("id = ?", params.Id).
 		Updates(map[string]any{
-			"parsed_content": params.ParsedContent,
-			"updated_at":     params.UpdatedAt,
+			"parsed_content_key": params.ParsedContentKey,
+			"updated_at":         params.UpdatedAt,
 		}).Error; err != nil {
 		return sql.WrapErr(err)
 	}

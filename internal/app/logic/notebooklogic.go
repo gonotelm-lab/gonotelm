@@ -2,6 +2,7 @@ package logic
 
 import (
 	"context"
+	"log/slog"
 
 	bizchat "github.com/gonotelm-lab/gonotelm/internal/app/biz/chat"
 	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
@@ -138,7 +139,7 @@ type ListNotebookSourcesParams struct {
 }
 
 type ListNotebookSourcesResult struct {
-	Sources []*model.DecodedSource
+	Sources []*model.FullSource
 	HasMore bool
 }
 
@@ -157,7 +158,11 @@ func (l *NotebookLogic) ListNotebookSources(
 		Limit:      fetchLimit,
 		Offset:     params.Offset,
 	}
-	sources, err := l.sourceBiz.ListDecodedSourcesByNotebook(ctx, req)
+	sources, err := l.sourceBiz.ListDecodedSourcesByNotebook(
+		ctx,
+		req,
+		bizsource.WithContentRefUrl(true),
+	)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "list notebook sources failed, notebook_id=%s", params.NotebookId)
 	}
@@ -167,8 +172,25 @@ func (l *NotebookLogic) ListNotebookSources(
 		sources = sources[:params.Limit]
 	}
 
+	// populate url
+	fullSources := make([]*model.FullSource, 0, len(sources))
+	for _, source := range sources {
+		fullSource := &model.FullSource{
+			DecodedSource: source,
+		}
+		fullSources = append(fullSources, fullSource)
+	}
+
+	err = l.sourceBiz.BatchPopulateFullSources(ctx, fullSources)
+	if err != nil {
+		slog.ErrorContext(ctx, "batch populate full sources failed",
+			slog.Any("err", err),
+			slog.String("notebook_id", params.NotebookId.String()),
+		)
+	}
+
 	return &ListNotebookSourcesResult{
-		Sources: sources,
+		Sources: fullSources,
 		HasMore: hasMore,
 	}, nil
 }

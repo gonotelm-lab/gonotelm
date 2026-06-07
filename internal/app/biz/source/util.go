@@ -8,6 +8,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
+	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 )
 
 const parsedContentStorePrefix = "parsed_file/"
@@ -46,7 +47,7 @@ func buildNewSource(ctx context.Context, cmd *CreateSourceCommand) (*model.Sourc
 	case model.SourceKindText:
 		ts := model.TextSourceContent{Text: cmd.TextContent}
 		source.Content, err = sonic.Marshal(&ts)
-		source.Title = truncateRunes(cmd.TextContent, 32)
+		source.Title = pkgstring.TruncateRune(cmd.TextContent, 32)
 	case model.SourceKindUrl:
 		us := model.UrlSourceContent{Url: cmd.UrlContent.String()}
 		source.Content, err = sonic.Marshal(&us)
@@ -63,15 +64,4 @@ func buildNewSource(ctx context.Context, cmd *CreateSourceCommand) (*model.Sourc
 	}
 
 	return source, err
-}
-
-func truncateRunes(input string, max int) string {
-	if max <= 0 {
-		return ""
-	}
-	runes := []rune(input)
-	if len(runes) <= max {
-		return input
-	}
-	return string(runes[:max])
 }

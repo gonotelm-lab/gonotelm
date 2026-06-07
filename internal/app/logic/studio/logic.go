@@ -340,12 +340,12 @@ func (l *Logic) helpGetSourcesParsedContent(
 
 	eg, wctx := errgroup.WithContext(ctx)
 	for _, source := range sources {
-		if source.ParsedContent == nil {
+		if source.ParsedContentKey == "" {
 			slog.WarnContext(ctx, "source parsed content is nil", "source_id", source.Id)
 			continue
 		}
 
-		if source.ParsedContent.StoreKey == "" {
+		if source.ParsedContentKey == "" {
 			slog.WarnContext(ctx, "source parsed content store key is empty", "source_id", source.Id)
 			continue
 		}
@@ -353,7 +353,7 @@ func (l *Logic) helpGetSourcesParsedContent(
 		eg.Go(safe.Do(ctx, func() error {
 			parsedContent, err := l.objectStorage.GetObject(wctx,
 				&storage.GetObjectRequest{
-					Key: source.ParsedContent.StoreKey,
+					Key: source.ParsedContentKey,
 				})
 			if err != nil {
 				return errors.WithMessage(err, "get parsed content failed")

@@ -276,14 +276,15 @@ func (b *BizForAgent) fetchSourceContent(
 		return nil, "", fmt.Errorf("get decoded source failed, id=%s, err=%w", sourceId, err)
 	}
 
-	if src.ParsedContent == nil || src.ParsedContent.StoreKey == "" {
-		return nil, "", fmt.Errorf("source does not contain any valid content")
+	if src.ParsedContentKey == "" {
+		return nil, "", fmt.Errorf("source does not contain any valid parsed content key")
 	}
 
 	content, err := b.impl.objectStorage.GetObject(ctx,
 		&storage.GetObjectRequest{
-			Key: src.ParsedContent.StoreKey,
-		})
+			Key: src.ParsedContentKey,
+		},
+	)
 	if err != nil {
 		return nil, "", fmt.Errorf("get parsed content failed, id=%s, err=%w", sourceId, err)
 	}

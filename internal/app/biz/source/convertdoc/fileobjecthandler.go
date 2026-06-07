@@ -83,14 +83,16 @@ func fileConversionOptions(fs model.FileSourceContent) ([]einoparser.Option, []d
 }
 
 func (e *FileObjectHandler) loadObjectBody(ctx context.Context, storeKey string) ([]byte, bool, error) {
-	obj, err := e.objectStorage.GetObject(ctx, &storage.GetObjectRequest{
-		Key: storeKey,
-	})
+	obj, err := e.objectStorage.GetObject(ctx,
+		&storage.GetObjectRequest{
+			Key: storeKey,
+		})
 	if err != nil {
 		if errors.Is(err, storage.ErrObjectNotFound) {
 			slog.ErrorContext(ctx, "file source object not found", "store_key", storeKey)
 			return nil, false, nil
 		}
+
 		return nil, false, errors.Wrap(err, "get file source object failed")
 	}
 

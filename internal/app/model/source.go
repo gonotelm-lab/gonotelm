@@ -2,7 +2,6 @@ package model
 
 import (
 	"fmt"
-	"log/slog"
 
 	"github.com/bytedance/sonic"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal/schema"
@@ -60,16 +59,24 @@ func (s SourceKind) Supported() bool {
 }
 
 type Source struct {
-	Id            Id           `json:"id"`
-	NotebookId    Id           `json:"notebook_id"`
-	Kind          SourceKind   `json:"kind"`
-	Status        SourceStatus `json:"status"`
-	Title         string       `json:"title"`
-	Content       []byte       `json:"content"`
-	ParsedContent []byte       `json:"parsed_content,omitempty"`
-	Abstract      string       `json:"abstract"`
-	OwnerId       string       `json:"owner_id"`
-	UpdatedAt     int64        `json:"updated_at"`
+	Id         Id           `json:"id"`
+	NotebookId Id           `json:"notebook_id"`
+	Kind       SourceKind   `json:"kind"`
+	Status     SourceStatus `json:"status"`
+	Title      string       `json:"title"`
+
+	// content为来源的原始内
+	// 按照Kind字段 content有不同的结构
+	// Kind=text时 TextSourceContent序列化数据
+	// Kind=url时  UrlSourceContent序列化数据
+	// Kind=file时 FileSourceContent序列化数据
+	Content []byte `json:"content"`
+
+	// 原始文档解析后存储的key
+	ParsedContentKey string `json:"parsed_content_key,omitempty"`
+	Abstract         string `json:"abstract"`
+	OwnerId          string `json:"owner_id"`
+	UpdatedAt        int64  `json:"updated_at"`
 }
 
 func (s *Source) KindText() bool {
@@ -141,18 +148,36 @@ func (s *Source) To() *schema.Source {
 	}
 }
 
+// 获取内容引用相关的对象键 (所有storeKeys)
+func (s *Source) ContentRefKeys() ([]string, error) {
+	keys := make([]string, 0, 2)
+	ds, err := NewDecodedSource(s)
+	if err != nil {
+		return keys, err
+	}
+
+	if key := ds.ContentRefKey(); key != "" && ds.IsContentRef() {
+		keys = append(keys, key)
+	}
+	if ds.ParsedContentKey != "" {
+		keys = append(keys, ds.ParsedContentKey)
+	}
+
+	return keys, nil
+}
+
 func NewSourceFrom(s *schema.Source) *Source {
 	source := &Source{
-		Id:            s.Id,
-		NotebookId:    s.NotebookId,
-		Kind:          SourceKind(s.Kind),
-		Status:        SourceStatus(s.Status),
-		Title:         s.Title,
-		Content:       s.Content,
-		ParsedContent: s.ParsedContent,
-		Abstract:      s.Abstract,
-		OwnerId:       s.OwnerId,
-		UpdatedAt:     s.UpdatedAt,
+		Id:               s.Id,
+		NotebookId:       s.NotebookId,
+		Kind:             SourceKind(s.Kind),
+		Status:           SourceStatus(s.Status),
+		Title:            s.Title,
+		Content:          s.Content,
+		ParsedContentKey: s.ParsedContentKey,
+		Abstract:         s.Abstract,
+		OwnerId:          s.OwnerId,
+		UpdatedAt:        s.UpdatedAt,
 	}
 
 	return source
@@ -211,15 +236,15 @@ func SupportedFileMimeType(mimeType string) bool {
 	return false
 }
 
+// DecodedSource 会将content进行解析
+//
+// 并且带有Url
 type DecodedSource struct {
 	*Source
 
 	ContentText *TextSourceContent `json:"content_text,omitempty"`
 	ContentUrl  *UrlSourceContent  `json:"content_url,omitempty"`
 	ContentFile *FileSourceContent `json:"content_file,omitempty"`
-
-	// 解析后的内容 storeKey用于获取解析后的内容
-	ParsedContent *ParsedSourceContent `json:"parsed_content,omitempty"`
 }
 
 func NewDecodedSource(s *Source) (*DecodedSource, error) {
@@ -253,16 +278,43 @@ func NewDecodedSource(s *Source) (*DecodedSource, error) {
 		return nil, err
 	}
 
-	if s.ParsedContent != nil {
-		if err := sonic.Unmarshal(s.ParsedContent, &sc.ParsedContent); err != nil {
-			// log only
-			slog.Error("unmarshal parsed content failed", "source_id", s.Id, "err", err)
-		}
-	}
-
 	return &sc, nil
 }
 
-type ParsedSourceContent struct {
-	StoreKey string `json:"store_key,omitempty"`
+// 判断content是inline内容还是需要从对象存储拿
+// inline: 原始内容直接可以从content字段解析出来
+// ref: 原始内容需要从对象存储拿, content字段只是存储原始内容的store_key
+func (d *DecodedSource) IsContentRef() bool {
+	return d.Kind.IsFile()
+}
+
+// 如果是ref内容获取获取url
+func (d *DecodedSource) PopulateContentRef(fn func(storeKey string) (string, error)) error {
+	if d.Kind.IsFile() {
+		url, err := fn(d.ContentFile.StoreKey)
+		if err != nil {
+			return err
+		}
+
+		if url != "" {
+			d.ContentFile.Url = url
+		}
+	}
+
+	return nil
+}
+
+func (d *DecodedSource) ContentRefKey() string {
+	switch d.Kind {
+	case SourceKindFile:
+		return d.ContentFile.StoreKey
+	default:
+		return ""
+	}
+}
+
+// 带完整Url的来源建模
+type FullSource struct {
+	*DecodedSource
+	ParsedContentUrl string
 }

@@ -5,9 +5,9 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/route"
+	"github.com/gonotelm-lab/gonotelm/internal/api/schema"
 	"github.com/gonotelm-lab/gonotelm/internal/app/logic"
 	studiologic "github.com/gonotelm-lab/gonotelm/internal/app/logic/studio"
-	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
@@ -92,31 +92,6 @@ type GetNotebookResponse struct {
 	Name        string `json:"name"`
 	Desc        string `json:"desc"`
 	SourceCount int64  `json:"source_count"`
-}
-
-type TextSourceContent struct {
-	Text string `json:"text"`
-}
-
-type UrlSourceContent struct {
-	Url string `json:"url"`
-}
-
-type FileSourceContent struct {
-	Url      string `json:"url"` // full url link
-	Filename string `json:"filename"`
-	Format   string `json:"format"`
-}
-
-type NotebookSourceResponse struct {
-	Id     string             `json:"id"`
-	Kind   model.SourceKind   `json:"kind"`
-	Status model.SourceStatus `json:"status"`
-	Title  string             `json:"title"`
-
-	Text *TextSourceContent `json:"text,omitempty"`
-	Url  *UrlSourceContent  `json:"url,omitempty"`
-	File *FileSourceContent `json:"file,omitempty"`
 }
 
 func (s *Server) GetNotebook(ctx context.Context, c *app.RequestContext) {
@@ -254,10 +229,10 @@ func (r *ListNotebookSourcesRequest) Validate() error {
 }
 
 type ListNotebookSourcesResponse struct {
-	Sources []*NotebookSourceResponse `json:"sources"`
-	Limit   int                       `json:"limit"`
-	Offset  int                       `json:"offset"`
-	HasMore bool                      `json:"has_more"`
+	Sources []*schema.Source `json:"sources"`
+	Limit   int              `json:"limit"`
+	Offset  int              `json:"offset"`
+	HasMore bool             `json:"has_more"`
 }
 
 func (s *Server) ListNotebookSources(ctx context.Context, c *app.RequestContext) {
@@ -280,44 +255,11 @@ func (s *Server) ListNotebookSources(ctx context.Context, c *app.RequestContext)
 	}
 
 	http.OkResp(c, ListNotebookSourcesResponse{
-		Sources: toNotebookSourceResponses(result.Sources),
+		Sources: schema.ToSources(result.Sources),
 		Limit:   req.Limit,
 		Offset:  req.Offset,
 		HasMore: result.HasMore,
 	})
-}
-
-func toNotebookSourceResponses(sources []*model.DecodedSource) []*NotebookSourceResponse {
-	resp := make([]*NotebookSourceResponse, 0, len(sources))
-	for _, source := range sources {
-		sourceResp := NotebookSourceResponse{
-			Id:     source.Id.String(),
-			Kind:   source.Kind,
-			Status: source.Status,
-			Title:  source.Title,
-		}
-		if source.Kind.IsText() {
-			sourceResp.Text = &TextSourceContent{
-				Text: source.ContentText.Text,
-			}
-		}
-		if source.Kind.IsUrl() {
-			sourceResp.Url = &UrlSourceContent{
-				Url: source.ContentUrl.Url,
-			}
-		}
-		if source.Kind.IsFile() {
-			sourceResp.File = &FileSourceContent{
-				Url:      source.ContentFile.Url,
-				Filename: source.ContentFile.Filename,
-				Format:   source.ContentFile.Format,
-			}
-		}
-
-		resp = append(resp, &sourceResp)
-	}
-
-	return resp
 }
 
 type UpdateNotebookNameRequest struct {

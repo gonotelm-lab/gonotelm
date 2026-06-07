@@ -434,7 +434,7 @@ func (l *Logic) RetrySourcePreparation(
 }
 
 func (l *Logic) DeleteSource(ctx context.Context, sourceId uuid.UUID) error {
-	_, err := l.sourceBiz.DeleteSource(ctx, sourceId)
+	err := l.sourceBiz.DeleteSource(ctx, sourceId)
 	if err != nil {
 		if errors.Is(err, bizsource.ErrSourceNotFound) {
 			return nil
@@ -446,7 +446,7 @@ func (l *Logic) DeleteSource(ctx context.Context, sourceId uuid.UUID) error {
 	return nil
 }
 
-func (l *Logic) DeleteSourcesByNotebook(
+func (l *Logic) DeleteNotebookSources(
 	ctx context.Context,
 	notebookId uuid.UUID,
 ) error {
@@ -458,21 +458,20 @@ func (l *Logic) DeleteSourcesByNotebook(
 	return nil
 }
 
-type GetSourceParsedContentParams struct {
+type GetFullSourceParams struct {
 	Download bool
 }
 
-type GetSourceParsedContentResult struct {
-	Content string `json:"content,omitempty"`
-	Url     string `json:"url,omitempty"`
-}
-
-func (l *Logic) GetSourceParsedContent(
+func (l *Logic) GetFullSource(
 	ctx context.Context,
 	sourceId uuid.UUID,
-	params *GetSourceParsedContentParams,
-) (*GetSourceParsedContentResult, error) {
-	source, err := l.sourceBiz.GetDecodedSource(ctx, sourceId)
+	params *GetFullSourceParams,
+) (*model.FullSource, error) {
+	source, err := l.sourceBiz.GetDecodedSource(
+		ctx,
+		sourceId,
+		bizsource.WithContentRefUrl(true),
+	)
 	if err != nil {
 		if errors.Is(err, bizsource.ErrSourceNotFound) {
 			return nil, errors.ErrParams.Msgf("source not found, id=%s", sourceId)
@@ -491,37 +490,19 @@ func (l *Logic) GetSourceParsedContent(
 		return nil, errors.ErrParams.Msgf("source is not ready, status=%s", source.Status)
 	}
 
-	if source.Kind == model.SourceKindText {
-		return &GetSourceParsedContentResult{
-			Content: source.ContentText.Text,
-		}, nil
+	fullSource := &model.FullSource{
+		DecodedSource: source,
 	}
-
-	// 处理parsed content放在对象存储的情况
-	var storeKey string
-	if source.ParsedContent != nil {
-		storeKey = source.ParsedContent.StoreKey
-	}
-
-	if storeKey == "" {
-		// slog.WarnContext(ctx, "parsed content store key is empty", "source_id", sourceId)
-		return &GetSourceParsedContentResult{}, nil
-	}
-	req := &storage.PresignedGetObjectRequest{
-		Key: storeKey,
-	}
-	if params != nil && params.Download {
-		req.Attachment = true
-		req.AttachmentFilename = source.Title + ".md"
-	}
-	resp, err := l.objectStorage.PresignedGetObject(ctx, req)
+	err = l.sourceBiz.BatchPopulateFullSources(
+		ctx,
+		[]*model.FullSource{fullSource},
+		bizsource.WithForDownload(params.Download),
+	)
 	if err != nil {
-		return nil, errors.WithMessage(err, "get presigned get object failed")
+		return nil, errors.WithMessagef(err, "populate full source failed, source_id=%s", sourceId)
 	}
 
-	return &GetSourceParsedContentResult{
-		Url: resp.Url,
-	}, nil
+	return fullSource, nil
 }
 
 func (l *Logic) GetSourceParsedTree(

@@ -25,6 +25,7 @@ CREATE TABLE sources (
   title VARCHAR(255) NOT NULL DEFAULT '',
   content BYTEA,
   owner_id VARCHAR(255) NOT NULL DEFAULT '',
+  parsed_content_key VARCHAR(255) NOT NULL DEFAULT '',
   updated_at BIGINT NOT NULL DEFAULT 0
 );
 
@@ -38,10 +39,8 @@ COMMENT ON COLUMN sources.status IS 'source processing state';
 COMMENT ON COLUMN sources.title IS 'source title';
 COMMENT ON COLUMN sources.content IS 'source content payload (file source stores format in content)';
 COMMENT ON COLUMN sources.owner_id IS 'source owner id';
+COMMENT ON COLUMN sources.parsed_content_key IS 'source parsed content key';
 COMMENT ON COLUMN sources.updated_at IS 'source updated time (unix ms)';
-
-ALTER TABLE sources ADD COLUMN parsed_content BYTEA;
-COMMENT ON COLUMN sources.parsed_content IS 'source parsed content';
 
 ALTER TABLE sources ADD COLUMN abstract TEXT;
 COMMENT ON COLUMN sources.abstract IS 'generated abstract for the source';

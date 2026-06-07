@@ -11,6 +11,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	logic "github.com/gonotelm-lab/gonotelm/internal/app/logic/source"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
+	"github.com/gonotelm-lab/gonotelm/internal/api/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 	"github.com/gonotelm-lab/gonotelm/pkg/slices"
@@ -23,17 +24,18 @@ func (s *Server) registerSourcesRoutes(g *route.RouterGroup) {
 	sourceIdGroup := g.Group("/source/:id")
 	sourceIdGroup.Use(s.checkSourceUserMiddleware)
 	{
+		sourceIdGroup.GET("", s.GetSource)
+		sourceIdGroup.DELETE("", s.DeleteSource)
 		sourceIdGroup.POST("/file/upload", s.UploadFileSource)
 		sourceIdGroup.POST("/status", s.PollSourceStatus)       // check source processing status
 		sourceIdGroup.POST("/reload", s.RetrySourcePreparation) // retry source preparation
-		sourceIdGroup.DELETE("/", s.DeleteSource)
 		sourceIdGroup.GET("/doc/:doc_id", s.GetSourceDoc)
 		sourceIdGroup.GET("/batch/docs", s.BatchGetSourceDocs)
-		sourceIdGroup.GET("/parsed/content", s.GetSourceParsedContent)
 		sourceIdGroup.GET("/parsed/tree", s.GetSourceParsedTree)
 		sourceIdGroup.PUT("/title", s.UpdateSourceTitle)
 	}
 }
+
 
 func (s *Server) checkSourceUserMiddleware(ctx context.Context, c *app.RequestContext) {
 	sourceId := c.Param("id")
@@ -401,27 +403,21 @@ func (s *Server) BatchGetSourceDocs(ctx context.Context, c *app.RequestContext) 
 	})
 }
 
-type GetSourceParsedContentRequest struct {
+type GetSourceRequest struct {
 	Id       uuid.UUID `path:"id,required"`
 	Download bool      `query:"download,optional"`
 }
 
-type GetSourceParsedContentResponse struct {
-	// one of the following fields will be present
-	Content string `json:"content,omitempty"`
-	Url     string `json:"url,omitempty"`
-}
-
-func (s *Server) GetSourceParsedContent(ctx context.Context, c *app.RequestContext) {
-	var req GetSourceParsedContentRequest
+func (s *Server) GetSource(ctx context.Context, c *app.RequestContext) {
+	var req GetSourceRequest
 	err := c.BindAndValidate(&req)
 	if err != nil {
 		http.ErrResp(c, err)
 		return
 	}
 
-	resp, err := s.sourceLogic.GetSourceParsedContent(ctx, req.Id,
-		&logic.GetSourceParsedContentParams{
+	resp, err := s.sourceLogic.GetFullSource(ctx, req.Id,
+		&logic.GetFullSourceParams{
 			Download: req.Download,
 		})
 	if err != nil {
@@ -429,16 +425,7 @@ func (s *Server) GetSourceParsedContent(ctx context.Context, c *app.RequestConte
 		return
 	}
 
-	if resp.Content == "" && resp.Url == "" {
-		// no content
-		http.OkRespNoContent(c)
-		return
-	}
-
-	http.OkResp(c, &GetSourceParsedContentResponse{
-		Content: resp.Content,
-		Url:     resp.Url,
-	})
+	http.OkResp(c, schema.ToSource(resp))
 }
 
 type GetSourceParsedTreeRequest struct {

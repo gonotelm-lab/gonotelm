@@ -25,8 +25,8 @@ func TestContextJSONHandler_AddsUserIDFromContext(t *testing.T) {
 		t.Fatalf("unmarshal log json failed: %v", err)
 	}
 
-	if got[AttrKeyUserID] != "u-123" {
-		t.Fatalf("user_id mismatch, got=%v", got[AttrKeyUserID])
+	if got[pkgcontext.AttrKeyUserID] != "u-123" {
+		t.Fatalf("user_id mismatch, got=%v", got[pkgcontext.AttrKeyUserID])
 	}
 }
 

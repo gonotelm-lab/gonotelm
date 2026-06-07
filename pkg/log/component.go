@@ -2,7 +2,6 @@ package log
 
 const (
 	AttrKeyComponent = "component"
-	AttrKeyUserID    = "user_id"
 )
 
 const (

@@ -7,6 +7,8 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
 
+	deepseekext "github.com/cloudwego/eino-ext/components/model/deepseek"
+	qwenext "github.com/cloudwego/eino-ext/components/model/qwen"
 	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/eino/components"
 	einomodel "github.com/cloudwego/eino/components/model"
@@ -47,28 +49,26 @@ func (g *Gateway) initProviders(cfg *chat.ProviderConfig) error {
 	if err != nil {
 		return err
 	}
-	g.providers[chat.DeepSeek] = newWrappedChatModel(deepseekModel)
+	g.providers[chat.DeepSeek] = newWrappedChatModel(deepseekModel, chat.DeepSeek)
 
 	// 2. openai
 	openaiModel, err := chat.New(ctx, chat.Openai, cfg)
 	if err != nil {
 		return err
 	}
-	g.providers[chat.Openai] = newWrappedChatModel(openaiModel)
+	g.providers[chat.Openai] = newWrappedChatModel(openaiModel, chat.Openai)
 
 	// 3. qwen
 	qwenModel, err := chat.New(ctx, chat.Qwen, cfg)
 	if err != nil {
 		return err
 	}
-	g.providers[chat.Qwen] = newWrappedChatModel(qwenModel)
+	g.providers[chat.Qwen] = newWrappedChatModel(qwenModel, chat.Qwen)
 
 	return nil
 }
 
-func (g *Gateway) GetProvider(
-	providerType chat.Provider,
-) (einomodel.ToolCallingChatModel, error) {
+func (g *Gateway) GetProvider(providerType chat.Provider) (einomodel.ToolCallingChatModel, error) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 
@@ -81,18 +81,20 @@ func (g *Gateway) GetProvider(
 }
 
 type wrappedChatModel struct {
-	typ  string
-	impl einomodel.ToolCallingChatModel
+	typ      string
+	provider chat.Provider
+	impl     einomodel.ToolCallingChatModel
 }
 
-func newWrappedChatModel(impl einomodel.ToolCallingChatModel) *wrappedChatModel {
+func newWrappedChatModel(impl einomodel.ToolCallingChatModel, provider chat.Provider) *wrappedChatModel {
 	typ, ok := components.GetType(impl)
 	if !ok {
 		typ = "GatewayWrapped"
 	}
 	return &wrappedChatModel{
-		typ:  typ,
-		impl: impl,
+		typ:      typ,
+		provider: provider,
+		impl:     impl,
 	}
 }
 
@@ -127,6 +129,15 @@ func (g *wrappedChatModel) Stream(
 		Component: components.ComponentOfChatModel,
 	}, &Interceptor{})
 
+	switch g.provider {
+	case chat.DeepSeek:
+		// https://api-docs.deepseek.com/zh-cn/api/create-chat-completion
+		// deepseek 流式输出需要设置stream_options.include_usage=true包含token usage
+		opts = append(opts, deepseekext.WithExtraFields(streamOptionsIncludeUsage))
+	case chat.Qwen:
+		opts = append(opts, qwenext.WithExtraFields(streamOptionsIncludeUsage))
+	}
+
 	return g.impl.Stream(ctx, input, opts...)
 }
 
@@ -137,17 +148,18 @@ func (g *wrappedChatModel) WithTools(
 	if err != nil {
 		return nil, err
 	}
-	return &wrappedChatModel{impl: impl}, nil
+
+	return newWrappedChatModel(impl, g.provider), nil
 }
 
 func extractOptionModelName(opts ...einomodel.Option) string {
 	option := einomodel.GetCommonOptions(&einomodel.Options{}, opts...)
 	if option.Model == nil {
-		return "unspecified"
+		return ""
 	}
 	modelName := *option.Model
 	if modelName == "" {
-		return "unspecified"
+		return ""
 	}
 
 	return modelName
@@ -162,7 +174,8 @@ func withModelName(ctx context.Context, modelName string) context.Context {
 func getModelName(ctx context.Context) string {
 	modelName, ok := ctx.Value(modelNameKeyType{}).(string)
 	if !ok {
-		return "unspecified"
+		return ""
 	}
+
 	return modelName
 }

@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/cloudwego/hertz/pkg/common/hlog"
-	hslog "github.com/hertz-contrib/logger/slog"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
+	hslog "github.com/hertz-contrib/logger/slog"
 )
 
 var (
@@ -115,10 +115,9 @@ func (h *contextJSONHandler) Enabled(ctx context.Context, level slog.Level) bool
 
 func (h *contextJSONHandler) Handle(ctx context.Context, record slog.Record) error {
 	if ctx != nil {
-		if userID, ok := ctx.Value(pkgcontext.ContextKeyUserId).(string); ok && strings.TrimSpace(userID) != "" {
-			record.AddAttrs(slog.String(AttrKeyUserID, userID))
-		}
+		record.AddAttrs(pkgcontext.ToSlogAttrs(ctx)...)
 	}
+
 	return h.handler.Handle(ctx, record)
 }
 

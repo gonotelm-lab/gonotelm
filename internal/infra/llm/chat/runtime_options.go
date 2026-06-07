@@ -3,9 +3,9 @@ package chat
 import (
 	"strings"
 
-	deepseekext "github.com/cloudwego/eino-ext/components/model/deepseek"
-	openaiext "github.com/cloudwego/eino-ext/components/model/openai"
-	qwenext "github.com/cloudwego/eino-ext/components/model/qwen"
+	"github.com/cloudwego/eino-ext/components/model/deepseek"
+	"github.com/cloudwego/eino-ext/components/model/openai"
+	"github.com/cloudwego/eino-ext/components/model/qwen"
 	einomodel "github.com/cloudwego/eino/components/model"
 )
 
@@ -19,15 +19,15 @@ func BuildThinkingOption(
 		if !enableThinking {
 			return einomodel.Option{}
 		}
-		return openaiext.WithReasoningEffort(openaiext.ReasoningEffortLevelHigh)
+		return openai.WithReasoningEffort(openai.ReasoningEffortLevelHigh)
 	case Qwen:
-		return qwenext.WithEnableThinking(enableThinking)
+		return qwen.WithEnableThinking(enableThinking)
 	case DeepSeek:
 		thinkingType := "disabled"
 		if enableThinking {
 			thinkingType = "enabled"
 		}
-		return deepseekext.WithExtraFields(map[string]interface{}{
+		return deepseek.WithExtraFields(map[string]interface{}{
 			"thinking": map[string]string{
 				"type": thinkingType,
 			},
@@ -51,15 +51,15 @@ func BuildLLMOptions(opts ...einomodel.Option) []einomodel.Option {
 
 func normalizeOpenAIReasoningEffort(
 	reasoningEffort string,
-) openaiext.ReasoningEffortLevel {
+) openai.ReasoningEffortLevel {
 	switch strings.ToLower(strings.TrimSpace(reasoningEffort)) {
-	case string(openaiext.ReasoningEffortLevelLow):
-		return openaiext.ReasoningEffortLevelLow
-	case string(openaiext.ReasoningEffortLevelHigh):
-		return openaiext.ReasoningEffortLevelHigh
-	case string(openaiext.ReasoningEffortLevelMedium):
+	case string(openai.ReasoningEffortLevelLow):
+		return openai.ReasoningEffortLevelLow
+	case string(openai.ReasoningEffortLevelHigh):
+		return openai.ReasoningEffortLevelHigh
+	case string(openai.ReasoningEffortLevelMedium):
 		fallthrough
 	default:
-		return openaiext.ReasoningEffortLevelMedium
+		return openai.ReasoningEffortLevelMedium
 	}
 }

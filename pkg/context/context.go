@@ -5,8 +5,8 @@ import "context"
 type contextKey string
 
 const (
-	ContextKeyUserId  = contextKey("_user_id")
-	ContextKeyBizType = contextKey("_biz_type")
+	ContextKeyUserId    = contextKey("_user_id")
+	ContextKeySceneType = contextKey("_scene_type")
 )
 
 func WithUserId(ctx context.Context, userId string) context.Context {
@@ -22,15 +22,15 @@ func GetUserId(ctx context.Context) string {
 	return userId
 }
 
-func WithBizType(ctx context.Context, bizType SceneType) context.Context {
-	return context.WithValue(ctx, ContextKeyBizType, bizType)
+func WithSceneType(ctx context.Context, sceneType SceneType) context.Context {
+	return context.WithValue(ctx, ContextKeySceneType, sceneType)
 }
 
-func GetBizType(ctx context.Context) SceneType {
-	bizType, ok := ctx.Value(ContextKeyBizType).(SceneType)
+func GetSceneType(ctx context.Context) SceneType {
+	sceneType, ok := ctx.Value(ContextKeySceneType).(SceneType)
 	if !ok {
 		return UnknownScene
 	}
 
-	return bizType
+	return sceneType
 }

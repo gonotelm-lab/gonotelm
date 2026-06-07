@@ -72,6 +72,7 @@ func (m *mindmapGenerator) generate(
 	ctx context.Context,
 	params *generateMindmapTaskParams,
 ) (*mindmapExpectation, error) {
+	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioMindmapScene)
 	// check notebook
 	notebook, err := m.l.helpGetNotebook(ctx, params.NotebookId)
 	if err != nil {
@@ -173,7 +174,6 @@ func (m *mindmapGenerator) oneshotCreateMindmap(
 	msgs := pkgslices.FromSingle(msg)
 
 	const retryTimes = 3
-	ctx = pkgcontext.WithBizType(ctx, pkgcontext.StudioMindmapScene)
 	for idx := range retryTimes {
 		llmResp, err := model.Generate(ctx, msgs, llmOptions...)
 		if err != nil {

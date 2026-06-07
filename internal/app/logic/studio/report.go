@@ -12,6 +12,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/app/prompts"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/slices"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
@@ -64,6 +65,7 @@ func (m *reportGenerator) generate(
 	ctx context.Context,
 	params *generateReportTaskParams,
 ) (*reportExpectation, error) {
+	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioReportScene)
 	usedModel := conf.Global().Logic.Studio.Report.Model
 	llmModel, err := m.l.llmGateway.GetProvider(
 		conf.Global().Logic.Studio.Report.ModelProvider,

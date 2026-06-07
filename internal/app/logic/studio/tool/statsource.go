@@ -3,7 +3,6 @@ package tool
 import (
 	"context"
 	"fmt"
-	"log/slog"
 
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
 	pkstring "github.com/gonotelm-lab/gonotelm/pkg/string"
@@ -73,8 +72,6 @@ func (s *StatSourceTool) InvokableRun(
 
 	output := fmt.Sprintf(`{"bytes_count":%d,"runes_count":%d,"lines_count":%d,"abstract":"%s"}`,
 		result.Bytes, result.Runes, result.Lines, result.Abstract)
-
-	slog.DebugContext(ctx, "stat source tool output", slog.String("output", output))
 
 	return output, nil
 }

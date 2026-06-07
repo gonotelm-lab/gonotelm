@@ -4,8 +4,9 @@ type SceneType string
 
 const (
 	UnknownScene       = SceneType("unknown")
-	StudioMindmapScene = SceneType("studio_mindmap")
-	StudioReportScene  = SceneType("studio_report")
+	ChatScene          = SceneType("chat")
+	StudioMindmapScene = SceneType("studio.mindmap")
+	StudioReportScene  = SceneType("studio.report")
 )
 
 func (s SceneType) String() string {

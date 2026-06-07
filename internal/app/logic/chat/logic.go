@@ -381,6 +381,7 @@ func (l *Logic) processUserMessageTask(
 	}
 
 	chatAgent := l.buildNewChatAgent(chatLLM, sessionState)
+	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.ChatScene)
 	answer, err = chatAgent.React(ctx, contextMsgs)
 	if err != nil {
 		slog.ErrorContext(ctx, "chat agent loop failed",

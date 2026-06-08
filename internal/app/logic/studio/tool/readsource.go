@@ -32,10 +32,11 @@ func init() {
 // 来源是解析后的内容
 type ReadSourceTool struct {
 	biz *bizsource.BizForAgent
+	checker SourceChecker
 }
 
-func NewReadSourceTool(biz *bizsource.BizForAgent) *ReadSourceTool {
-	return &ReadSourceTool{biz: biz}
+func NewReadSourceTool(biz *bizsource.BizForAgent, checker SourceChecker) *ReadSourceTool {
+	return &ReadSourceTool{biz: biz, checker: checker}
 }
 
 var _ tool.InvokableTool = &ReadSourceTool{}
@@ -70,6 +71,12 @@ func (s *ReadSourceTool) InvokableRun(
 	sourceId, err := uuid.ParseString(input.SourceId)
 	if err != nil {
 		return "", fmt.Errorf("source id is not valid uuid: %w", err)
+	}
+
+	if s.checker != nil {
+		if err := s.checker.CheckPermission(ctx, sourceId); err != nil {
+			return "", fmt.Errorf("source access denied: %w", err)
+		}
 	}
 
 	result, err := s.biz.ReadSource(ctx, &bizsource.ReadSourceQuery{

@@ -5,7 +5,7 @@ import (
 )
 
 // ParsedSourceDocTree is the API-facing compact tree view.
-// It intentionally excludes internal fields such as derivedFrom.
+// It intentionally excludes internal fields such as derivation
 type ParsedSourceDocTree struct {
 	Root   *ParsedSourceDocTreeNode `json:"root,omitempty"`
 	Height int                      `json:"height"`

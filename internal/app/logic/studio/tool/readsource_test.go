@@ -43,7 +43,7 @@ func TestReadSourceTool_InvokableRun(t *testing.T) {
 			nil,
 		)
 
-		tool := NewReadSourceTool(biz)
+		tool := NewReadSourceTool(biz, nil)
 		got, err := tool.InvokableRun(context.Background(), fmt.Sprintf(
 			`{"source_id":"%s","start_line":2,"line_count":2}`,
 			sourceID.String(),

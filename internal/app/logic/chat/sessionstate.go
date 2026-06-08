@@ -12,7 +12,7 @@ type chatSessionState struct {
 	taskId   string
 	chatId   uuid.UUID
 	userId   string
-	userLang string // TODO i18n
+	userLang string
 
 	chatStyle        chatmodel.ChatStyle
 	chatAnswerLength chatmodel.ChatAnswerLength

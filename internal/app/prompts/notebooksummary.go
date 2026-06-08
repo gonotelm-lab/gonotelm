@@ -49,15 +49,6 @@ func NotebookSummaryMessage(
 	return msg, nil
 }
 
-func NotebookSummary(sources []string, lang string) (string, error) {
-	msg, err := NotebookSummaryMessage(context.Background(), sources, lang)
-	if err != nil {
-		return "", err
-	}
-
-	return msg.Content, nil
-}
-
 func normalizeStrings(sources []string) []string {
 	normalized := make([]string, 0, len(sources))
 	for _, source := range sources {

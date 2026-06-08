@@ -28,10 +28,11 @@ func init() {
 
 type StatSourceTool struct {
 	biz *bizsource.BizForAgent
+	checker SourceChecker
 }
 
-func NewStatSourceTool(biz *bizsource.BizForAgent) *StatSourceTool {
-	return &StatSourceTool{biz: biz}
+func NewStatSourceTool(biz *bizsource.BizForAgent, checker SourceChecker) *StatSourceTool {
+	return &StatSourceTool{biz: biz, checker: checker}
 }
 
 var _ tool.InvokableTool = &StatSourceTool{}
@@ -63,6 +64,12 @@ func (s *StatSourceTool) InvokableRun(
 	sourceID, err := uuid.ParseString(input.SourceId)
 	if err != nil {
 		return "", fmt.Errorf("source id is not valid uuid: %w", err)
+	}
+
+	if s.checker != nil {
+		if err := s.checker.CheckPermission(ctx, sourceID); err != nil {
+			return "", fmt.Errorf("source access denied: %w", err)
+		}
 	}
 
 	result, err := s.biz.StatSource(ctx, sourceID)

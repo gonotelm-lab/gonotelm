@@ -1,4 +1,5 @@
 package source
+
 import (
 	"context"
 	"log/slog"
@@ -404,7 +405,7 @@ func (s *Biz) PopulateSourceDocs(
 			continue
 		}
 
-		derivedFrom := make([]uuid.UUID, 0, len(meta.poses))
+		derivation := make([]uuid.UUID, 0, len(meta.poses))
 		seen := make(map[uuid.UUID]struct{}, len(meta.poses))
 		for _, pos := range meta.poses {
 			derivedDoc, ok := docsByPos[pos]
@@ -412,7 +413,7 @@ func (s *Biz) PopulateSourceDocs(
 				continue
 			}
 
-			derivedFromId, err := uuid.ParseString(derivedDoc.Id)
+			derivingId, err := uuid.ParseString(derivedDoc.Id)
 			if err != nil {
 				slog.WarnContext(ctx, "ignore invalid source doc id while populating deriving ids",
 					slog.String("doc_id", derivedDoc.Id),
@@ -423,13 +424,13 @@ func (s *Biz) PopulateSourceDocs(
 				)
 				continue
 			}
-			if _, ok := seen[derivedFromId]; ok {
+			if _, ok := seen[derivingId]; ok {
 				continue
 			}
-			seen[derivedFromId] = struct{}{}
-			derivedFrom = append(derivedFrom, derivedFromId)
+			seen[derivingId] = struct{}{}
+			derivation = append(derivation, derivingId)
 		}
-		meta.doc.DerivedFrom = derivedFrom
+		meta.doc.Derivation = derivation
 	}
 
 	return nil

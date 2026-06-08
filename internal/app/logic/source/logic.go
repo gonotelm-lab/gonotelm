@@ -9,8 +9,10 @@ import (
 
 	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
+	"github.com/gonotelm-lab/gonotelm/internal/app/biz/textgen/summarizer"
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
+	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infra"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/mq"
@@ -55,6 +57,7 @@ type Logic struct {
 	prepConsumer mq.Consumer
 
 	llmGateway *gateway.Gateway
+	summarizer summarizer.Summarizer
 
 	wg sync.WaitGroup
 }
@@ -91,6 +94,13 @@ func MustNewLogic(
 		redis:         infras.Redis,
 	}
 
+	summarizer := summarizer.NewWithOption(llmGateway,
+		summarizer.SummarizeOption{
+			Provider: conf.Global().Logic.Source.ModelProvider,
+			Model:    conf.Global().Logic.Source.Model,
+		})
+
+	sl.summarizer = summarizer
 	sl.mustInitMsgQueue()
 
 	return sl

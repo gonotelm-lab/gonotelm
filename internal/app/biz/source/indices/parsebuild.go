@@ -5,8 +5,6 @@ import (
 	"strings"
 
 	sourceutil "github.com/gonotelm-lab/gonotelm/internal/app/biz/source/util"
-	"github.com/gonotelm-lab/gonotelm/internal/app/prompts"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
 	vschema "github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/batch"
 	"github.com/gonotelm-lab/gonotelm/pkg/eino-ext/chunker/recursive"
@@ -76,7 +74,7 @@ type markdownDocTreeNode struct {
 	headingLevel int // 此处根节点是level=0
 	pos          int
 
-	derivedFrom []string
+	derivation []string
 
 	derived bool
 
@@ -374,24 +372,10 @@ func (b *DocTreeBuilder) generateRootTitle(ctx context.Context, vroot *markdownD
 	}
 	titleContent := strings.Join(slices.Unique(titles), "\n")
 
-	providerType := chat.Provider(b.providerSelector(ctx))
-	provider, err := b.gateway.GetProvider(providerType)
+	summary, err := b.summarizer.Summarize(ctx, titleContent)
 	if err != nil {
-		return errors.Wrapf(errors.ErrInner, "get provider failed, err=%v", err)
+		return errors.WithMessagef(err, "generate vroot summary failed")
 	}
-
-	model := b.modelSelector(ctx)
-	llmOption := chat.BuildLLMModelOption(model)
-	msg, err := prompts.SummarizeMessage(ctx, titleContent, "")
-	if err != nil {
-		return errors.Wrapf(errors.ErrInner, "render summarize prompt failed, err=%v", err)
-	}
-
-	genResp, err := provider.Generate(ctx, []*einoschema.Message{msg}, llmOption)
-	if err != nil {
-		return errors.Wrapf(errors.ErrLLM, "generate vroot summary failed, err=%v", err)
-	}
-	summary := strings.TrimSpace(genResp.Content)
 	if summary == "" {
 		summary = "vroot"
 	}
@@ -834,12 +818,12 @@ func buildDocTreeFromNode(
 	var build func(node *markdownDocTreeNode) *DocTreeNode
 	build = func(node *markdownDocTreeNode) *DocTreeNode {
 		children := make([]*DocTreeNode, 0, len(node.children))
-		childDerivedFrom := make([]string, 0)
+		childDerivation := make([]string, 0)
 		maxChildLevel := 0
 		for _, child := range node.children {
 			childNode := build(child)
 			children = append(children, childNode)
-			childDerivedFrom = append(childDerivedFrom, childNode.derivedFrom...)
+			childDerivation = append(childDerivation, childNode.derivation...)
 			if childNode.level > maxChildLevel {
 				maxChildLevel = childNode.level
 			}
@@ -854,11 +838,11 @@ func buildDocTreeFromNode(
 			ChunkPos: -1,
 		}
 
-		derivedFrom := []string{id}
+		derivations := []string{id}
 		if node.derived {
-			derivedFrom = slices.Unique(childDerivedFrom)
+			derivations = slices.Unique(childDerivation)
 		}
-		node.derivedFrom = derivedFrom
+		node.derivation = derivations
 
 		level := 0
 		if len(children) > 0 {
@@ -873,11 +857,11 @@ func buildDocTreeFromNode(
 		}
 
 		docNode := &DocTreeNode{
-			core:        core,
-			level:       level,
-			pos:         pos,
-			children:    children,
-			derivedFrom: derivedFrom,
+			core:       core,
+			level:      level,
+			pos:        pos,
+			children:   children,
+			derivation: derivations,
 		}
 		if !node.derived {
 			docNode.parseMetadata = cloneParseMetadata(node.parseMetadata)

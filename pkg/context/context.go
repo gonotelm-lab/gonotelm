@@ -7,6 +7,7 @@ type contextKey string
 const (
 	ContextKeyUserId    = contextKey("_user_id")
 	ContextKeySceneType = contextKey("_scene_type")
+	ContextLang         = contextKey("_lang")
 )
 
 func WithUserId(ctx context.Context, userId string) context.Context {
@@ -33,4 +34,17 @@ func GetSceneType(ctx context.Context) SceneType {
 	}
 
 	return sceneType
+}
+
+func WithLang(ctx context.Context, lang string) context.Context {
+	return context.WithValue(ctx, ContextLang, lang)
+}
+
+func GetLang(ctx context.Context) string {
+	lang, ok := ctx.Value(ContextLang).(string)
+	if !ok {
+		return ""
+	}
+
+	return lang
 }

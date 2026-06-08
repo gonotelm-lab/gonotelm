@@ -28,11 +28,12 @@ func init() {
 }
 
 type GrepSourceTool struct {
-	biz *bizsource.BizForAgent
+	biz     *bizsource.BizForAgent
+	checker SourceChecker
 }
 
-func NewGrepSourceTool(biz *bizsource.BizForAgent) *GrepSourceTool {
-	return &GrepSourceTool{biz: biz}
+func NewGrepSourceTool(biz *bizsource.BizForAgent, checker SourceChecker) *GrepSourceTool {
+	return &GrepSourceTool{biz: biz, checker: checker}
 }
 
 var _ tool.InvokableTool = &GrepSourceTool{}
@@ -64,6 +65,12 @@ func (s *GrepSourceTool) InvokableRun(
 	sourceID, err := uuid.ParseString(input.SourceId)
 	if err != nil {
 		return "", fmt.Errorf("source id is not valid uuid: %w", err)
+	}
+
+	if s.checker != nil {
+		if err := s.checker.CheckPermission(ctx, sourceID); err != nil {
+			return "", fmt.Errorf("source access denied: %w", err)
+		}
 	}
 
 	content, err := s.biz.GetSourceContent(ctx, sourceID)

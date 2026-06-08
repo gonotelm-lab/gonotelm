@@ -51,7 +51,7 @@ type SourceDoc struct {
 	ChunkPos int32
 
 	// 派生自哪些非派生节点Id 仅在召回阶段值有效
-	DerivedFrom []Id
+	Derivation  []Id
 	derivingPos string
 
 	BytePos *SourceDocPosition
@@ -89,7 +89,7 @@ func NewSourceDoc(doc *vecschema.SourceDoc) (*SourceDoc, error) {
 		ChunkPos:   doc.ChunkPos,
 	}
 
-	// 注意 DerivedFrom 字段在外部设置 因为derivedFrom需要额外查询Id映射
+	// 注意 Derivation 字段在外部设置 因为derivation需要额外查询Id映射
 	derivingPos, ok := doc.GetStringMeta(SourceDocMetaDerivingPos)
 	if ok {
 		sdc.derivingPos = derivingPos

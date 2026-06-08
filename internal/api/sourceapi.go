@@ -8,10 +8,10 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/route"
+	"github.com/gonotelm-lab/gonotelm/internal/api/schema"
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	logic "github.com/gonotelm-lab/gonotelm/internal/app/logic/source"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
-	"github.com/gonotelm-lab/gonotelm/internal/api/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 	"github.com/gonotelm-lab/gonotelm/pkg/slices"
@@ -35,7 +35,6 @@ func (s *Server) registerSourcesRoutes(g *route.RouterGroup) {
 		sourceIdGroup.PUT("/title", s.UpdateSourceTitle)
 	}
 }
-
 
 func (s *Server) checkSourceUserMiddleware(ctx context.Context, c *app.RequestContext) {
 	sourceId := c.Param("id")
@@ -291,9 +290,9 @@ func toGetSourceDocResponse(
 		return nil
 	}
 
-	summarizedFrom := make([]string, 0, len(doc.DerivedFrom))
-	for _, derivedFrom := range doc.DerivedFrom {
-		summarizedFrom = append(summarizedFrom, derivedFrom.String())
+	summarizedFrom := make([]string, 0, len(doc.Derivation))
+	for _, derivation := range doc.Derivation {
+		summarizedFrom = append(summarizedFrom, derivation.String())
 	}
 
 	resp := &GetSourceDocResponse{

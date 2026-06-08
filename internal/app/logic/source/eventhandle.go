@@ -262,22 +262,6 @@ func (l *Logic) generateSourceSummary(
 		return
 	}
 
-	summaryModel, err := l.llmGateway.GetProvider(
-		conf.Global().Logic.Source.ModelProvider,
-	)
-	if err != nil {
-		slog.ErrorContext(ctx, "get summary model failed",
-			slog.String("source_id", sourceId.String()),
-			slog.String("notebook_id", notebookId.String()),
-			slog.Any("err", err),
-		)
-		return
-	}
-	var (
-		llmOption = llmchat.BuildLLMModelOption(conf.Global().Logic.Source.Model)
-		userLang  = "" // TODO
-	)
-
 	const (
 		batchSize          = 1
 		maxConcurrency     = 20
@@ -297,19 +281,7 @@ func (l *Logic) generateSourceSummary(
 		batchSize,
 		maxConcurrency,
 		func(ctx context.Context, batch []string) ([]string, error) {
-			summaryPrompt, err := prompts.SummarizeMessage(
-				ctx, batch[0], userLang,
-			)
-			if err != nil {
-				slog.ErrorContext(ctx, "render summarize prompt failed",
-					slog.String("source_id", sourceId.String()),
-					slog.Any("err", err),
-				)
-				return []string{}, nil
-			}
-
-			msgs := []*einoschema.Message{summaryPrompt}
-			result, err := summaryModel.Generate(ctx, msgs, llmOption)
+			summary, err := l.summarizer.Summarize(ctx, batch[0])
 			if err != nil {
 				slog.ErrorContext(ctx, "generate summary failed",
 					slog.String("source_id", sourceId.String()),
@@ -318,7 +290,7 @@ func (l *Logic) generateSourceSummary(
 				return []string{}, nil
 			}
 
-			return []string{result.Content}, nil
+			return []string{summary}, nil
 		},
 	)
 	if err != nil {
@@ -331,28 +303,11 @@ func (l *Logic) generateSourceSummary(
 
 	// 给每个chunk的summary组合后再输出一句summary 作为整个source的summary
 	summarizingTexts := strings.Join(chunkSummaries, "\n")
-	summaryPrompt, err := prompts.SummarizeMessage(
-		ctx, summarizingTexts, userLang,
-	)
+	summary, err := l.summarizer.Summarize(ctx, summarizingTexts)
 	if err != nil {
-		slog.ErrorContext(ctx, "render summarize prompt failed",
-			slog.String("source_id", sourceId.String()),
-			slog.Any("err", err),
-		)
 		return
 	}
-
-	msgs := []*einoschema.Message{summaryPrompt}
-	summaryResult, err := summaryModel.Generate(ctx, msgs, llmOption)
-	if err != nil {
-		slog.ErrorContext(ctx, "generate summary failed",
-			slog.String("source_id", sourceId.String()),
-			slog.Any("err", err),
-		)
-		return
-	}
-
-	if err := l.sourceBiz.UpdateAbstract(ctx, sourceId, summaryResult.Content); err != nil {
+	if err := l.sourceBiz.UpdateAbstract(ctx, sourceId, summary); err != nil {
 		slog.ErrorContext(ctx, "update source abstract failed",
 			slog.String("source_id", sourceId.String()),
 			slog.Any("err", err),
@@ -403,10 +358,9 @@ func (l *Logic) generateNotebookSummary(
 		}
 	}
 
-	userLang := "" // TODO
 	// generate prompt message
 	msg, err := prompts.NotebookSummaryMessage(
-		ctx, abstracts, userLang,
+		ctx, abstracts, pkgcontext.GetLang(ctx),
 	)
 	if err != nil {
 		slog.ErrorContext(ctx, "render notebook summary prompt failed",

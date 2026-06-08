@@ -24,7 +24,7 @@ func TestRecoverDocTreeNonDerivedNonLeafByChildrenMeta(t *testing.T) {
 		leafDoc.PutMeta(model.SourceDocMetaLevel, int64(0))
 
 		parentBitmap := bitmap.New(2)
-		parentBitmap.Set(1) // parent 自己是非派生节点，derivedFrom 指向自己
+		parentBitmap.Set(1) // parent 自己是非派生节点，derivation 指向自己
 		parentDoc := &vschema.SourceDoc{
 			Id:         "parent-doc",
 			NotebookId: "nb",
@@ -57,7 +57,7 @@ func TestRecoverDocTreeNonDerivedNonLeafByChildrenMeta(t *testing.T) {
 		So(err, ShouldBeNil)
 		So(tree, ShouldNotBeNil)
 		So(tree.Root(), ShouldNotBeNil)
-		So(tree.Root().DerivedFrom(), ShouldResemble, []string{"parent-doc"})
+		So(tree.Root().Derivation(), ShouldResemble, []string{"parent-doc"})
 
 		var (
 			parentNode *indices.DocTreeNode
@@ -77,12 +77,12 @@ func TestRecoverDocTreeNonDerivedNonLeafByChildrenMeta(t *testing.T) {
 
 		So(parentNode, ShouldNotBeNil)
 		So(parentNode.IsLeaf(), ShouldBeFalse)
-		So(parentNode.DerivedFrom(), ShouldResemble, []string{"parent-doc"})
+		So(parentNode.Derivation(), ShouldResemble, []string{"parent-doc"})
 		So(len(parentNode.Children()), ShouldEqual, 1)
 		So(parentNode.Children()[0].Core().Id, ShouldEqual, "leaf-doc")
 
 		So(leafNode, ShouldNotBeNil)
 		So(leafNode.IsLeaf(), ShouldBeTrue)
-		So(leafNode.DerivedFrom(), ShouldResemble, []string{"leaf-doc"})
+		So(leafNode.Derivation(), ShouldResemble, []string{"leaf-doc"})
 	})
 }

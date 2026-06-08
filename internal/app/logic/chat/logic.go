@@ -292,6 +292,7 @@ func (l *Logic) processUserMessageTask(
 		taskId:           taskId,
 		chatId:           chat.Id,
 		userId:           userId,
+		userLang:         pkgcontext.GetLang(ctx),
 		enableThinking:   params.EnableThinking,
 		chatStyle:        params.ChatStyle,
 		chatAnswerLength: params.ChatAnswerLength,
@@ -382,7 +383,7 @@ func (l *Logic) processUserMessageTask(
 
 	chatAgent := l.buildNewChatAgent(chatLLM, sessionState)
 	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.ChatScene)
-	answer, err = chatAgent.React(ctx, contextMsgs)
+	answer, err = chatAgent.ReactStream(ctx, contextMsgs)
 	if err != nil {
 		slog.ErrorContext(ctx, "chat agent loop failed",
 			slog.String("chat_id", chat.Id.String()),

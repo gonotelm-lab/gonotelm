@@ -154,7 +154,7 @@ func (m *mindmapGenerator) oneshotCreateMindmap(
 	var (
 		msg  *einoschema.Message
 		err  error
-		lang = ""
+		lang = pkgcontext.GetLang(ctx)
 	)
 
 	if mode == mindmapAbstractMode {

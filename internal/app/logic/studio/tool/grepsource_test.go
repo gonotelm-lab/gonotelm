@@ -23,7 +23,7 @@ func TestGrepSourceTool_InvokableRun_GetSourceContentFailed(t *testing.T) {
 		mockErr := errors.New("mock get source content failed")
 		patches.ApplyMethodReturn(biz, "GetSourceContent", []byte(nil), mockErr)
 
-		tool := NewGrepSourceTool(biz)
+		tool := NewGrepSourceTool(biz, nil)
 		got, err := tool.InvokableRun(context.Background(), fmt.Sprintf(
 			`{"source_id":"%s","pattern":"hello"}`,
 			sourceID.String(),

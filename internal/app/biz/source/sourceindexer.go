@@ -8,6 +8,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/app/biz/source/convertdoc"
 	"github.com/gonotelm-lab/gonotelm/internal/app/biz/source/indices"
 	"github.com/gonotelm-lab/gonotelm/internal/app/biz/source/util"
+	"github.com/gonotelm-lab/gonotelm/internal/app/biz/textgen/summarizer"
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
@@ -53,6 +54,14 @@ func NewSourceIndexer(
 		hc.OverlapSize = int(float64(hc.ChunkSize) * 0.15)
 	}
 
+	summarizer := summarizer.NewWithOption(
+		llmGateway,
+		summarizer.SummarizeOption{
+			Provider: conf.Global().Logic.Source.ModelProvider,
+			Model:    conf.Global().Logic.Source.Model,
+		},
+	)
+
 	return &SourceIndexer{
 		embedder:            embedder,
 		embedBatchSize:      conf.Global().Embedding.BatchSize,
@@ -63,12 +72,7 @@ func NewSourceIndexer(
 			model.SourceKindUrl:  convertdoc.NewUrlHandler(hc),
 			model.SourceKindFile: convertdoc.NewFileObjectHandler(hc, objectStorage),
 		},
-		docTreeBuilder: indices.NewDocTreeBuilder(
-			embedder,
-			llmGateway,
-			func(_ context.Context) string { return string(conf.Global().Logic.Source.ModelProvider) },
-			func(_ context.Context) string { return conf.Global().Logic.Source.Model },
-		),
+		docTreeBuilder: indices.NewDocTreeBuilder(embedder, summarizer),
 	}
 }
 
@@ -200,7 +204,7 @@ func (b *SourceIndexer) parseEmbedChunks(
 		if node.IsLeaf() {
 			continue
 		}
-		if derivingIds := node.DerivedFrom(); len(derivingIds) > 0 {
+		if derivingIds := node.Derivation(); len(derivingIds) > 0 {
 			if bitmapSize == 0 {
 				continue
 			}
@@ -326,7 +330,7 @@ func (b *SourceIndexer) mergeEmbedChunks(
 			}
 
 			// 派生节点需要额外处理
-			if derivingIds := node.DerivedFrom(); len(derivingIds) > 0 {
+			if derivingIds := node.Derivation(); len(derivingIds) > 0 {
 				if bitmapSize == 0 {
 					continue
 				}
@@ -501,10 +505,10 @@ func (b *docTreeRecoverBuilder) buildNode(pos int) (*indices.DocTreeNode, error)
 
 	var (
 		children    []*indices.DocTreeNode
-		derivedFrom []string
+		derivation []string
 	)
 	if isLeaf {
-		derivedFrom = []string{doc.Id}
+		derivation = []string{doc.Id}
 	} else {
 		if len(childrenPos) == 0 {
 			return nil, errors.ErrInner.Msgf("children pos is empty for non-leaf node, node_pos=%d", pos)
@@ -518,18 +522,18 @@ func (b *docTreeRecoverBuilder) buildNode(pos int) (*indices.DocTreeNode, error)
 			children = append(children, childNode)
 		}
 
-		derivedFrom, err = readSourceDocDerivedFrom(doc, b.docPosMapping)
+		derivation, err = readSourceDocDerivation(doc, b.docPosMapping)
 		if err != nil {
 			return nil, errors.WithMessagef(err, "read deriving docs failed, node_pos=%d", pos)
 		}
 	}
 
-	node := indices.NewDocTreeNode(doc, level, pos, children, derivedFrom)
+	node := indices.NewDocTreeNode(doc, level, pos, children, derivation)
 	b.nodeByPos[pos] = node
 	return node, nil
 }
 
-func readSourceDocDerivedFrom(
+func readSourceDocDerivation(
 	doc *vecschema.SourceDoc,
 	docPosMapping map[int]*vecschema.SourceDoc,
 ) ([]string, error) {
@@ -549,7 +553,7 @@ func readSourceDocDerivedFrom(
 	if len(setPos) == 0 {
 		return nil, errors.ErrInner.Msgf("deriving bitmap has no set bit, node_id=%s", doc.Id)
 	}
-	derivedFrom := make([]string, 0, len(setPos))
+	derivation := make([]string, 0, len(setPos))
 	for _, nonDerivedPos := range setPos {
 		nonDerivedDoc, ok := docPosMapping[int(nonDerivedPos)]
 		if !ok {
@@ -558,8 +562,8 @@ func readSourceDocDerivedFrom(
 				nonDerivedPos,
 			)
 		}
-		derivedFrom = append(derivedFrom, nonDerivedDoc.Id)
+		derivation = append(derivation, nonDerivedDoc.Id)
 	}
 
-	return slices.Unique(derivedFrom), nil
+	return slices.Unique(derivation), nil
 }

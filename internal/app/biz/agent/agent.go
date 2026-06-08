@@ -35,6 +35,7 @@ type AgentConfig[State any] struct {
 
 	MsgAppender func(ctx context.Context, state State, newMsgs []*einoschema.Message)
 
+	// 流式输出时生效 非流式输出时不会调用hook
 	OnReasoning    AgentStreamingHook[State]
 	OnReasoningEnd AgentStreamingHook[State]
 	OnContent      AgentStreamingHook[State]
@@ -111,7 +112,7 @@ func (a *Agent[State]) appendAccumulatedMessages(msgs ...*einoschema.Message) {
 }
 
 // 与模型交互 并返回最终的回答
-func (a *Agent[State]) React(
+func (a *Agent[State]) ReactStream(
 	ctx context.Context,
 	msgs []*einoschema.Message,
 ) (*einoschema.Message, error) {
@@ -120,23 +121,15 @@ func (a *Agent[State]) React(
 	}
 	a.setAccumulatedMessages(msgs)
 
-	if a.cfg.BeforeChat != nil {
-		newMsgs, err := a.cfg.BeforeChat(ctx, a.state, msgs)
-		if err != nil {
-			return nil, errors.WithMessage(err, "before chat failed")
-		}
-		msgs = newMsgs
-		a.setAccumulatedMessages(msgs)
+	msgs, err := a.handleBeforeChat(ctx, msgs)
+	if err != nil {
+		return nil, errors.WithMessage(err, "handle before chat failed")
 	}
 
 	for round := range a.cfg.MaxRound {
-		if a.cfg.BeforeRound != nil {
-			newMsgs, err := a.cfg.BeforeRound(ctx, round, a.state, msgs)
-			if err != nil {
-				return nil, errors.WithMessagef(err, "before round %d failed", round)
-			}
-			msgs = newMsgs
-			a.setAccumulatedMessages(msgs)
+		msgs, err = a.handleBeforeRound(ctx, round, msgs)
+		if err != nil {
+			return nil, errors.WithMessagef(err, "before round %d failed", round)
 		}
 
 		stream, err := a.cfg.LLM.Stream(ctx, msgs, a.cfg.Options...)
@@ -207,6 +200,88 @@ func (a *Agent[State]) React(
 	}
 
 	return nil, errors.ErrParams.Msgf("chat round exceeded max rounds=%d", a.cfg.MaxRound)
+}
+
+// 非流式输出
+func (a *Agent[State]) React(
+	ctx context.Context,
+	msgs []*einoschema.Message,
+) (*einoschema.Message, error) {
+	if len(msgs) == 0 {
+		return nil, errors.ErrParams.Msg("no messages to chat")
+	}
+	a.setAccumulatedMessages(msgs)
+
+	msgs, err := a.handleBeforeChat(ctx, msgs)
+	if err != nil {
+		return nil, errors.WithMessage(err, "handle before chat failed")
+	}
+
+	for round := range a.cfg.MaxRound {
+		msgs, err = a.handleBeforeRound(ctx, round, msgs)
+		if err != nil {
+			return nil, errors.WithMessagef(err, "before round %d failed", round)
+		}
+
+		responseMsg, err := a.cfg.LLM.Generate(ctx, msgs, a.cfg.Options...)
+		if err != nil {
+			return nil, errors.WithMessage(err, "generate chat failed")
+		}
+
+		if responseMsg.ResponseMeta.FinishReason == chat.FinishReasonToolCalls {
+			toolMsgs := a.handleToolCalls(ctx, responseMsg.ToolCalls)
+			roundMsgs := make([]*einoschema.Message, 0, 1+len(toolMsgs))
+			roundMsgs = append(roundMsgs, responseMsg)
+			roundMsgs = append(roundMsgs, toolMsgs...)
+			msgs = append(msgs, roundMsgs...)
+			a.appendAccumulatedMessages(roundMsgs...)
+			if a.cfg.MsgAppender != nil {
+				a.cfg.MsgAppender(ctx, a.state, roundMsgs)
+			}
+		} else {
+			// 没有工具调用任务 认为已经结束
+			a.appendAccumulatedMessages(responseMsg)
+			if a.cfg.MsgAppender != nil {
+				a.cfg.MsgAppender(ctx, a.state, []*einoschema.Message{responseMsg})
+			}
+			return responseMsg, nil
+		}
+	}
+
+	return nil, errors.ErrParams.Msgf("chat round exceeded max rounds=%d", a.cfg.MaxRound)
+}
+
+func (a *Agent[State]) handleBeforeChat(
+	ctx context.Context,
+	msgs []*einoschema.Message,
+) ([]*einoschema.Message, error) {
+	if a.cfg.BeforeChat != nil {
+		newMsgs, err := a.cfg.BeforeChat(ctx, a.state, msgs)
+		if err != nil {
+			return nil, errors.WithMessage(err, "before chat failed")
+		}
+
+		a.setAccumulatedMessages(newMsgs)
+		return newMsgs, nil
+	}
+
+	return msgs, nil
+}
+
+func (a *Agent[State]) handleBeforeRound(
+	ctx context.Context, round int, msgs []*einoschema.Message,
+) ([]*einoschema.Message, error) {
+	if a.cfg.BeforeRound != nil {
+		newMsgs, err := a.cfg.BeforeRound(ctx, round, a.state, msgs)
+		if err != nil {
+			return nil, errors.WithMessage(err, "before round failed")
+		}
+
+		a.setAccumulatedMessages(newMsgs)
+		return newMsgs, nil
+	}
+
+	return msgs, nil
 }
 
 // 处理工具调用 并且以message的格式返回工具调用的结果

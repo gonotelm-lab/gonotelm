@@ -8,6 +8,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/bytedance/sonic"
+	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/log"
@@ -53,22 +54,6 @@ func NewBizForAgent(ctx context.Context, impl *Biz, c BizForAgentConfig) (*BizFo
 	}, nil
 }
 
-type ReadSourceQuery struct {
-	SourceId uuid.UUID
-	Offset   int // 起始行 1-indexed
-	Limit    int // 读取的行数
-}
-
-type ReadSourceResult struct {
-	TotalLines int
-	Lines      []ReadSourceResultLine
-}
-
-type ReadSourceResultLine struct {
-	LineNo int // 行号 1-indexed
-	Line   []byte
-}
-
 type lineRange struct {
 	Start int `json:"s"`
 	End   int `json:"e"`
@@ -101,19 +86,19 @@ func (b *BizForAgent) GetSourceContent(ctx context.Context, id uuid.UUID) ([]byt
 	return rawContent, nil
 }
 
-type StatSourceResult struct {
+type AgentStatSourceResult struct {
 	Bytes    int    `json:"b"` // content len in bytes
 	Runes    int    `json:"r"` // content len in runes
 	Lines    int    `json:"l"` // content line count
 	Abstract string `json:"a"` // summary of the source content
 }
 
-func (b *BizForAgent) StatSource(ctx context.Context, id uuid.UUID) (*StatSourceResult, error) {
+func (b *BizForAgent) StatSource(ctx context.Context, id uuid.UUID) (*AgentStatSourceResult, error) {
 	encodedPayload, err := b.sourceCache.Get(id.String())
 	if err == nil {
 		cached, decodeErr := b.decodeCachedSource(encodedPayload)
 		if decodeErr == nil {
-			return &StatSourceResult{
+			return &AgentStatSourceResult{
 				Bytes:    len(cached.Content),
 				Runes:    utf8.RuneCount(cached.Content),
 				Lines:    len(cached.LineRanges),
@@ -127,7 +112,7 @@ func (b *BizForAgent) StatSource(ctx context.Context, id uuid.UUID) (*StatSource
 		return nil, err
 	}
 
-	return &StatSourceResult{
+	return &AgentStatSourceResult{
 		Bytes:    len(rawContent),
 		Runes:    utf8.RuneCount(rawContent),
 		Lines:    len(lineRanges),
@@ -135,11 +120,27 @@ func (b *BizForAgent) StatSource(ctx context.Context, id uuid.UUID) (*StatSource
 	}, nil
 }
 
+type AgentReadSourceQuery struct {
+	SourceId uuid.UUID
+	Offset   int // 起始行 1-indexed
+	Limit    int // 读取的行数
+}
+
+type AgentReadSourceResult struct {
+	TotalLines int
+	Lines      []AgentReadSourceResultLine
+}
+
+type AgentReadSourceResultLine struct {
+	LineNo int // 行号 1-indexed
+	Line   []byte
+}
+
 // 为agent提供来源的内容
 func (b *BizForAgent) ReadSource(
 	ctx context.Context,
-	query *ReadSourceQuery,
-) (*ReadSourceResult, error) {
+	query *AgentReadSourceQuery,
+) (*AgentReadSourceResult, error) {
 	sourceID := query.SourceId.String()
 	cacheKey := sourceID
 
@@ -218,7 +219,7 @@ func (b *BizForAgent) selectContent(
 	lineRanges []lineRange,
 	offset int,
 	limit int,
-) (*ReadSourceResult, error) {
+) (*AgentReadSourceResult, error) {
 	totalLines := len(lineRanges)
 	start := 0
 	if offset != 0 {
@@ -238,9 +239,9 @@ func (b *BizForAgent) selectContent(
 	}
 	end = min(end, totalLines)
 
-	result := &ReadSourceResult{
+	result := &AgentReadSourceResult{
 		TotalLines: totalLines,
-		Lines:      make([]ReadSourceResultLine, 0, end-start),
+		Lines:      make([]AgentReadSourceResultLine, 0, end-start),
 	}
 	contentLen := len(rawContent)
 	for i := start; i < end; i++ {
@@ -249,7 +250,7 @@ func (b *BizForAgent) selectContent(
 			return nil, fmt.Errorf("invalid line range at line %d: start=%d end=%d content=%d",
 				i+1, lineRange.Start, lineRange.End, contentLen)
 		}
-		result.Lines = append(result.Lines, ReadSourceResultLine{
+		result.Lines = append(result.Lines, AgentReadSourceResultLine{
 			LineNo: i + 1,
 			Line:   rawContent[lineRange.Start:lineRange.End],
 		})
@@ -321,4 +322,49 @@ func (b *BizForAgent) buildLineRanges(rawContent []byte) []lineRange {
 	}
 
 	return lineRanges
+}
+
+type AgentSearchSourceQuery struct {
+	SourceId uuid.UUID
+	Target   string
+	Count    int
+}
+
+type AgentSearchSourceResult struct {
+	Chunks []*model.SourceDoc
+}
+
+func (b *BizForAgent) SearchSource(
+	ctx context.Context,
+	query *AgentSearchSourceQuery,
+) (*AgentSearchSourceResult, error) {
+	s, err := b.impl.GetSource(ctx, query.SourceId)
+	if err != nil {
+		slog.ErrorContext(ctx, "get source failed",
+			slog.Any("err", err),
+			slog.String("source_id", query.SourceId.String()),
+		)
+
+		return nil, fmt.Errorf("get source failed: %w, source_id=%s", err, query.SourceId)
+	}
+
+	resp, err := b.impl.SimilaritySearchSourceDocs(ctx,
+		&SimilaritySearchSourceDocsQuery{
+			NotebookId: s.NotebookId,
+			Query:      query.Target,
+			SourceIds:  []uuid.UUID{query.SourceId},
+			Count:      query.Count,
+		})
+	if err != nil {
+		slog.ErrorContext(ctx, "similarity search source docs failed",
+			slog.Any("err", err),
+			slog.String("source_id", query.SourceId.String()),
+		)
+
+		return nil, err
+	}
+
+	return &AgentSearchSourceResult{
+		Chunks: resp,
+	}, nil
 }

@@ -9,6 +9,7 @@ import (
 	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
 	chatlogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/chat"
+	notebooklogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/notebook"
 	sourcelogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/source"
 	studiologic "github.com/gonotelm-lab/gonotelm/internal/app/logic/studio"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
@@ -18,7 +19,7 @@ import (
 )
 
 type Logic struct {
-	NotebookLogic *NotebookLogic
+	NotebookLogic *notebooklogic.Logic
 	SourceLogic   *sourcelogic.Logic
 	ChatLogic     *chatlogic.Logic
 	StudioLogic   *studiologic.Logic
@@ -73,10 +74,11 @@ func MustNewLogic(
 		gateway,
 	)
 
-	notebookLogic := NewNotebookLogic(
+	notebookLogic := notebooklogic.NewLogic(
 		notebookBiz,
 		sourceBiz,
 		chatBiz,
+		artifactBiz,
 	)
 
 	chatLogic := chatlogic.MustNewLogic(

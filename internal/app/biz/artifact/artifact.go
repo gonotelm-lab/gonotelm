@@ -119,15 +119,15 @@ func (b *Biz) GetTaskStatus(ctx context.Context, id uuid.UUID) (model.ArtifactSt
 	return model.ArtifactStatus(status), nil
 }
 
-type ListTasksByNotebookQuery struct {
+type ListNotebookTasksQuery struct {
 	NotebookId uuid.UUID
 	Limit      int
 	Offset     int
 }
 
-func (b *Biz) ListTasksByNotebook(
+func (b *Biz) ListNotebookTasks(
 	ctx context.Context,
-	query *ListTasksByNotebookQuery,
+	query *ListNotebookTasksQuery,
 ) ([]*model.ArtifactTask, error) {
 	rows, err := b.taskStore.ListByNotebookId(
 		ctx,
@@ -201,7 +201,7 @@ type CompleteTaskCommand struct {
 
 // 设置指定的任务成功并且设置结果
 func (b *Biz) CompleteTask(ctx context.Context, cmd *CompleteTaskCommand) error {
-	title :=pkgstring.TruncateRune(cmd.Title, constants.MaxArtifactTitleLength)
+	title := pkgstring.TruncateRune(cmd.Title, constants.MaxArtifactTitleLength)
 	_, err := b.taskStore.UpdateResult(ctx, cmd.TaskId, cmd.RunId,
 		model.ArtifactStatusRunning.String(),
 		&schema.ArtifactTaskUpdateResultParams{
@@ -265,6 +265,15 @@ func (b *Biz) CancelRunningTask(ctx context.Context, taskId uuid.UUID) error {
 	)
 	if err != nil {
 		return errors.WithMessagef(err, "cancel artifact task failed, task_id=%s", taskId)
+	}
+
+	return nil
+}
+
+func (b *Biz) DeleteNotebookTasks(ctx context.Context, notebookId uuid.UUID) error {
+	err := b.taskStore.DeleteByNotebookId(ctx, notebookId)
+	if err != nil {
+		return errors.WithMessagef(err, "delete notebook tasks failed, notebook_id=%s", notebookId)
 	}
 
 	return nil

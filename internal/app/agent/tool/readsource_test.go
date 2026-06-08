@@ -6,24 +6,11 @@ import (
 	"testing"
 
 	"github.com/agiledragon/gomonkey/v2"
-	"github.com/bytedance/sonic"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-func TestReadSourceTool_Info(t *testing.T) {
-	s, _ := readSourceToolParams.ToJSONSchema()
-	json, err := sonic.MarshalIndent(s, "", "  ")
-	if err != nil {
-		t.Fatalf("marshal jsonschema failed: %v", err)
-	}
-	t.Log(string(json))
-	t.Log("-------------------------")
-	s, _ = grepSourceToolParams.ToJSONSchema()
-	json, _ = sonic.MarshalIndent(s, "", "  ")
-	t.Log(string(json))
-}
 
 func TestReadSourceTool_InvokableRun(t *testing.T) {
 	Convey("InvokableRun 使用 start_line 和 line_count 参数格式化输出", t, func() {
@@ -34,8 +21,8 @@ func TestReadSourceTool_InvokableRun(t *testing.T) {
 		defer patches.Reset()
 
 		patches.ApplyMethodReturn(biz, "ReadSource",
-			&bizsource.ReadSourceResult{
-				Lines: []bizsource.ReadSourceResultLine{
+			&bizsource.AgentReadSourceResult{
+				Lines: []bizsource.AgentReadSourceResultLine{
 					{LineNo: 2, Line: []byte("hello")},
 					{LineNo: 3, Line: []byte("world")},
 				},

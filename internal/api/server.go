@@ -4,6 +4,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/app/server"
 	"github.com/gonotelm-lab/gonotelm/internal/app/logic"
 	chatlogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/chat"
+	notebooklogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/notebook"
 	sourcelogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/source"
 	studiologic "github.com/gonotelm-lab/gonotelm/internal/app/logic/studio"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
@@ -14,7 +15,7 @@ import (
 type Server struct {
 	h *server.Hertz
 
-	notebookLogic *logic.NotebookLogic
+	notebookLogic *notebooklogic.Logic
 	sourceLogic   *sourcelogic.Logic
 	chatLogic     *chatlogic.Logic
 	studioLogic   *studiologic.Logic

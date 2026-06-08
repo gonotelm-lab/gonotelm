@@ -1,6 +1,9 @@
 package model
 
-import "github.com/gonotelm-lab/gonotelm/internal/infra/dal/schema"
+import (
+	"github.com/bytedance/sonic"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/dal/schema"
+)
 
 type ArtifactKind string
 
@@ -88,7 +91,7 @@ type ArtifactTask struct {
 	Status     ArtifactStatus
 	Title      string
 	Result     []byte
-	ResultKind ArtifactResultKind
+	ResultKind ArtifactResultKind // inline/storage
 	UserId     string
 	RunId      string
 	LockNo     int32
@@ -115,4 +118,42 @@ func NewArtifactTaskFrom(task *schema.ArtifactTask) *ArtifactTask {
 		UpdatedAt:  task.UpdatedAt,
 		ExpiredAt:  task.ExpiredAt,
 	}
+}
+
+type ArtifactInlineResult struct {
+	Data []byte
+}
+
+type ArtifactStorageResult struct {
+	StoreKey    string `json:"store_key"`
+	ContentType string `json:"content_type"`
+}
+
+type FlavoredArtifactTask struct {
+	*ArtifactTask
+
+	InlineResult  *ArtifactInlineResult
+	StorageResult *ArtifactStorageResult
+}
+
+func NewFlavoredArtifactTask(t *ArtifactTask) (*FlavoredArtifactTask, error) {
+	at := &FlavoredArtifactTask{
+		ArtifactTask: t,
+	}
+
+	// parse result
+	switch t.ResultKind {
+	case ArtifactResultKindInline:
+		at.InlineResult = &ArtifactInlineResult{Data: t.Result}
+	case ArtifactResultKindStorage:
+		var r ArtifactStorageResult
+		err := sonic.Unmarshal(at.Result, &r)
+		if err != nil {
+			return nil, err
+		}
+
+		at.StorageResult = &r
+	}
+
+	return at, nil
 }

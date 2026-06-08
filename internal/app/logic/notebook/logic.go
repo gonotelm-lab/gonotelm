@@ -1,9 +1,10 @@
-package logic
+package notebook
 
 import (
 	"context"
 	"log/slog"
 
+	bizartifact "github.com/gonotelm-lab/gonotelm/internal/app/biz/artifact"
 	bizchat "github.com/gonotelm-lab/gonotelm/internal/app/biz/chat"
 	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
@@ -14,21 +15,24 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 
-type NotebookLogic struct {
+type Logic struct {
 	notebookBiz *biznotebook.Biz
 	sourceBiz   *bizsource.Biz
 	chatBiz     *bizchat.Biz
+	artifactBiz *bizartifact.Biz
 }
 
-func NewNotebookLogic(
+func NewLogic(
 	notebookBiz *biznotebook.Biz,
 	sourceBiz *bizsource.Biz,
 	chatBiz *bizchat.Biz,
-) *NotebookLogic {
-	return &NotebookLogic{
+	artifactBiz *bizartifact.Biz,
+) *Logic {
+	return &Logic{
 		notebookBiz: notebookBiz,
 		sourceBiz:   sourceBiz,
 		chatBiz:     chatBiz,
+		artifactBiz: artifactBiz,
 	}
 }
 
@@ -37,7 +41,7 @@ type CreateNotebookParams struct {
 	Desc string
 }
 
-func (l *NotebookLogic) CreateNotebook(
+func (l *Logic) CreateNotebook(
 	ctx context.Context,
 	params *CreateNotebookParams,
 ) (*model.Notebook, error) {
@@ -60,7 +64,7 @@ type NotebookSummary struct {
 	SourceCount int64
 }
 
-func (l *NotebookLogic) GetNotebook(
+func (l *Logic) GetNotebook(
 	ctx context.Context,
 	id uuid.UUID,
 ) (*NotebookSummary, error) {
@@ -99,7 +103,7 @@ type ListNotebooksResult struct {
 	HasMore   bool
 }
 
-func (l *NotebookLogic) ListNotebooks(
+func (l *Logic) ListNotebooks(
 	ctx context.Context,
 	params *ListNotebooksParams,
 ) (*ListNotebooksResult, error) {
@@ -143,7 +147,7 @@ type ListNotebookSourcesResult struct {
 	HasMore bool
 }
 
-func (l *NotebookLogic) ListNotebookSources(
+func (l *Logic) ListNotebookSources(
 	ctx context.Context,
 	params *ListNotebookSourcesParams,
 ) (*ListNotebookSourcesResult, error) {
@@ -195,7 +199,7 @@ func (l *NotebookLogic) ListNotebookSources(
 	}, nil
 }
 
-func (l *NotebookLogic) buildNotebookSummary(
+func (l *Logic) buildNotebookSummary(
 	ctx context.Context,
 	notebook *model.Notebook,
 ) (*NotebookSummary, error) {
@@ -210,7 +214,7 @@ func (l *NotebookLogic) buildNotebookSummary(
 	}, nil
 }
 
-func (l *NotebookLogic) UpdateNotebookName(
+func (l *Logic) UpdateNotebookName(
 	ctx context.Context,
 	id uuid.UUID,
 	name string,
@@ -231,7 +235,7 @@ func (l *NotebookLogic) UpdateNotebookName(
 	return nil
 }
 
-func (l *NotebookLogic) UpdateNotebookDescription(
+func (l *Logic) UpdateNotebookDescription(
 	ctx context.Context,
 	id uuid.UUID,
 	desc string,
@@ -256,7 +260,7 @@ func (l *NotebookLogic) UpdateNotebookDescription(
 	return nil
 }
 
-func (l *NotebookLogic) GetOrCreateNotebookChat(
+func (l *Logic) GetOrCreateNotebookChat(
 	ctx context.Context,
 	id uuid.UUID,
 ) (*chatmodel.Chat, error) {
@@ -273,7 +277,7 @@ func (l *NotebookLogic) GetOrCreateNotebookChat(
 	return chat, nil
 }
 
-func (l *NotebookLogic) DeleteNotebook(
+func (l *Logic) DeleteNotebook(
 	ctx context.Context,
 	id uuid.UUID,
 ) error {
@@ -282,6 +286,7 @@ func (l *NotebookLogic) DeleteNotebook(
 		if errors.Is(err, biznotebook.ErrNotebookNotFound) {
 			return nil
 		}
+
 		return errors.WithMessagef(err, "get notebook failed before deleting, notebook_id=%s", id)
 	}
 
@@ -292,18 +297,35 @@ func (l *NotebookLogic) DeleteNotebook(
 
 	err = l.sourceBiz.DeleteNotebookSources(ctx, id)
 	if err != nil {
-		return errors.WithMessagef(err, "delete notebook sources failed, notebook_id=%s", id)
+		slog.ErrorContext(ctx,
+			"delete notebook sources failed",
+			slog.Any("err", err),
+			slog.String("notebook_id", id.String()),
+		)
 	}
 
-	err = l.chatBiz.DeleteChatsByNotebook(ctx, id)
+	err = l.chatBiz.DeleteNotebookChats(ctx, id)
 	if err != nil {
-		return errors.WithMessagef(err, "delete notebook chats failed, notebook_id=%s", id)
+		slog.ErrorContext(ctx,
+			"delete notebook chats failed",
+			slog.Any("err", err),
+			slog.String("notebook_id", id.String()),
+		)
+	}
+
+	err = l.artifactBiz.DeleteNotebookTasks(ctx, id)
+	if err != nil {
+		slog.ErrorContext(ctx,
+			"delete notebook tasks failed",
+			slog.Any("err", err),
+			slog.String("notebook_id", id.String()),
+		)
 	}
 
 	return nil
 }
 
-func (l *NotebookLogic) CheckNotebookUserId(ctx context.Context, id uuid.UUID) error {
+func (l *Logic) CheckNotebookUserId(ctx context.Context, id uuid.UUID) error {
 	userId := pkgcontext.GetUserId(ctx)
 	notebookUserId, err := l.notebookBiz.GetNotebookUser(ctx, id)
 	if err != nil {

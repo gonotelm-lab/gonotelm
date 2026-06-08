@@ -43,6 +43,23 @@ type GrepSourceToolInput struct {
 	*rg.Params
 }
 
+func (i *GrepSourceToolInput) Normalize() (*rg.Params, uuid.UUID, error) {
+	if i.Params == nil {
+		i.Params = &rg.Params{}
+	}
+
+	if i.Pattern == "" {
+		return nil, uuid.UUID{}, fmt.Errorf("pattern is required")
+	}
+
+	sourceID, err := uuid.ParseString(i.SourceId)
+	if err != nil {
+		return nil, uuid.UUID{}, err
+	}
+
+	return i.Params, sourceID, nil
+}
+
 func (s *GrepSourceTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 	return &schema.ToolInfo{
 		Name:        GrepSourceToolName,
@@ -62,28 +79,20 @@ func (s *GrepSourceTool) InvokableRun(
 		return "", fmt.Errorf("args input is not valid json: %w", err)
 	}
 
-	sourceID, err := uuid.ParseString(input.SourceId)
+	params, sourceID, err := input.Normalize()
 	if err != nil {
-		return "", fmt.Errorf("source id is not valid uuid: %w", err)
+		return "", err
 	}
 
 	if s.checker != nil {
 		if err := s.checker.CheckPermission(ctx, sourceID); err != nil {
-			return "", fmt.Errorf("source access denied: %w", err)
+			return "", permissionDeniedForSource(sourceID)
 		}
 	}
 
 	content, err := s.biz.GetSourceContent(ctx, sourceID)
 	if err != nil {
 		return "", fmt.Errorf("get source content failed: %w", err)
-	}
-
-	params := &rg.Params{}
-	if input.Params != nil {
-		params = input.Params
-	}
-	if params.Pattern == "" {
-		return "", fmt.Errorf("pattern is required")
 	}
 
 	output, err := rg.Grep(content, params)

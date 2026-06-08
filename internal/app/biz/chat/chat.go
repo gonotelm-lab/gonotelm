@@ -475,7 +475,7 @@ func (b *Biz) ClearChatContext(
 	return nil
 }
 
-func (b *Biz) DeleteChatsByNotebook(
+func (b *Biz) DeleteNotebookChats(
 	ctx context.Context,
 	notebookId Id,
 ) error {

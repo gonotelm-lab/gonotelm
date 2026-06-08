@@ -7,9 +7,9 @@ import (
 	stdslices "slices"
 	"strings"
 
-	bizagent "github.com/gonotelm-lab/gonotelm/internal/app/biz/agent"
+	bizagent "github.com/gonotelm-lab/gonotelm/internal/app/agent"
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
-	"github.com/gonotelm-lab/gonotelm/internal/app/logic/studio/tool"
+	"github.com/gonotelm-lab/gonotelm/internal/app/agent/tool"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/app/prompts"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
@@ -106,7 +106,7 @@ func (m *reportGenerator) generate(
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "generate report message failed, err=%v", err)
 	}
-	output, err := agent.ReactStream(ctx, slices.FromSingle(msg))
+	output, err := agent.React(ctx, slices.FromSingle(msg))
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "generate report output failed, err=%v", err)
 	}

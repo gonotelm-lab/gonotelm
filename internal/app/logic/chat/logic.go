@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	bizagent "github.com/gonotelm-lab/gonotelm/internal/app/biz/agent"
+	bizagent "github.com/gonotelm-lab/gonotelm/internal/app/agent"
 	bizchat "github.com/gonotelm-lab/gonotelm/internal/app/biz/chat"
 	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
@@ -246,8 +246,8 @@ func (l *Logic) retrieveSourceDocs(
 			notebookId, sourceIds)
 	}
 
-	retrieved, err := l.sourceBiz.RetrieveSourceDocs(ctx,
-		&bizsource.RetrieveSourceDocsQuery{
+	retrieved, err := l.sourceBiz.SimilaritySearchSourceDocs(ctx,
+		&bizsource.SimilaritySearchSourceDocsQuery{
 			NotebookId: notebookId,
 			SourceIds:  existSourceIds,
 			Query:      userPrompt,

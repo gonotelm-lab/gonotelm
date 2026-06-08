@@ -171,6 +171,7 @@ func (t *taskLoop) handleWork(task *model.ArtifactTask) {
 	}()
 
 	ctx := pkgcontext.WithUserId(t.ctx, task.UserId)
+	ctx = pkgcontext.WithAgentOperate(ctx)
 
 	slog.DebugContext(ctx, "task handle work started",
 		slog.String("task_id", task.Id.String()),
@@ -180,7 +181,7 @@ func (t *taskLoop) handleWork(task *model.ArtifactTask) {
 
 	result, err := t.dispatcher.dispatch(ctx, task)
 	if err != nil {
-		slog.ErrorContext(ctx, "task handle work dispatch failed",
+		slog.ErrorContext(ctx, "task handle work failed",
 			slog.Any("err", err),
 			slog.String("task_id", task.Id.String()),
 			slog.String("task_status", task.Status.String()),
@@ -188,7 +189,7 @@ func (t *taskLoop) handleWork(task *model.ArtifactTask) {
 			slog.String("task_run_id", task.RunId),
 		)
 		if err := t.taskBiz.FailTask(ctx, task.Id, task.RunId); err != nil {
-			slog.ErrorContext(ctx, "task handle work fail task failed", slog.Any("err", err))
+			slog.ErrorContext(ctx, "task handle work fail task error", slog.Any("err", err))
 		}
 
 		return

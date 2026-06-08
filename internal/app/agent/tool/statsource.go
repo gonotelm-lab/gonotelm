@@ -68,7 +68,7 @@ func (s *StatSourceTool) InvokableRun(
 
 	if s.checker != nil {
 		if err := s.checker.CheckPermission(ctx, sourceID); err != nil {
-			return "", fmt.Errorf("source access denied: %w", err)
+			return "", permissionDeniedForSource(sourceID)
 		}
 	}
 

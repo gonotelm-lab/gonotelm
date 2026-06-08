@@ -31,7 +31,7 @@ func init() {
 //
 // 来源是解析后的内容
 type ReadSourceTool struct {
-	biz *bizsource.BizForAgent
+	biz     *bizsource.BizForAgent
 	checker SourceChecker
 }
 
@@ -75,15 +75,16 @@ func (s *ReadSourceTool) InvokableRun(
 
 	if s.checker != nil {
 		if err := s.checker.CheckPermission(ctx, sourceId); err != nil {
-			return "", fmt.Errorf("source access denied: %w", err)
+			return "", permissionDeniedForSource(sourceId)
 		}
 	}
 
-	result, err := s.biz.ReadSource(ctx, &bizsource.ReadSourceQuery{
-		SourceId: sourceId,
-		Offset:   max(0, input.StartLine),
-		Limit:    max(0, input.LineCount),
-	})
+	result, err := s.biz.ReadSource(ctx,
+		&bizsource.AgentReadSourceQuery{
+			SourceId: sourceId,
+			Offset:   max(0, input.StartLine),
+			Limit:    max(0, input.LineCount),
+		})
 	if err != nil {
 		return "", fmt.Errorf("read source failed: %w", err)
 	}

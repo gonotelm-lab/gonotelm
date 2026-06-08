@@ -31,7 +31,7 @@ func TestBizForAgent_ReadSource_CacheMissUsesPatchedFetch(t *testing.T) {
 				return []byte("core-line-1\ncore-line-2\ncore-line-3"), nil
 			})
 
-		got, err := biz.ReadSource(context.Background(), &ReadSourceQuery{
+		got, err := biz.ReadSource(context.Background(), &AgentReadSourceQuery{
 			SourceId: sourceID,
 		})
 		So(err, ShouldBeNil)
@@ -47,7 +47,7 @@ func TestBizForAgent_ReadSource_CacheMissUsesPatchedFetch(t *testing.T) {
 		So(string(got.Lines[2].Line), ShouldEqual, "core-line-3")
 
 		// 第二次读取应走缓存，不再访问 fetchSourceContent。
-		got, err = biz.ReadSource(context.Background(), &ReadSourceQuery{
+		got, err = biz.ReadSource(context.Background(), &AgentReadSourceQuery{
 			SourceId: sourceID,
 			Offset:   2,
 			Limit:    1,
@@ -87,7 +87,7 @@ func TestBizForAgent_ReadSource_CacheHitSkipsFetchAndAppliesRange(t *testing.T) 
 				return []byte("mock-line-1\nmock-line-2"), nil
 			})
 
-		got, err := biz.ReadSource(context.Background(), &ReadSourceQuery{
+		got, err := biz.ReadSource(context.Background(), &AgentReadSourceQuery{
 			SourceId: sourceID,
 			Offset:   2,
 			Limit:    1,

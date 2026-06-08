@@ -6,9 +6,10 @@ import (
 )
 
 const (
-	SourceDocMetaDerivingPos = "_doc_deriving_pos"      // 派生节点的来源非派生节点pos bitmap
+	SourceDocMetaDerivingPos = "_doc_derivation_pos"    // 派生节点的来源非派生节点pos bitmap
 	SourceDocMetaLevel       = "_doc_tree_level"        // 节点在树中的层级
 	SourceDocMetaChildrenPos = "_doc_node_children_pos" // 节点的子节点pos列表
+	SourceDocMetaTreeMeta    = "_doc_node_parent_pos"   // 节点在树中的父节点pos
 
 	ChunkMetaPosStartKey     = "_doc_pos_rune_start"
 	ChunkMetaPosEndKey       = "_doc_pos_rune_end"
@@ -51,22 +52,29 @@ type SourceDoc struct {
 	ChunkPos int32
 
 	// 派生自哪些非派生节点Id 仅在召回阶段值有效
-	Derivation  []Id
-	derivingPos string
+	Derivation    []Id
+	derivationPos string
 
 	BytePos *SourceDocPosition
 	RunePos *SourceDocPosition
+
+	TreeMeta *SourceDocTreeMeta
+}
+
+type SourceDocTreeMeta struct {
+	ParentId Id
+	Children []Id
 }
 
 func (s *SourceDoc) IsDerived() bool {
 	return s.ChunkPos < 0
 }
 
-func (s *SourceDoc) DerivingPos() string {
+func (s *SourceDoc) DerivationPos() string {
 	if s == nil {
 		return ""
 	}
-	return s.derivingPos
+	return s.derivationPos
 }
 
 func NewSourceDoc(doc *vecschema.SourceDoc) (*SourceDoc, error) {
@@ -92,7 +100,7 @@ func NewSourceDoc(doc *vecschema.SourceDoc) (*SourceDoc, error) {
 	// 注意 Derivation 字段在外部设置 因为derivation需要额外查询Id映射
 	derivingPos, ok := doc.GetStringMeta(SourceDocMetaDerivingPos)
 	if ok {
-		sdc.derivingPos = derivingPos
+		sdc.derivationPos = derivingPos
 	}
 
 	byteStart, ok1 := doc.GetInt64Meta(ChunkMetaPosByteStartKey)

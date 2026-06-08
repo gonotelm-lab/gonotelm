@@ -63,7 +63,7 @@ func (b *Biz) ClearSourceIndices(
 	return nil
 }
 
-type RetrieveSourceDocsQuery struct {
+type SimilaritySearchSourceDocsQuery struct {
 	NotebookId uuid.UUID
 	Query      string
 	SourceIds  []uuid.UUID
@@ -98,7 +98,11 @@ func (b *Biz) GetSourceDoc(
 		return nil, errors.WithMessage(err, "new source doc failed")
 	}
 	if query.Populate {
-		if err := b.PopulateSourceDocs(ctx, query.NotebookId, []*model.SourceDoc{sourceDoc}); err != nil {
+		if err := b.PopulateSourceDocs(
+			ctx,
+			query.NotebookId,
+			[]*model.SourceDoc{sourceDoc},
+		); err != nil {
 			slog.WarnContext(ctx, "populate source doc failed",
 				slog.Any("err", err),
 				slog.String("notebook_id", query.NotebookId.String()),
@@ -204,9 +208,9 @@ func (b *Biz) ListSourceDocs(
 // 召回来源片段
 //
 // 需要注意的是 来源片段中可能会存在派生的片段, 这些派生片段一般为一些总结性的语句片段
-func (b *Biz) RetrieveSourceDocs(
+func (b *Biz) SimilaritySearchSourceDocs(
 	ctx context.Context,
-	query *RetrieveSourceDocsQuery,
+	query *SimilaritySearchSourceDocsQuery,
 ) ([]*model.SourceDoc, error) {
 	var (
 		notebookId = query.NotebookId.String()
@@ -293,7 +297,9 @@ func (b *Biz) GetSourceDocTree(
 	return recoverDocTree(ctx, docs)
 }
 
-// 额外填充SourceDoc字段
+// 额外填充 SourceDoc 字段。
+// 
+// 额外字段定义见 [model.SourceDoc]
 func (s *Biz) PopulateSourceDocs(
 	ctx context.Context,
 	notebookId uuid.UUID,
@@ -317,14 +323,14 @@ func (s *Biz) PopulateSourceDocs(
 			continue
 		}
 
-		derivingPos := doc.DerivingPos()
-		if derivingPos == "" {
+		derivationPos := doc.DerivationPos()
+		if derivationPos == "" {
 			continue
 		}
 
-		bm, err := bitmap.NewFrom(derivingPos)
+		bm, err := bitmap.NewFrom(derivationPos)
 		if err != nil {
-			slog.WarnContext(ctx, "decode source doc deriving pos failed",
+			slog.WarnContext(ctx, "decode source doc derivation pos failed",
 				slog.String("doc_id", doc.Id),
 				slog.String("source_id", doc.SourceId.String()),
 				slog.String("notebook_id", notebookID),
@@ -413,9 +419,9 @@ func (s *Biz) PopulateSourceDocs(
 				continue
 			}
 
-			derivingId, err := uuid.ParseString(derivedDoc.Id)
+			derivationId, err := uuid.ParseString(derivedDoc.Id)
 			if err != nil {
-				slog.WarnContext(ctx, "ignore invalid source doc id while populating deriving ids",
+				slog.WarnContext(ctx, "ignore invalid source doc id while populating derivation ids",
 					slog.String("doc_id", derivedDoc.Id),
 					slog.Int64("chunk_pos", int64(pos)),
 					slog.String("source_id", meta.sourceId),
@@ -424,11 +430,11 @@ func (s *Biz) PopulateSourceDocs(
 				)
 				continue
 			}
-			if _, ok := seen[derivingId]; ok {
+			if _, ok := seen[derivationId]; ok {
 				continue
 			}
-			seen[derivingId] = struct{}{}
-			derivation = append(derivation, derivingId)
+			seen[derivationId] = struct{}{}
+			derivation = append(derivation, derivationId)
 		}
 		meta.doc.Derivation = derivation
 	}

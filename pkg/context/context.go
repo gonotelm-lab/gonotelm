@@ -8,6 +8,7 @@ const (
 	ContextKeyUserId    = contextKey("_user_id")
 	ContextKeySceneType = contextKey("_scene_type")
 	ContextLang         = contextKey("_lang")
+	ContextOperatorType = contextKey("_operator_type")
 )
 
 func WithUserId(ctx context.Context, userId string) context.Context {
@@ -47,4 +48,25 @@ func GetLang(ctx context.Context) string {
 	}
 
 	return lang
+}
+
+func WithOperatorType(ctx context.Context, operatorType OperatorType) context.Context {
+	return context.WithValue(ctx, ContextOperatorType, operatorType)
+}
+
+func GetOperatorType(ctx context.Context) OperatorType {
+	operatorType, ok := ctx.Value(ContextOperatorType).(OperatorType)
+	if !ok {
+		return OperatorTypeUser
+	}
+
+	return operatorType
+}
+
+func WithAgentOperate(ctx context.Context) context.Context {
+	return context.WithValue(ctx, ContextOperatorType, OperatorTypeAgent)
+}
+
+func GetAgentOperate(ctx context.Context) bool {
+	return GetOperatorType(ctx) == OperatorTypeAgent
 }

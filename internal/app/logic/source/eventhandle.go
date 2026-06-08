@@ -15,8 +15,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/mq"
-	mqimpl "github.com/gonotelm-lab/gonotelm/internal/infra/mq/impl"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/mq/impl/kafka"
 	"github.com/gonotelm-lab/gonotelm/pkg/batch"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -31,36 +29,6 @@ const (
 	sourcePrepareRetryKey   = "x-source-prepare-retry"
 	sourcePrepareRetryValue = "true"
 )
-
-func mustNewMsgQueueProducer() mq.Producer {
-	switch conf.Global().MsgQueue.Type {
-	case mqimpl.Kafka:
-		return kafka.NewProducer(kafka.ProducerConfig{
-			Brokers:  conf.Global().MsgQueue.Kafka.Brokers,
-			Username: conf.Global().MsgQueue.Kafka.Username,
-			Password: conf.Global().MsgQueue.Kafka.Password,
-		})
-	default:
-		panic("unknown msg queue type")
-	}
-}
-
-func mustNewMsgQueueConsumer(topic, groupId string) mq.Consumer {
-	switch conf.Global().MsgQueue.Type {
-	case mqimpl.Kafka:
-		return kafka.NewConsumer(kafka.ConsumerConfig{
-			Brokers:        conf.Global().MsgQueue.Kafka.Brokers,
-			GroupID:        groupId,
-			Topic:          topic,
-			QueueCapacity:  conf.Global().MsgQueue.Kafka.ConsumerQueueCapacity,
-			CommitInterval: conf.Global().MsgQueue.Kafka.ConsumerCommitInterval,
-			Username:       conf.Global().MsgQueue.Kafka.Username,
-			Password:       conf.Global().MsgQueue.Kafka.Password,
-		})
-	default:
-		panic("unknown msg queue type")
-	}
-}
 
 // logic event handler
 func (l *Logic) notifySourceEventMessage(

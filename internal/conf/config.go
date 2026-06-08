@@ -33,7 +33,7 @@ type Config struct {
 	Redis     cache.RedisCacheConfig `toml:"redis"`
 	VectorDB  vecimpl.Config         `toml:"vectorDb"`
 	Storage   StorageConfig          `toml:"storage"`
-	MsgQueue  MsgQueueConfig         `toml:"msgQueue"`
+	MsgQueue  mqimpl.Config          `toml:"msgQueue"`
 	Embedding embedimpl.Config       `toml:"embedding"`
 	Logging   LoggingConfig          `toml:"logging"`
 	Chunking  ChunkingConfig         `toml:"chunking"`
@@ -75,19 +75,6 @@ type MinioConfig struct {
 	Region        string        `toml:"region"`
 	Secure        bool          `toml:"secure"`
 	PresignExpiry time.Duration `toml:"presignExpiry"`
-}
-
-type MsgQueueConfig struct {
-	Type  mqimpl.Type `toml:"type"`
-	Kafka KafkaConfig `toml:"kafka"`
-}
-
-type KafkaConfig struct {
-	Brokers                []string      `toml:"brokers"`
-	Username               string        `toml:"username"`
-	Password               string        `toml:"password"`
-	ConsumerQueueCapacity  int           `toml:"consumerQueueCapacity"`
-	ConsumerCommitInterval time.Duration `toml:"consumerCommitInterval"`
 }
 
 type LoggingConfig struct {

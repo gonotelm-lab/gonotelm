@@ -53,6 +53,7 @@ type Logic struct {
 
 	notebookBiz  *biznotebook.Biz
 	sourceBiz    *bizsource.Biz
+	mqFactory    *mq.MQ
 	prepProducer mq.Producer
 	prepConsumer mq.Consumer
 
@@ -90,6 +91,7 @@ func MustNewLogic(
 		objectStorage: objectStorage,
 		notebookBiz:   notebookBiz,
 		sourceBiz:     sourceBiz,
+		mqFactory:     infras.MQ,
 		llmGateway:    llmGateway,
 		redis:         infras.Redis,
 	}
@@ -107,10 +109,14 @@ func MustNewLogic(
 }
 
 func (l *Logic) mustInitMsgQueue() {
+	if l.mqFactory == nil || l.mqFactory.NewProducer == nil || l.mqFactory.NewConsumer == nil {
+		panic("message queue is not initialized")
+	}
+
 	// producer
-	l.prepProducer = mustNewMsgQueueProducer()
+	l.prepProducer = l.mqFactory.NewProducer()
 	// consumer
-	l.prepConsumer = mustNewMsgQueueConsumer(TopicSourcePreparation, SourcePreparationConsumerGroup)
+	l.prepConsumer = l.mqFactory.NewConsumer(TopicSourcePreparation, SourcePreparationConsumerGroup)
 	l.prepConsumer.Subscribe(l.rootCtx, TopicSourcePreparation, l.handleSourceEventMessage)
 }
 

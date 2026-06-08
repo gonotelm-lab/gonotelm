@@ -580,3 +580,37 @@ func TestParseBuildDerivationSemanticWithNonDerivedNodes(t *testing.T) {
 		So(tree.Root().Derivation(), ShouldResemble, []string{parentNode.Core().Id})
 	})
 }
+
+func TestParseBuildParentLinks(t *testing.T) {
+	Convey("ParseBuild 应正确回填父子关系链", t, func() {
+		mockLLM := &parseBuildMockLLM{response: "ROOT-PARENT-LINK"}
+		mockEmbedder := &parseBuildMockEmbedder{}
+		builder := NewDocTreeBuilder(mockEmbedder, mockLLM)
+
+		markdown := strings.Join([]string{
+			"# Parent",
+			"parent body",
+			"## Child",
+			"child body",
+		}, "\n")
+		tree, err := builder.ParseBuild(
+			context.Background(),
+			[]byte(markdown),
+			WithParseBuildMaxNodeToken(200),
+			WithParseBuildTokenLenFn(parseBuildRuneTokenLen),
+			WithParseBuildChunkSplitFunc(parseBuildSplitByRuneWindow(200)),
+		)
+		So(err, ShouldBeNil)
+		So(tree, ShouldNotBeNil)
+		So(tree.Root(), ShouldNotBeNil)
+		So(tree.Root().Parent(), ShouldBeNil)
+
+		parentNode := findNodeByExactContent(tree.Root(), "Parent\n\nparent body")
+		So(parentNode, ShouldNotBeNil)
+		So(parentNode.Parent(), ShouldEqual, tree.Root())
+
+		childNode := findNodeByExactContent(tree.Root(), "Child\n\nchild body")
+		So(childNode, ShouldNotBeNil)
+		So(childNode.Parent(), ShouldEqual, parentNode)
+	})
+}

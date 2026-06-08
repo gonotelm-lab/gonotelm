@@ -9,7 +9,7 @@ const (
 	SourceDocMetaDerivingPos = "_doc_derivation_pos"    // 派生节点的来源非派生节点pos bitmap
 	SourceDocMetaLevel       = "_doc_tree_level"        // 节点在树中的层级
 	SourceDocMetaChildrenPos = "_doc_node_children_pos" // 节点的子节点pos列表
-	SourceDocMetaTreeMeta    = "_doc_node_parent_pos"   // 节点在树中的父节点pos
+	SourceDocMetaParentPos   = "_doc_node_parent_pos"   // 节点在树中的父节点pos
 
 	ChunkMetaPosStartKey     = "_doc_pos_rune_start"
 	ChunkMetaPosEndKey       = "_doc_pos_rune_end"
@@ -64,6 +64,23 @@ type SourceDoc struct {
 type SourceDocTreeMeta struct {
 	ParentId Id
 	Children []Id
+
+	childrenPos []int
+	parentPos   *int
+}
+
+func (m *SourceDocTreeMeta) ParentPos() (int, bool) {
+	if m == nil || m.parentPos == nil {
+		return 0, false
+	}
+	return *m.parentPos, true
+}
+
+func (m *SourceDocTreeMeta) ChildrenPos() []int {
+	if m == nil || len(m.childrenPos) == 0 {
+		return nil
+	}
+	return append([]int(nil), m.childrenPos...)
 }
 
 func (s *SourceDoc) IsDerived() bool {
@@ -119,6 +136,20 @@ func NewSourceDoc(doc *vecschema.SourceDoc) (*SourceDoc, error) {
 			End:   int(runeEnd),
 		}
 	}
+	var treeMeta *SourceDocTreeMeta
+	if parentPos, ok := doc.GetMetaInt(SourceDocMetaParentPos); ok {
+		parentPosCopy := parentPos
+		treeMeta = &SourceDocTreeMeta{
+			parentPos: &parentPosCopy,
+		}
+	}
+	if childrenPos, ok, err := doc.GetMetaIntSlice(SourceDocMetaChildrenPos); err == nil && ok {
+		if treeMeta == nil {
+			treeMeta = &SourceDocTreeMeta{}
+		}
+		treeMeta.childrenPos = append([]int(nil), childrenPos...)
+	}
+	sdc.TreeMeta = treeMeta
 
 	return sdc, nil
 }

@@ -856,13 +856,7 @@ func buildDocTreeFromNode(
 			state.nonDerivedPos++
 		}
 
-		docNode := &DocTreeNode{
-			core:       core,
-			level:      level,
-			pos:        pos,
-			children:   children,
-			derivation: derivations,
-		}
+		docNode := NewDocTreeNode(core, level, pos, children, derivations)
 		if !node.derived {
 			docNode.parseMetadata = cloneParseMetadata(node.parseMetadata)
 			if docNode.parseMetadata != nil && !docNode.parseMetadata.Valid() {

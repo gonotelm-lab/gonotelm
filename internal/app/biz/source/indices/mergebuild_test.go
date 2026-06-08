@@ -42,5 +42,10 @@ func TestMergeBuildDerivationSemanticWithNonDerivedNodes(t *testing.T) {
 		So(tree.Root(), ShouldNotBeNil)
 		So(tree.Root().IsLeaf(), ShouldBeFalse)
 		So(tree.Root().Derivation(), ShouldResemble, []string{"node-a", "node-b"})
+		So(tree.Root().Parent(), ShouldBeNil)
+		for _, child := range tree.Root().Children() {
+			So(child, ShouldNotBeNil)
+			So(child.Parent(), ShouldEqual, tree.Root())
+		}
 	})
 }

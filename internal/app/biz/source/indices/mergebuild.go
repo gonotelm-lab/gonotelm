@@ -255,27 +255,22 @@ func (b *DocTreeBuilder) extractNodes(
 	embedding := embedResp[0]
 
 	var (
-		notebookId  = nodes[0].core.NotebookId
-		sourceId    = nodes[0].core.SourceId
-		owner       = nodes[0].core.Owner
+		notebookId = nodes[0].core.NotebookId
+		sourceId   = nodes[0].core.SourceId
+		owner      = nodes[0].core.Owner
 		derivation = collectDerivationFromChildren(nodes)
 	)
 
-	newNode := &DocTreeNode{
-		core: &vschema.SourceDoc{
-			Id:         uuid.NewV4().String(),
-			NotebookId: notebookId,
-			SourceId:   sourceId,
-			Owner:      owner,
-			Content:    summary,
-			Embedding:  slices.CastFloat[float64, float32](embedding),
-			ChunkPos:   -1, // 派生节点后续流程会分配
-		},
-		level:      targetLevel,
-		pos:        -1,
-		children:   nodes,
-		derivation: derivation,
+	core := &vschema.SourceDoc{
+		Id:         uuid.NewV4().String(),
+		NotebookId: notebookId,
+		SourceId:   sourceId,
+		Owner:      owner,
+		Content:    summary,
+		Embedding:  slices.CastFloat[float64, float32](embedding),
+		ChunkPos:   -1, // 派生节点后续流程会分配
 	}
+	newNode := NewDocTreeNode(core, targetLevel, -1, nodes, derivation)
 
 	return newNode, nil
 }

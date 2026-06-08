@@ -13,7 +13,9 @@ type DocTreeNode struct {
 
 	// 表示文档在来源中所处的位置（和 core.ChunkPos 一致）。
 	// 当前分配策略下通常 pos<0 为派生节点、pos>=0 为非派生节点（非派生节点表示文本块内容来自原始来源）。
-	pos      int
+	pos    int
+	parent *DocTreeNode
+
 	children []*DocTreeNode
 
 	// 衍生自哪些非派生节点
@@ -31,12 +33,25 @@ func NewDocTreeNode(
 	children []*DocTreeNode,
 	derivation []string,
 ) *DocTreeNode {
-	return &DocTreeNode{
+	node := &DocTreeNode{
 		core:       core,
 		level:      level,
 		pos:        pos,
 		children:   children,
 		derivation: derivation,
+	}
+	bindParentForChildren(node.children, node)
+	return node
+}
+
+// bindParentForChildren 只负责连接当前层的 parent -> children 关系，
+// 递归层级由各构建流程按需触发，避免在基础结构层引入隐式深遍历。
+func bindParentForChildren(children []*DocTreeNode, parent *DocTreeNode) {
+	for _, child := range children {
+		if child == nil {
+			continue
+		}
+		child.parent = parent
 	}
 }
 
@@ -73,6 +88,13 @@ func (n *DocTreeNode) Children() []*DocTreeNode {
 		return nil
 	}
 	return n.children
+}
+
+func (n *DocTreeNode) Parent() *DocTreeNode {
+	if n == nil {
+		return nil
+	}
+	return n.parent
 }
 
 func (n *DocTreeNode) Derivation() []string {

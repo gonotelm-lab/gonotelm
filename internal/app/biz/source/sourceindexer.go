@@ -188,7 +188,7 @@ func (b *SourceIndexer) parseEmbedChunks(
 		node.Core().NotebookId = source.NotebookId.String()
 		node.Core().SourceId = source.Id.String()
 		node.Core().Owner = source.OwnerId
-		node.Core().PutMeta(model.SourceDocMetaLevel, int64(node.Level()))
+		writeNodeLevelAndTreeMeta(node)
 		if parseMeta := node.ParseMetadata(); parseMeta != nil && parseMeta.Valid() {
 			node.Core().PutMeta(model.ChunkMetaPosStartKey, parseMeta.StartRune())
 			node.Core().PutMeta(model.ChunkMetaPosEndKey, parseMeta.EndRune())
@@ -221,13 +221,8 @@ func (b *SourceIndexer) parseEmbedChunks(
 			if !hasSetBit {
 				continue
 			}
-			childrenPos := make([]int, 0, len(node.Children()))
-			for _, child := range node.Children() {
-				childrenPos = append(childrenPos, child.Pos())
-			}
-
 			node.Core().PutMeta(model.SourceDocMetaDerivingPos, bm.String())
-			node.Core().PutMeta(model.SourceDocMetaChildrenPos, childrenPos)
+			node.Core().PutMeta(model.SourceDocMetaChildrenPos, collectChildPoses(node))
 		}
 	}
 
@@ -323,7 +318,7 @@ func (b *SourceIndexer) mergeEmbedChunks(
 		for _, node := range nodes {
 			vDoc := node.Core()
 			vsDocs = append(vsDocs, vDoc)
-			vDoc.PutMeta(model.SourceDocMetaLevel, int64(node.Level()))
+			writeNodeLevelAndTreeMeta(node)
 
 			if node.IsLeaf() {
 				continue
@@ -347,14 +342,9 @@ func (b *SourceIndexer) mergeEmbedChunks(
 				if !hasSetBit {
 					continue
 				}
-				childrenPos := make([]int, 0, len(node.Children()))
-				for _, child := range node.Children() {
-					// children_pos 必须和 RecoverDocTree 的查找键一致，使用 chunk_pos/pos 体系。
-					childrenPos = append(childrenPos, child.Pos())
-				}
 
 				vDoc.PutMeta(model.SourceDocMetaDerivingPos, bm.String())
-				vDoc.PutMeta(model.SourceDocMetaChildrenPos, childrenPos)
+				vDoc.PutMeta(model.SourceDocMetaChildrenPos, collectChildPoses(node))
 			}
 		}
 
@@ -399,6 +389,33 @@ func buildNonDerivedIDPosMapping(nodes []*indices.DocTreeNode) (map[string]int, 
 		}
 	}
 	return out, maxPos + 1
+}
+
+func writeNodeLevelAndTreeMeta(node *indices.DocTreeNode) {
+	if node == nil || node.Core() == nil {
+		return
+	}
+
+	core := node.Core()
+	core.PutMeta(model.SourceDocMetaLevel, int64(node.Level()))
+	// parent_pos 是 TreeMeta 关系链的关键入口：有父节点就写入，无父节点（root）保持缺失即可。
+	if parent := node.Parent(); parent != nil {
+		core.PutMeta(model.SourceDocMetaParentPos, parent.Pos())
+	}
+}
+
+func collectChildPoses(node *indices.DocTreeNode) []int {
+	if node == nil {
+		return nil
+	}
+
+	childrenPos := make([]int, 0, len(node.Children()))
+	for _, child := range node.Children() {
+		// children_pos 必须和 RecoverDocTree 的查找键一致，使用 chunk_pos/pos 体系。
+		childrenPos = append(childrenPos, child.Pos())
+	}
+
+	return childrenPos
 }
 
 func isNonDerivedNode(node *indices.DocTreeNode) bool {
@@ -504,7 +521,7 @@ func (b *docTreeRecoverBuilder) buildNode(pos int) (*indices.DocTreeNode, error)
 	defer delete(b.building, pos)
 
 	var (
-		children    []*indices.DocTreeNode
+		children   []*indices.DocTreeNode
 		derivation []string
 	)
 	if isLeaf {

@@ -312,14 +312,14 @@ func (a *Agent[State]) handleToolCalls(
 	ctx context.Context,
 	toolCalls []einoschema.ToolCall,
 ) []*einoschema.Message {
+	if len(toolCalls) == 0 {
+		return nil
+	}
+
 	var (
 		wg      sync.WaitGroup
 		results = make([]*einoschema.Message, len(toolCalls))
 	)
-
-	if len(toolCalls) == 0 {
-		return nil
-	}
 
 	for idx, tc := range toolCalls {
 		wg.Go(func() {

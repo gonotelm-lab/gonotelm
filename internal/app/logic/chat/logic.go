@@ -6,10 +6,12 @@ import (
 	"log/slog"
 	"math"
 	"runtime/debug"
+	"slices"
 	"sync"
 	"time"
 
 	bizagent "github.com/gonotelm-lab/gonotelm/internal/app/agent"
+	"github.com/gonotelm-lab/gonotelm/internal/app/agent/tool"
 	bizchat "github.com/gonotelm-lab/gonotelm/internal/app/biz/chat"
 	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
@@ -30,11 +32,12 @@ import (
 const defaultPromptLang = "zh"
 
 type Logic struct {
-	wg           sync.WaitGroup
-	notebookBiz  *biznotebook.Biz
-	sourceBiz    *bizsource.Biz
-	chatBiz      *bizchat.Biz
-	eventManager *bizchat.ChatEventManager
+	wg                sync.WaitGroup
+	notebookBiz       *biznotebook.Biz
+	sourceBiz         *bizsource.Biz
+	sourceBizForAgent *bizsource.BizForAgent
+	chatBiz           *bizchat.Biz
+	eventManager      *bizchat.ChatEventManager
 
 	llmGateway          *gateway.Gateway
 	chatTemplateManager *prompts.ChatTemplateManager
@@ -44,6 +47,7 @@ func MustNewLogic(
 	llmGateway *gateway.Gateway,
 	notebookBiz *biznotebook.Biz,
 	sourceBiz *bizsource.Biz,
+	sourceBizForAgent *bizsource.BizForAgent,
 	chatBiz *bizchat.Biz,
 	eventManager *bizchat.ChatEventManager,
 ) *Logic {
@@ -55,6 +59,7 @@ func MustNewLogic(
 	return &Logic{
 		notebookBiz:         notebookBiz,
 		sourceBiz:           sourceBiz,
+		sourceBizForAgent:   sourceBizForAgent,
 		chatBiz:             chatBiz,
 		eventManager:        eventManager,
 		llmGateway:          llmGateway,
@@ -291,6 +296,8 @@ func (l *Logic) processUserMessageTask(
 		id:               0, // accumulated id
 		taskId:           taskId,
 		chatId:           chat.Id,
+		notebookId:       chat.NotebookId,
+		sourceIds:        params.SourceIds,
 		userId:           userId,
 		userLang:         pkgcontext.GetLang(ctx),
 		enableThinking:   params.EnableThinking,
@@ -414,15 +421,6 @@ func (l *Logic) processCheckUserMessage(ctx context.Context, chatId, msgId uuid.
 		}
 
 		slog.ErrorContext(ctx, "get message failed", logAttrs(err)...)
-		// 这里看起来没太大必要写一条错误信息进去
-		// if _, err := l.chatBiz.AddAssistantSystemMessage(ctx,
-		// 	&bizchat.AddAssistantSystemMessageCommand{
-		// 		ChatId:  chatId,
-		// 		UserId:  pkgcontext.GetUserId(ctx),
-		// 		Content: "I'm sorry, I'm not able to process your request.",
-		// 	}); err != nil {
-		// 	slog.ErrorContext(ctx, "add assistant system message failed", logAttrs(err)...)
-		// }
 		return false
 	}
 
@@ -626,6 +624,21 @@ func (l *Logic) buildNewChatAgent(
 	}
 
 	agent := bizagent.New(agentConfig, sessionState)
+
+	// TODO add source tools to agent
+	querySourceTool := tool.NewQuerySourceTool(
+		l.sourceBizForAgent,
+		sessionState.notebookId,
+		tool.SourceCheckerFn(func(ctx context.Context, sourceId uuid.UUID) error {
+			if !slices.Contains(sessionState.sourceIds, sourceId) {
+				return fmt.Errorf("source access not allowed")
+			}
+
+			return nil
+		}),
+	)
+
+	_ = querySourceTool
 
 	return agent
 }

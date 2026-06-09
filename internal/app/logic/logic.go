@@ -85,6 +85,7 @@ func MustNewLogic(
 		gateway,
 		notebookBiz,
 		sourceBiz,
+		sourceBizForAgent,
 		chatBiz,
 		chatEventManager,
 	)

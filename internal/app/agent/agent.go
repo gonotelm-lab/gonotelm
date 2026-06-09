@@ -30,31 +30,54 @@ type AgentConfig[State any] struct {
 	tools map[string]einotool.InvokableTool
 
 	// 一般可以在此hook中注入系统提示词等操作 如果超过上下文还可以进行上下文压缩等操作
-	BeforeChat  AgentBeforeChatHook[State]
-	BeforeRound AgentBeforeRoundHook[State]
+	BeforeChat  BeforeChatHook[State]
+	BeforeRound BeforeRoundHook[State]
 
 	MsgAppender func(ctx context.Context, state State, newMsgs []*einoschema.Message)
 
 	// 流式输出时生效 非流式输出时不会调用hook
-	OnReasoning    AgentStreamingHook[State]
-	OnReasoningEnd AgentStreamingHook[State]
-	OnContent      AgentStreamingHook[State]
+	OnReasoning    StreamingHook[State]
+	OnReasoningEnd StreamingHook[State]
+	OnContent      StreamingHook[State]
+
+	// 由于工具是并发被调用 所以下面的hook也会被并发调用 需要注意并发安全
+	BeforeToolCall BeforeToolCallHook[State]
+	AfterToolCall  AfterToolCallHook[State]
 }
 
-type AgentBeforeChatHook[T any] func(
+type BeforeChatHook[T any] func(
 	ctx context.Context, state T, msgs []*einoschema.Message,
 ) ([]*einoschema.Message, error)
 
-type AgentBeforeRoundHook[T any] func(
+type BeforeRoundHook[T any] func(
 	ctx context.Context, round int, state T, msgs []*einoschema.Message,
 ) ([]*einoschema.Message, error)
 
-type AgentStreamingHook[T any] func(
+type StreamingHook[T any] func(
 	ctx context.Context,
 	round int,
 	msg *einoschema.Message,
 	state T,
 ) error
+
+type BeforeToolCallHook[T any] func(
+	ctx context.Context,
+	state T,
+	tool string,
+	arguments string,
+)
+
+type AfterToolCallHookResult struct {
+	Result string
+	Error  error
+}
+
+type AfterToolCallHook[T any] func(
+	ctx context.Context,
+	state T,
+	tool string,
+	result *AfterToolCallHookResult,
+)
 
 // agent for chat logic
 type Agent[State any] struct {
@@ -330,11 +353,21 @@ func (a *Agent[State]) handleToolCalls(
 			if invokable, ok := a.cfg.tools[tc.Function.Name]; !ok {
 				results[idx].Content = fmt.Sprintf("tool %s not found", tc.Function.Name)
 			} else {
+				if a.cfg.BeforeToolCall != nil {
+					a.cfg.BeforeToolCall(ctx, a.state, tc.Function.Name, tc.Function.Arguments)
+				}
 				result, err := invokable.InvokableRun(ctx, tc.Function.Arguments)
 				if err != nil {
 					results[idx].Content = fmt.Sprintf("tool call failed: %v", err)
 				} else {
 					results[idx].Content = result
+				}
+
+				if a.cfg.AfterToolCall != nil {
+					a.cfg.AfterToolCall(ctx, a.state, tc.Function.Name, &AfterToolCallHookResult{
+						Result: result,
+						Error:  err,
+					})
 				}
 			}
 		})

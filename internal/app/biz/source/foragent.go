@@ -325,7 +325,8 @@ func (b *BizForAgent) buildLineRanges(rawContent []byte) []lineRange {
 }
 
 type AgentSearchSourceQuery struct {
-	SourceId uuid.UUID
+	NotebookId uuid.UUID
+	SourceIds []uuid.UUID
 	Target   string
 	Count    int
 }
@@ -338,27 +339,31 @@ func (b *BizForAgent) SearchSource(
 	ctx context.Context,
 	query *AgentSearchSourceQuery,
 ) (*AgentSearchSourceResult, error) {
-	s, err := b.impl.GetSource(ctx, query.SourceId)
+	sources, err := b.impl.BatchGetSources(ctx, query.NotebookId, query.SourceIds)
 	if err != nil {
-		slog.ErrorContext(ctx, "get source failed",
+		slog.ErrorContext(ctx, "batch get sources failed",
 			slog.Any("err", err),
-			slog.String("source_id", query.SourceId.String()),
+			slog.Any("source_ids", query.SourceIds),
 		)
 
-		return nil, fmt.Errorf("get source failed: %w, source_id=%s", err, query.SourceId)
+		return nil, err
+	}
+	
+	if len(sources) != len(query.SourceIds) {
+		return nil, fmt.Errorf("some sources not found, source_ids=%v", query.SourceIds)
 	}
 
 	resp, err := b.impl.SimilaritySearchSourceDocs(ctx,
 		&SimilaritySearchSourceDocsQuery{
-			NotebookId: s.NotebookId,
+			NotebookId: query.NotebookId,
 			Query:      query.Target,
-			SourceIds:  []uuid.UUID{query.SourceId},
+			SourceIds:  query.SourceIds,
 			Count:      query.Count,
 		})
 	if err != nil {
 		slog.ErrorContext(ctx, "similarity search source docs failed",
 			slog.Any("err", err),
-			slog.String("source_id", query.SourceId.String()),
+			slog.Any("source_ids", query.SourceIds),
 		)
 
 		return nil, err

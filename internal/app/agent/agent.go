@@ -345,11 +345,6 @@ func (a *Agent[State]) handleToolCalls(
 				}
 			}()
 
-			if a.cfg.tools == nil {
-				results[idx].Content = "no tools bound"
-				return
-			}
-
 			if invokable, ok := a.cfg.tools[tc.Function.Name]; !ok {
 				results[idx].Content = fmt.Sprintf("tool %s not found", tc.Function.Name)
 			} else {

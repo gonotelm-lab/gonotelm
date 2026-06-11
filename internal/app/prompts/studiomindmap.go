@@ -55,12 +55,12 @@ func NewStudioMindmapTemplate(lang string) *StudioMindmapTemplate {
 	return newTemplate[StudioMindmapTemplateVars](templateNameStudioMindmap, lang)
 }
 
-func StudioMindmapContentMessage(
+func RenderStudioMindmapContentMessage(
 	ctx context.Context,
 	contents []string,
 	lang string,
 ) (*schema.Message, error) {
-	return StudioMindmapMessageWithMode(
+	return RenderStudioMindmapMessageWithMode(
 		ctx,
 		StudioMindmapModeContent,
 		contents,
@@ -69,12 +69,12 @@ func StudioMindmapContentMessage(
 	)
 }
 
-func StudioMindmapAbstractMessage(
+func RenderStudioMindmapAbstractMessage(
 	ctx context.Context,
 	abstracts []string,
 	lang string,
 ) (*schema.Message, error) {
-	return StudioMindmapMessageWithMode(
+	return RenderStudioMindmapMessageWithMode(
 		ctx,
 		StudioMindmapModeAbstract,
 		nil,
@@ -83,7 +83,7 @@ func StudioMindmapAbstractMessage(
 	)
 }
 
-func StudioMindmapMessageWithMode(
+func RenderStudioMindmapMessageWithMode(
 	ctx context.Context,
 	mode string,
 	contents []string,

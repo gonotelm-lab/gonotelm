@@ -40,7 +40,7 @@ func (t *titlemakerImpl) Generate(ctx context.Context, text string) (string, err
 
 func (t *titlemakerImpl) GenerateWith(ctx context.Context, provider chat.Provider, model string, text string) (string, error) {
 	lang := pkgcontext.GetLang(ctx)
-	msg, err := prompts.TitleMakerMessage(ctx, text, lang)
+	msg, err := prompts.RenderTitleMakerMessage(ctx, text, lang)
 	if err != nil {
 		return "", errors.Wrapf(errors.ErrInner, "render title maker prompt failed, err=%v", err)
 	}

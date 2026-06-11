@@ -34,17 +34,16 @@ const (
 
 // 在指定来源中进行相似性搜索 返回相似度较高的文档片段
 type QuerySourceTool struct {
-	biz     *bizsource.BizForAgent
-	checker SourceChecker
-
-	// 当前工具只支持在指定notebook中查询来源
+	biz        *bizsource.BizForAgent
+	checker    SourceChecker
 	notebookId uuid.UUID
 }
 
 func NewQuerySourceTool(
 	biz *bizsource.BizForAgent,
 	notebookId uuid.UUID,
-	checker SourceChecker) *QuerySourceTool {
+	checker SourceChecker,
+) *QuerySourceTool {
 	return &QuerySourceTool{
 		biz:        biz,
 		checker:    checker,
@@ -126,9 +125,10 @@ func (s *QuerySourceTool) InvokableRun(
 
 	matches, err := s.biz.SearchSource(ctx,
 		&bizsource.AgentSearchSourceQuery{
-			SourceIds: sourceIds,
-			Target:    input.Query,
-			Count:     input.Count,
+			NotebookId: s.notebookId,
+			SourceIds:  sourceIds,
+			Target:     input.Query,
+			Count:      input.Count,
 		})
 	if err != nil {
 		return "", fmt.Errorf("search source failed: %w", err)
@@ -141,7 +141,12 @@ func (s *QuerySourceTool) InvokableRun(
 	builder := markdown.NewTableBuilder(querySourceToolTableHeader)
 
 	for _, match := range matches.Chunks {
-		builder.AddRow([]string{match.SourceId.String(), match.Id, match.Content, fmt.Sprintf("%f", match.Score)})
+		builder.AddRow([]string{
+			match.SourceId.String(),
+			match.Id,
+			match.Content,
+			fmt.Sprintf("%.3f", match.Score),
+		})
 	}
 
 	return builder.Build(), nil

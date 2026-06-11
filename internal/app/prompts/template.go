@@ -19,12 +19,13 @@ type templateName string
 const (
 	defaultLang = "zh"
 
-	templateNameChat            templateName = "chat"
-	templateNameSummarize       templateName = "summarize"
-	templateNameNotebookSummary templateName = "notebook-summary"
-	templateNameStudioMindmap   templateName = "studio-mindmap"
-	templateNameStudioReport    templateName = "studio-report"
-	templateNameTitlleMaker     templateName = "titlle-maker"
+	templateNameChat              templateName = "chat"
+	templateNameSummarize         templateName = "summarize"
+	templateNameRetrieveSourceDoc templateName = "retrieve-soucedoc"
+	templateNameNotebookSummary   templateName = "notebook-summary"
+	templateNameStudioMindmap     templateName = "studio-mindmap"
+	templateNameStudioReport      templateName = "studio-report"
+	templateNameTitlleMaker       templateName = "titlle-maker"
 )
 
 //go:embed */*.jinja

@@ -35,7 +35,7 @@ func NewNotebookSummaryTemplate(lang string) *NotebookSummaryTemplate {
 	return newTemplate[NotebookSummaryTemplateVars](templateNameNotebookSummary, lang)
 }
 
-func NotebookSummaryMessage(
+func RenderNotebookSummaryMessage(
 	ctx context.Context,
 	sources []string,
 	lang string,

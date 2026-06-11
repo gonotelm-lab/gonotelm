@@ -327,7 +327,7 @@ func (l *Logic) generateNotebookSummary(
 	}
 
 	// generate prompt message
-	msg, err := prompts.NotebookSummaryMessage(
+	msg, err := prompts.RenderNotebookSummaryMessage(
 		ctx, abstracts, pkgcontext.GetLang(ctx),
 	)
 	if err != nil {

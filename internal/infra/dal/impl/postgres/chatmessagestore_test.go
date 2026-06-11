@@ -23,7 +23,6 @@ func TestChatMessageStoreCreateListDeleteByChatId(t *testing.T) {
 			ChatId:  chatID,
 			UserId:  userID,
 			MsgRole: int8(0),
-			MsgType: int8(0),
 			Content: json.RawMessage(`{"text":"hello"}`),
 			SeqNo:   1000,
 		}
@@ -31,7 +30,6 @@ func TestChatMessageStoreCreateListDeleteByChatId(t *testing.T) {
 			ChatId:  chatID,
 			UserId:  userID,
 			MsgRole: int8(1),
-			MsgType: int8(0),
 			Content: json.RawMessage(`{"text":"world"}`),
 			SeqNo:   2000,
 		}
@@ -46,7 +44,6 @@ func TestChatMessageStoreCreateListDeleteByChatId(t *testing.T) {
 		So(err, ShouldBeNil)
 		So(gotByID.Id, ShouldEqual, msgNew.Id)
 		So(gotByID.MsgRole, ShouldEqual, msgNew.MsgRole)
-		So(gotByID.MsgType, ShouldEqual, msgNew.MsgType)
 		So(gotByID.SeqNo, ShouldEqual, msgNew.SeqNo)
 
 		gotByIDAndChatID, err := store.GetByIdAndChatId(ctx, msgNew.Id, chatID)
@@ -59,11 +56,9 @@ func TestChatMessageStoreCreateListDeleteByChatId(t *testing.T) {
 		So(len(listed), ShouldEqual, 2)
 		So(listed[0].SeqNo, ShouldEqual, msgNew.SeqNo)
 		So(listed[0].MsgRole, ShouldEqual, msgNew.MsgRole)
-		So(listed[0].MsgType, ShouldEqual, msgNew.MsgType)
 		So(compactJSON(listed[0].Content), ShouldEqual, compactJSON(msgNew.Content))
 		So(listed[1].SeqNo, ShouldEqual, msgOld.SeqNo)
 		So(listed[1].MsgRole, ShouldEqual, msgOld.MsgRole)
-		So(listed[1].MsgType, ShouldEqual, msgOld.MsgType)
 		So(compactJSON(listed[1].Content), ShouldEqual, compactJSON(msgOld.Content))
 
 		err = store.DeleteByChatId(ctx, chatID)
@@ -115,7 +110,6 @@ func TestChatMessageStoreListByChatIdPagination(t *testing.T) {
 			ChatId:  chatID,
 			UserId:  userID,
 			MsgRole: int8(0),
-			MsgType: int8(0),
 			Content: json.RawMessage(`{"text":"old"}`),
 			SeqNo:   1000,
 		}
@@ -123,7 +117,6 @@ func TestChatMessageStoreListByChatIdPagination(t *testing.T) {
 			ChatId:  chatID,
 			UserId:  userID,
 			MsgRole: int8(1),
-			MsgType: int8(0),
 			Content: json.RawMessage(`{"text":"new"}`),
 			SeqNo:   2000,
 		}
@@ -139,14 +132,12 @@ func TestChatMessageStoreListByChatIdPagination(t *testing.T) {
 		So(len(firstPage), ShouldEqual, 1)
 		So(firstPage[0].SeqNo, ShouldEqual, msgNew.SeqNo)
 		So(firstPage[0].MsgRole, ShouldEqual, msgNew.MsgRole)
-		So(firstPage[0].MsgType, ShouldEqual, msgNew.MsgType)
 
 		secondPage, err := store.ListByChatId(ctx, chatID, 1, 1)
 		So(err, ShouldBeNil)
 		So(len(secondPage), ShouldEqual, 1)
 		So(secondPage[0].SeqNo, ShouldEqual, msgOld.SeqNo)
 		So(secondPage[0].MsgRole, ShouldEqual, msgOld.MsgRole)
-		So(secondPage[0].MsgType, ShouldEqual, msgOld.MsgType)
 	})
 }
 
@@ -161,7 +152,6 @@ func TestChatMessageStoreListByChatIdBeforeSeqNoIncludesExtra(t *testing.T) {
 			ChatId:  chatID,
 			UserId:  userID,
 			MsgRole: int8(0),
-			MsgType: int8(0),
 			Content: json.RawMessage(`{"text":"old"}`),
 			SeqNo:   1000,
 		}
@@ -169,7 +159,6 @@ func TestChatMessageStoreListByChatIdBeforeSeqNoIncludesExtra(t *testing.T) {
 			ChatId:  chatID,
 			UserId:  userID,
 			MsgRole: int8(1),
-			MsgType: int8(0),
 			Content: json.RawMessage(`{"text":"new"}`),
 			SeqNo:   2000,
 			Extra:   json.RawMessage(`{"citation":{"citations":[{"source_id":"source-1","doc_ids":["doc-1"]}]}}`),

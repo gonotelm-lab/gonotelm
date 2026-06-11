@@ -42,7 +42,7 @@ func NewTitleMakerTemplate(lang string) *TitleMakerTemplate {
 	return newTemplate[TitleMakerTemplateVars](templateNameTitlleMaker, lang)
 }
 
-func TitleMakerMessage(ctx context.Context, text, lang string) (*schema.Message, error) {
+func RenderTitleMakerMessage(ctx context.Context, text, lang string) (*schema.Message, error) {
 	tmpl := NewTitleMakerTemplate(lang)
 	msg, err := tmpl.Message(ctx, TitleMakerTemplateVars{Text: text})
 	if err != nil {

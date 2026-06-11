@@ -22,7 +22,7 @@ func NewStudioReportTemplate(lang string) *StudioReportTemplate {
 	return newTemplate[StudioReportTemplateVars](templateNameStudioReport, lang)
 }
 
-func StudioReportMessage(
+func RenderStudioReportMessage(
 	ctx context.Context,
 	sourceIds []string,
 	lang string,

@@ -158,9 +158,9 @@ func (m *mindmapGenerator) oneshotCreateMindmap(
 	)
 
 	if mode == mindmapAbstractMode {
-		msg, err = prompts.StudioMindmapAbstractMessage(ctx, tmps, lang)
+		msg, err = prompts.RenderStudioMindmapAbstractMessage(ctx, tmps, lang)
 	} else {
-		msg, err = prompts.StudioMindmapContentMessage(ctx, tmps, lang)
+		msg, err = prompts.RenderStudioMindmapContentMessage(ctx, tmps, lang)
 	}
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner,

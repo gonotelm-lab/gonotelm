@@ -10,3 +10,22 @@ func TestUniqueCount(t *testing.T) {
 		t.Fatalf("unexpected unique count, got=%d want=%d", got, want)
 	}
 }
+
+func TestUniqueyFn(t *testing.T) {
+	data := []struct{
+		ID int
+		Name string
+	}{
+		{ID: 1, Name: "alice"},
+		{ID: 2, Name: "bob"},
+		{ID: 2, Name: "bob"},
+		{ID: 3, Name: "charlie"},
+	}
+
+	t.Log(data)
+
+	got := UniqueyFn(data, func(item struct{ID int; Name string}) int {
+		return item.ID
+	})
+	t.Log(got)
+}

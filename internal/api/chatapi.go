@@ -30,12 +30,13 @@ func (s *Server) registerChatRoutes(g *route.RouterGroup) {
 }
 
 type ChatCreateMessageRequest struct {
-	Id             uuid.UUID   `path:"id,required"`
-	Prompt         string      `json:"prompt"`
-	SourceIds      []uuid.UUID `json:"source_ids"`
-	EnableThinking bool        `json:"enable_thinking"`
-	Style          string      `json:"style"`
-	AnswerLength   string      `json:"answer_length"`
+	Id                uuid.UUID   `path:"id,required"`
+	Prompt            string      `json:"prompt"`
+	SourceIds         []uuid.UUID `json:"source_ids"`
+	EnableThinking    bool        `json:"enable_thinking"`
+	Style             string      `json:"style"`
+	AnswerLength      string      `json:"answer_length"`
+	EnhancedRetrieval bool        `json:"enhanced_retrieval"`
 }
 
 func (r *ChatCreateMessageRequest) Validate() error {
@@ -82,12 +83,13 @@ func (s *Server) ChatCreateMessage(ctx context.Context, c *app.RequestContext) {
 
 	result, err := s.chatLogic.CreateUserMessage(ctx,
 		&chatlogic.CreateUserMessageParams{
-			ChatId:           req.Id,
-			Prompt:           req.Prompt,
-			SourceIds:        req.SourceIds,
-			EnableThinking:   req.EnableThinking,
-			ChatStyle:        chatmodel.ChatStyle(req.Style),
-			ChatAnswerLength: chatmodel.ChatAnswerLength(req.AnswerLength),
+			ChatId:            req.Id,
+			Prompt:            req.Prompt,
+			SourceIds:         req.SourceIds,
+			EnableThinking:    req.EnableThinking,
+			ChatStyle:         chatmodel.ChatStyle(req.Style),
+			ChatAnswerLength:  chatmodel.ChatAnswerLength(req.AnswerLength),
+			EnhancedRetrieval: req.EnhancedRetrieval,
 		})
 	if err != nil {
 		http.ErrResp(c, err)

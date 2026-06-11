@@ -45,7 +45,7 @@ func (s *summazierImpl) SummarizeWith(
 	text string,
 ) (string, error) {
 	lang := pkgcontext.GetLang(ctx)
-	msg, err := prompts.SummarizeMessage(ctx, text, lang)
+	msg, err := prompts.RenderSummarizeMessage(ctx, text, lang)
 	if err != nil {
 		return "", errors.Wrapf(errors.ErrInner, "render summarize prompt failed, err=%v", err)
 	}

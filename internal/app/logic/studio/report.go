@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	bizagent "github.com/gonotelm-lab/gonotelm/internal/app/agent"
-	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/agent/tool"
+	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/app/prompts"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
@@ -79,7 +79,7 @@ func (m *reportGenerator) generate(
 
 	modelOption := llmchat.BuildLLMModelOption(usedModel)
 	maxRound := conf.Global().Logic.Studio.Report.MaxRound
-	agentConfig := bizagent.AgentConfig[*reportAgentState]{
+	agentConfig := bizagent.Config[*reportAgentState]{
 		MaxRound:    maxRound,
 		LLM:         llmModel,
 		Options:     llmchat.BuildLLMOptions(modelOption),
@@ -102,7 +102,7 @@ func (m *reportGenerator) generate(
 		sourceIds = append(sourceIds, sourceId.String())
 	}
 
-	msg, err := prompts.StudioReportMessage(ctx, sourceIds, "")
+	msg, err := prompts.RenderStudioReportMessage(ctx, sourceIds, "")
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "generate report message failed, err=%v", err)
 	}
@@ -138,7 +138,7 @@ func (m *reportGenerator) generateTitle(
 	previousMsgs []*einoschema.Message,
 ) (string, error) {
 	title := ""
-	titleMakerMsg, err := prompts.TitleMakerMessage(ctx, report, pkgcontext.GetLang(ctx))
+	titleMakerMsg, err := prompts.RenderTitleMakerMessage(ctx, report, pkgcontext.GetLang(ctx))
 	if err != nil {
 		slog.ErrorContext(ctx, "generate title maker message failed", slog.Any("err", err))
 	} else {

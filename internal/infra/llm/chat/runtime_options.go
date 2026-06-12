@@ -52,7 +52,7 @@ func WithModel(model string) einomodel.Option {
 }
 
 // 要求模型输出 JSON 对象
-// 
+//
 // 注意使用此Option时 需要在提示词中明确要模型输出JSON 否接在某些provider下接口会报错
 func WithResponseJsonObject(providerType Provider) einomodel.Option {
 	switch providerType {

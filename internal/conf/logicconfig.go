@@ -20,11 +20,11 @@ type LogicConfig struct {
 }
 
 type ChatLogicConfig struct {
-	MaxRound              int           `toml:"maxRound"`
+	MaxRound              int                 `toml:"maxRound"`
 	ModelProvider         chat.Provider `toml:"modelProvider"`
-	Model                 string        `toml:"model"` // 对话使用的模型
-	SourceDocsRecallCount int           `toml:"sourceDocsRecallCount"`
-	TaskTimeout           time.Duration `toml:"taskTimeout"` // 流式任务超时时间
+	Model                 string              `toml:"model"` // 对话使用的模型
+	SourceDocsRecallCount int                 `toml:"sourceDocsRecallCount"`
+	TaskTimeout           time.Duration       `toml:"taskTimeout"` // 流式任务超时时间
 }
 
 func (c *ChatLogicConfig) GetSourceDocsRecallCount() int {
@@ -53,7 +53,7 @@ func (c *ChatLogicConfig) GetMaxRound() int {
 
 type SourceLogicConfig struct {
 	ModelProvider chat.Provider `toml:"modelProvider"`
-	Model         string        `toml:"model"`
+	Model         string              `toml:"model"`
 
 	BizCache struct {
 		Eviction time.Duration `toml:"eviction"`
@@ -64,13 +64,13 @@ type SourceLogicConfig struct {
 type StudioLogicConfig struct {
 	Mindmap struct {
 		ModelProvider chat.Provider `toml:"modelProvider"`
-		Model         string        `toml:"model"`
+		Model         string              `toml:"model"`
 	} `toml:"mindmap"`
 
 	Report struct {
-		MaxRound      int           `toml:"maxRound"`
+		MaxRound      int                 `toml:"maxRound"`
 		ModelProvider chat.Provider `toml:"modelProvider"`
-		Model         string        `toml:"model"`
+		Model         string              `toml:"model"`
 	} `toml:"report"`
 
 	TaskConfig struct {

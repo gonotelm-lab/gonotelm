@@ -28,16 +28,16 @@ type Config struct {
 
 	Logic LogicConfig `toml:"logic"`
 
-	Api       ApiConfig              `toml:"api"`
-	Database  DatabaseConfig         `toml:"database"`
-	Redis     cache.RedisCacheConfig `toml:"redis"`
-	VectorDB  vecimpl.Config         `toml:"vectorDb"`
-	Storage   StorageConfig          `toml:"storage"`
-	MsgQueue  mqimpl.Config          `toml:"msgQueue"`
-	Embedding embedimpl.Config       `toml:"embedding"`
-	Logging   LoggingConfig          `toml:"logging"`
-	Chunking  ChunkingConfig         `toml:"chunking"`
-	Provider  chat.ProviderConfig    `toml:"provider"`
+	Api       ApiConfig                 `toml:"api"`
+	Database  DatabaseConfig            `toml:"database"`
+	Redis     cache.RedisCacheConfig    `toml:"redis"`
+	VectorDB  vecimpl.Config            `toml:"vectorDb"`
+	Storage   StorageConfig             `toml:"storage"`
+	MsgQueue  mqimpl.Config             `toml:"msgQueue"`
+	Embedding embedimpl.Config          `toml:"embedding"`
+	Logging   LoggingConfig             `toml:"logging"`
+	Chunking  ChunkingConfig            `toml:"chunking"`
+	Provider  chat.ProviderConfig `toml:"provider"`
 }
 
 func (c *Config) IsDev() bool {

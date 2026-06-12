@@ -30,7 +30,7 @@ type Logic struct {
 	ctx context.Context
 
 	sourceBiz         *bizsource.Biz
-	sourceBizForAgent *bizsource.BizForAgent
+	sourceBizForAgent *bizsource.AgentBiz
 	notebookBiz       *biznotebook.Biz
 	artifactBiz       *bizartifact.Biz
 
@@ -45,7 +45,7 @@ func MustNewLogic(
 	ctx context.Context,
 	objectStorage storage.Storage,
 	sourceBiz *bizsource.Biz,
-	sourceBizForAgent *bizsource.BizForAgent,
+	sourceBizForAgent *bizsource.AgentBiz,
 	notebookBiz *biznotebook.Biz,
 	artifactBiz *bizartifact.Biz,
 	llmGateway *gateway.Gateway,

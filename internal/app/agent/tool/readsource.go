@@ -31,11 +31,11 @@ func init() {
 //
 // 来源是解析后的内容
 type ReadSourceTool struct {
-	biz     *bizsource.BizForAgent
+	biz     *bizsource.AgentBiz
 	checker SourceChecker
 }
 
-func NewReadSourceTool(biz *bizsource.BizForAgent, checker SourceChecker) *ReadSourceTool {
+func NewReadSourceTool(biz *bizsource.AgentBiz, checker SourceChecker) *ReadSourceTool {
 	return &ReadSourceTool{biz: biz, checker: checker}
 }
 

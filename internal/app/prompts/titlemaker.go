@@ -39,7 +39,7 @@ func (v TitleMakerTemplateVars) PromptVars() map[string]any {
 type TitleMakerTemplate = template[TitleMakerTemplateVars]
 
 func NewTitleMakerTemplate(lang string) *TitleMakerTemplate {
-	return newTemplate[TitleMakerTemplateVars](templateNameTitlleMaker, lang)
+	return newTemplate[TitleMakerTemplateVars](templateNameTitleMaker, lang)
 }
 
 func RenderTitleMakerMessage(ctx context.Context, text, lang string) (*schema.Message, error) {

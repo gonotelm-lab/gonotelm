@@ -17,12 +17,12 @@ import (
 	"github.com/allegro/bigcache/v3"
 )
 
-type BizForAgent struct {
+type AgentBiz struct {
 	impl        *Biz
 	sourceCache *bigcache.BigCache
 }
 
-type BizForAgentConfig struct {
+type AgentBizConfig struct {
 	// 缓存的过期时间
 	SourceCacheEviction time.Duration
 
@@ -30,7 +30,7 @@ type BizForAgentConfig struct {
 	SourceCacheMaxMB int
 }
 
-func NewBizForAgent(ctx context.Context, impl *Biz, c BizForAgentConfig) (*BizForAgent, error) {
+func NewAgentBiz(ctx context.Context, impl *Biz, c AgentBizConfig) (*AgentBiz, error) {
 	if c.SourceCacheEviction <= 0 {
 		c.SourceCacheEviction = time.Minute * 15
 	}
@@ -48,7 +48,7 @@ func NewBizForAgent(ctx context.Context, impl *Biz, c BizForAgentConfig) (*BizFo
 		return nil, errors.Wrap(err, "new source cache failed")
 	}
 
-	return &BizForAgent{
+	return &AgentBiz{
 		impl:        impl,
 		sourceCache: sourceCache,
 	}, nil
@@ -66,7 +66,7 @@ type cachedSource struct {
 }
 
 // 获取来源全部内容
-func (b *BizForAgent) GetSourceContent(ctx context.Context, id uuid.UUID) ([]byte, error) {
+func (b *AgentBiz) GetSourceContent(ctx context.Context, id uuid.UUID) ([]byte, error) {
 	sourceId := id.String()
 	cacheKey := sourceId
 
@@ -93,7 +93,7 @@ type AgentStatSourceResult struct {
 	Abstract string `json:"a"` // summary of the source content
 }
 
-func (b *BizForAgent) StatSource(ctx context.Context, id uuid.UUID) (*AgentStatSourceResult, error) {
+func (b *AgentBiz) StatSource(ctx context.Context, id uuid.UUID) (*AgentStatSourceResult, error) {
 	encodedPayload, err := b.sourceCache.Get(id.String())
 	if err == nil {
 		cached, decodeErr := b.decodeCachedSource(encodedPayload)
@@ -137,7 +137,7 @@ type AgentReadSourceResultLine struct {
 }
 
 // 为agent提供来源的内容
-func (b *BizForAgent) ReadSource(
+func (b *AgentBiz) ReadSource(
 	ctx context.Context,
 	query *AgentReadSourceQuery,
 ) (*AgentReadSourceResult, error) {
@@ -166,7 +166,7 @@ func (b *BizForAgent) ReadSource(
 	return b.selectContent(rawContent, lineRanges, query.Offset, query.Limit)
 }
 
-func (b *BizForAgent) fetchAndSetCache(ctx context.Context, sourceId uuid.UUID) ([]byte, []lineRange, string, error) {
+func (b *AgentBiz) fetchAndSetCache(ctx context.Context, sourceId uuid.UUID) ([]byte, []lineRange, string, error) {
 	rawContent, abstract, err := b.fetchSourceContent(ctx, sourceId)
 	if err != nil {
 		return nil, nil, "", err
@@ -193,7 +193,7 @@ func (b *BizForAgent) fetchAndSetCache(ctx context.Context, sourceId uuid.UUID) 
 	return rawContent, lineRanges, abstract, nil
 }
 
-func (b *BizForAgent) encodeCachedSource(
+func (b *AgentBiz) encodeCachedSource(
 	content []byte,
 	lineRanges []lineRange,
 	abstract string,
@@ -205,7 +205,7 @@ func (b *BizForAgent) encodeCachedSource(
 	})
 }
 
-func (b *BizForAgent) decodeCachedSource(payload []byte) (*cachedSource, error) {
+func (b *AgentBiz) decodeCachedSource(payload []byte) (*cachedSource, error) {
 	var c cachedSource
 	if err := sonic.Unmarshal(payload, &c); err != nil {
 		return nil, fmt.Errorf("unmarshal cache payload failed: %w", err)
@@ -214,7 +214,7 @@ func (b *BizForAgent) decodeCachedSource(payload []byte) (*cachedSource, error) 
 	return &c, nil
 }
 
-func (b *BizForAgent) selectContent(
+func (b *AgentBiz) selectContent(
 	rawContent []byte,
 	lineRanges []lineRange,
 	offset int,
@@ -259,7 +259,7 @@ func (b *BizForAgent) selectContent(
 	return result, nil
 }
 
-func (b *BizForAgent) fetchSourceContent(
+func (b *AgentBiz) fetchSourceContent(
 	ctx context.Context,
 	sourceId uuid.UUID,
 ) ([]byte, string, error) {
@@ -293,7 +293,7 @@ func (b *BizForAgent) fetchSourceContent(
 	return content.Body, src.Abstract, nil
 }
 
-func (b *BizForAgent) buildLineRanges(rawContent []byte) []lineRange {
+func (b *AgentBiz) buildLineRanges(rawContent []byte) []lineRange {
 	lineRanges := make([]lineRange, 0, len(rawContent)/48+1)
 	lineStart := 0
 
@@ -326,16 +326,16 @@ func (b *BizForAgent) buildLineRanges(rawContent []byte) []lineRange {
 
 type AgentSearchSourceQuery struct {
 	NotebookId uuid.UUID
-	SourceIds []uuid.UUID
-	Target   string
-	Count    int
+	SourceIds  []uuid.UUID
+	Target     string
+	Count      int
 }
 
 type AgentSearchSourceResult struct {
 	Chunks []*model.SourceDoc
 }
 
-func (b *BizForAgent) SearchSource(
+func (b *AgentBiz) SearchSource(
 	ctx context.Context,
 	query *AgentSearchSourceQuery,
 ) (*AgentSearchSourceResult, error) {
@@ -348,7 +348,7 @@ func (b *BizForAgent) SearchSource(
 
 		return nil, err
 	}
-	
+
 	if len(sources) != len(query.SourceIds) {
 		return nil, fmt.Errorf("some sources not found, source_ids=%v", query.SourceIds)
 	}

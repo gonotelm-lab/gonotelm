@@ -55,7 +55,7 @@ func (s *summazierImpl) SummarizeWith(
 		return "", errors.Wrapf(errors.ErrParams, "get provider failed, err=%v", err)
 	}
 
-	opt := chat.BuildLLMModelOption(model)
+	opt := chat.WithModel(model)
 	result, err := p.Generate(ctx, []*einoschema.Message{msg}, opt)
 	if err != nil {
 		return "", errors.Wrapf(errors.ErrLLM, "generate summary failed, err=%v", err)

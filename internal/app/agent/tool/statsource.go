@@ -27,11 +27,11 @@ func init() {
 }
 
 type StatSourceTool struct {
-	biz *bizsource.BizForAgent
+	biz     *bizsource.AgentBiz
 	checker SourceChecker
 }
 
-func NewStatSourceTool(biz *bizsource.BizForAgent, checker SourceChecker) *StatSourceTool {
+func NewStatSourceTool(biz *bizsource.AgentBiz, checker SourceChecker) *StatSourceTool {
 	return &StatSourceTool{biz: biz, checker: checker}
 }
 

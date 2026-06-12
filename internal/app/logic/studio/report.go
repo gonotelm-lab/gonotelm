@@ -7,6 +7,7 @@ import (
 	stdslices "slices"
 	"strings"
 
+	"github.com/gonotelm-lab/gonotelm/internal/app/agent"
 	bizagent "github.com/gonotelm-lab/gonotelm/internal/app/agent"
 	"github.com/gonotelm-lab/gonotelm/internal/app/agent/tool"
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
@@ -62,7 +63,7 @@ type reportExpectation struct {
 	Report string `json:"report"`
 }
 
-type reportAgentState struct{}
+type dummayState struct{}
 
 func (m *reportGenerator) generate(
 	ctx context.Context,
@@ -77,22 +78,22 @@ func (m *reportGenerator) generate(
 		return nil, errors.Wrapf(errors.ErrInner, "get mindmap llm model failed: %v", err)
 	}
 
-	modelOption := llmchat.BuildLLMModelOption(usedModel)
+	modelOption := llmchat.WithModel(usedModel)
 	maxRound := conf.Global().Logic.Studio.Report.MaxRound
-	agentConfig := bizagent.Config[*reportAgentState]{
-		MaxRound:    maxRound,
-		LLM:         llmModel,
-		Options:     llmchat.BuildLLMOptions(modelOption),
-		BeforeRound: m.beforeAgentRoundHook,
+	agentConfig := bizagent.Config[dummayState]{
+		MaxRound: maxRound,
+		BaseLLM:  llmModel,
+		Options:  llmchat.BuildLLMOptions(modelOption),
 	}
 
 	sbz := m.l.sourceBizForAgent
-	agent := bizagent.New(agentConfig, &reportAgentState{})
+	agent := bizagent.New(agentConfig, dummayState{})
 	err = agent.BindTools(map[string]einotool.InvokableTool{
 		tool.ReadSourceToolName: tool.NewReadSourceTool(sbz, m.checkAgentSourceAccess(params)),
 		tool.GrepSourceToolName: tool.NewGrepSourceTool(sbz, m.checkAgentSourceAccess(params)),
 		tool.StatSourceToolName: tool.NewStatSourceTool(sbz, m.checkAgentSourceAccess(params)),
 	})
+	agent.OnBeforeRound(m.beforeAgentRoundHook(agent))
 	if err != nil {
 		return nil, errors.WithMessagef(err, "bind tools failed")
 	}
@@ -165,22 +166,24 @@ func (m *reportGenerator) generateTitle(
 }
 
 func (m *reportGenerator) beforeAgentRoundHook(
-	ctx context.Context,
-	round int,
-	state *reportAgentState,
-	msgs []*einoschema.Message,
-) ([]*einoschema.Message, error) {
-	slog.DebugContext(ctx, "generating report before round hook invoked", slog.Int("round", round))
+	ag *bizagent.Agent[dummayState],
+) agent.BeforeRoundHook[dummayState] {
+	return func(
+		ctx context.Context,
+		round int,
+		state dummayState,
+		msgs []*einoschema.Message,
+	) ([]*einoschema.Message, error) {
+		if round >= conf.Global().Logic.Studio.Report.MaxRound-1 {
+			msgs = append(msgs, &einoschema.Message{
+				Role:    einoschema.User,
+				Content: "IMPORTANT: 这轮输出是你最后一轮输出，请直接输出最终结果，**不需要再进行工具调用**，按照你已有的信息输出最终结果",
+			})
+			ag.StripTools() // 最后一轮把工具去掉
+		}
 
-	if round >= conf.Global().Logic.Studio.Report.MaxRound-1 {
-		// 注入一条msg
-		msgs = append(msgs, &einoschema.Message{
-			Role:    einoschema.User,
-			Content: "IMPORTANT: 这轮输出是你最后一轮输出，请直接输出最终结果，**不需要再进行工具调用**，按照你已有的信息输出最终结果",
-		})
+		return msgs, nil
 	}
-
-	return msgs, nil
 }
 
 func (m *reportGenerator) checkAgentSourceAccess(params *generateReportTaskParams) tool.SourceChecker {

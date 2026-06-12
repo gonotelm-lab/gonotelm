@@ -55,9 +55,9 @@ func MustNewLogic(
 		panic(err)
 	}
 
-	sourceBizForAgent, err := bizsource.NewBizForAgent(ctx,
+	agentSourceBiz, err := bizsource.NewAgentBiz(ctx,
 		sourceBiz,
-		bizsource.BizForAgentConfig{
+		bizsource.AgentBizConfig{
 			SourceCacheEviction: conf.Global().Logic.Source.BizCache.Eviction,
 			SourceCacheMaxMB:    conf.Global().Logic.Source.BizCache.MaxMB,
 		})
@@ -85,7 +85,7 @@ func MustNewLogic(
 		gateway,
 		notebookBiz,
 		sourceBiz,
-		sourceBizForAgent,
+		agentSourceBiz,
 		chatBiz,
 		chatEventManager,
 	)
@@ -94,7 +94,7 @@ func MustNewLogic(
 		ctx,
 		objectStorage,
 		sourceBiz,
-		sourceBizForAgent,
+		agentSourceBiz,
 		notebookBiz,
 		artifactBiz,
 		gateway,

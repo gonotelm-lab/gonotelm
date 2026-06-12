@@ -14,6 +14,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/app/prompts"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgslices "github.com/gonotelm-lab/gonotelm/pkg/slices"
@@ -22,10 +23,30 @@ import (
 
 	einomodel "github.com/cloudwego/eino/components/model"
 	einotool "github.com/cloudwego/eino/components/tool"
+	einoschema "github.com/cloudwego/eino/schema"
 )
 
+type dummyState struct{}
+
+type SourceDocRetriever struct {
+	sourceBiz      *bizsource.Biz
+	agentSourceBiz *bizsource.AgentBiz
+	llmGateway     *gateway.Gateway
+}
+
+func NewSourceDocRetriever(
+	sourceBiz *bizsource.Biz,
+	agentSourceBiz *bizsource.AgentBiz,
+	llmGateway *gateway.Gateway) *SourceDocRetriever {
+	return &SourceDocRetriever{
+		sourceBiz:      sourceBiz,
+		agentSourceBiz: agentSourceBiz,
+		llmGateway:     llmGateway,
+	}
+}
+
 // 处理文章召回
-func (l *Logic) processRetrievingSourceDocs(
+func (s *SourceDocRetriever) Retrieve(
 	ctx context.Context,
 	notebookId uuid.UUID,
 	params *CreateUserMessageParams,
@@ -35,15 +56,11 @@ func (l *Logic) processRetrievingSourceDocs(
 		return nil, nil
 	}
 
-	if l.isTaskAborted(ctx, taskId) {
-		return nil, errors.WithStack(fmt.Errorf("task %s is aborted", taskId))
-	}
-
 	query := &bizsource.CheckSourceIdsReadyQuery{
 		NotebookId: notebookId,
 		SourceIds:  params.SourceIds,
 	}
-	existSourceIds, err := l.sourceBiz.CheckSourceIdsReady(ctx, query)
+	existSourceIds, err := s.sourceBiz.CheckSourceIdsReady(ctx, query)
 	if err != nil {
 		return nil, errors.WithMessage(err, "check source ids failed")
 	}
@@ -57,13 +74,13 @@ func (l *Logic) processRetrievingSourceDocs(
 	var (
 		enhancedSourceDocs []*model.SourceDoc
 		intention          string
-		shouldContinue     = true
+		continuing         = true
 	)
 
 	// 增强检索会使用Agent召回一遍文档 再使用向量检索再召回一遍 然后将两者结果拼接
 	if params.EnhancedRetrieval {
 		var result *agentRetrivalResult
-		result, shouldContinue, err = l.retrieveSourceDocsByAgent(
+		result, continuing, err = s.agentRetrieve(
 			ctx,
 			notebookId,
 			existSourceIds,
@@ -81,7 +98,7 @@ func (l *Logic) processRetrievingSourceDocs(
 		}
 	}
 
-	if !shouldContinue {
+	if !continuing {
 		slog.InfoContext(ctx, "skip retrieval by agent decision",
 			slog.String("task_id", taskId),
 			slog.String("intention", intention),
@@ -93,7 +110,7 @@ func (l *Logic) processRetrievingSourceDocs(
 	if intention != "" {
 		userPrompt += " " + intention
 	}
-	vecSearchSourceDocs, err := l.retrieveSourceDocs(
+	vecSearchSourceDocs, err := s.naiveRetrieve(
 		ctx,
 		notebookId,
 		userPrompt,
@@ -128,7 +145,7 @@ func (l *Logic) processRetrievingSourceDocs(
 }
 
 // 手动召回文档
-func (l *Logic) retrieveSourceDocs(
+func (l *SourceDocRetriever) naiveRetrieve(
 	ctx context.Context,
 	notebookId uuid.UUID,
 	userPrompt string,
@@ -155,13 +172,25 @@ func (l *Logic) retrieveSourceDocs(
 	return retrieved, nil
 }
 
+func (s *SourceDocRetriever) sourcePermissionChecker(sourceIds []uuid.UUID) tool.SourceCheckerFn {
+	return func(ctx context.Context, sourceId uuid.UUID) error {
+		if !slices.Contains(sourceIds, sourceId) {
+			return fmt.Errorf("permission denied")
+		}
+
+		return nil
+	}
+}
+
 type agentRetrivalResult struct {
 	intention  string
 	sourceDocs []*model.SourceDoc
 }
 
 // 给Agent可调用的工具 交由Agent决定召回哪些文档
-func (l *Logic) retrieveSourceDocsByAgent(
+//
+// 返回召回结果 并判断是否需要继续召回
+func (s *SourceDocRetriever) agentRetrieve(
 	ctx context.Context,
 	notebookId uuid.UUID,
 	sourceIds []uuid.UUID,
@@ -169,46 +198,43 @@ func (l *Logic) retrieveSourceDocsByAgent(
 	enableThinking bool,
 	taskId string,
 ) (*agentRetrivalResult, bool, error) {
-	type state struct{}
 	var (
-		provider       = conf.Global().Logic.Chat.ModelProvider
-		llmModel       = conf.Global().Logic.Chat.Model
-		shouldContinue = true
+		provider   = conf.Global().Logic.Chat.ModelProvider
+		llmModel   = conf.Global().Logic.Chat.Model
+		continuing = true
 	)
 
-	llm, err := l.llmGateway.GetProvider(provider)
+	llm, err := s.llmGateway.GetProvider(provider)
 	if err != nil {
-		return nil, shouldContinue, errors.WithMessage(err, "get chat llm failed")
+		return nil, continuing, errors.WithMessage(err, "get chat llm failed")
 	}
 
-	llmOptions := []einomodel.Option{llmchat.BuildLLMModelOption(llmModel)}
+	llmOptions := []einomodel.Option{
+		llmchat.WithModel(llmModel),
+		llmchat.WithResponseJsonObject(provider),
+	}
 	if enableThinking {
-		llmOptions = append(llmOptions, llmchat.BuildThinkingOption(provider, true))
+		llmOptions = append(llmOptions, llmchat.WithThinking(provider, true))
 	}
 
-	agentConfig := agent.Config[state]{
-		LLM:     llm,
-		Options: llmchat.BuildLLMOptions(llmOptions...),
+	var maxRound = conf.Global().Logic.Chat.MaxRound
+	agentConfig := agent.Config[dummyState]{
+		MaxRound: maxRound,
+		BaseLLM:  llm,
+		Options:  llmchat.BuildLLMOptions(llmOptions...),
 	}
 
-	sourcePermissionChecker := tool.SourceCheckerFn(
-		func(ctx context.Context, sourceId uuid.UUID) error {
-			if !slices.Contains(sourceIds, sourceId) {
-				return fmt.Errorf("permission denied")
-			}
-
-			return nil
-		})
-
-	agent := agent.New(agentConfig, state{})
+	spChecker := s.sourcePermissionChecker(sourceIds)
+	agent := agent.New(agentConfig, dummyState{})
 	// 绑定工具
 	agent.BindTools(map[string]einotool.InvokableTool{
-		tool.GrepSourceToolName:  tool.NewGrepSourceTool(l.sourceBizForAgent, sourcePermissionChecker),
-		tool.StatSourceToolName:  tool.NewStatSourceTool(l.sourceBizForAgent, sourcePermissionChecker),
-		tool.QuerySourceToolName: tool.NewQuerySourceTool(l.sourceBizForAgent, notebookId, sourcePermissionChecker),
+		tool.GrepSourceToolName:  tool.NewGrepSourceTool(s.agentSourceBiz, spChecker),
+		tool.StatSourceToolName:  tool.NewStatSourceTool(s.agentSourceBiz, spChecker),
+		tool.QuerySourceToolName: tool.NewQuerySourceTool(s.agentSourceBiz, notebookId, spChecker),
 	})
+	agent.OnBeforeRound(s.beforeRoundHook(agent))
 
-	sources, err := l.sourceBiz.BatchGetSources(ctx, notebookId, sourceIds)
+	sources, err := s.sourceBiz.BatchGetSources(ctx, notebookId, sourceIds)
 	if err != nil {
 		slog.ErrorContext(ctx, "batch get sources failed",
 			slog.String("task_id", taskId), slog.Any("err", err),
@@ -219,7 +245,7 @@ func (l *Logic) retrieveSourceDocsByAgent(
 		sourcesMap[source.Id] = source
 	}
 
-	potentialSources := make([]*prompts.RetrieveSource, 0, len(sources))
+	promptSources := make([]*prompts.RetrieveSource, 0, len(sources))
 	for _, id := range sourceIds {
 		var name, abstract string
 		source, ok := sourcesMap[id]
@@ -228,7 +254,7 @@ func (l *Logic) retrieveSourceDocsByAgent(
 			abstract = source.Abstract
 		}
 
-		potentialSources = append(potentialSources, &prompts.RetrieveSource{
+		promptSources = append(promptSources, &prompts.RetrieveSource{
 			Id:       id.String(),
 			Name:     name,
 			Abstract: abstract,
@@ -239,19 +265,19 @@ func (l *Logic) retrieveSourceDocsByAgent(
 		ctx,
 		userPrompt,
 		notebookId.String(),
-		potentialSources,
+		promptSources,
 		pkgcontext.GetLang(ctx),
 	)
 	if err != nil {
-		return nil, shouldContinue, errors.WithMessage(err, "render retrieve source doc prompt failed")
+		return nil, continuing, errors.WithMessage(err, "render retrieve source doc prompt failed")
 	}
 
 	output, err := agent.React(ctx, pkgslices.FromSingle(msg))
 	if err != nil {
-		return nil, shouldContinue, errors.WithMessage(err, "react retrieve source doc prompt failed")
+		return nil, continuing, errors.WithMessage(err, "react retrieve source doc prompt failed")
 	}
 
-	var expect agentRetrieveSourceDocExpect
+	var expect llmRetrivalExpect
 	err = sonic.Unmarshal(pkgstring.AsBytes(output.Content), &expect)
 	if err != nil {
 		slog.ErrorContext(ctx, "unmarshal retrieve source doc expect failed",
@@ -259,10 +285,10 @@ func (l *Logic) retrieveSourceDocsByAgent(
 			slog.String("content", string(output.Content)),
 		)
 
-		return nil, shouldContinue, errors.WithMessage(err, "unmarshal retrieve source doc expect failed")
+		return nil, continuing, errors.WithMessage(err, "unmarshal retrieve source doc expect failed")
 	}
 
-	if !expect.ShouldContinueOrDefault() {
+	if !expect.Continuing() {
 		slog.DebugContext(ctx, "skip retrieval by expect.should_continue=false",
 			slog.String("task_id", taskId),
 			slog.String("intention", expect.Intention),
@@ -278,14 +304,14 @@ func (l *Logic) retrieveSourceDocsByAgent(
 		for _, docId := range expect.DocIds {
 			docIds = append(docIds, docId.String())
 		}
-		retrievedDocs, err := l.sourceBiz.BatchGetSourceDocs(ctx,
+		retrievedDocs, err := s.sourceBiz.BatchGetSourceDocs(ctx,
 			&bizsource.BatchGetSourceDocsQuery{
 				NotebookId: notebookId,
 				DocIds:     docIds,
 				Populate:   true,
 			})
 		if err != nil {
-			return nil, shouldContinue, errors.WithMessage(err, "batch get source docs failed")
+			return nil, continuing, errors.WithMessage(err, "batch get source docs failed")
 		}
 
 		slog.DebugContext(ctx, "successfully retrieved source docs by agent",
@@ -296,7 +322,7 @@ func (l *Logic) retrieveSourceDocsByAgent(
 		return &agentRetrivalResult{
 			intention:  expect.Intention,
 			sourceDocs: retrievedDocs,
-		}, shouldContinue, nil
+		}, continuing, nil
 	}
 
 	slog.DebugContext(ctx, "no source docs retrieved by agent",
@@ -305,19 +331,38 @@ func (l *Logic) retrieveSourceDocsByAgent(
 
 	return &agentRetrivalResult{
 		intention: expect.Intention,
-	}, shouldContinue, nil
+	}, continuing, nil
 }
 
-type agentRetrieveSourceDocExpect struct {
+type llmRetrivalExpect struct {
 	Intention      string      `json:"intention"`
 	DocIds         []uuid.UUID `json:"doc_ids"`
 	ShouldContinue *bool       `json:"should_continue,omitempty"`
 }
 
-func (e agentRetrieveSourceDocExpect) ShouldContinueOrDefault() bool {
+func (e llmRetrivalExpect) Continuing() bool {
 	if e.ShouldContinue == nil {
 		return true
 	}
 
 	return *e.ShouldContinue
+}
+
+func (s *SourceDocRetriever) beforeRoundHook(agent *agent.Agent[dummyState]) agent.BeforeRoundHook[dummyState] {
+	return func(
+		ctx context.Context,
+		round int,
+		state dummyState,
+		msgs []*einoschema.Message,
+	) ([]*einoschema.Message, error) {
+		if round >= conf.Global().Logic.Chat.MaxRound-1 {
+			msgs = append(msgs, &einoschema.Message{
+				Role:    einoschema.User,
+				Content: "IMPORTANT: 这轮输出是你最后一轮输出，请直接输出最终结果，**不需要再进行工具调用**，按照你已有的信息输出最终结果",
+			})
+			agent.StripTools() // 最后一轮把工具去掉
+		}
+
+		return msgs, nil
+	}
 }

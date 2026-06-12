@@ -338,10 +338,13 @@ func (l *Logic) generateNotebookSummary(
 		return
 	}
 
-	// generate summary
-	provider, err := l.llmGateway.GetProvider(
-		conf.Global().Logic.Source.ModelProvider,
+	var (
+		provider = conf.Global().Logic.Source.ModelProvider
+		model    = conf.Global().Logic.Source.Model
 	)
+
+	// generate summary
+	chatModel, err := l.llmGateway.GetProvider(provider)
 	if err != nil {
 		slog.ErrorContext(ctx, "get summary model failed",
 			slog.String("notebook_id", notebookId.String()),
@@ -349,34 +352,33 @@ func (l *Logic) generateNotebookSummary(
 		)
 		return
 	}
-	llmOption := llmchat.BuildLLMModelOption(conf.Global().Logic.Source.Model)
-	result, err := provider.Generate(
+	result, err := chatModel.Generate(
 		ctx,
 		[]*einoschema.Message{msg},
-		llmOption,
+		llmchat.WithModel(model),
+		llmchat.WithResponseJsonObject(provider),
 	)
 	if err != nil {
 		slog.ErrorContext(ctx, "generate notebook summary failed",
-			slog.String("notebook_id", notebookId.String()),
-			slog.Any("err", err),
+			slog.String("notebook_id", notebookId.String()), slog.Any("err", err),
 		)
 		return
 	}
 
 	// now we update notebook description
-	convention := struct {
+	expect := struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
 		Valid       bool   `json:"valid"`
 	}{}
 
 	// truncate
-	convention.Name = strings.TrimSpace(convention.Name)
-	convention.Description = strings.TrimSpace(convention.Description)
-	convention.Name = constants.TruncateNotebookName(convention.Name)
-	convention.Description = constants.TruncateNotebookDescription(convention.Description)
+	expect.Name = strings.TrimSpace(expect.Name)
+	expect.Description = strings.TrimSpace(expect.Description)
+	expect.Name = constants.TruncateNotebookName(expect.Name)
+	expect.Description = constants.TruncateNotebookDescription(expect.Description)
 
-	err = sonic.Unmarshal(pkgstring.AsBytes(result.Content), &convention)
+	err = sonic.Unmarshal(pkgstring.AsBytes(result.Content), &expect)
 	if err != nil {
 		slog.WarnContext(ctx, "llm model response unmarshal failed",
 			slog.String("notebook_id", notebookId.String()),
@@ -385,7 +387,7 @@ func (l *Logic) generateNotebookSummary(
 		return
 	}
 
-	if !convention.Valid {
+	if !expect.Valid {
 		slog.WarnContext(ctx, "notebook summary is not valid",
 			slog.String("notebook_id", notebookId.String()),
 		)
@@ -399,8 +401,8 @@ func (l *Logic) generateNotebookSummary(
 	err = l.notebookBiz.FillNotebookMeta(ctx,
 		&biznotebook.FillNotebookMetaCommand{
 			Id:          notebookId,
-			Name:        convention.Name,
-			Description: convention.Description,
+			Name:        expect.Name,
+			Description: expect.Description,
 		})
 	if err != nil {
 		slog.ErrorContext(ctx, "fill notebook meta failed",

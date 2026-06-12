@@ -15,7 +15,7 @@ import (
 func TestGrepSourceTool_InvokableRun_GetSourceContentFailed(t *testing.T) {
 	Convey("InvokableRun 在 GetSourceContent 失败时返回包装错误", t, func() {
 		sourceID := uuid.NewV4()
-		biz := &bizsource.BizForAgent{}
+		biz := &bizsource.AgentBiz{}
 
 		patches := gomonkey.NewPatches()
 		defer patches.Reset()

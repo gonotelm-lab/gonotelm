@@ -11,11 +11,10 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-
 func TestReadSourceTool_InvokableRun(t *testing.T) {
 	Convey("InvokableRun 使用 start_line 和 line_count 参数格式化输出", t, func() {
 		sourceID := uuid.NewV4()
-		biz := &bizsource.BizForAgent{}
+		biz := &bizsource.AgentBiz{}
 
 		patches := gomonkey.NewPatches()
 		defer patches.Reset()

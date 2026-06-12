@@ -22,12 +22,12 @@ import (
 const defaultPromptLang = "zh"
 
 type Logic struct {
-	wg                sync.WaitGroup
-	notebookBiz       *biznotebook.Biz
-	sourceBiz         *bizsource.Biz
-	sourceBizForAgent *bizsource.BizForAgent
-	chatBiz           *bizchat.Biz
-	eventManager      *bizchat.ChatEventManager
+	wg                 sync.WaitGroup
+	notebookBiz        *biznotebook.Biz
+	sourceBiz          *bizsource.Biz
+	chatBiz            *bizchat.Biz
+	eventManager       *bizchat.ChatEventManager
+	sourceDocRetriever *SourceDocRetriever
 
 	llmGateway          *gateway.Gateway
 	chatTemplateManager *prompts.ChatTemplateManager
@@ -37,7 +37,7 @@ func MustNewLogic(
 	llmGateway *gateway.Gateway,
 	notebookBiz *biznotebook.Biz,
 	sourceBiz *bizsource.Biz,
-	sourceBizForAgent *bizsource.BizForAgent,
+	agentSourceBiz *bizsource.AgentBiz,
 	chatBiz *bizchat.Biz,
 	eventManager *bizchat.ChatEventManager,
 ) *Logic {
@@ -46,15 +46,17 @@ func MustNewLogic(
 		panic(err)
 	}
 
-	return &Logic{
+	logic := &Logic{
 		notebookBiz:         notebookBiz,
 		sourceBiz:           sourceBiz,
-		sourceBizForAgent:   sourceBizForAgent,
 		chatBiz:             chatBiz,
 		eventManager:        eventManager,
 		llmGateway:          llmGateway,
 		chatTemplateManager: chatTemplateManager,
+		sourceDocRetriever:  NewSourceDocRetriever(sourceBiz, agentSourceBiz, llmGateway),
 	}
+
+	return logic
 }
 
 func (l *Logic) Close(ctx context.Context) {

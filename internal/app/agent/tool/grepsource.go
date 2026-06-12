@@ -28,11 +28,11 @@ func init() {
 }
 
 type GrepSourceTool struct {
-	biz     *bizsource.BizForAgent
+	biz     *bizsource.AgentBiz
 	checker SourceChecker
 }
 
-func NewGrepSourceTool(biz *bizsource.BizForAgent, checker SourceChecker) *GrepSourceTool {
+func NewGrepSourceTool(biz *bizsource.AgentBiz, checker SourceChecker) *GrepSourceTool {
 	return &GrepSourceTool{biz: biz, checker: checker}
 }
 

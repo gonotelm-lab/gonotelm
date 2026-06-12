@@ -54,16 +54,14 @@
 ## 输出格式约束
 
 - 你的输出会被程序直接 `JSON.parse`，任何额外字符都会导致失败。
-- 只输出一个合法 JSON 对象：首字符必须是 `{`，末字符必须是 `}`。
+- 只输出一个合法 JSON 对象：首字符必须是 `{`，末字符必须是 `}`。禁止输出类似“根据分析”“按约束规则”“以下是结果”等说明性文字。
 - 不要输出 Markdown、解释、代码块、前后缀文本、空行或任何额外字符。
 - JSON 字段必须且仅能包含：`intention`、`doc_ids`、`should_continue`。
 - `intention` 必须是字符串；`doc_ids` 必须是字符串数组；`should_continue` 必须是布尔值。
 - `doc_ids` 内不允许重复 id。
 - 不得输出 `source_ids` 或其他字段。
-- 禁止输出类似“根据分析”“按约束规则”“以下是结果”等说明性文字。
-- 不要使用 ```json 或 ``` 包裹输出。
 
-输出格式示例：
+输出JSON格式示例：
 {"intention":"改写后的检索意图","doc_ids":["文档片段id1","文档片段id2"],"should_continue":true}
 {"intention":"用户在寒暄问候","doc_ids":[],"should_continue":false}
 

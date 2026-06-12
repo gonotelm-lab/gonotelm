@@ -28,7 +28,7 @@ func (l *Logic) processUserMessageTask(
 	params *CreateUserMessageParams,
 ) {
 	userId := pkgcontext.GetUserId(ctx)
-	sessionState := &chatSessionState{
+	sessionState := &sessionState{
 		id:               0, // accumulated id
 		taskId:           taskId,
 		chatId:           chat.Id,
@@ -43,10 +43,10 @@ func (l *Logic) processUserMessageTask(
 	ctx, sessionState.cancel = context.WithCancel(ctx)
 
 	var (
-		doFinalizing            bool = true
-		answer                  *einoschema.Message
-		err                     error
-		errorContent            string = "服务繁忙，请稍后重试"
+		doFinalizing      bool = true
+		answer            *einoschema.Message
+		err               error
+		errorContent      string = "服务繁忙，请稍后重试"
 		addMessageWhenErr bool   = true
 	)
 
@@ -83,8 +83,14 @@ func (l *Logic) processUserMessageTask(
 	}
 	var queriedSourceDocs []*model.SourceDoc
 	if len(params.SourceIds) > 0 {
+		if l.isTaskAborted(ctx, taskId) {
+			// 再次检查一遍任务是否取消了
+			addMessageWhenErr = false
+			return
+		}
+
 		l.emitRetrievingStreamEvent(ctx, sessionState, true)
-		queriedSourceDocs, err = l.processRetrievingSourceDocs(
+		queriedSourceDocs, err = l.sourceDocRetriever.Retrieve(
 			ctx,
 			chat.NotebookId,
 			params,
@@ -157,7 +163,6 @@ func (l *Logic) isUserMessageExist(ctx context.Context, chatId, msgId uuid.UUID)
 	return true
 }
 
-
 func (l *Logic) checkMessageContexts(
 	ctx context.Context,
 	chatId uuid.UUID,
@@ -178,7 +183,7 @@ func (l *Logic) checkMessageContexts(
 // 结束任务处理 写入最终结果 并落库
 func (l *Logic) finalizingProcess(
 	ctx context.Context,
-	state *chatSessionState,
+	state *sessionState,
 	answerMsg *einoschema.Message,
 	processErr error,
 	addMessageWhenErr bool,
@@ -263,7 +268,7 @@ func (l *Logic) finalizingProcess(
 
 func (l *Logic) cleanProcess(
 	ctx context.Context,
-	state *chatSessionState,
+	state *sessionState,
 ) {
 	ttl := conf.Global().Logic.Chat.GetTaskTimeout()
 	if err := l.eventManager.SetEventStreamTTL(ctx, state.taskId, ttl); err != nil {
@@ -290,8 +295,8 @@ func (l *Logic) cleanProcess(
 func (l *Logic) buildChatAgent(
 	ctx context.Context,
 	chatId uuid.UUID,
-	sessionState *chatSessionState,
-) (*bizagent.Agent[*chatSessionState], error) {
+	session *sessionState,
+) (*bizagent.Agent[*sessionState], error) {
 	var (
 		provider = conf.Global().Logic.Chat.ModelProvider
 		model    = conf.Global().Logic.Chat.Model
@@ -307,24 +312,24 @@ func (l *Logic) buildChatAgent(
 		return nil, errors.WithMessage(err, "get chat llm failed")
 	}
 
-	options := llmchat.BuildLLMOptions(llmchat.BuildThinkingOption(provider, sessionState.enableThinking))
+	options := llmchat.BuildLLMOptions(llmchat.WithThinking(provider, session.enableThinking))
 	if model != "" {
-		options = append(options, llmchat.BuildLLMModelOption(model))
+		options = append(options, llmchat.WithModel(model))
 	}
 
-	agentConfig := bizagent.Config[*chatSessionState]{
-		MaxRound:         conf.Global().Logic.Chat.GetMaxRound(),
-		LLM:              chatLLM,
-		Options:          options,
-		BeforeChat:       l.agentBeforeChatHook,
-		BeforeRound:      l.agentBeforeRoundHook,
-		MsgAppender:      l.agentMessageAppender,
-		OnReasoningDelta: l.agentOnReasoningHook,
-		OnReasoningEnd:   l.agentOnReasoningEndHook,
-		OnContentDelta:   l.agentOnContentHook,
+	agentConfig := bizagent.Config[*sessionState]{
+		MaxRound: conf.Global().Logic.Chat.GetMaxRound(),
+		BaseLLM:  chatLLM,
+		Options:  options,
 	}
 
-	agent := bizagent.New(agentConfig, sessionState)
+	agent := bizagent.New(agentConfig, session)
+	agent.OnBeforeChat(l.agentBeforeChatHook)
+	agent.OnBeforeRound(l.agentBeforeRoundHook)
+	agent.OnMsgAppender(l.agentMessageAppender)
+	agent.OnReasoningDelta(l.agentOnReasoningHook)
+	agent.OnReasoningEnd(l.agentOnReasoningEndHook)
+	agent.OnContentDelta(l.agentOnContentHook)
 
 	return agent, nil
 }
@@ -332,7 +337,7 @@ func (l *Logic) buildChatAgent(
 // 每一轮的所有消息都写入上下文
 func (l *Logic) agentMessageAppender(
 	ctx context.Context,
-	state *chatSessionState,
+	state *sessionState,
 	newMsgs []*einoschema.Message,
 ) {
 	if err := l.chatBiz.AppendContextMessage(ctx, state.chatId, newMsgs); err != nil {
@@ -346,7 +351,7 @@ func (l *Logic) agentMessageAppender(
 func (l *Logic) agentOnReasoningHook(
 	ctx context.Context,
 	round int,
-	state *chatSessionState,
+	state *sessionState,
 	delta string,
 ) error {
 	l.emitReasoningStreamEvent(ctx, state, delta, false)
@@ -357,7 +362,7 @@ func (l *Logic) agentOnReasoningHook(
 func (l *Logic) agentOnReasoningEndHook(
 	ctx context.Context,
 	round int,
-	state *chatSessionState,
+	state *sessionState,
 ) error {
 	l.emitReasoningStreamEvent(ctx, state, "", true)
 
@@ -367,7 +372,7 @@ func (l *Logic) agentOnReasoningEndHook(
 func (l *Logic) agentOnContentHook(
 	ctx context.Context,
 	round int,
-	state *chatSessionState,
+	state *sessionState,
 	delta string,
 ) error {
 	l.emitAnswerStreamEvent(ctx, state, delta)
@@ -377,7 +382,7 @@ func (l *Logic) agentOnContentHook(
 
 func (l *Logic) agentBeforeChatHook(
 	ctx context.Context,
-	state *chatSessionState,
+	state *sessionState,
 	msgs []*einoschema.Message) (
 	[]*einoschema.Message, error,
 ) {
@@ -399,7 +404,7 @@ func (l *Logic) agentBeforeChatHook(
 func (l *Logic) agentBeforeRoundHook(
 	ctx context.Context,
 	round int,
-	state *chatSessionState,
+	state *sessionState,
 	msgs []*einoschema.Message,
 ) ([]*einoschema.Message, error) {
 	// 如果只剩下最后一轮 要求模型马上输出最终结果
@@ -416,7 +421,7 @@ func (l *Logic) agentBeforeRoundHook(
 
 func (l *Logic) emitStreamEvent(
 	ctx context.Context,
-	state *chatSessionState,
+	state *sessionState,
 	event *chatmodel.MessageStreamEvent,
 ) {
 	task, err := l.eventManager.GetTask(ctx, state.taskId)
@@ -453,7 +458,7 @@ func (l *Logic) emitStreamEvent(
 
 func (l *Logic) emitRetrievingStreamEvent(
 	ctx context.Context,
-	state *chatSessionState,
+	state *sessionState,
 	typing bool,
 ) {
 	timestamp := time.Now().Unix()
@@ -480,7 +485,7 @@ func (l *Logic) emitRetrievingStreamEvent(
 
 func (l *Logic) emitReasoningStreamEvent(
 	ctx context.Context,
-	state *chatSessionState,
+	state *sessionState,
 	reasoningContent string,
 	end bool,
 ) {
@@ -504,7 +509,7 @@ func (l *Logic) emitReasoningStreamEvent(
 
 func (l *Logic) emitAnswerStreamEvent(
 	ctx context.Context,
-	state *chatSessionState,
+	state *sessionState,
 	content string,
 ) {
 	timestamp := time.Now().Unix()
@@ -524,7 +529,7 @@ func (l *Logic) emitAnswerStreamEvent(
 // 流式输出完成 结束流式输出
 func (l *Logic) emitNormalFinishStreamEvent(
 	ctx context.Context,
-	state *chatSessionState,
+	state *sessionState,
 	finishReason chatmodel.FinishReason,
 ) {
 	timestamp := time.Now().Unix()
@@ -545,7 +550,7 @@ func (l *Logic) emitNormalFinishStreamEvent(
 // 流式输出中途出错 结束流式输出
 func (l *Logic) emitErrorFinishStreamEvent(
 	ctx context.Context,
-	state *chatSessionState,
+	state *sessionState,
 	content string,
 	finishReason chatmodel.FinishReason,
 ) {

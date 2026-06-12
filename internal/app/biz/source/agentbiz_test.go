@@ -12,7 +12,7 @@ import (
 
 func TestBizForAgent_ReadSource_CacheMissUsesPatchedFetch(t *testing.T) {
 	Convey("cache miss时调用mock fetch并缓存多行结果", t, func() {
-		biz, err := NewBizForAgent(context.Background(), nil, BizForAgentConfig{
+		biz, err := NewAgentBiz(context.Background(), nil, AgentBizConfig{
 			SourceCacheEviction: time.Minute,
 			SourceCacheMaxMB:    1,
 		})
@@ -25,7 +25,7 @@ func TestBizForAgent_ReadSource_CacheMissUsesPatchedFetch(t *testing.T) {
 		patches := gomonkey.NewPatches()
 		defer patches.Reset()
 		patches.ApplyPrivateMethod(biz, "fetchSourceContent",
-			func(_ *BizForAgent, _ context.Context, gotSourceID uuid.UUID) ([]byte, error) {
+			func(_ *AgentBiz, _ context.Context, gotSourceID uuid.UUID) ([]byte, error) {
 				called++
 				So(gotSourceID.EqualsTo(sourceID), ShouldBeTrue)
 				return []byte("core-line-1\ncore-line-2\ncore-line-3"), nil
@@ -64,7 +64,7 @@ func TestBizForAgent_ReadSource_CacheMissUsesPatchedFetch(t *testing.T) {
 
 func TestBizForAgent_ReadSource_CacheHitSkipsFetchAndAppliesRange(t *testing.T) {
 	Convey("cache hit时跳过fetch并按范围返回", t, func() {
-		biz, err := NewBizForAgent(context.Background(), nil, BizForAgentConfig{
+		biz, err := NewAgentBiz(context.Background(), nil, AgentBizConfig{
 			SourceCacheEviction: time.Minute,
 			SourceCacheMaxMB:    4,
 		})
@@ -82,7 +82,7 @@ func TestBizForAgent_ReadSource_CacheHitSkipsFetchAndAppliesRange(t *testing.T) 
 		patches := gomonkey.NewPatches()
 		defer patches.Reset()
 		patches.ApplyPrivateMethod(biz, "fetchSourceContent",
-			func(_ *BizForAgent, _ context.Context, _ uuid.UUID) ([]byte, error) {
+			func(_ *AgentBiz, _ context.Context, _ uuid.UUID) ([]byte, error) {
 				called++
 				return []byte("mock-line-1\nmock-line-2"), nil
 			})
@@ -104,7 +104,7 @@ func TestBizForAgent_ReadSource_CacheHitSkipsFetchAndAppliesRange(t *testing.T) 
 
 func TestBizForAgent_StatSource_CacheMissUsesPatchedFetch(t *testing.T) {
 	Convey("StatSource在cache miss时调用mock fetch并在后续命中缓存", t, func() {
-		biz, err := NewBizForAgent(context.Background(), nil, BizForAgentConfig{
+		biz, err := NewAgentBiz(context.Background(), nil, AgentBizConfig{
 			SourceCacheEviction: time.Minute,
 			SourceCacheMaxMB:    1,
 		})
@@ -118,7 +118,7 @@ func TestBizForAgent_StatSource_CacheMissUsesPatchedFetch(t *testing.T) {
 		patches := gomonkey.NewPatches()
 		defer patches.Reset()
 		patches.ApplyPrivateMethod(biz, "fetchSourceContent",
-			func(_ *BizForAgent, _ context.Context, gotSourceID uuid.UUID) ([]byte, error) {
+			func(_ *AgentBiz, _ context.Context, gotSourceID uuid.UUID) ([]byte, error) {
 				called++
 				So(gotSourceID.EqualsTo(sourceID), ShouldBeTrue)
 				return expectedContent, nil

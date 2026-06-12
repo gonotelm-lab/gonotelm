@@ -34,13 +34,13 @@ const (
 
 // 在指定来源中进行相似性搜索 返回相似度较高的文档片段
 type QuerySourceTool struct {
-	biz        *bizsource.BizForAgent
+	biz        *bizsource.AgentBiz
 	checker    SourceChecker
 	notebookId uuid.UUID
 }
 
 func NewQuerySourceTool(
-	biz *bizsource.BizForAgent,
+	biz *bizsource.AgentBiz,
 	notebookId uuid.UUID,
 	checker SourceChecker,
 ) *QuerySourceTool {

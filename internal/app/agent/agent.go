@@ -24,32 +24,11 @@ type EinoMessage = einoschema.Message
 type Config[State any] struct {
 	MaxRound int
 
-	// 带工具的大模型
-	LLM eino.ToolCallingChatModel
+	// 基础模型对象 不带工具 工具动态绑定
+	BaseLLM eino.ToolCallingChatModel
 
 	// 每次向模型发起请求时附带的动态参数（如是否开启思考）
 	Options []eino.Option
-
-	tools map[string]einotool.InvokableTool
-
-	// 一般可以在此hook中注入系统提示词等操作 如果超过上下文还可以进行上下文压缩等操作
-	BeforeChat  BeforeChatHook[State]
-	BeforeRound BeforeRoundHook[State]
-
-	MsgAppender MsgAppender[State]
-
-	// 全部工具被调用前回调
-	BeforeToolCall BeforeToolCallHook[State]
-	// 全部工具被调用后回调
-	AfterToolCall ToolCallHook[State]
-
-	// 流式输出时生效 非流式输出时不会调用hook
-	OnReasoningStart OnStartHook[State]
-	OnReasoningDelta OnDeltaHook[State]
-	OnReasoningEnd   OnEndHook[State]
-	OnContentStart   OnStartHook[State]
-	OnContentDelta   OnDeltaHook[State]
-	OnContentEnd     OnEndHook[State]
 }
 
 type OnDeltaHook[T any] func(ctx context.Context, round int, state T, delta string) error
@@ -66,15 +45,15 @@ type BeforeToolCallHook[T any] func(ctx context.Context, state T, toolCalls []ei
 
 type MsgAppender[T any] func(ctx context.Context, state T, newMsgs []*EinoMessage)
 
-type ToolCallHookResult struct {
+type ToolCallResult struct {
 	Result string
 	Error  error
 }
 
-type ToolCallHook[T any] func(
+type AfterToolCallHook[T any] func(
 	ctx context.Context,
 	state T,
-	results []*ToolCallHookResult,
+	results []*ToolCallResult,
 )
 
 // agent for chat logic
@@ -82,7 +61,28 @@ type Agent[State any] struct {
 	cfg   Config[State]
 	state State
 
-	accMsgs []*EinoMessage // 累计的历史消息
+	tooledLLM eino.ToolCallingChatModel
+	tools     map[string]einotool.InvokableTool
+	accMsgs   []*EinoMessage // 累计的历史消息
+
+	// 全部工具被调用前回调
+	beforeToolCall BeforeToolCallHook[State]
+	// 全部工具被调用后回调
+	afterToolCall AfterToolCallHook[State]
+
+	msgAppender MsgAppender[State]
+
+	// 流式输出时生效 非流式输出时不会调用hook
+	onReasoningStart OnStartHook[State]
+	onReasoningDelta OnDeltaHook[State]
+	onReasoningEnd   OnEndHook[State]
+	onContentStart   OnStartHook[State]
+	onContentDelta   OnDeltaHook[State]
+	onContentEnd     OnEndHook[State]
+
+	// 一般可以在此hook中注入系统提示词等操作 如果超过上下文还可以进行上下文压缩等操作
+	beforeChat  BeforeChatHook[State]
+	beforeRound BeforeRoundHook[State]
 }
 
 func New[State any](cfg Config[State], state State) *Agent[State] {
@@ -90,11 +90,59 @@ func New[State any](cfg Config[State], state State) *Agent[State] {
 		cfg.MaxRound = defaultAgentRound
 	}
 
-	return &Agent[State]{cfg: cfg, state: state}
+	return &Agent[State]{cfg: cfg, state: state, tooledLLM: cfg.BaseLLM}
+}
+
+func (a *Agent[State]) OnReasoningStart(hook OnStartHook[State]) {
+	a.onReasoningStart = hook
+}
+
+func (a *Agent[State]) OnReasoningDelta(hook OnDeltaHook[State]) {
+	a.onReasoningDelta = hook
+}
+
+func (a *Agent[State]) OnReasoningEnd(hook OnEndHook[State]) {
+	a.onReasoningEnd = hook
+}
+
+func (a *Agent[State]) OnContentStart(hook OnStartHook[State]) {
+	a.onContentStart = hook
+}
+
+func (a *Agent[State]) OnContentDelta(hook OnDeltaHook[State]) {
+	a.onContentDelta = hook
+}
+
+func (a *Agent[State]) OnContentEnd(hook OnEndHook[State]) {
+	a.onContentEnd = hook
+}
+
+func (a *Agent[State]) OnBeforeChat(hook BeforeChatHook[State]) {
+	a.beforeChat = hook
+}
+
+func (a *Agent[State]) OnBeforeRound(hook BeforeRoundHook[State]) {
+	a.beforeRound = hook
+}
+
+func (a *Agent[State]) OnBeforeToolCall(hook BeforeToolCallHook[State]) {
+	a.beforeToolCall = hook
+}
+
+func (a *Agent[State]) OnAfterToolCall(hook AfterToolCallHook[State]) {
+	a.afterToolCall = hook
+}
+
+func (a *Agent[State]) OnMsgAppender(hook MsgAppender[State]) {
+	a.msgAppender = hook
 }
 
 func (a *Agent[State]) BindTools(tools map[string]einotool.InvokableTool) error {
-	a.cfg.tools = tools
+	if len(tools) == 0 {
+		return nil
+	}
+
+	a.tools = tools
 	toolInfos := make([]*einoschema.ToolInfo, 0, len(tools))
 	for _, tool := range tools {
 		toolInfo, err := tool.Info(context.Background())
@@ -104,13 +152,20 @@ func (a *Agent[State]) BindTools(tools map[string]einotool.InvokableTool) error 
 		toolInfos = append(toolInfos, toolInfo)
 	}
 
-	toolLLM, err := a.cfg.LLM.WithTools(toolInfos)
+	tooledLLM, err := a.cfg.BaseLLM.WithTools(toolInfos)
 	if err != nil {
 		return errors.Wrapf(errors.ErrInner, "bind tools failed: %v", err)
 	}
-	a.cfg.LLM = toolLLM
+	a.tooledLLM = tooledLLM
 
 	return nil
+}
+
+// 清空所有已绑定的工具
+// 可以在React循环中动态删减工具
+func (a *Agent[State]) StripTools() {
+	a.tooledLLM = a.cfg.BaseLLM
+	clear(a.tools)
 }
 
 func (a *Agent[State]) GetAccumulatedMessages() []*EinoMessage {
@@ -153,7 +208,7 @@ func (a *Agent[State]) ReactStream(
 			return nil, errors.WithMessagef(err, "before round %d failed", round)
 		}
 
-		stream, err := a.cfg.LLM.Stream(ctx, msgs, a.cfg.Options...)
+		stream, err := a.tooledLLM.Stream(ctx, msgs, a.cfg.Options...)
 		if err != nil {
 			return nil, errors.WithMessage(err, "stream chat failed")
 		}
@@ -168,33 +223,33 @@ func (a *Agent[State]) ReactStream(
 		// 处理流式消息
 		chat.HandleStreamWithCallback(ctx, stream, &chat.Callbacks{
 			OnReasoningStart: func() {
-				if a.cfg.OnReasoningStart != nil {
-					a.cfg.OnReasoningStart(ctx, round, a.state)
+				if a.onReasoningStart != nil {
+					a.onReasoningStart(ctx, round, a.state)
 				}
 			},
 			OnReasoningDelta: func(delta string) {
-				if a.cfg.OnReasoningDelta != nil {
-					a.cfg.OnReasoningDelta(ctx, round, a.state, delta)
+				if a.onReasoningDelta != nil {
+					a.onReasoningDelta(ctx, round, a.state, delta)
 				}
 			},
 			OnReasoningEnd: func() {
-				if a.cfg.OnReasoningEnd != nil {
-					a.cfg.OnReasoningEnd(ctx, round, a.state)
+				if a.onReasoningEnd != nil {
+					a.onReasoningEnd(ctx, round, a.state)
 				}
 			},
 			OnContentStart: func() {
-				if a.cfg.OnContentStart != nil {
-					a.cfg.OnContentStart(ctx, round, a.state)
+				if a.onContentStart != nil {
+					a.onContentStart(ctx, round, a.state)
 				}
 			},
 			OnContentDelta: func(delta string) {
-				if a.cfg.OnContentDelta != nil {
-					a.cfg.OnContentDelta(ctx, round, a.state, delta)
+				if a.onContentDelta != nil {
+					a.onContentDelta(ctx, round, a.state, delta)
 				}
 			},
 			OnContentEnd: func() {
-				if a.cfg.OnContentEnd != nil {
-					a.cfg.OnContentEnd(ctx, round, a.state)
+				if a.onContentEnd != nil {
+					a.onContentEnd(ctx, round, a.state)
 				}
 			},
 			OnError: func(err error) {
@@ -209,15 +264,15 @@ func (a *Agent[State]) ReactStream(
 					roundMsgs = append(roundMsgs, toolMsgs...)
 					msgs = append(msgs, roundMsgs...)
 					a.appendAccumulatedMessages(roundMsgs...)
-					if a.cfg.MsgAppender != nil {
-						a.cfg.MsgAppender(ctx, a.state, roundMsgs)
+					if a.msgAppender != nil {
+						a.msgAppender(ctx, a.state, roundMsgs)
 					}
 				} else {
 					// 认为已经结束
 					msgs = append(msgs, msg)
 					a.appendAccumulatedMessages(msg)
-					if a.cfg.MsgAppender != nil {
-						a.cfg.MsgAppender(ctx, a.state, []*EinoMessage{msg})
+					if a.msgAppender != nil {
+						a.msgAppender(ctx, a.state, []*EinoMessage{msg})
 					}
 					finished = true
 					finishedMsg = msg
@@ -259,7 +314,7 @@ func (a *Agent[State]) React(
 			return nil, errors.WithMessagef(err, "before round %d failed", round)
 		}
 
-		responseMsg, err := a.cfg.LLM.Generate(ctx, msgs, a.cfg.Options...)
+		responseMsg, err := a.tooledLLM.Generate(ctx, msgs, a.cfg.Options...)
 		if err != nil {
 			return nil, errors.WithMessage(err, "generate chat failed")
 		}
@@ -271,14 +326,14 @@ func (a *Agent[State]) React(
 			roundMsgs = append(roundMsgs, toolMsgs...)
 			msgs = append(msgs, roundMsgs...)
 			a.appendAccumulatedMessages(roundMsgs...)
-			if a.cfg.MsgAppender != nil {
-				a.cfg.MsgAppender(ctx, a.state, roundMsgs)
+			if a.msgAppender != nil {
+				a.msgAppender(ctx, a.state, roundMsgs)
 			}
 		} else {
 			// 没有工具调用任务 认为已经结束
 			a.appendAccumulatedMessages(responseMsg)
-			if a.cfg.MsgAppender != nil {
-				a.cfg.MsgAppender(ctx, a.state, []*einoschema.Message{responseMsg})
+			if a.msgAppender != nil {
+				a.msgAppender(ctx, a.state, []*einoschema.Message{responseMsg})
 			}
 			return responseMsg, nil
 		}
@@ -291,8 +346,8 @@ func (a *Agent[State]) handleBeforeChat(
 	ctx context.Context,
 	msgs []*EinoMessage,
 ) ([]*einoschema.Message, error) {
-	if a.cfg.BeforeChat != nil {
-		newMsgs, err := a.cfg.BeforeChat(ctx, a.state, msgs)
+	if a.beforeChat != nil {
+		newMsgs, err := a.beforeChat(ctx, a.state, msgs)
 		if err != nil {
 			return nil, errors.WithMessage(err, "before chat failed")
 		}
@@ -307,8 +362,8 @@ func (a *Agent[State]) handleBeforeChat(
 func (a *Agent[State]) handleBeforeRound(
 	ctx context.Context, round int, msgs []*EinoMessage,
 ) ([]*EinoMessage, error) {
-	if a.cfg.BeforeRound != nil {
-		newMsgs, err := a.cfg.BeforeRound(ctx, round, a.state, msgs)
+	if a.beforeRound != nil {
+		newMsgs, err := a.beforeRound(ctx, round, a.state, msgs)
 		if err != nil {
 			return nil, errors.WithMessage(err, "before round failed")
 		}
@@ -332,14 +387,14 @@ func (a *Agent[State]) handleToolCalls(
 	var (
 		wg                sync.WaitGroup
 		results           = make([]*EinoMessage, len(toolCalls))
-		resultForCallback = make([]*ToolCallHookResult, len(toolCalls))
+		resultForCallback = make([]*ToolCallResult, len(toolCalls))
 	)
 	for i := range resultForCallback {
-		resultForCallback[i] = &ToolCallHookResult{}
+		resultForCallback[i] = &ToolCallResult{}
 	}
 
-	if a.cfg.BeforeToolCall != nil {
-		a.cfg.BeforeToolCall(ctx, a.state, toolCalls)
+	if a.beforeToolCall != nil {
+		a.beforeToolCall(ctx, a.state, toolCalls)
 	}
 
 	for idx, tc := range toolCalls {
@@ -371,7 +426,7 @@ func (a *Agent[State]) handleToolCalls(
 				}
 			}()
 
-			invokable, ok := a.cfg.tools[tc.Function.Name]
+			invokable, ok := a.tools[tc.Function.Name]
 			if !ok {
 				err := fmt.Errorf("tool %s not found", tc.Function.Name)
 				results[idx].Content = err.Error()
@@ -401,8 +456,8 @@ func (a *Agent[State]) handleToolCalls(
 	wg.Wait()
 
 	// after took
-	if a.cfg.AfterToolCall != nil {
-		a.cfg.AfterToolCall(ctx, a.state, resultForCallback)
+	if a.afterToolCall != nil {
+		a.afterToolCall(ctx, a.state, resultForCallback)
 	}
 
 	return results

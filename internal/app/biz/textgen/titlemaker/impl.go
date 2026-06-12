@@ -50,7 +50,7 @@ func (t *titlemakerImpl) GenerateWith(ctx context.Context, provider chat.Provide
 		return "", errors.Wrapf(errors.ErrParams, "get provider failed, err=%v", err)
 	}
 
-	opt := chat.BuildLLMModelOption(model)
+	opt := chat.WithModel(model)
 	result, err := p.Generate(ctx, []*einoschema.Message{msg}, opt)
 	if err != nil {
 		return "", errors.Wrapf(errors.ErrLLM, "generate title failed, err=%v", err)

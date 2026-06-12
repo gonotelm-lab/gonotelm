@@ -25,6 +25,18 @@
 - `intention` 必须保留用户原始意图，不得扩展、歪曲或引入未提及的新目标。
 - 当问题与知识检索相关（解释概念、比较、机制、排错、引用来源等）时，`should_continue` 必须为 `true`。
 
+## 输出格式约束
+
+输出JSON格式示例：
+{"intention":"改写后的检索意图","doc_ids":["文档片段id1","文档片段id2"],"should_continue":true}
+{"intention":"用户在寒暄问候","doc_ids":[],"should_continue":false}
+
+- 只输出一个合法 JSON 对象，不要输出 Markdown、解释、代码块或任何额外文本。
+- JSON 字段必须且仅能包含：`intention`、`doc_ids`、`should_continue`。
+- `intention` 必须是字符串；`doc_ids` 必须是字符串数组；`should_continue` 必须是布尔值。
+- `doc_ids` 内不允许重复 id。
+- 不得输出 `source_ids` 或其他字段。
+
 ## 用户问题改写示例（仅用于学习改写风格）
 
 示例 1（定义类问题，最小改写）：
@@ -51,25 +63,11 @@
 - 用户问题：板块构造学说的核心观点
 - intention：板块构造学说的核心观点
 
-## 输出格式约束
-
-- 你的输出会被程序直接 `JSON.parse`，任何额外字符都会导致失败。
-- 只输出一个合法 JSON 对象：首字符必须是 `{`，末字符必须是 `}`。禁止输出类似“根据分析”“按约束规则”“以下是结果”等说明性文字。
-- 不要输出 Markdown、解释、代码块、前后缀文本、空行或任何额外字符。
-- JSON 字段必须且仅能包含：`intention`、`doc_ids`、`should_continue`。
-- `intention` 必须是字符串；`doc_ids` 必须是字符串数组；`should_continue` 必须是布尔值。
-- `doc_ids` 内不允许重复 id。
-- 不得输出 `source_ids` 或其他字段。
-
-输出JSON格式示例：
-{"intention":"改写后的检索意图","doc_ids":["文档片段id1","文档片段id2"],"should_continue":true}
-{"intention":"用户在寒暄问候","doc_ids":[],"should_continue":false}
-
 # 用户输入
 
 用户输入为：{{Question}}
 
-# 来源输入
+## 来源输入
 
 以下是用户选中的来源，请仅基于这些来源做筛选：
 

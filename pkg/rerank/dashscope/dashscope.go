@@ -13,6 +13,8 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/rerank/schema"
 )
 
+// https://bailian.console.aliyun.com/cn-beijing/?spm=5176.29619931.J_SEsSjsNv72yRuRFS2VknO.2.738b10d7oyVJ7e&tab=api#/api/?type=model&url=2780056
+
 const (
 	defaultBaseURL = "https://dashscope.aliyuncs.com"
 	defaultPath    = "/compatible-api/v1/reranks"
@@ -45,7 +47,7 @@ func New(cfg Config, opts ...rerank.ClientOption) (*Reranker, error) {
 	}, nil
 }
 
-func (r *Reranker) Rerank(ctx context.Context, req schema.Request, opts ...rerank.Option) (schema.Response, error) {
+func (r *Reranker) Rerank(ctx context.Context, req *schema.Request, opts ...rerank.Option) (schema.Response, error) {
 	topN, err := schema.NormalizeTopN(req.TopN, len(req.Documents))
 	if err != nil {
 		return schema.Response{}, err
@@ -68,7 +70,7 @@ func (r *Reranker) Rerank(ctx context.Context, req schema.Request, opts ...reran
 	callOpts := rerank.BuildCallOptions(opts...)
 	parameters := map[string]any{
 		paramTopN:            topN,
-		paramReturnDocuments: false,
+		paramReturnDocuments: req.ReturnDocuments,
 	}
 	if callOpts.Extra != nil {
 		if instruct, ok := callOpts.Extra[extraKeyInstruct].(string); ok && instruct != "" {
@@ -80,11 +82,12 @@ func (r *Reranker) Rerank(ctx context.Context, req schema.Request, opts ...reran
 	}
 
 	payload := apiRequest{
-		Model:      model,
-		Query:      queryPayload,
-		Documents:  documentsPayload,
-		TopN:       topN,
-		Parameters: parameters,
+		Model:           model,
+		Query:           queryPayload,
+		Documents:       documentsPayload,
+		TopN:            topN,
+		ReturnDocuments: req.ReturnDocuments,
+		Parameters:      parameters,
 	}
 
 	bodyBytes, err := json.Marshal(payload)
@@ -122,11 +125,12 @@ func (r *Reranker) Rerank(ctx context.Context, req schema.Request, opts ...reran
 // --- request payload ---
 
 type apiRequest struct {
-	Model      string         `json:"model"`
-	Query      any            `json:"query"`
-	Documents  []any          `json:"documents"`
-	TopN       int            `json:"top_n"`
-	Parameters map[string]any `json:"parameters,omitempty"`
+	Model           string         `json:"model"`
+	Query           any            `json:"query"`
+	Documents       []any          `json:"documents"`
+	TopN            int            `json:"top_n"`
+	ReturnDocuments bool           `json:"return_documents,omitempty"`
+	Parameters      map[string]any `json:"parameters,omitempty"`
 }
 
 func buildQuery(q schema.Query) (any, error) {
@@ -162,11 +166,7 @@ func buildDocuments(documents []schema.Document) ([]any, error) {
 
 	payload := make([]any, 0, len(documents))
 	for idx, doc := range documents {
-		if len(doc.Parts) == 0 {
-			return nil, fmt.Errorf("document[%d] parts must not be empty", idx)
-		}
-
-		obj, err := buildPartObject(doc.Parts)
+		obj, err := buildDocument(doc)
 		if err != nil {
 			return nil, fmt.Errorf("build document[%d] failed: %w", idx, err)
 		}
@@ -175,58 +175,45 @@ func buildDocuments(documents []schema.Document) ([]any, error) {
 	return payload, nil
 }
 
-func buildPartObject(parts []schema.Part) (map[string]any, error) {
-	var (
-		texts     []string
-		imageData string
-		videoData string
-	)
+func buildDocument(doc schema.Document) (any, error) {
+	if doc.Part != nil {
+		return buildPartObject(*doc.Part)
+	}
 
-	for idx, part := range parts {
-		switch part.Type {
-		case schema.PartTypeText:
-			if strings.TrimSpace(part.Text) == "" {
-				continue
-			}
-			texts = append(texts, part.Text)
-		case schema.PartTypeImage:
-			if imageData != "" {
-				return nil, fmt.Errorf("part[%d] duplicated image content", idx)
-			}
-			img, err := buildImageValue(part.Image)
-			if err != nil {
-				return nil, fmt.Errorf("part[%d] image invalid: %w", idx, err)
-			}
-			imageData = img
-		case schema.PartTypeVideo:
-			if videoData != "" {
-				return nil, fmt.Errorf("part[%d] duplicated video content", idx)
-			}
-			video, err := buildVideoValue(part.Video)
-			if err != nil {
-				return nil, fmt.Errorf("part[%d] video invalid: %w", idx, err)
-			}
-			videoData = video
-		default:
-			return nil, fmt.Errorf("part[%d] type %q is not supported", idx, part.Type)
+	if strings.TrimSpace(doc.Text) == "" {
+		return nil, fmt.Errorf("text and part must not both be empty")
+	}
+	return doc.Text, nil
+}
+
+func buildPartObject(part schema.Part) (map[string]any, error) {
+	switch part.Type {
+	case schema.PartTypeText:
+		if strings.TrimSpace(part.Text) == "" {
+			return nil, fmt.Errorf("part text must not be empty")
 		}
+		return map[string]any{
+			fieldText: part.Text,
+		}, nil
+	case schema.PartTypeImage:
+		img, err := buildImageValue(part.Image)
+		if err != nil {
+			return nil, fmt.Errorf("part image invalid: %w", err)
+		}
+		return map[string]any{
+			fieldImage: img,
+		}, nil
+	case schema.PartTypeVideo:
+		video, err := buildVideoValue(part.Video)
+		if err != nil {
+			return nil, fmt.Errorf("part video invalid: %w", err)
+		}
+		return map[string]any{
+			fieldVideo: video,
+		}, nil
+	default:
+		return nil, fmt.Errorf("part type %q is not supported", part.Type)
 	}
-
-	if len(texts) == 0 && imageData == "" && videoData == "" {
-		return nil, fmt.Errorf("parts contain no valid content")
-	}
-
-	obj := map[string]any{}
-	if len(texts) > 0 {
-		obj[fieldText] = strings.Join(texts, "\n")
-	}
-	if imageData != "" {
-		obj[fieldImage] = imageData
-	}
-	if videoData != "" {
-		obj[fieldVideo] = videoData
-	}
-	return obj, nil
 }
 
 func buildImageValue(image *schema.Image) (string, error) {
@@ -272,8 +259,9 @@ type apiResponse struct {
 }
 
 type apiResult struct {
+	Document       any     `json:"document"`
 	Index          int     `json:"index"`
-	RelevanceScore float64 `json:"relevance_score"`
+	RelevanceScore float32 `json:"relevance_score"`
 }
 
 type apiUsage struct {
@@ -288,10 +276,14 @@ func parseResponse(respBody []byte) (schema.Response, error) {
 
 	results := make([]schema.Result, 0, len(apiResp.Results))
 	for _, r := range apiResp.Results {
-		results = append(results, schema.Result{
+		item := schema.Result{
 			Index:          r.Index,
 			RelevanceScore: r.RelevanceScore,
-		})
+		}
+		if doc := parseResultDocument(r.Document); doc != nil {
+			item.Document = doc
+		}
+		results = append(results, item)
 	}
 
 	resp := schema.Response{
@@ -322,4 +314,48 @@ func parseResponse(respBody []byte) (schema.Response, error) {
 	}
 
 	return resp, nil
+}
+
+func parseResultDocument(raw any) *schema.Document {
+	switch doc := raw.(type) {
+	case nil:
+		return nil
+	case string:
+		if strings.TrimSpace(doc) == "" {
+			return nil
+		}
+		return &schema.Document{Text: doc}
+	case map[string]any:
+		result := &schema.Document{}
+		text, _ := doc[fieldText].(string)
+		if strings.TrimSpace(text) != "" {
+			result.Text = text
+		}
+		image, _ := doc[fieldImage].(string)
+		if strings.TrimSpace(image) != "" {
+			result.Part = &schema.Part{
+				Type: schema.PartTypeImage,
+				Image: &schema.Image{
+					URL: ptr(strings.TrimSpace(image)),
+				},
+			}
+		}
+		video, _ := doc[fieldVideo].(string)
+		if strings.TrimSpace(video) != "" {
+			result.Part = &schema.Part{
+				Type: schema.PartTypeVideo,
+				Video: &schema.Video{
+					URL: strings.TrimSpace(video),
+				},
+			}
+		}
+		if result.Text != "" || result.Part != nil {
+			return result
+		}
+	}
+	return nil
+}
+
+func ptr[T any](v T) *T {
+	return &v
 }

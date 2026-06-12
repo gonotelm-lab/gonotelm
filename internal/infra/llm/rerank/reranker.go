@@ -7,16 +7,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/rerank/dashscope"
 )
 
-type Provider string
-
-const (
-	DashScope Provider = "dashscope"
-)
-
-type Config struct {
-	DashScope dashscope.Config `toml:"dashscope"`
-}
-
 func New(
 	provider Provider,
 	cfg *Config,

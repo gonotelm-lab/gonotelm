@@ -57,7 +57,11 @@ level = "${ENV_GONOTELM_LOG_LEVEL:-debug}"
 [logic.chat]
 modelProvider = "${ENV_GONOTELM_LOGIC_CHAT_PROVIDER:-qwen}"
 model = "${ENV_GONOTELM_LOGIC_CHAT_MODEL:-glm-5.1}"
-maxRound = 10
+maxRound = ${ENV_GONOTELM_LOGIC_CHAT_MAX_ROUND:-10}
+rerankEnabled = ${ENV_GONOTELM_LOGIC_CHAT_RERANK_ENABLED:-false}
+rerankProvider = "${ENV_GONOTELM_LOGIC_RERANK_PROVIDER:-dashscope}"
+rerankTopN = ${ENV_GONOTELM_LOGIC_CHAT_RERANK_TOP_N:-30}
+rerankModel = "${ENV_GONOTELM_LOGIC_CHAT_RERANK_MODEL:-qwen3-rerank}"
 
 [logic.source]
 modelProvider = "${ENV_GONOTELM_LOGIC_SOURCE_PROVIDER:-qwen}"
@@ -146,6 +150,16 @@ model = "${ENV_GONOTELM_QIANFAN_MODEL:-Embedding-V1}"
 secretId = "${ENV_GONOTELM_TENCENTCLOUD_SECRET_ID:-}"
 secretKey = "${ENV_GONOTELM_TENCENTCLOUD_SECRET_KEY:-}"
 region = "${ENV_GONOTELM_TENCENTCLOUD_REGION:-ap-guangzhou}"
+
+[rerank]
+type = "${ENV_GONOTELM_RERANK_TYPE:-dashscope}"
+
+[rerank.dashscope]
+apiKey = "${ENV_GONOTELM_DASHSCOPE_API_KEY:-}"
+baseURL = "${ENV_GONOTELM_RERANK_DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com}"
+path = "${ENV_GONOTELM_RERANK_DASHSCOPE_PATH:-/compatible-api/v1/reranks}"
+model = "${ENV_GONOTELM_RERANK_DASHSCOPE_MODEL:-qwen3-rerank}"
+timeout = "${ENV_GONOTELM_RERANK_DASHSCOPE_TIMEOUT:-30s}"
 
 [provider]
 

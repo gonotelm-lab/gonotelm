@@ -38,6 +38,9 @@ type OpenaiConfig struct {
 	Seed             *int          `toml:"seed"`
 	FrequencyPenalty *float32      `toml:"frequencyPenalty"`
 	ReasoningEffort  string        `toml:"reasoningEffort"` // low, medium, high
+
+	// Gateway最大并发调用数 通过合理设置此值防止被限流
+	MaxConcurrency int `toml:"maxConcurrency"`
 }
 
 func (c *OpenaiConfig) ToEino() *openai.ChatModelConfig {
@@ -67,6 +70,9 @@ type QwenConfig struct {
 	Seed             *int          `toml:"seed"`
 	FrequencyPenalty *float32      `toml:"frequencyPenalty"`
 	EnableThinking   *bool         `toml:"enableThinking"`
+
+	// Gateway最大并发调用数 通过合理设置此值防止被限流
+	MaxConcurrency int `toml:"maxConcurrency"`
 }
 
 func (c *QwenConfig) ToEino() *qwen.ChatModelConfig {
@@ -99,6 +105,9 @@ type DeepSeekConfig struct {
 	LogProbs         bool          `toml:"logProbs"`
 	TopLogProbs      int           `toml:"topLogProbs"`
 	ThinkingEnabled  bool          `toml:"thinkingEnabled"`
+
+	// Gateway最大并发调用数 通过合理设置此值防止被限流
+	MaxConcurrency int `toml:"maxConcurrency"`
 }
 
 func (c *DeepSeekConfig) ToEino() *deepseek.ChatModelConfig {

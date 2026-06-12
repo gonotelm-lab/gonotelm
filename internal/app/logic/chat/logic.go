@@ -12,6 +12,7 @@ import (
 	chatmodel "github.com/gonotelm-lab/gonotelm/internal/app/model/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/app/prompts"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/rerank"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
@@ -35,6 +36,7 @@ type Logic struct {
 
 func MustNewLogic(
 	llmGateway *gateway.Gateway,
+	rerankerGateway *rerank.Gateway,
 	notebookBiz *biznotebook.Biz,
 	sourceBiz *bizsource.Biz,
 	agentSourceBiz *bizsource.AgentBiz,
@@ -53,7 +55,7 @@ func MustNewLogic(
 		eventManager:        eventManager,
 		llmGateway:          llmGateway,
 		chatTemplateManager: chatTemplateManager,
-		sourceDocRetriever:  NewSourceDocRetriever(sourceBiz, agentSourceBiz, llmGateway),
+		sourceDocRetriever:  NewSourceDocRetriever(sourceBiz, agentSourceBiz, llmGateway, rerankerGateway),
 	}
 
 	return logic

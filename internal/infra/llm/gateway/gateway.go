@@ -13,10 +13,13 @@ import (
 	"github.com/cloudwego/eino/components"
 	einomodel "github.com/cloudwego/eino/components/model"
 	einoschema "github.com/cloudwego/eino/schema"
+	"golang.org/x/sync/semaphore"
 )
 
 const (
 	wrappedChatModelRunName = "gateway-chat-model"
+
+	defaultMaxConcurrency = 250
 )
 
 // 管理项目中的多个提供商的LLM模型，根据配置选择不同的模型
@@ -49,21 +52,21 @@ func (g *Gateway) initProviders(cfg *chat.ProviderConfig) error {
 	if err != nil {
 		return err
 	}
-	g.providers[chat.DeepSeek] = newWrappedChatModel(deepseekModel, chat.DeepSeek)
+	g.providers[chat.DeepSeek] = newWrappedChatModel(deepseekModel, chat.DeepSeek, cfg.DeepSeek.MaxConcurrency)
 
 	// 2. openai
 	openaiModel, err := chat.New(ctx, chat.Openai, cfg)
 	if err != nil {
 		return err
 	}
-	g.providers[chat.Openai] = newWrappedChatModel(openaiModel, chat.Openai)
+	g.providers[chat.Openai] = newWrappedChatModel(openaiModel, chat.Openai, cfg.Openai.MaxConcurrency)
 
 	// 3. qwen
 	qwenModel, err := chat.New(ctx, chat.Qwen, cfg)
 	if err != nil {
 		return err
 	}
-	g.providers[chat.Qwen] = newWrappedChatModel(qwenModel, chat.Qwen)
+	g.providers[chat.Qwen] = newWrappedChatModel(qwenModel, chat.Qwen, cfg.Qwen.MaxConcurrency)
 
 	return nil
 }
@@ -81,20 +84,35 @@ func (g *Gateway) GetProvider(providerType chat.Provider) (einomodel.ToolCalling
 }
 
 type wrappedChatModel struct {
-	typ      string
-	provider chat.Provider
-	impl     einomodel.ToolCallingChatModel
+	typ            string
+	provider       chat.Provider
+	impl           einomodel.ToolCallingChatModel
+	maxConcurrency int
+	sem            *semaphore.Weighted
 }
 
-func newWrappedChatModel(impl einomodel.ToolCallingChatModel, provider chat.Provider) *wrappedChatModel {
+func newWrappedChatModel(
+	impl einomodel.ToolCallingChatModel,
+	provider chat.Provider,
+	maxConcurrency int,
+) *wrappedChatModel {
 	typ, ok := components.GetType(impl)
 	if !ok {
 		typ = "GatewayWrapped"
 	}
+
+	if maxConcurrency <= 0 {
+		maxConcurrency = defaultMaxConcurrency
+	}
+
+	sem := semaphore.NewWeighted(int64(maxConcurrency))
+
 	return &wrappedChatModel{
-		typ:      typ,
-		provider: provider,
-		impl:     impl,
+		typ:            typ,
+		provider:       provider,
+		impl:           impl,
+		maxConcurrency: maxConcurrency,
+		sem:            sem,
 	}
 }
 
@@ -113,9 +131,16 @@ func (g *wrappedChatModel) Generate(
 		Component: components.ComponentOfChatModel,
 	}, &Interceptor{})
 
+	err := g.sem.Acquire(ctx, 1)
+	if err != nil {
+		return nil, err // ctx.Err()
+	}
+	defer g.sem.Release(1)
+
 	return g.impl.Generate(ctx, input, opts...)
 }
 
+// 调用方必须主动Close流式输出，否则会导致资源泄漏
 func (g *wrappedChatModel) Stream(
 	ctx context.Context,
 	input []*einoschema.Message,
@@ -123,6 +148,7 @@ func (g *wrappedChatModel) Stream(
 ) (*einoschema.StreamReader[*einoschema.Message], error) {
 	modelName := extractOptionModelName(opts...)
 	ctx = withModelName(ctx, modelName)
+	ctx = withIsStreaming(ctx, true)
 	ctx = callbacks.InitCallbacks(ctx, &callbacks.RunInfo{
 		Name:      wrappedChatModelRunName,
 		Type:      g.typ,
@@ -138,7 +164,22 @@ func (g *wrappedChatModel) Stream(
 		opts = append(opts, qwenext.WithExtraFields(streamOptionsIncludeUsage))
 	}
 
-	return g.impl.Stream(ctx, input, opts...)
+	err := g.sem.Acquire(ctx, 1)
+	if err != nil {
+		return nil, err // ctx.Err()
+	}
+	releaseSem := sync.OnceFunc(func() {
+		g.sem.Release(1)
+	})
+	ctx = withSemReleaseFunc(ctx, releaseSem)
+
+	stream, err := g.impl.Stream(ctx, input, opts...)
+	if err != nil {
+		releaseSem()
+		return nil, err
+	}
+
+	return stream, nil
 }
 
 func (g *wrappedChatModel) WithTools(
@@ -149,7 +190,7 @@ func (g *wrappedChatModel) WithTools(
 		return nil, err
 	}
 
-	return newWrappedChatModel(impl, g.provider), nil
+	return newWrappedChatModel(impl, g.provider, g.maxConcurrency), nil
 }
 
 func extractOptionModelName(opts ...einomodel.Option) string {
@@ -159,21 +200,6 @@ func extractOptionModelName(opts ...einomodel.Option) string {
 	}
 	modelName := *option.Model
 	if modelName == "" {
-		return ""
-	}
-
-	return modelName
-}
-
-type modelNameKeyType struct{}
-
-func withModelName(ctx context.Context, modelName string) context.Context {
-	return context.WithValue(ctx, modelNameKeyType{}, modelName)
-}
-
-func getModelName(ctx context.Context) string {
-	modelName, ok := ctx.Value(modelNameKeyType{}).(string)
-	if !ok {
 		return ""
 	}
 

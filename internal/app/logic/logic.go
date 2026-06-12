@@ -14,7 +14,10 @@ import (
 	studiologic "github.com/gonotelm-lab/gonotelm/internal/app/logic/studio"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infra"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/cache"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/embedding"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/rerank"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
 )
 
@@ -30,7 +33,22 @@ func MustNewLogic(
 	infrastructures *infra.Instances,
 	objectStorage storage.Storage,
 ) *Logic {
-	gateway, err := gateway.New(&conf.Global().Provider)
+	llmGateway, err := gateway.New(&conf.Global().Provider)
+	if err != nil {
+		panic(err)
+	}
+
+	embeddingGateway, err := embedding.NewGateway(
+		&conf.Global().Embedding,
+		embedding.NewRedisCacher(cache.GetRedis()),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	rerankerGateway, err := rerank.NewGateway(
+		&conf.Global().Rerank,
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -49,7 +67,8 @@ func MustNewLogic(
 		objectStorage,
 		infrastructures.Dal.SourceStore,
 		infrastructures.VectorDal.SourceDocStore,
-		gateway,
+		llmGateway,
+		embeddingGateway,
 	)
 	if err != nil {
 		panic(err)
@@ -71,7 +90,7 @@ func MustNewLogic(
 		objectStorage,
 		notebookBiz,
 		sourceBiz,
-		gateway,
+		llmGateway,
 	)
 
 	notebookLogic := notebooklogic.NewLogic(
@@ -82,7 +101,8 @@ func MustNewLogic(
 	)
 
 	chatLogic := chatlogic.MustNewLogic(
-		gateway,
+		llmGateway,
+		rerankerGateway,
 		notebookBiz,
 		sourceBiz,
 		agentSourceBiz,
@@ -97,7 +117,7 @@ func MustNewLogic(
 		agentSourceBiz,
 		notebookBiz,
 		artifactBiz,
-		gateway,
+		llmGateway,
 	)
 
 	return &Logic{

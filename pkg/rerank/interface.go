@@ -7,5 +7,5 @@ import (
 )
 
 type Reranker interface {
-	Rerank(ctx context.Context, req schema.Request, opts ...Option) (schema.Response, error)
+	Rerank(ctx context.Context, req *schema.Request, opts ...Option) (schema.Response, error)
 }

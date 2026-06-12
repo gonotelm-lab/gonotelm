@@ -105,8 +105,11 @@ func (i *Interceptor) OnError(
 	info *callbacks.RunInfo,
 	err error,
 ) context.Context {
+	runSemRelease(ctx)
+
 	slog.ErrorContext(ctx, "[Interceptor] OnError",
 		slog.Any("info", info),
+		slog.Bool("is_streaming", getIsStreaming(ctx)),
 		slog.Any("err", err),
 	)
 
@@ -127,7 +130,10 @@ func (i *Interceptor) OnEndWithStreamOutput(
 	output *schema.StreamReader[callbacks.CallbackOutput],
 ) context.Context {
 	safe.Go(ctx, func() {
-		defer output.Close()
+		defer func() {
+			output.Close()
+			runSemRelease(ctx)
+		}()
 
 		var lastCallbackOutput *model.CallbackOutput
 		for {

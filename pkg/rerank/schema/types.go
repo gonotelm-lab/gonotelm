@@ -36,13 +36,12 @@ type Part struct {
 	Text  string `json:"text,omitempty"`
 	Image *Image `json:"image,omitempty"`
 	Video *Video `json:"video,omitempty"`
-
-	Extra map[string]any `json:"extra,omitempty"`
 }
 
 type Document struct {
-	Parts []Part         `json:"parts"`
-	Extra map[string]any `json:"extra,omitempty"`
+	// Text 和 Part 二选一；当 Part 非空时优先使用 Part。
+	Text string `json:"text,omitempty"`
+	Part *Part  `json:"part,omitempty"`
 }
 
 // Query 表示 query string | object 的并集类型：
@@ -115,19 +114,22 @@ type Request struct {
 	Documents []Document `json:"documents"`
 	TopN      int        `json:"top_n,omitempty"`
 	Model     string     `json:"model,omitempty"`
+	// ReturnDocuments 控制是否在响应结果中返回 document 字段。
+	ReturnDocuments bool `json:"return_documents,omitempty"`
 
 	Extra map[string]any `json:"extra,omitempty"`
 }
 
 type Response struct {
-	Results []Result `json:"results,omitempty"`
-	Usage   Usage    `json:"usage,omitempty"`
+	Results []Result       `json:"results,omitempty"`
+	Usage   Usage          `json:"usage,omitempty"`
 	Extra   map[string]any `json:"extra,omitempty"`
 }
 
 type Result struct {
-	Index          int     `json:"index"`
-	RelevanceScore float64 `json:"relevance_score"`
+	Document       *Document      `json:"document,omitempty"`
+	Index          int            `json:"index"`
+	RelevanceScore float32        `json:"relevance_score"`
 	Extra          map[string]any `json:"extra,omitempty"`
 }
 

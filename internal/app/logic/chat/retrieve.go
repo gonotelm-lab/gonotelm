@@ -15,8 +15,10 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/rerank"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	rerankschema "github.com/gonotelm-lab/gonotelm/pkg/rerank/schema"
 	pkgslices "github.com/gonotelm-lab/gonotelm/pkg/slices"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
@@ -29,19 +31,23 @@ import (
 type dummyState struct{}
 
 type SourceDocRetriever struct {
-	sourceBiz      *bizsource.Biz
-	agentSourceBiz *bizsource.AgentBiz
-	llmGateway     *gateway.Gateway
+	sourceBiz       *bizsource.Biz
+	agentSourceBiz  *bizsource.AgentBiz
+	llmGateway      *gateway.Gateway
+	rerankerGateway *rerank.Gateway
 }
 
 func NewSourceDocRetriever(
 	sourceBiz *bizsource.Biz,
 	agentSourceBiz *bizsource.AgentBiz,
-	llmGateway *gateway.Gateway) *SourceDocRetriever {
+	llmGateway *gateway.Gateway,
+	rerankerGateway *rerank.Gateway,
+) *SourceDocRetriever {
 	return &SourceDocRetriever{
-		sourceBiz:      sourceBiz,
-		agentSourceBiz: agentSourceBiz,
-		llmGateway:     llmGateway,
+		sourceBiz:       sourceBiz,
+		agentSourceBiz:  agentSourceBiz,
+		llmGateway:      llmGateway,
+		rerankerGateway: rerankerGateway,
 	}
 }
 
@@ -135,11 +141,29 @@ func (s *SourceDocRetriever) Retrieve(
 	vecSearchSourceDocs = pkgslices.UniqueyFn(vecSearchSourceDocs,
 		func(doc *model.SourceDoc) string {
 			return doc.Id
-		})
+		},
+	)
 
 	slog.DebugContext(ctx, "successfully retrieved source docs",
 		slog.String("task_id", taskId), slog.Int("count", len(vecSearchSourceDocs)),
 	)
+
+	if conf.Global().Logic.Chat.RerankEnabled {
+		slog.DebugContext(ctx, fmt.Sprintf("reranking %d source docs", len(vecSearchSourceDocs)),
+			slog.String("task_id", taskId), slog.String("user_prompt", userPrompt),
+		)
+		rerankedSourceDocs, err := s.rerankSourceDocs(ctx,
+			userPrompt,
+			vecSearchSourceDocs,
+		)
+		if err != nil {
+			slog.ErrorContext(ctx, "rerank source docs failed",
+				slog.String("task_id", taskId), slog.Any("err", err),
+			)
+		} else {
+			vecSearchSourceDocs = rerankedSourceDocs
+		}
+	}
 
 	return vecSearchSourceDocs, nil
 }
@@ -217,7 +241,7 @@ func (s *SourceDocRetriever) agentRetrieve(
 		llmOptions = append(llmOptions, llmchat.WithThinking(provider, true))
 	}
 
-	var maxRound = conf.Global().Logic.Chat.MaxRound
+	maxRound := conf.Global().Logic.Chat.MaxRound
 	agentConfig := agent.Config[dummyState]{
 		MaxRound: maxRound,
 		BaseLLM:  llm,
@@ -304,6 +328,9 @@ func (s *SourceDocRetriever) agentRetrieve(
 		for _, docId := range expect.DocIds {
 			docIds = append(docIds, docId.String())
 		}
+
+		// 去重
+		docIds = pkgslices.Unique(docIds)
 		retrievedDocs, err := s.sourceBiz.BatchGetSourceDocs(ctx,
 			&bizsource.BatchGetSourceDocsQuery{
 				NotebookId: notebookId,
@@ -348,7 +375,9 @@ func (e llmRetrivalExpect) Continuing() bool {
 	return *e.ShouldContinue
 }
 
-func (s *SourceDocRetriever) beforeRoundHook(agent *agent.Agent[dummyState]) agent.BeforeRoundHook[dummyState] {
+func (s *SourceDocRetriever) beforeRoundHook(
+	agent *agent.Agent[dummyState],
+) agent.BeforeRoundHook[dummyState] {
 	return func(
 		ctx context.Context,
 		round int,
@@ -365,4 +394,45 @@ func (s *SourceDocRetriever) beforeRoundHook(agent *agent.Agent[dummyState]) age
 
 		return msgs, nil
 	}
+}
+
+func (s *SourceDocRetriever) rerankSourceDocs(
+	ctx context.Context,
+	query string,
+	sourceDocs []*model.SourceDoc,
+) ([]*model.SourceDoc, error) {
+	provider := conf.Global().Logic.Chat.RerankProvider
+	reranker, err := s.rerankerGateway.GetProvider(provider)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "get reranker failed, provider=%s", provider)
+	}
+
+	req := &rerankschema.Request{
+		Query: rerankschema.NewStringQuery(query),
+		TopN:  conf.Global().Logic.Chat.GetRerankTopN(),
+		Model: conf.Global().Logic.Chat.RerankModel,
+	}
+
+	for _, doc := range sourceDocs {
+		req.Documents = append(req.Documents, rerankschema.Document{
+			Text: doc.Content,
+		})
+	}
+
+	resp, err := reranker.Rerank(ctx, req)
+	if err != nil {
+		return nil, errors.WithMessage(err, "rerank source docs failed")
+	}
+
+	selected := make([]int, 0, len(resp.Results))
+	lenSourceDocs := len(sourceDocs)
+	for _, result := range resp.Results {
+		if result.Index < lenSourceDocs && result.Index >= 0 {
+			selected = append(selected, result.Index)
+			sourceDocs[result.Index].Score = result.RelevanceScore
+		}
+	}
+
+	// 只返回选中的文档
+	return pkgslices.Select(sourceDocs, selected), nil
 }

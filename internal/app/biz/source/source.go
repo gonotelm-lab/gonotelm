@@ -9,7 +9,6 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/cache"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal/schema"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/embedding"
@@ -46,14 +45,12 @@ func New(
 	sourceStore dal.SourceStore,
 	sourceDocStore vectordal.SourceDocStore,
 	llmGateway *gateway.Gateway,
+	embeddingGateway *embedding.Gateway,
 ) (*Biz, error) {
-	embedder, err := embedding.New(
-		context.Background(),
-		&conf.Global().Embedding,
-		embedding.NewRedisCacher(cache.GetRedis()),
-	)
+	providerType := conf.Global().Embedding.Type
+	embedder, err := embeddingGateway.GetProvider(providerType)
 	if err != nil {
-		return nil, errors.WithMessage(err, "new embedder failed")
+		return nil, errors.WithMessage(err, "get embedder from gateway failed")
 	}
 
 	b := &Biz{

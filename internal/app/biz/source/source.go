@@ -9,7 +9,6 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/cache"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal/schema"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/embedding"
@@ -46,14 +45,12 @@ func New(
 	sourceStore dal.SourceStore,
 	sourceDocStore vectordal.SourceDocStore,
 	llmGateway *gateway.Gateway,
+	embeddingGateway *embedding.Gateway,
 ) (*Biz, error) {
-	embedder, err := embedding.New(
-		context.Background(),
-		&conf.Global().Embedding,
-		embedding.NewRedisCacher(cache.GetRedis()),
-	)
+	providerType := conf.Global().Embedding.Type
+	embedder, err := embeddingGateway.GetProvider(providerType)
 	if err != nil {
-		return nil, errors.WithMessage(err, "new embedder failed")
+		return nil, errors.WithMessage(err, "get embedder from gateway failed")
 	}
 
 	b := &Biz{
@@ -101,28 +98,12 @@ func (b *Biz) BatchGetSources(
 	return sources, nil
 }
 
-type getDecodedSourceOption struct {
-	populateContentRef bool
-}
-
-type GetDecodedSourceOptions func(o *getDecodedSourceOption)
-
-func WithContentRefUrl(b bool) GetDecodedSourceOptions {
-	return func(o *getDecodedSourceOption) {
-		o.populateContentRef = b
-	}
-}
-
 func (b *Biz) GetDecodedSource(
 	ctx context.Context,
 	sourceId uuid.UUID,
-	options ...GetDecodedSourceOptions,
+	options ...SourceOption,
 ) (*model.DecodedSource, error) {
-	var opt getDecodedSourceOption
-	for _, option := range options {
-		option(&opt)
-	}
-
+	opt := newSourceOption(options...)
 	rawSource, err := b.GetSource(ctx, sourceId)
 	if err != nil {
 		return nil, err
@@ -160,13 +141,9 @@ func (b *Biz) BatchGetDecodedSources(
 	ctx context.Context,
 	notebookId uuid.UUID,
 	sourceIds []uuid.UUID,
-	options ...GetDecodedSourceOptions,
+	options ...SourceOption,
 ) ([]*model.DecodedSource, error) {
-	var opt getDecodedSourceOption
-	for _, option := range options {
-		option(&opt)
-	}
-
+	opt := newSourceOption(options...)
 	sources, err := b.BatchGetSources(ctx, notebookId, sourceIds)
 	if err != nil {
 		return nil, errors.WithMessage(err, "batch get sources failed")
@@ -208,13 +185,9 @@ type ListDecodedSourcesByNotebookQuery struct {
 
 func (b *Biz) ListDecodedSourcesByNotebook(
 	ctx context.Context, query *ListDecodedSourcesByNotebookQuery,
-	options ...GetDecodedSourceOptions,
+	options ...SourceOption,
 ) ([]*model.DecodedSource, error) {
-	var opt getDecodedSourceOption
-	for _, option := range options {
-		option(&opt)
-	}
-
+	opt := newSourceOption(options...)
 	rows, err := b.sourceStore.ListByNotebookId(
 		ctx,
 		query.NotebookId,
@@ -324,13 +297,9 @@ func (b *Biz) FetchNotebookSources(
 func (b *Biz) FetchNotebookDecodedSources(
 	ctx context.Context,
 	notebookId uuid.UUID,
-	options ...GetDecodedSourceOptions,
+	options ...SourceOption,
 ) ([]*model.DecodedSource, error) {
-	var opt getDecodedSourceOption
-	for _, option := range options {
-		option(&opt)
-	}
-
+	opt := newSourceOption(options...)
 	var (
 		limit             = 100
 		offset            = 0
@@ -731,27 +700,12 @@ func (b *Biz) GetSourceUser(ctx context.Context, sourceId uuid.UUID) (string, er
 	return source.OwnerId, nil
 }
 
-type batchPopulateFullSourcesOptions struct {
-	forDownload bool
-}
-
-type BatchPopulateFullSourcesOptions func(o *batchPopulateFullSourcesOptions)
-
-func WithForDownload(b bool) BatchPopulateFullSourcesOptions {
-	return func(o *batchPopulateFullSourcesOptions) {
-		o.forDownload = b
-	}
-}
-
 func (b *Biz) BatchPopulateFullSources(
 	ctx context.Context,
 	sources []*model.FullSource,
-	options ...BatchPopulateFullSourcesOptions,
+	options ...SourceOption,
 ) error {
-	var opt batchPopulateFullSourcesOptions
-	for _, option := range options {
-		option(&opt)
-	}
+	opt := newSourceOption(options...)
 
 	var wg sync.WaitGroup
 	for _, source := range sources {

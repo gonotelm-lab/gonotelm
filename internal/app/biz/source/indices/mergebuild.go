@@ -6,8 +6,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/gonotelm-lab/gonotelm/internal/app/prompts"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
 	vschema "github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/algo/manifold"
 	"github.com/gonotelm-lab/gonotelm/pkg/algo/mixture"
@@ -16,8 +14,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/slices"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 	"golang.org/x/sync/errgroup"
-
-	einoschema "github.com/cloudwego/eino/schema"
 )
 
 // 从叶子节点nodes由下至上通过合并的方式构建树结构
@@ -238,28 +234,16 @@ func (b *DocTreeBuilder) extractNodes(
 	nodes []*DocTreeNode,
 	targetLevel int,
 ) (*DocTreeNode, error) {
-	providerType := chat.Provider(b.providerSelector(ctx))
-	provider, err := b.gateway.GetProvider(providerType)
-	if err != nil {
-		return nil, errors.Wrapf(errors.ErrInner, "get provider failed, err=%v", err)
-	}
-	model := b.modelSelector(ctx)
-	llmOption := chat.BuildLLMModelOption(model)
 	tbd := strings.Builder{}
 	for _, node := range nodes {
 		tbd.WriteString(node.core.Content)
 		tbd.WriteString("\n")
 	}
-	msg, err := prompts.SummarizeMessage(ctx, tbd.String(), "")
+	summary, err := b.summarizer.Summarize(ctx, tbd.String())
 	if err != nil {
-		return nil, errors.Wrapf(errors.ErrInner, "render summarize prompt failed, err=%v", err)
-	}
-	genResp, err := provider.Generate(ctx, []*einoschema.Message{msg}, llmOption)
-	if err != nil {
-		return nil, errors.Wrapf(errors.ErrLLM, "generate summary failed, err=%v", err)
+		return nil, errors.WithMessagef(err, "generate summary failed")
 	}
 
-	summary := genResp.Content
 	// gen embedding
 	embedResp, err := b.embedder.EmbedStrings(ctx, []string{summary})
 	if err != nil {
@@ -271,38 +255,33 @@ func (b *DocTreeBuilder) extractNodes(
 	embedding := embedResp[0]
 
 	var (
-		notebookId  = nodes[0].core.NotebookId
-		sourceId    = nodes[0].core.SourceId
-		owner       = nodes[0].core.Owner
-		derivedFrom = collectDerivedFromFromChildren(nodes)
+		notebookId = nodes[0].core.NotebookId
+		sourceId   = nodes[0].core.SourceId
+		owner      = nodes[0].core.Owner
+		derivation = collectDerivationFromChildren(nodes)
 	)
 
-	newNode := &DocTreeNode{
-		core: &vschema.SourceDoc{
-			Id:         uuid.NewV4().String(),
-			NotebookId: notebookId,
-			SourceId:   sourceId,
-			Owner:      owner,
-			Content:    summary,
-			Embedding:  slices.CastFloat[float64, float32](embedding),
-			ChunkPos:   -1, // 派生节点后续流程会分配
-		},
-		level:       targetLevel,
-		pos:         -1,
-		children:    nodes,
-		derivedFrom: derivedFrom,
+	core := &vschema.SourceDoc{
+		Id:         uuid.NewV4().String(),
+		NotebookId: notebookId,
+		SourceId:   sourceId,
+		Owner:      owner,
+		Content:    summary,
+		Embedding:  slices.CastFloat[float64, float32](embedding),
+		ChunkPos:   -1, // 派生节点后续流程会分配
 	}
+	newNode := NewDocTreeNode(core, targetLevel, -1, nodes, derivation)
 
 	return newNode, nil
 }
 
-func collectDerivedFromFromChildren(nodes []*DocTreeNode) []string {
-	derivedFrom := make([]string, 0, len(nodes))
+func collectDerivationFromChildren(nodes []*DocTreeNode) []string {
+	d := make([]string, 0, len(nodes))
 	for _, node := range nodes {
 		if node == nil {
 			continue
 		}
-		derivedFrom = append(derivedFrom, node.derivedFrom...)
+		d = append(d, node.derivation...)
 	}
-	return slices.Unique(derivedFrom)
+	return slices.Unique(d)
 }

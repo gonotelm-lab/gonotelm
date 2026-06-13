@@ -6,8 +6,8 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/route"
 	"github.com/gonotelm-lab/gonotelm/internal/api/schema"
-	"github.com/gonotelm-lab/gonotelm/internal/app/logic"
-	studiologic "github.com/gonotelm-lab/gonotelm/internal/app/logic/studio"
+	"github.com/gonotelm-lab/gonotelm/internal/app/logic/notebook"
+	"github.com/gonotelm-lab/gonotelm/internal/app/logic/studio"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
@@ -65,7 +65,7 @@ func (s *Server) CreateNotebook(ctx context.Context, c *app.RequestContext) {
 	}
 
 	resp, err := s.notebookLogic.CreateNotebook(ctx,
-		&logic.CreateNotebookParams{
+		&notebook.CreateNotebookParams{
 			Name: req.Name,
 			Desc: req.Desc,
 		})
@@ -123,15 +123,15 @@ const (
 	ListNotebooksSortByCreateTime ListNotebooksSortBy = "create_time"
 )
 
-func (s ListNotebooksSortBy) ToSortBy() logic.ListNotebooksSortBy {
+func (s ListNotebooksSortBy) ToSortBy() notebook.ListNotebooksSortBy {
 	switch s {
 	case ListNotebooksSortByLastActive:
-		return logic.ListNotebooksSortByLastActive
+		return notebook.ListNotebooksSortByLastActive
 	case ListNotebooksSortByCreateTime:
-		return logic.ListNotebooksSortByCreateTime
+		return notebook.ListNotebooksSortByCreateTime
 	}
 
-	return logic.ListNotebooksSortByCreateTime
+	return notebook.ListNotebooksSortByCreateTime
 }
 
 type ListNotebooksRequest struct {
@@ -181,7 +181,7 @@ func (s *Server) ListNotebooks(ctx context.Context, c *app.RequestContext) {
 	}
 
 	result, err := s.notebookLogic.ListNotebooks(ctx,
-		&logic.ListNotebooksParams{
+		&notebook.ListNotebooksParams{
 			Limit:  req.Limit,
 			Offset: req.Offset,
 			SortBy: req.SortBy.ToSortBy(),
@@ -244,7 +244,7 @@ func (s *Server) ListNotebookSources(ctx context.Context, c *app.RequestContext)
 	}
 
 	result, err := s.notebookLogic.ListNotebookSources(ctx,
-		&logic.ListNotebookSourcesParams{
+		&notebook.ListNotebookSourcesParams{
 			NotebookId: req.Id,
 			Limit:      req.Limit,
 			Offset:     req.Offset,
@@ -369,7 +369,7 @@ func (s *Server) ListNotebookStudioArtifacts(ctx context.Context, c *app.Request
 	}
 
 	result, err := s.studioLogic.ListNotebookArtifacts(ctx,
-		&studiologic.ListNotebookArtifactsParams{
+		&studio.ListNotebookArtifactsParams{
 			NotebookId: req.Id,
 			Limit:      req.Limit,
 			Offset:     req.Offset,

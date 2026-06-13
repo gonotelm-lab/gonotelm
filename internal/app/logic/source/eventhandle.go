@@ -15,8 +15,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/mq"
-	mqimpl "github.com/gonotelm-lab/gonotelm/internal/infra/mq/impl"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/mq/impl/kafka"
 	"github.com/gonotelm-lab/gonotelm/pkg/batch"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -31,36 +29,6 @@ const (
 	sourcePrepareRetryKey   = "x-source-prepare-retry"
 	sourcePrepareRetryValue = "true"
 )
-
-func mustNewMsgQueueProducer() mq.Producer {
-	switch conf.Global().MsgQueue.Type {
-	case mqimpl.Kafka:
-		return kafka.NewProducer(kafka.ProducerConfig{
-			Brokers:  conf.Global().MsgQueue.Kafka.Brokers,
-			Username: conf.Global().MsgQueue.Kafka.Username,
-			Password: conf.Global().MsgQueue.Kafka.Password,
-		})
-	default:
-		panic("unknown msg queue type")
-	}
-}
-
-func mustNewMsgQueueConsumer(topic, groupId string) mq.Consumer {
-	switch conf.Global().MsgQueue.Type {
-	case mqimpl.Kafka:
-		return kafka.NewConsumer(kafka.ConsumerConfig{
-			Brokers:        conf.Global().MsgQueue.Kafka.Brokers,
-			GroupID:        groupId,
-			Topic:          topic,
-			QueueCapacity:  conf.Global().MsgQueue.Kafka.ConsumerQueueCapacity,
-			CommitInterval: conf.Global().MsgQueue.Kafka.ConsumerCommitInterval,
-			Username:       conf.Global().MsgQueue.Kafka.Username,
-			Password:       conf.Global().MsgQueue.Kafka.Password,
-		})
-	default:
-		panic("unknown msg queue type")
-	}
-}
 
 // logic event handler
 func (l *Logic) notifySourceEventMessage(
@@ -262,22 +230,6 @@ func (l *Logic) generateSourceSummary(
 		return
 	}
 
-	summaryModel, err := l.llmGateway.GetProvider(
-		conf.Global().Logic.Source.ModelProvider,
-	)
-	if err != nil {
-		slog.ErrorContext(ctx, "get summary model failed",
-			slog.String("source_id", sourceId.String()),
-			slog.String("notebook_id", notebookId.String()),
-			slog.Any("err", err),
-		)
-		return
-	}
-	var (
-		llmOption = llmchat.BuildLLMModelOption(conf.Global().Logic.Source.Model)
-		userLang  = "" // TODO
-	)
-
 	const (
 		batchSize          = 1
 		maxConcurrency     = 20
@@ -297,19 +249,7 @@ func (l *Logic) generateSourceSummary(
 		batchSize,
 		maxConcurrency,
 		func(ctx context.Context, batch []string) ([]string, error) {
-			summaryPrompt, err := prompts.SummarizeMessage(
-				ctx, batch[0], userLang,
-			)
-			if err != nil {
-				slog.ErrorContext(ctx, "render summarize prompt failed",
-					slog.String("source_id", sourceId.String()),
-					slog.Any("err", err),
-				)
-				return []string{}, nil
-			}
-
-			msgs := []*einoschema.Message{summaryPrompt}
-			result, err := summaryModel.Generate(ctx, msgs, llmOption)
+			summary, err := l.summarizer.Summarize(ctx, batch[0])
 			if err != nil {
 				slog.ErrorContext(ctx, "generate summary failed",
 					slog.String("source_id", sourceId.String()),
@@ -318,7 +258,7 @@ func (l *Logic) generateSourceSummary(
 				return []string{}, nil
 			}
 
-			return []string{result.Content}, nil
+			return []string{summary}, nil
 		},
 	)
 	if err != nil {
@@ -331,28 +271,11 @@ func (l *Logic) generateSourceSummary(
 
 	// 给每个chunk的summary组合后再输出一句summary 作为整个source的summary
 	summarizingTexts := strings.Join(chunkSummaries, "\n")
-	summaryPrompt, err := prompts.SummarizeMessage(
-		ctx, summarizingTexts, userLang,
-	)
+	summary, err := l.summarizer.Summarize(ctx, summarizingTexts)
 	if err != nil {
-		slog.ErrorContext(ctx, "render summarize prompt failed",
-			slog.String("source_id", sourceId.String()),
-			slog.Any("err", err),
-		)
 		return
 	}
-
-	msgs := []*einoschema.Message{summaryPrompt}
-	summaryResult, err := summaryModel.Generate(ctx, msgs, llmOption)
-	if err != nil {
-		slog.ErrorContext(ctx, "generate summary failed",
-			slog.String("source_id", sourceId.String()),
-			slog.Any("err", err),
-		)
-		return
-	}
-
-	if err := l.sourceBiz.UpdateAbstract(ctx, sourceId, summaryResult.Content); err != nil {
+	if err := l.sourceBiz.UpdateAbstract(ctx, sourceId, summary); err != nil {
 		slog.ErrorContext(ctx, "update source abstract failed",
 			slog.String("source_id", sourceId.String()),
 			slog.Any("err", err),
@@ -403,10 +326,9 @@ func (l *Logic) generateNotebookSummary(
 		}
 	}
 
-	userLang := "" // TODO
 	// generate prompt message
-	msg, err := prompts.NotebookSummaryMessage(
-		ctx, abstracts, userLang,
+	msg, err := prompts.RenderNotebookSummaryMessage(
+		ctx, abstracts, pkgcontext.GetLang(ctx),
 	)
 	if err != nil {
 		slog.ErrorContext(ctx, "render notebook summary prompt failed",
@@ -416,10 +338,13 @@ func (l *Logic) generateNotebookSummary(
 		return
 	}
 
-	// generate summary
-	provider, err := l.llmGateway.GetProvider(
-		conf.Global().Logic.Source.ModelProvider,
+	var (
+		provider = conf.Global().Logic.Source.ModelProvider
+		model    = conf.Global().Logic.Source.Model
 	)
+
+	// generate summary
+	chatModel, err := l.llmGateway.GetProvider(provider)
 	if err != nil {
 		slog.ErrorContext(ctx, "get summary model failed",
 			slog.String("notebook_id", notebookId.String()),
@@ -427,34 +352,33 @@ func (l *Logic) generateNotebookSummary(
 		)
 		return
 	}
-	llmOption := llmchat.BuildLLMModelOption(conf.Global().Logic.Source.Model)
-	result, err := provider.Generate(
+	result, err := chatModel.Generate(
 		ctx,
 		[]*einoschema.Message{msg},
-		llmOption,
+		llmchat.WithModel(model),
+		llmchat.WithResponseJsonObject(provider),
 	)
 	if err != nil {
 		slog.ErrorContext(ctx, "generate notebook summary failed",
-			slog.String("notebook_id", notebookId.String()),
-			slog.Any("err", err),
+			slog.String("notebook_id", notebookId.String()), slog.Any("err", err),
 		)
 		return
 	}
 
 	// now we update notebook description
-	convention := struct {
+	expect := struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
 		Valid       bool   `json:"valid"`
 	}{}
 
 	// truncate
-	convention.Name = strings.TrimSpace(convention.Name)
-	convention.Description = strings.TrimSpace(convention.Description)
-	convention.Name = constants.TruncateNotebookName(convention.Name)
-	convention.Description = constants.TruncateNotebookDescription(convention.Description)
+	expect.Name = strings.TrimSpace(expect.Name)
+	expect.Description = strings.TrimSpace(expect.Description)
+	expect.Name = constants.TruncateNotebookName(expect.Name)
+	expect.Description = constants.TruncateNotebookDescription(expect.Description)
 
-	err = sonic.Unmarshal(pkgstring.AsBytes(result.Content), &convention)
+	err = sonic.Unmarshal(pkgstring.AsBytes(result.Content), &expect)
 	if err != nil {
 		slog.WarnContext(ctx, "llm model response unmarshal failed",
 			slog.String("notebook_id", notebookId.String()),
@@ -463,7 +387,7 @@ func (l *Logic) generateNotebookSummary(
 		return
 	}
 
-	if !convention.Valid {
+	if !expect.Valid {
 		slog.WarnContext(ctx, "notebook summary is not valid",
 			slog.String("notebook_id", notebookId.String()),
 		)
@@ -477,8 +401,8 @@ func (l *Logic) generateNotebookSummary(
 	err = l.notebookBiz.FillNotebookMeta(ctx,
 		&biznotebook.FillNotebookMetaCommand{
 			Id:          notebookId,
-			Name:        convention.Name,
-			Description: convention.Description,
+			Name:        expect.Name,
+			Description: expect.Description,
 		})
 	if err != nil {
 		slog.ErrorContext(ctx, "fill notebook meta failed",

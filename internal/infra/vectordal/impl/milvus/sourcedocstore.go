@@ -310,9 +310,6 @@ func (s *SourceDocStoreImpl) BatchGet(
 	if notebookID == "" {
 		return nil, errors.ErrParams.Msg("notebook id is empty")
 	}
-	if sourceID == "" {
-		return nil, errors.ErrParams.Msg("source id is empty")
-	}
 
 	inputDocIDs := make([]string, 0, len(params.DocIds))
 	for _, docID := range params.DocIds {
@@ -328,12 +325,7 @@ func (s *SourceDocStoreImpl) BatchGet(
 
 	uniqueDocIDs := slices.Unique(inputDocIDs)
 	partitionName := partitionNameByNotebookID(notebookID)
-	filterExpr := fmt.Sprintf(
-		`%s == {%s} && %s == {%s} && %s in {%s}`,
-		schema.FieldNotebookID, notebookIDTplKey,
-		schema.FieldSourceID, sourceIDTplKey,
-		schema.FieldID, docIDsTplKey,
-	)
+	filterExpr := buildBatchGetFilterExpr(sourceID != "")
 
 	opt := milvusclient.NewQueryOption(collectionName).
 		WithPartitions(partitionName).
@@ -341,8 +333,10 @@ func (s *SourceDocStoreImpl) BatchGet(
 		WithOutputFields(schema.OutputFields...).
 		WithFilter(filterExpr).
 		WithTemplateParam(notebookIDTplKey, notebookID).
-		WithTemplateParam(sourceIDTplKey, sourceID).
 		WithTemplateParam(docIDsTplKey, uniqueDocIDs)
+	if sourceID != "" {
+		opt = opt.WithTemplateParam(sourceIDTplKey, sourceID)
+	}
 
 	rs, err := s.cli.Query(ctx, opt)
 	if err != nil {
@@ -374,6 +368,17 @@ func (s *SourceDocStoreImpl) BatchGet(
 	}
 
 	return orderedDocs, nil
+}
+
+func buildBatchGetFilterExpr(withSourceFilter bool) string {
+	clauses := []string{
+		fmt.Sprintf(`%s == {%s}`, schema.FieldNotebookID, notebookIDTplKey),
+	}
+	if withSourceFilter {
+		clauses = append(clauses, fmt.Sprintf(`%s == {%s}`, schema.FieldSourceID, sourceIDTplKey))
+	}
+	clauses = append(clauses, fmt.Sprintf(`%s in {%s}`, schema.FieldID, docIDsTplKey))
+	return strings.Join(clauses, " && ")
 }
 
 func (s *SourceDocStoreImpl) Query(

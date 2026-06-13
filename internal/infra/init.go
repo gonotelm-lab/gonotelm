@@ -9,6 +9,8 @@ import (
 	cacheimpl "github.com/gonotelm-lab/gonotelm/internal/infra/cache/impl"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal"
 	dalimpl "github.com/gonotelm-lab/gonotelm/internal/infra/dal/impl"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/mq"
+	mqimpl "github.com/gonotelm-lab/gonotelm/internal/infra/mq/impl"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/vectordal"
 	vectordalimpl "github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/impl"
 
@@ -20,6 +22,7 @@ var gInstances *Instances
 type Instances struct {
 	Dal       *dal.DAL
 	VectorDal *vectordal.DAL
+	MQ        *mq.MQ
 	Cache     *cacheimpl.Cache
 	Redis     redis.UniversalClient
 }
@@ -39,6 +42,13 @@ func MustInit(c *conf.Config) *Instances {
 
 	slog.Info("initialized vector dal", "type", c.VectorDB.Type)
 
+	mqInfra, err := mqimpl.New(&c.MsgQueue)
+	if err != nil {
+		panic(err)
+	}
+
+	slog.Info("initialized message queue", "type", c.MsgQueue.Type)
+
 	if err := cache.Init(&c.Redis); err != nil {
 		panic(err)
 	}
@@ -48,6 +58,7 @@ func MustInit(c *conf.Config) *Instances {
 	gInstances = &Instances{
 		Dal:       d,
 		VectorDal: vd,
+		MQ:        mqInfra,
 		Cache:     cacheImpl,
 		Redis:     cache.GetRedis(),
 	}

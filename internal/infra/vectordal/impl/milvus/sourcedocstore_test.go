@@ -265,6 +265,64 @@ func TestSourceDocStore_BatchGetWithoutMatches(t *testing.T) {
 	})
 }
 
+func TestSourceDocStore_BatchGetWithoutSourceIDFilter(t *testing.T) {
+	Convey("SourceDocStore BatchGet should allow empty source id and query by notebook+doc ids", t, func() {
+		store, closeFn := mustNewTestStore(t)
+		defer closeFn()
+
+		ctx := t.Context()
+		suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+		notebookID := "test-nb-batch-get-empty-source-" + suffix
+		sourceID := "test-src-batch-get-empty-source-" + suffix
+		docID := "test-doc-batch-get-empty-source-" + suffix
+
+		cleanupParams := &schema.SourceDocBatchDeleteParams{
+			NotebookId: notebookID,
+			SourceId:   []string{sourceID},
+		}
+		_ = store.BatchDelete(ctx, cleanupParams)
+		defer func() {
+			_ = store.BatchDelete(ctx, cleanupParams)
+		}()
+
+		err := store.BatchInsert(ctx, []*schema.SourceDoc{
+			{
+				Id:         docID,
+				NotebookId: notebookID,
+				SourceId:   sourceID,
+				Content:    "test-content-batch-get-empty-source",
+				Owner:      "test-owner",
+				Embedding:  make([]float32, 1024),
+				ChunkPos:   1,
+			},
+		})
+		So(err, ShouldBeNil)
+
+		var got []*schema.SourceDoc
+		deadline := time.Now().Add(8 * time.Second)
+		for {
+			got, err = store.BatchGet(ctx, &schema.SourceDocBatchGetParams{
+				NotebookId: notebookID,
+				SourceId:   "",
+				DocIds:     []string{docID},
+			})
+			if err == nil && len(got) == 1 {
+				break
+			}
+			if time.Now().After(deadline) {
+				break
+			}
+			time.Sleep(200 * time.Millisecond)
+		}
+
+		So(err, ShouldBeNil)
+		So(got, ShouldNotBeNil)
+		So(len(got), ShouldEqual, 1)
+		So(got[0].Id, ShouldEqual, docID)
+		So(got[0].SourceId, ShouldEqual, sourceID)
+	})
+}
+
 func TestSourceDocStore_GetWithoutMatches(t *testing.T) {
 	Convey("SourceDocStore Get should return ErrNoRecord when no matches", t, func() {
 		store, closeFn := mustNewTestStore(t)
@@ -393,4 +451,23 @@ func mustNewTestStore(t *testing.T) (*SourceDocStoreImpl, func()) {
 	return store, func() {
 		_ = cli.Close(context.Background())
 	}
+}
+
+func TestBuildBatchGetFilterExpr(t *testing.T) {
+	Convey("buildBatchGetFilterExpr should include source filter only when source id exists", t, func() {
+		withSource := buildBatchGetFilterExpr(true)
+		So(withSource, ShouldEqual, fmt.Sprintf(
+			`%s == {%s} && %s == {%s} && %s in {%s}`,
+			schema.FieldNotebookID, notebookIDTplKey,
+			schema.FieldSourceID, sourceIDTplKey,
+			schema.FieldID, docIDsTplKey,
+		))
+
+		withoutSource := buildBatchGetFilterExpr(false)
+		So(withoutSource, ShouldEqual, fmt.Sprintf(
+			`%s == {%s} && %s in {%s}`,
+			schema.FieldNotebookID, notebookIDTplKey,
+			schema.FieldID, docIDsTplKey,
+		))
+	})
 }

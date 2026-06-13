@@ -9,8 +9,10 @@ import (
 
 	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
+	"github.com/gonotelm-lab/gonotelm/internal/app/biz/textgen/summarizer"
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
+	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infra"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/mq"
@@ -51,10 +53,12 @@ type Logic struct {
 
 	notebookBiz  *biznotebook.Biz
 	sourceBiz    *bizsource.Biz
+	mqFactory    *mq.MQ
 	prepProducer mq.Producer
 	prepConsumer mq.Consumer
 
 	llmGateway *gateway.Gateway
+	summarizer summarizer.Summarizer
 
 	wg sync.WaitGroup
 }
@@ -87,20 +91,32 @@ func MustNewLogic(
 		objectStorage: objectStorage,
 		notebookBiz:   notebookBiz,
 		sourceBiz:     sourceBiz,
+		mqFactory:     infras.MQ,
 		llmGateway:    llmGateway,
 		redis:         infras.Redis,
 	}
 
+	summarizer := summarizer.NewWithOption(llmGateway,
+		summarizer.SummarizeOption{
+			Provider: conf.Global().Logic.Source.ModelProvider,
+			Model:    conf.Global().Logic.Source.Model,
+		})
+
+	sl.summarizer = summarizer
 	sl.mustInitMsgQueue()
 
 	return sl
 }
 
 func (l *Logic) mustInitMsgQueue() {
+	if l.mqFactory == nil || l.mqFactory.NewProducer == nil || l.mqFactory.NewConsumer == nil {
+		panic("message queue is not initialized")
+	}
+
 	// producer
-	l.prepProducer = mustNewMsgQueueProducer()
+	l.prepProducer = l.mqFactory.NewProducer()
 	// consumer
-	l.prepConsumer = mustNewMsgQueueConsumer(TopicSourcePreparation, SourcePreparationConsumerGroup)
+	l.prepConsumer = l.mqFactory.NewConsumer(TopicSourcePreparation, SourcePreparationConsumerGroup)
 	l.prepConsumer.Subscribe(l.rootCtx, TopicSourcePreparation, l.handleSourceEventMessage)
 }
 

@@ -124,20 +124,24 @@ func (m *mindmapGenerator) generate(
 	return m.twoshotCreateMindmap(ctx, params.NotebookId, parsedContents, tokensCounts)
 }
 
-func (m *mindmapGenerator) llmModelWithOption() (
+func (m *mindmapGenerator) llmOptions() (
 	einomodel.ToolCallingChatModel,
 	[]einomodel.Option,
 	error,
 ) {
-	model, err := m.l.llmGateway.GetProvider(
-		conf.Global().Logic.Studio.Mindmap.ModelProvider,
+	var (
+		provider = conf.Global().Logic.Studio.Mindmap.ModelProvider
+		model    = conf.Global().Logic.Studio.Mindmap.Model
 	)
+	chatModel, err := m.l.llmGateway.GetProvider(provider)
 	if err != nil {
 		return nil, nil, errors.Wrapf(errors.ErrInner, "failed to get studio mindmap model, err=%v", err)
 	}
-	llmOption := llmchat.BuildLLMModelOption(conf.Global().Logic.Studio.Mindmap.Model)
 
-	return model, []einomodel.Option{llmOption}, nil
+	return chatModel, []einomodel.Option{
+		llmchat.WithModel(model),
+		llmchat.WithResponseJsonObject(provider),
+	}, nil
 }
 
 func (m *mindmapGenerator) oneshotCreateMindmap(
@@ -154,20 +158,20 @@ func (m *mindmapGenerator) oneshotCreateMindmap(
 	var (
 		msg  *einoschema.Message
 		err  error
-		lang = ""
+		lang = pkgcontext.GetLang(ctx)
 	)
 
 	if mode == mindmapAbstractMode {
-		msg, err = prompts.StudioMindmapAbstractMessage(ctx, tmps, lang)
+		msg, err = prompts.RenderStudioMindmapAbstractMessage(ctx, tmps, lang)
 	} else {
-		msg, err = prompts.StudioMindmapContentMessage(ctx, tmps, lang)
+		msg, err = prompts.RenderStudioMindmapContentMessage(ctx, tmps, lang)
 	}
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner,
 			"failed to get mindmap template message, mode=%s, err=%v", mode, err)
 	}
 
-	model, llmOptions, err := m.llmModelWithOption()
+	chatModel, llmOptions, err := m.llmOptions()
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "failed to get studio mindmap model and options, err=%v", err)
 	}
@@ -175,7 +179,7 @@ func (m *mindmapGenerator) oneshotCreateMindmap(
 
 	const retryTimes = 3
 	for idx := range retryTimes {
-		llmResp, err := model.Generate(ctx, msgs, llmOptions...)
+		llmResp, err := chatModel.Generate(ctx, msgs, llmOptions...)
 		if err != nil {
 			return nil, errors.Wrapf(errors.ErrLLM,
 				"failed to generate studio mindmap, retry=%d, err=%v",
@@ -192,7 +196,7 @@ func (m *mindmapGenerator) oneshotCreateMindmap(
 			builder.WriteString(llmResp.Content)
 			builder.WriteString("\n\n")
 			if err != nil {
-				fmt.Fprintf(&builder, "原因：你输出的不是合法JSON，错误信息：%v\n\n", err)
+				fmt.Fprintf(&builder, "原因：你输出的不是合法JSON，错误信息：%v\n\n请重新输出合法JSON", err)
 			} else {
 				builder.WriteString("原因：你输出的思维导图不符合要求的格式\n\n")
 			}

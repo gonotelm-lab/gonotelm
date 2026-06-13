@@ -4,21 +4,17 @@ import (
 	"context"
 	"testing"
 
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
 	vschema "github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/schema"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-func TestMergeBuildDerivedFromSemanticWithNonDerivedNodes(t *testing.T) {
-	Convey("MergeBuild 派生节点应聚合非派生节点 derivedFrom", t, func() {
+func TestMergeBuildDerivationSemanticWithNonDerivedNodes(t *testing.T) {
+	Convey("MergeBuild 派生节点应聚合非派生节点 derivation", t, func() {
 		mockLLM := &parseBuildMockLLM{response: "merge-root-summary"}
 		mockEmbedder := &parseBuildMockEmbedder{}
-		mockGateway := newParseBuildMockGateway(chat.Openai, mockLLM)
 		builder := NewDocTreeBuilder(
 			mockEmbedder,
-			mockGateway,
-			func(_ context.Context) string { return string(chat.Openai) },
-			func(_ context.Context) string { return "mock-model" },
+			mockLLM,
 		)
 
 		nodeA := NewDocTreeNode(&vschema.SourceDoc{
@@ -45,6 +41,11 @@ func TestMergeBuildDerivedFromSemanticWithNonDerivedNodes(t *testing.T) {
 		So(tree, ShouldNotBeNil)
 		So(tree.Root(), ShouldNotBeNil)
 		So(tree.Root().IsLeaf(), ShouldBeFalse)
-		So(tree.Root().DerivedFrom(), ShouldResemble, []string{"node-a", "node-b"})
+		So(tree.Root().Derivation(), ShouldResemble, []string{"node-a", "node-b"})
+		So(tree.Root().Parent(), ShouldBeNil)
+		for _, child := range tree.Root().Children() {
+			So(child, ShouldNotBeNil)
+			So(child.Parent(), ShouldEqual, tree.Root())
+		}
 	})
 }

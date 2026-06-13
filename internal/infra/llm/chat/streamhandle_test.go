@@ -1,9 +1,11 @@
 package chat
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	einomodel "github.com/cloudwego/eino/components/model"
@@ -124,9 +126,156 @@ outer:
 	}
 }
 
-func TestModelWithCallback(t *testing.T) {
+func TestHandleStreamWithCallbackV2_RecoversPanic(t *testing.T) {
+	stream := schema.StreamReaderFromArray([]*schema.Message{
+		{
+			Role:    schema.Assistant,
+			Content: "hello",
+		},
+	})
+	defer stream.Close()
+
+	var gotErr error
+	doneCalled := false
+	contentEndCalled := false
+	HandleStreamWithCallback(context.Background(), stream, &Callbacks{
+		OnContentDelta: func(_ string) {
+			panic("boom")
+		},
+		OnContentEnd: func() {
+			contentEndCalled = true
+		},
+		OnError: func(err error) {
+			gotErr = err
+		},
+		OnDone: func(msg *schema.Message) {
+			doneCalled = true
+			if msg != nil {
+				t.Fatalf("done msg should be nil on panic, got=%+v", msg)
+			}
+		},
+	})
+
+	if gotErr == nil {
+		t.Fatal("expected OnError to be called on panic")
+	}
+	streamErr, ok := gotErr.(*StreamError)
+	if !ok {
+		t.Fatalf("expected StreamError, got=%T", gotErr)
+	}
+	if streamErr.Reason != StreamErrorReasonPanic {
+		t.Fatalf("unexpected stop reason, got=%q want=%q", streamErr.Reason, StreamErrorReasonPanic)
+	}
+	if doneCalled {
+		t.Fatal("OnDone should not be called when OnError is triggered")
+	}
+	if contentEndCalled {
+		t.Fatal("content end should not be called when OnError is triggered")
+	}
+}
+
+func TestHandleStreamWithCallbackV2_FinishReasonClassification(t *testing.T) {
+	tests := []struct {
+		name          string
+		reason        string
+		wantError     bool
+		wantOnDone    bool
+		wantErrReason StreamErrorReason
+	}{
+		{name: "stop", reason: FinishReasonStop, wantError: false, wantOnDone: true},
+		{name: "length", reason: FinishReasonLength, wantError: false, wantOnDone: true},
+		{name: "tool_calls", reason: FinishReasonToolCalls, wantError: true, wantOnDone: false, wantErrReason: StreamErrorReasonModelFinishReason},
+		{name: "content_filter", reason: FinishReasonContentFilter, wantError: true, wantOnDone: false, wantErrReason: StreamErrorReasonModelFinishReason},
+		{name: "unknown", reason: "unknown_reason", wantError: true, wantOnDone: false, wantErrReason: StreamErrorReasonModelFinishReason},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			stream := schema.StreamReaderFromArray([]*schema.Message{
+				{
+					Role:    schema.Assistant,
+					Content: "hello",
+					ResponseMeta: &schema.ResponseMeta{
+						FinishReason: tt.reason,
+					},
+				},
+			})
+			defer stream.Close()
+
+			var gotErr error
+			doneCalled := false
+			HandleStreamWithCallback(context.Background(), stream, &Callbacks{
+				OnError: func(err error) {
+					gotErr = err
+				},
+				OnDone: func(_ *schema.Message) {
+					doneCalled = true
+				},
+			})
+
+			if tt.wantError {
+				if gotErr == nil {
+					t.Fatalf("expected error for reason=%q", tt.reason)
+				}
+				streamErr, ok := gotErr.(*StreamError)
+				if !ok {
+					t.Fatalf("expected StreamError, got=%T", gotErr)
+				}
+				if streamErr.Reason != tt.wantErrReason {
+					t.Fatalf("unexpected stop reason, got=%q want=%q", streamErr.Reason, tt.wantErrReason)
+				}
+				if !strings.Contains(streamErr.Message, tt.reason) {
+					t.Fatalf("expected error message to contain finish reason, got=%q want_contains=%q", streamErr.Message, tt.reason)
+				}
+			} else if gotErr != nil {
+				t.Fatalf("did not expect error for reason=%q, got=%v", tt.reason, gotErr)
+			}
+
+			if doneCalled != tt.wantOnDone {
+				t.Fatalf("OnDone mismatch for reason=%q, got=%v want=%v", tt.reason, doneCalled, tt.wantOnDone)
+			}
+		})
+	}
+}
+
+func TestHandleStreamWithCallbackV2_SuccessCallsDoneOnly(t *testing.T) {
+	stream := schema.StreamReaderFromArray([]*schema.Message{
+		{
+			Role:    schema.Assistant,
+			Content: "hello",
+		},
+	})
+	defer stream.Close()
+
+	var gotErr error
+	doneCalled := false
+	HandleStreamWithCallback(context.Background(), stream, &Callbacks{
+		OnError: func(err error) {
+			gotErr = err
+		},
+		OnDone: func(msg *schema.Message) {
+			doneCalled = true
+			if msg == nil {
+				t.Fatal("done message should not be nil in success path")
+			}
+			if msg.Content != "hello" {
+				t.Fatalf("unexpected done content, got=%q want=%q", msg.Content, "hello")
+			}
+		},
+	})
+
+	if gotErr != nil {
+		t.Fatalf("OnError should not be called in success path: %v", gotErr)
+	}
+	if !doneCalled {
+		t.Fatal("expected OnDone to be called in success path")
+	}
+}
+
+func TestModelWithCallbackV2(t *testing.T) {
 	modelWithTools := mustNewTestModelWithTools(t)
-	messages := buildTestMessages("当你你在输出思考内容的时候，使用一句话来描述你正在思考什么")
+	messages := buildTestMessages("当你你在输出思考内容的时候，使用一句话来描述你正在思考什么。如果你输出工具调用，就不要输出任何文本回答内容，只需要进行工具调用")
 
 	const maxRound = 10
 	for round := 0; round < maxRound; round++ {
@@ -142,41 +291,65 @@ func TestModelWithCallback(t *testing.T) {
 		}
 
 		var endMsg *schema.Message
+		var hasError bool
 		HandleStreamWithCallback(t.Context(), callbackStream, &Callbacks{
-			OnReasoning: func(msg *schema.Message) {
-				t.Logf("[callback] reasoning=%s", msg.ReasoningContent)
+			OnStart: func() {
+				fmt.Println("[callback-v2] start")
 			},
-			OnReasoningEnd: func(msg *schema.Message) {
-				t.Logf("[callback] reasoning end, content=%s", msg.ReasoningContent)
+			OnReasoningStart: func() {
+				fmt.Println("[callback-v2] reasoning start")
 			},
-			OnContent: func(msg *schema.Message) {
-				t.Logf("[callback] content=%s", msg.Content)
+			OnReasoningDelta: func(delta string) {
+				fmt.Printf("[callback-v2] reasoning delta=%s\n", delta)
 			},
-			OnTooling: func(msg *schema.Message) {
-				bb, _ := json.Marshal(msg.ToolCalls)
-				t.Logf("[callback] tooling=%v", string(bb))
+			OnReasoningEnd: func() {
+				fmt.Println("[callback-v2] reasoning end")
+			},
+			OnContentStart: func() {
+				fmt.Println("[callback-v2] content start")
+			},
+			OnContentDelta: func(delta string) {
+				fmt.Printf("[callback-v2] content delta=%s\n", delta)
+			},
+			OnContentEnd: func() {
+				fmt.Println("[callback-v2] content end")
+			},
+			OnToolStart: func() {
+				fmt.Println("[callback-v2] tool start")
+			},
+			OnToolDelta: func(delta []schema.ToolCall) {
+				bb, _ := json.Marshal(delta)
+				fmt.Printf("[callback-v2] tool delta=%v\n", string(bb))
+			},
+			OnToolEnd: func() {
+				fmt.Println("[callback-v2] tool end")
 			},
 			OnError: func(err error) {
-				t.Errorf("callback stream failed: %v", err)
+				hasError = true
+				t.Errorf("callback-v2 stream failed: %v", err)
 			},
-			OnEnd: func(msg *schema.Message) {
+			OnDone: func(msg *schema.Message) {
 				if msg == nil {
-					t.Error("callback stream final result is nil")
+					t.Error("callback-v2 stream final result is nil")
 					return
 				}
 				endMsg = msg
-				t.Logf("[callback] end tooling total=%d", len(msg.ToolCalls))
-				t.Logf("[callback] end content=%s", msg.Content)
-				t.Logf("[callback] end reasoning=%s", msg.ReasoningContent)
+				fmt.Printf("[callback-v2] done tooling total=%d\n", len(msg.ToolCalls))
+				fmt.Printf("[callback-v2] done content=%s\n", msg.Content)
+				fmt.Printf("[callback-v2] done reasoning=%s\n", msg.ReasoningContent)
 				jb, _ := json.MarshalIndent(msg, " ", " ")
 				fmt.Println(string(jb))
 			},
 		})
 		callbackStream.Close()
 
-		if endMsg == nil {
-			t.Fatal("callback stream end message is nil")
+		if hasError {
+			t.Fatal("callback-v2 stream has error")
 		}
+		if endMsg == nil {
+			t.Fatal("callback-v2 stream end message is nil")
+		}
+
 		messages = append(messages, endMsg)
 		if len(endMsg.ToolCalls) == 0 {
 			return

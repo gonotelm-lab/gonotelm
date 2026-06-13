@@ -8,6 +8,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/app/biz/source/convertdoc"
 	"github.com/gonotelm-lab/gonotelm/internal/app/biz/source/indices"
 	"github.com/gonotelm-lab/gonotelm/internal/app/biz/source/util"
+	"github.com/gonotelm-lab/gonotelm/internal/app/biz/textgen/summarizer"
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
@@ -53,6 +54,14 @@ func NewSourceIndexer(
 		hc.OverlapSize = int(float64(hc.ChunkSize) * 0.15)
 	}
 
+	summarizer := summarizer.NewWithOption(
+		llmGateway,
+		summarizer.SummarizeOption{
+			Provider: conf.Global().Logic.Source.ModelProvider,
+			Model:    conf.Global().Logic.Source.Model,
+		},
+	)
+
 	return &SourceIndexer{
 		embedder:            embedder,
 		embedBatchSize:      conf.Global().Embedding.BatchSize,
@@ -63,12 +72,7 @@ func NewSourceIndexer(
 			model.SourceKindUrl:  convertdoc.NewUrlHandler(hc),
 			model.SourceKindFile: convertdoc.NewFileObjectHandler(hc, objectStorage),
 		},
-		docTreeBuilder: indices.NewDocTreeBuilder(
-			embedder,
-			llmGateway,
-			func(_ context.Context) string { return string(conf.Global().Logic.Source.ModelProvider) },
-			func(_ context.Context) string { return conf.Global().Logic.Source.Model },
-		),
+		docTreeBuilder: indices.NewDocTreeBuilder(embedder, summarizer),
 	}
 }
 
@@ -184,7 +188,7 @@ func (b *SourceIndexer) parseEmbedChunks(
 		node.Core().NotebookId = source.NotebookId.String()
 		node.Core().SourceId = source.Id.String()
 		node.Core().Owner = source.OwnerId
-		node.Core().PutMeta(model.SourceDocMetaLevel, int64(node.Level()))
+		writeNodeLevelAndTreeMeta(node)
 		if parseMeta := node.ParseMetadata(); parseMeta != nil && parseMeta.Valid() {
 			node.Core().PutMeta(model.ChunkMetaPosStartKey, parseMeta.StartRune())
 			node.Core().PutMeta(model.ChunkMetaPosEndKey, parseMeta.EndRune())
@@ -200,7 +204,7 @@ func (b *SourceIndexer) parseEmbedChunks(
 		if node.IsLeaf() {
 			continue
 		}
-		if derivingIds := node.DerivedFrom(); len(derivingIds) > 0 {
+		if derivingIds := node.Derivation(); len(derivingIds) > 0 {
 			if bitmapSize == 0 {
 				continue
 			}
@@ -217,13 +221,8 @@ func (b *SourceIndexer) parseEmbedChunks(
 			if !hasSetBit {
 				continue
 			}
-			childrenPos := make([]int, 0, len(node.Children()))
-			for _, child := range node.Children() {
-				childrenPos = append(childrenPos, child.Pos())
-			}
-
 			node.Core().PutMeta(model.SourceDocMetaDerivingPos, bm.String())
-			node.Core().PutMeta(model.SourceDocMetaChildrenPos, childrenPos)
+			node.Core().PutMeta(model.SourceDocMetaChildrenPos, collectChildPoses(node))
 		}
 	}
 
@@ -319,14 +318,14 @@ func (b *SourceIndexer) mergeEmbedChunks(
 		for _, node := range nodes {
 			vDoc := node.Core()
 			vsDocs = append(vsDocs, vDoc)
-			vDoc.PutMeta(model.SourceDocMetaLevel, int64(node.Level()))
+			writeNodeLevelAndTreeMeta(node)
 
 			if node.IsLeaf() {
 				continue
 			}
 
 			// 派生节点需要额外处理
-			if derivingIds := node.DerivedFrom(); len(derivingIds) > 0 {
+			if derivingIds := node.Derivation(); len(derivingIds) > 0 {
 				if bitmapSize == 0 {
 					continue
 				}
@@ -343,14 +342,9 @@ func (b *SourceIndexer) mergeEmbedChunks(
 				if !hasSetBit {
 					continue
 				}
-				childrenPos := make([]int, 0, len(node.Children()))
-				for _, child := range node.Children() {
-					// children_pos 必须和 RecoverDocTree 的查找键一致，使用 chunk_pos/pos 体系。
-					childrenPos = append(childrenPos, child.Pos())
-				}
 
 				vDoc.PutMeta(model.SourceDocMetaDerivingPos, bm.String())
-				vDoc.PutMeta(model.SourceDocMetaChildrenPos, childrenPos)
+				vDoc.PutMeta(model.SourceDocMetaChildrenPos, collectChildPoses(node))
 			}
 		}
 
@@ -395,6 +389,33 @@ func buildNonDerivedIDPosMapping(nodes []*indices.DocTreeNode) (map[string]int, 
 		}
 	}
 	return out, maxPos + 1
+}
+
+func writeNodeLevelAndTreeMeta(node *indices.DocTreeNode) {
+	if node == nil || node.Core() == nil {
+		return
+	}
+
+	core := node.Core()
+	core.PutMeta(model.SourceDocMetaLevel, int64(node.Level()))
+	// parent_pos 是 TreeMeta 关系链的关键入口：有父节点就写入，无父节点（root）保持缺失即可。
+	if parent := node.Parent(); parent != nil {
+		core.PutMeta(model.SourceDocMetaParentPos, parent.Pos())
+	}
+}
+
+func collectChildPoses(node *indices.DocTreeNode) []int {
+	if node == nil {
+		return nil
+	}
+
+	childrenPos := make([]int, 0, len(node.Children()))
+	for _, child := range node.Children() {
+		// children_pos 必须和 RecoverDocTree 的查找键一致，使用 chunk_pos/pos 体系。
+		childrenPos = append(childrenPos, child.Pos())
+	}
+
+	return childrenPos
 }
 
 func isNonDerivedNode(node *indices.DocTreeNode) bool {
@@ -500,11 +521,11 @@ func (b *docTreeRecoverBuilder) buildNode(pos int) (*indices.DocTreeNode, error)
 	defer delete(b.building, pos)
 
 	var (
-		children    []*indices.DocTreeNode
-		derivedFrom []string
+		children   []*indices.DocTreeNode
+		derivation []string
 	)
 	if isLeaf {
-		derivedFrom = []string{doc.Id}
+		derivation = []string{doc.Id}
 	} else {
 		if len(childrenPos) == 0 {
 			return nil, errors.ErrInner.Msgf("children pos is empty for non-leaf node, node_pos=%d", pos)
@@ -518,18 +539,18 @@ func (b *docTreeRecoverBuilder) buildNode(pos int) (*indices.DocTreeNode, error)
 			children = append(children, childNode)
 		}
 
-		derivedFrom, err = readSourceDocDerivedFrom(doc, b.docPosMapping)
+		derivation, err = readSourceDocDerivation(doc, b.docPosMapping)
 		if err != nil {
 			return nil, errors.WithMessagef(err, "read deriving docs failed, node_pos=%d", pos)
 		}
 	}
 
-	node := indices.NewDocTreeNode(doc, level, pos, children, derivedFrom)
+	node := indices.NewDocTreeNode(doc, level, pos, children, derivation)
 	b.nodeByPos[pos] = node
 	return node, nil
 }
 
-func readSourceDocDerivedFrom(
+func readSourceDocDerivation(
 	doc *vecschema.SourceDoc,
 	docPosMapping map[int]*vecschema.SourceDoc,
 ) ([]string, error) {
@@ -549,7 +570,7 @@ func readSourceDocDerivedFrom(
 	if len(setPos) == 0 {
 		return nil, errors.ErrInner.Msgf("deriving bitmap has no set bit, node_id=%s", doc.Id)
 	}
-	derivedFrom := make([]string, 0, len(setPos))
+	derivation := make([]string, 0, len(setPos))
 	for _, nonDerivedPos := range setPos {
 		nonDerivedDoc, ok := docPosMapping[int(nonDerivedPos)]
 		if !ok {
@@ -558,8 +579,8 @@ func readSourceDocDerivedFrom(
 				nonDerivedPos,
 			)
 		}
-		derivedFrom = append(derivedFrom, nonDerivedDoc.Id)
+		derivation = append(derivation, nonDerivedDoc.Id)
 	}
 
-	return slices.Unique(derivedFrom), nil
+	return slices.Unique(derivation), nil
 }

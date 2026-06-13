@@ -107,7 +107,7 @@ func buildPhaseCitation(sourceDocs []*model.SourceDoc) []*chatmodel.PhaseCitatio
 	return items
 }
 
-func buildChatTemplateVars(state *chatSessionState) prompts.ChatTemplateVars {
+func buildChatTemplateVars(state *sessionState) prompts.ChatTemplateVars {
 	sourceDocs := state.sourceDocs
 	templateVars := prompts.ChatTemplateVars{}
 

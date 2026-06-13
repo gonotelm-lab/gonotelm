@@ -3,17 +3,12 @@ package indices
 import (
 	"context"
 	"errors"
-	"reflect"
 	"strings"
 	"sync"
 	"testing"
-	"unsafe"
 
 	einoembed "github.com/cloudwego/eino/components/embedding"
-	einomodel "github.com/cloudwego/eino/components/model"
-	einoschema "github.com/cloudwego/eino/schema"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -65,50 +60,28 @@ type parseBuildMockLLM struct {
 	inputs        []string
 }
 
-func (m *parseBuildMockLLM) Generate(
-	_ context.Context,
-	input []*einoschema.Message,
-	_ ...einomodel.Option,
-) (*einoschema.Message, error) {
-	var sb strings.Builder
-	for _, msg := range input {
-		if msg == nil {
-			continue
-		}
-		if sb.Len() > 0 {
-			sb.WriteString("\n---\n")
-		}
-		sb.WriteString(msg.Content)
-	}
-
+func (m *parseBuildMockLLM) Summarize(_ context.Context, text string) (string, error) {
 	m.mu.Lock()
 	m.generateCalls++
-	m.inputs = append(m.inputs, sb.String())
+	m.inputs = append(m.inputs, text)
 	generateErr := m.generateErr
+	response := m.response
 	m.mu.Unlock()
 
 	if generateErr != nil {
-		return nil, generateErr
+		return "", generateErr
 	}
 
-	return &einoschema.Message{
-		Role:    einoschema.Assistant,
-		Content: m.response,
-	}, nil
+	return response, nil
 }
 
-func (m *parseBuildMockLLM) Stream(
-	_ context.Context,
-	_ []*einoschema.Message,
-	_ ...einomodel.Option,
-) (*einoschema.StreamReader[*einoschema.Message], error) {
-	return nil, nil
-}
-
-func (m *parseBuildMockLLM) WithTools(
-	_ []*einoschema.ToolInfo,
-) (einomodel.ToolCallingChatModel, error) {
-	return m, nil
+func (m *parseBuildMockLLM) SummarizeWith(
+	ctx context.Context,
+	_ chat.Provider,
+	_ string,
+	text string,
+) (string, error) {
+	return m.Summarize(ctx, text)
 }
 
 func (m *parseBuildMockLLM) GenerateCallCount() int {
@@ -121,21 +94,6 @@ func (m *parseBuildMockLLM) Inputs() []string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return append([]string(nil), m.inputs...)
-}
-
-func newParseBuildMockGateway(
-	providerType chat.Provider,
-	provider einomodel.ToolCallingChatModel,
-) *gateway.Gateway {
-	gw := &gateway.Gateway{}
-	providers := map[chat.Provider]einomodel.ToolCallingChatModel{
-		providerType: provider,
-	}
-
-	// test helper: inject mock providers into unexported field.
-	rv := reflect.ValueOf(gw).Elem().FieldByName("providers")
-	reflect.NewAt(rv.Type(), unsafe.Pointer(rv.UnsafeAddr())).Elem().Set(reflect.ValueOf(providers))
-	return gw
 }
 
 func parseBuildSplitByRuneWindow(maxSize int) ParseBuildChunkSplitFunc {
@@ -233,13 +191,10 @@ func TestParseBuildMockedLeafSplit(t *testing.T) {
 	Convey("ParseBuild 叶子节点超限时应横向分裂", t, func() {
 		mockLLM := &parseBuildMockLLM{response: "ROOT-MOCK"}
 		mockEmbedder := &parseBuildMockEmbedder{}
-		mockGateway := newParseBuildMockGateway(chat.Openai, mockLLM)
 
 		builder := NewDocTreeBuilder(
 			mockEmbedder,
-			mockGateway,
-			func(_ context.Context) string { return string(chat.Openai) },
-			func(_ context.Context) string { return "mock-model" },
+			mockLLM,
 		)
 
 		markdown := strings.Join([]string{
@@ -278,13 +233,10 @@ func TestParseBuildMockedNonLeafDownshift(t *testing.T) {
 	Convey("ParseBuild 非叶子节点超限时应内容下放", t, func() {
 		mockLLM := &parseBuildMockLLM{response: "ROOT-NON-LEAF"}
 		mockEmbedder := &parseBuildMockEmbedder{}
-		mockGateway := newParseBuildMockGateway(chat.Openai, mockLLM)
 
 		builder := NewDocTreeBuilder(
 			mockEmbedder,
-			mockGateway,
-			func(_ context.Context) string { return string(chat.Openai) },
-			func(_ context.Context) string { return "mock-model" },
+			mockLLM,
 		)
 
 		markdown := strings.Join([]string{
@@ -342,13 +294,10 @@ func TestParseBuildNoHeadingKeepRootTitleEmpty(t *testing.T) {
 	Convey("ParseBuild 无标题正文时应保持根标题为空", t, func() {
 		mockLLM := &parseBuildMockLLM{response: "UNUSED-SUMMARY"}
 		mockEmbedder := &parseBuildMockEmbedder{}
-		mockGateway := newParseBuildMockGateway(chat.Openai, mockLLM)
 
 		builder := NewDocTreeBuilder(
 			mockEmbedder,
-			mockGateway,
-			func(_ context.Context) string { return string(chat.Openai) },
-			func(_ context.Context) string { return "mock-model" },
+			mockLLM,
 		)
 
 		markdown := strings.Join([]string{
@@ -381,13 +330,10 @@ func TestParseBuildNoHeadingLongBodySplit(t *testing.T) {
 	Convey("ParseBuild 长正文无标题时应分片且根内容为空", t, func() {
 		mockLLM := &parseBuildMockLLM{response: "UNUSED-SUMMARY"}
 		mockEmbedder := &parseBuildMockEmbedder{}
-		mockGateway := newParseBuildMockGateway(chat.Openai, mockLLM)
 
 		builder := NewDocTreeBuilder(
 			mockEmbedder,
-			mockGateway,
-			func(_ context.Context) string { return string(chat.Openai) },
-			func(_ context.Context) string { return "mock-model" },
+			mockLLM,
 		)
 
 		markdown := strings.Repeat("这是一段连续正文内容用于测试分片行为。", 20)
@@ -436,13 +382,10 @@ func TestParseBuildLeafParseMetadata(t *testing.T) {
 	Convey("ParseBuild 原生叶子节点应生成位置信息", t, func() {
 		mockLLM := &parseBuildMockLLM{response: "ROOT-META"}
 		mockEmbedder := &parseBuildMockEmbedder{}
-		mockGateway := newParseBuildMockGateway(chat.Openai, mockLLM)
 
 		builder := NewDocTreeBuilder(
 			mockEmbedder,
-			mockGateway,
-			func(_ context.Context) string { return string(chat.Openai) },
-			func(_ context.Context) string { return "mock-model" },
+			mockLLM,
 		)
 
 		markdown := strings.Join([]string{
@@ -493,9 +436,7 @@ func TestParseBuildRootParseMetadataByDerivation(t *testing.T) {
 	Convey("ParseBuild 根节点派生与非派生场景的位置信息应符合预期", t, func() {
 		builder := NewDocTreeBuilder(
 			&parseBuildMockEmbedder{},
-			newParseBuildMockGateway(chat.Openai, &parseBuildMockLLM{response: "ROOT-DERIVED"}),
-			func(_ context.Context) string { return string(chat.Openai) },
-			func(_ context.Context) string { return "mock-model" },
+			&parseBuildMockLLM{response: "ROOT-DERIVED"},
 		)
 
 		headingMarkdown := "# H1\nbody"
@@ -513,9 +454,7 @@ func TestParseBuildRootParseMetadataByDerivation(t *testing.T) {
 
 		noHeadingBuilder := NewDocTreeBuilder(
 			&parseBuildMockEmbedder{},
-			newParseBuildMockGateway(chat.Openai, &parseBuildMockLLM{response: "UNUSED"}),
-			func(_ context.Context) string { return string(chat.Openai) },
-			func(_ context.Context) string { return "mock-model" },
+			&parseBuildMockLLM{response: "UNUSED"},
 		)
 		noHeadingMarkdown := "第一段\n\n第二段"
 		noHeadingTree, err := noHeadingBuilder.ParseBuild(
@@ -544,13 +483,10 @@ func TestParseBuildMockedLLMError(t *testing.T) {
 			generateErr: errors.New("mock llm error"),
 		}
 		mockEmbedder := &parseBuildMockEmbedder{}
-		mockGateway := newParseBuildMockGateway(chat.Openai, mockLLM)
 
 		builder := NewDocTreeBuilder(
 			mockEmbedder,
-			mockGateway,
-			func(_ context.Context) string { return string(chat.Openai) },
-			func(_ context.Context) string { return "mock-model" },
+			mockLLM,
 		)
 
 		markdown := "# Title\nbody"
@@ -574,13 +510,10 @@ func TestParseBuildMockedEmbedCountMismatch(t *testing.T) {
 	Convey("ParseBuild 在 embedding 数量不匹配时应返回错误", t, func() {
 		mockLLM := &parseBuildMockLLM{response: "ROOT-OK"}
 		mockEmbedder := &parseBuildMockEmbedder{resultShrink: 1}
-		mockGateway := newParseBuildMockGateway(chat.Openai, mockLLM)
 
 		builder := NewDocTreeBuilder(
 			mockEmbedder,
-			mockGateway,
-			func(_ context.Context) string { return string(chat.Openai) },
-			func(_ context.Context) string { return "mock-model" },
+			mockLLM,
 		)
 
 		markdown := strings.Join([]string{
@@ -606,17 +539,14 @@ func TestParseBuildMockedEmbedCountMismatch(t *testing.T) {
 	})
 }
 
-func TestParseBuildDerivedFromSemanticWithNonDerivedNodes(t *testing.T) {
-	Convey("ParseBuild 应使用非派生节点语义填充 derivedFrom", t, func() {
+func TestParseBuildDerivationSemanticWithNonDerivedNodes(t *testing.T) {
+	Convey("ParseBuild 应使用非派生节点语义填充 derivation", t, func() {
 		mockLLM := &parseBuildMockLLM{response: "ROOT-DERIVED"}
 		mockEmbedder := &parseBuildMockEmbedder{}
-		mockGateway := newParseBuildMockGateway(chat.Openai, mockLLM)
 
 		builder := NewDocTreeBuilder(
 			mockEmbedder,
-			mockGateway,
-			func(_ context.Context) string { return string(chat.Openai) },
-			func(_ context.Context) string { return "mock-model" },
+			mockLLM,
 		)
 
 		markdown := strings.Join([]string{
@@ -639,14 +569,48 @@ func TestParseBuildDerivedFromSemanticWithNonDerivedNodes(t *testing.T) {
 		parentNode := findNodeByExactContent(tree.Root(), "Parent\n\nparent body")
 		So(parentNode, ShouldNotBeNil)
 		So(parentNode.IsLeaf(), ShouldBeFalse)
-		So(parentNode.DerivedFrom(), ShouldResemble, []string{parentNode.Core().Id})
+		So(parentNode.Derivation(), ShouldResemble, []string{parentNode.Core().Id})
 
 		childNode := findNodeByExactContent(tree.Root(), "Child\n\nchild body")
 		So(childNode, ShouldNotBeNil)
 		So(childNode.IsLeaf(), ShouldBeTrue)
-		So(childNode.DerivedFrom(), ShouldResemble, []string{childNode.Core().Id})
+		So(childNode.Derivation(), ShouldResemble, []string{childNode.Core().Id})
 
 		// root 是派生节点，应指向其直接来源的非派生节点（这里是 Parent）。
-		So(tree.Root().DerivedFrom(), ShouldResemble, []string{parentNode.Core().Id})
+		So(tree.Root().Derivation(), ShouldResemble, []string{parentNode.Core().Id})
+	})
+}
+
+func TestParseBuildParentLinks(t *testing.T) {
+	Convey("ParseBuild 应正确回填父子关系链", t, func() {
+		mockLLM := &parseBuildMockLLM{response: "ROOT-PARENT-LINK"}
+		mockEmbedder := &parseBuildMockEmbedder{}
+		builder := NewDocTreeBuilder(mockEmbedder, mockLLM)
+
+		markdown := strings.Join([]string{
+			"# Parent",
+			"parent body",
+			"## Child",
+			"child body",
+		}, "\n")
+		tree, err := builder.ParseBuild(
+			context.Background(),
+			[]byte(markdown),
+			WithParseBuildMaxNodeToken(200),
+			WithParseBuildTokenLenFn(parseBuildRuneTokenLen),
+			WithParseBuildChunkSplitFunc(parseBuildSplitByRuneWindow(200)),
+		)
+		So(err, ShouldBeNil)
+		So(tree, ShouldNotBeNil)
+		So(tree.Root(), ShouldNotBeNil)
+		So(tree.Root().Parent(), ShouldBeNil)
+
+		parentNode := findNodeByExactContent(tree.Root(), "Parent\n\nparent body")
+		So(parentNode, ShouldNotBeNil)
+		So(parentNode.Parent(), ShouldEqual, tree.Root())
+
+		childNode := findNodeByExactContent(tree.Root(), "Child\n\nchild body")
+		So(childNode, ShouldNotBeNil)
+		So(childNode.Parent(), ShouldEqual, parentNode)
 	})
 }

@@ -80,6 +80,8 @@ type ArtifactTaskStore interface {
 	// 按照created_at DESC分页获取
 	ListByNotebookId(ctx context.Context, notebookId Id, limit, offset int) ([]*schema.ArtifactTask, error)
 
+	DeleteByNotebookId(ctx context.Context, notebookId Id) error
+
 	// 按照NotebookId分页获取
 	PageListByNotebookId(
 		ctx context.Context,

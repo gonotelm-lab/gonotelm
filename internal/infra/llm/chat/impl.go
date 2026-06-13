@@ -19,7 +19,7 @@ func New(
 		return nil, fmt.Errorf("config must not be nil")
 	}
 
-		switch providerType {
+	switch providerType {
 	case DeepSeek:
 		return deepseek.NewChatModel(ctx, cfg.DeepSeek.ToEino())
 	case Openai:

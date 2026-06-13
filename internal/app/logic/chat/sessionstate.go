@@ -8,11 +8,13 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 
-type chatSessionState struct {
-	taskId   string
-	chatId   uuid.UUID
-	userId   string
-	userLang string // TODO i18n
+type sessionState struct {
+	taskId     string
+	chatId     uuid.UUID
+	notebookId uuid.UUID
+	sourceIds  []uuid.UUID
+	userId     string
+	userLang   string
 
 	chatStyle        chatmodel.ChatStyle
 	chatAnswerLength chatmodel.ChatAnswerLength
@@ -26,7 +28,7 @@ type chatSessionState struct {
 	taskAborted bool
 }
 
-func (s *chatSessionState) nextId() int64 {
+func (s *sessionState) nextId() int64 {
 	id := s.id
 	s.id++
 	return id

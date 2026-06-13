@@ -14,7 +14,6 @@ type ChatMessage struct {
 	ChatId  uuid.UUID       `gorm:"column:chat_id"`
 	UserId  string          `gorm:"column:user_id"`
 	MsgRole int8            `gorm:"column:msg_role"`
-	MsgType int8            `gorm:"column:msg_type"`
 	Content json.RawMessage `gorm:"column:content"` // see [model.ChatMessageContent]
 	SeqNo   int64           `gorm:"column:seq_no"`
 	Extra   json.RawMessage `gorm:"column:extra"`

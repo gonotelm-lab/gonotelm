@@ -40,3 +40,12 @@ type Consumer interface {
 	Subscribe(ctx context.Context, topic string, handler MessageHandler) error
 	Close(ctx context.Context) error
 }
+
+type ProducerFactory func() Producer
+
+type ConsumerFactory func(topic, groupID string) Consumer
+
+type MQ struct {
+	NewProducer ProducerFactory
+	NewConsumer ConsumerFactory
+}

@@ -4,13 +4,15 @@ import (
 	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/rerank"
 )
 
 const (
 	DefaultMaxRound              = 10
-	DefaultSourceDocsRecallCount = 30
+	DefaultSourceDocsRecallCount = 50
 	DefaultTaskTimeout           = 5 * time.Minute
 	DefaultGMMAutoMaxClusters    = 50
+	RerankDefaultTopN            = 20
 )
 
 type LogicConfig struct {
@@ -20,11 +22,15 @@ type LogicConfig struct {
 }
 
 type ChatLogicConfig struct {
-	MaxRound              int           `toml:"maxRound"`
-	ModelProvider         chat.Provider `toml:"modelProvider"`
-	Model                 string        `toml:"model"` // 对话使用的模型
-	SourceDocsRecallCount int           `toml:"sourceDocsRecallCount"`
-	TaskTimeout           time.Duration `toml:"taskTimeout"` // 流式任务超时时间
+	MaxRound              int             `toml:"maxRound"`
+	ModelProvider         chat.Provider   `toml:"modelProvider"`
+	Model                 string          `toml:"model"` // 对话使用的模型
+	SourceDocsRecallCount int             `toml:"sourceDocsRecallCount"`
+	TaskTimeout           time.Duration   `toml:"taskTimeout"`    // 流式任务超时时间
+	RerankProvider        rerank.Provider `toml:"rerankProvider"` // 重排序提供商
+	RerankEnabled         bool            `toml:"rerankEnabled"`
+	RerankTopN            int             `toml:"rerankTopN"`
+	RerankModel           string          `toml:"rerankModel"`
 }
 
 func (c *ChatLogicConfig) GetSourceDocsRecallCount() int {
@@ -49,6 +55,14 @@ func (c *ChatLogicConfig) GetMaxRound() int {
 	}
 
 	return c.MaxRound
+}
+
+func (c *ChatLogicConfig) GetRerankTopN() int {
+	if c.RerankTopN == 0 {
+		return RerankDefaultTopN
+	}
+
+	return c.RerankTopN
 }
 
 type SourceLogicConfig struct {

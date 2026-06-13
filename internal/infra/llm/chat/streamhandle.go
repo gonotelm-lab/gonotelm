@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"strings"
 	"sync"
 
 	"github.com/cloudwego/eino/schema"
@@ -103,52 +104,79 @@ func closeOnce(ch chan struct{}) func() {
 	}
 }
 
-type StreamState int8
+type EventType string
 
-// State 转移
-// Init -> [Reasoning] -> [ReasoningEnd] -> [Tooling] -> [Content] -> End
 const (
-	StreamStateInit         StreamState = iota // 流处理初始化
-	StreamStateReasoning                       // 推理中
-	StreamStateReasoningEnd                    // 推理结束
-	StreamStateTooling                         // 正在接收工具调用
-	StreamStateContent                         // 正在接收回复消息
-	StreamEnd                                  // 流处理结束
+	EventStart          EventType = "start"
+	EventContentStart   EventType = "content_start"
+	EventContentDelta   EventType = "content_delta"
+	EventContentEnd     EventType = "content_end"
+	EventToolStart      EventType = "tool_start"
+	EventToolDelta      EventType = "tool_delta"
+	EventToolEnd        EventType = "tool_end"
+	EventReasoningStart EventType = "reasoning_start"
+	EventReasoningDelta EventType = "reasoning_delta"
+	EventReasoningEnd   EventType = "reasoning_end"
+	EventError          EventType = "error"
+	EventDone           EventType = "done"
 )
 
-type Callbacks struct {
-	// OnReasoning 在接收到 reasoning 内容时触发
-	OnReasoning func(msg *schema.Message)
+type StreamErrorReason string
 
-	// OnReasoningEnd 在 reasoning 阶段结束时触发（例如切换到 tooling/content）。
-	OnReasoningEnd func(msg *schema.Message)
+const (
+	StreamErrorReasonPanic             StreamErrorReason = "panic"
+	StreamErrorReasonReceiveError      StreamErrorReason = "receive_error"
+	StreamErrorReasonContextDone       StreamErrorReason = "context_done"
+	StreamErrorReasonConcatError       StreamErrorReason = "concat_error"
+	StreamErrorReasonModelFinishReason StreamErrorReason = "model_finish_reason_error"
+	StreamErrorReasonUnknown           StreamErrorReason = "unknown_error"
+)
 
-	// OnTooling 在接收到 tool_calls 时触发
-	OnTooling func(msg *schema.Message)
-
-	// OnContent 在接收到正文 content 时触发
-	OnContent func(msg *schema.Message)
-
-	// OnError 在流处理期间发生错误时触发；该回调可能在 OnEnd 之前触发。
-	OnError func(err error)
-
-	// OnEnd 在流式输出结束时触发，msg 为最终合并结果（失败时为 nil）。
-	OnEnd func(msg *schema.Message)
+type StreamError struct {
+	Reason  StreamErrorReason
+	Message string
 }
 
-// HandleStreamWithCallback 通过回调处理流式输出，并在当前 goroutine 内同步执行直到流结束。
-//
-// 行为说明：
-//   - 持续调用 stream.Recv() 读取增量消息，并推进状态机。
-//   - OnReasoning / OnTooling / OnContent 在接收到对应内容 chunk 时触发
-//   - OnReasoningEnd 在 reasoning 阶段结束时触发（切换到 content/tooling，或 finish_reason/流结束兜底）。
-//   - OnEnd 始终在函数退出前触发，参数为最终合并消息；若合并失败则为 nil。
-//   - 接收失败、拼接失败、ctx 取消等错误通过 OnError 回调上报。
-//
-// 参数说明：
-//   - ctx: 生命周期控制。ctx.Done() 后中止接收循环，并通过 OnError 上报 ctx.Err()。
-//   - stream: 大模型流式输出读取器。该函数不会调用 stream.Close()，由调用方负责关闭。
-//   - callbacks: 回调集合。可为 nil；为 nil 时函数仅消费流，不做回调通知。
+func (e *StreamError) Error() string {
+	if e == nil {
+		return "stream error"
+	}
+	if e.Reason != "" && e.Message != "" {
+		return fmt.Sprintf("%s: %s", string(e.Reason), e.Message)
+	}
+	if e.Message != "" {
+		return e.Message
+	}
+	if e.Reason != "" {
+		return string(e.Reason)
+	}
+	return "stream error"
+}
+
+type Callbacks struct {
+	OnStart func()
+
+	OnContentStart func()
+	OnContentDelta func(delta string)
+	OnContentEnd   func()
+
+	OnToolStart func()
+	OnToolDelta func(delta []schema.ToolCall)
+	OnToolEnd   func()
+
+	OnReasoningStart func()
+	OnReasoningDelta func(delta string)
+	OnReasoningEnd   func()
+
+	OnError func(err error)
+	OnDone  func(msg *schema.Message)
+}
+
+// HandleStreamWithCallback 读取 LLM 流并按阶段触发回调。
+// 使用方式：
+//  1. 传入可取消的 ctx 和 stream；函数会阻塞直到 EOF、错误或 ctx 取消。
+//  2. 按需实现 callbacks 中的 On* 回调；未设置的回调会被安全跳过。
+//  3. 正常结束时触发 OnDone(聚合后的完整消息)，出错时仅触发一次 OnError。
 func HandleStreamWithCallback(
 	ctx context.Context,
 	stream *schema.StreamReader[*schema.Message],
@@ -156,17 +184,42 @@ func HandleStreamWithCallback(
 ) {
 	const bufSize = 256
 	tracker := newStreamTracker()
+	hasError := false
 	var finalResult *schema.Message
 	tmps := make([]*schema.Message, 0, bufSize)
-	emitError := func(err error) {
+
+	emitError := func(streamErr *StreamError) {
+		if streamErr == nil || hasError {
+			return
+		}
+		hasError = true
 		if callbacks != nil && callbacks.OnError != nil {
-			callbacks.OnError(err)
+			callbacks.OnError(streamErr)
 		}
 	}
+	emitStdError := func(reason StreamErrorReason, err error) {
+		if err == nil {
+			return
+		}
+		if reason == "" {
+			reason = StreamErrorReasonUnknown
+		}
+		emitError(&StreamError{
+			Reason:  reason,
+			Message: err.Error(),
+		})
+	}
+
 	defer func() {
 		if e := recover(); e != nil {
 			slog.ErrorContext(ctx, "handle stream panic", slog.Any("err", e))
-			emitError(fmt.Errorf("handle stream panic: %v", e))
+			emitError(&StreamError{
+				Reason:  StreamErrorReasonPanic,
+				Message: fmt.Sprintf("handle stream panic: %v", e),
+			})
+		}
+		if hasError {
+			return
 		}
 		tracker.finish(callbacks, finalResult)
 	}()
@@ -177,16 +230,26 @@ recvLoop:
 		if errors.Is(err, io.EOF) {
 			break
 		}
+
 		if err != nil {
-			emitError(fmt.Errorf("receive message failed: %w", err))
+			emitStdError(StreamErrorReasonReceiveError, fmt.Errorf("receive message failed: %w", err))
 			break
 		}
 
 		select {
 		case <-ctx.Done():
-			emitError(ctx.Err())
+			emitStdError(StreamErrorReasonContextDone, ctx.Err())
 			break recvLoop
 		default:
+		}
+
+		finishReason := msgFinishReason(msg)
+		if finishReason != "" && !isNonErrorFinishReason(finishReason) {
+			emitError(&StreamError{
+				Reason:  StreamErrorReasonModelFinishReason,
+				Message: fmt.Sprintf("model returned error finish_reason: %s", finishReason),
+			})
+			break recvLoop
 		}
 
 		tracker.feed(msg, callbacks)
@@ -194,94 +257,134 @@ recvLoop:
 		tmps = append(tmps, msg)
 	}
 
+	if hasError {
+		return
+	}
+
 	concat, err := schema.ConcatMessages(tmps)
 	if err != nil {
-		emitError(fmt.Errorf("concat messages failed: %w", err))
+		emitStdError(StreamErrorReasonConcatError, fmt.Errorf("concat messages failed: %w", err))
 		return
 	}
 	finalResult = concat
 }
 
 type streamTracker struct {
-	state        StreamState
-	hasReasoning bool
+	started bool
+	lastMsg *schema.Message // 上一个消息
 }
 
 func newStreamTracker() *streamTracker {
-	return &streamTracker{
-		state: StreamStateInit,
+	return &streamTracker{}
+}
+
+func (t *streamTracker) feed(curMsg *schema.Message, callbacks *Callbacks) {
+	if curMsg != nil && !t.started {
+		t.started = true
+		if callbacks != nil && callbacks.OnStart != nil {
+			callbacks.OnStart()
+		}
+	}
+
+	t.emitByTransition(t.lastMsg, curMsg, callbacks)
+	t.lastMsg = curMsg
+}
+
+func (t *streamTracker) finish(
+	callbacks *Callbacks,
+	finalResult *schema.Message,
+) {
+	t.emitByTransition(t.lastMsg, nil, callbacks)
+	t.lastMsg = nil
+
+	if callbacks != nil && callbacks.OnDone != nil {
+		callbacks.OnDone(finalResult)
 	}
 }
 
-func (t *streamTracker) feed(msg *schema.Message, callbacks *Callbacks) {
-	if msg == nil {
-		return
-	}
+func (t *streamTracker) emitByTransition(
+	prevMsg *schema.Message,
+	curMsg *schema.Message,
+	callbacks *Callbacks,
+) {
+	prevHasReasoning := hasReasoningDelta(prevMsg)
+	prevHasContent := hasContentDelta(prevMsg)
+	prevHasTool := hasToolDelta(prevMsg)
 
-	if msg.ReasoningContent != "" {
-		t.hasReasoning = true
-		if t.state != StreamStateReasoning {
-			t.state = StreamStateReasoning
-		}
-		if callbacks != nil && callbacks.OnReasoning != nil {
-			callbacks.OnReasoning(msg)
-		}
-	} else if t.state == StreamStateReasoning {
-		t.emitReasoningEnd(callbacks, msg)
-	}
+	curHasReasoning := hasReasoningDelta(curMsg)
+	curHasContent := hasContentDelta(curMsg)
+	curHasTool := hasToolDelta(curMsg)
 
-	if len(msg.ToolCalls) > 0 {
-		if t.state == StreamStateReasoning {
-			t.emitReasoningEnd(callbacks, msg)
-		}
-		if t.state != StreamStateTooling {
-			t.state = StreamStateTooling
-		}
-		if callbacks != nil && callbacks.OnTooling != nil {
-			callbacks.OnTooling(msg)
+	// 先发 end：上一块有、当前块没有，即认为结束。
+	if prevHasReasoning && !curHasReasoning {
+		if callbacks != nil && callbacks.OnReasoningEnd != nil {
+			callbacks.OnReasoningEnd()
 		}
 	}
-
-	if msg.Content != "" {
-		if t.state == StreamStateReasoning {
-			t.emitReasoningEnd(callbacks, msg)
+	if prevHasContent && !curHasContent {
+		if callbacks != nil && callbacks.OnContentEnd != nil {
+			callbacks.OnContentEnd()
 		}
-		if t.state != StreamStateContent {
-			t.state = StreamStateContent
-		}
-		if callbacks != nil && callbacks.OnContent != nil {
-			callbacks.OnContent(msg)
+	}
+	if prevHasTool && !curHasTool {
+		if callbacks != nil && callbacks.OnToolEnd != nil {
+			callbacks.OnToolEnd()
 		}
 	}
 
-	if hasFinishReason(msg) && t.state == StreamStateReasoning {
-		t.emitReasoningEnd(callbacks, msg)
+	// 再发 start：上一块没有、当前块有，即认为开始。
+	if !prevHasReasoning && curHasReasoning {
+		if callbacks != nil && callbacks.OnReasoningStart != nil {
+			callbacks.OnReasoningStart()
+		}
+	}
+	if !prevHasContent && curHasContent {
+		if callbacks != nil && callbacks.OnContentStart != nil {
+			callbacks.OnContentStart()
+		}
+	}
+	if !prevHasTool && curHasTool {
+		if callbacks != nil && callbacks.OnToolStart != nil {
+			callbacks.OnToolStart()
+		}
+	}
+
+	// 最后发 delta：当前块有增量就触发。
+	if curHasReasoning && callbacks != nil && callbacks.OnReasoningDelta != nil {
+		callbacks.OnReasoningDelta(curMsg.ReasoningContent)
+	}
+	if curHasContent && callbacks != nil && callbacks.OnContentDelta != nil {
+		callbacks.OnContentDelta(curMsg.Content)
+	}
+	if curHasTool && callbacks != nil && callbacks.OnToolDelta != nil {
+		callbacks.OnToolDelta(curMsg.ToolCalls)
 	}
 }
 
-func (t *streamTracker) emitReasoningEnd(callbacks *Callbacks, msg *schema.Message) {
-	if t.state != StreamStateReasoning {
-		return
-	}
-
-	t.state = StreamStateReasoningEnd
-	if callbacks != nil && callbacks.OnReasoningEnd != nil {
-		callbacks.OnReasoningEnd(msg)
-	}
+func hasReasoningDelta(msg *schema.Message) bool {
+	return msg != nil && msg.ReasoningContent != ""
 }
 
-func (t *streamTracker) finish(callbacks *Callbacks, finalResult *schema.Message) {
-	if t.state == StreamStateReasoning {
-		t.emitReasoningEnd(callbacks, nil)
-	}
-	t.state = StreamEnd
-	if callbacks != nil && callbacks.OnEnd != nil {
-		callbacks.OnEnd(finalResult)
-	}
+func hasContentDelta(msg *schema.Message) bool {
+	return msg != nil && msg.Content != ""
 }
 
-func hasFinishReason(msg *schema.Message) bool {
-	return msg != nil &&
-		msg.ResponseMeta != nil &&
-		msg.ResponseMeta.FinishReason != ""
+func hasToolDelta(msg *schema.Message) bool {
+	return msg != nil && len(msg.ToolCalls) > 0
+}
+
+func msgFinishReason(msg *schema.Message) string {
+	if msg == nil || msg.ResponseMeta == nil {
+		return ""
+	}
+	return strings.TrimSpace(msg.ResponseMeta.FinishReason)
+}
+
+func isNonErrorFinishReason(reason string) bool {
+	switch strings.ToLower(strings.TrimSpace(reason)) {
+	case FinishReasonStop, FinishReasonLength, FinishReasonToolCalls:
+		return true
+	default:
+		return false
+	}
 }

@@ -9,8 +9,14 @@ import (
 	einomodel "github.com/cloudwego/eino/components/model"
 )
 
-// BuildThinkingOption builds per-request model options for thinking behavior.
-func BuildThinkingOption(
+var responseFormatJsonObject = map[string]any{
+	"response_format": map[string]string{
+		"type": "json_object",
+	},
+}
+
+// WithThinking builds per-request model options for thinking behavior.
+func WithThinking(
 	providerType Provider,
 	enableThinking bool,
 ) einomodel.Option {
@@ -27,7 +33,7 @@ func BuildThinkingOption(
 		if enableThinking {
 			thinkingType = "enabled"
 		}
-		return deepseek.WithExtraFields(map[string]interface{}{
+		return deepseek.WithExtraFields(map[string]any{
 			"thinking": map[string]string{
 				"type": thinkingType,
 			},
@@ -37,12 +43,24 @@ func BuildThinkingOption(
 	}
 }
 
-func BuildLLMModelOption(model string) einomodel.Option {
+func WithModel(model string) einomodel.Option {
 	if model != "" {
 		return einomodel.WithModel(model)
 	}
 
 	return einomodel.Option{}
+}
+
+// 要求模型输出 JSON 对象
+//
+// 注意使用此Option时 需要在提示词中明确要模型输出JSON 否接在某些provider下接口会报错
+func WithResponseJsonObject(providerType Provider) einomodel.Option {
+	switch providerType {
+	case Qwen, DeepSeek, Openai:
+		return qwen.WithExtraFields(responseFormatJsonObject)
+	default:
+		return einomodel.Option{}
+	}
 }
 
 func BuildLLMOptions(opts ...einomodel.Option) []einomodel.Option {

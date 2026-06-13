@@ -30,7 +30,7 @@ type Logic struct {
 	ctx context.Context
 
 	sourceBiz         *bizsource.Biz
-	sourceBizForAgent *bizsource.BizForAgent
+	sourceBizForAgent *bizsource.AgentBiz
 	notebookBiz       *biznotebook.Biz
 	artifactBiz       *bizartifact.Biz
 
@@ -45,7 +45,7 @@ func MustNewLogic(
 	ctx context.Context,
 	objectStorage storage.Storage,
 	sourceBiz *bizsource.Biz,
-	sourceBizForAgent *bizsource.BizForAgent,
+	sourceBizForAgent *bizsource.AgentBiz,
 	notebookBiz *biznotebook.Biz,
 	artifactBiz *bizartifact.Biz,
 	llmGateway *gateway.Gateway,
@@ -206,8 +206,8 @@ func (l *Logic) ListNotebookArtifacts(
 	}
 
 	fetchLimit := params.Limit + 1 // for has_more check
-	tasks, err := l.artifactBiz.ListTasksByNotebook(ctx,
-		&bizartifact.ListTasksByNotebookQuery{
+	tasks, err := l.artifactBiz.ListNotebookTasks(ctx,
+		&bizartifact.ListNotebookTasksQuery{
 			NotebookId: params.NotebookId,
 			Limit:      fetchLimit,
 			Offset:     params.Offset,

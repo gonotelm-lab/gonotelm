@@ -2,12 +2,15 @@ package studio
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	stdslices "slices"
 	"strings"
 
-	bizagent "github.com/gonotelm-lab/gonotelm/internal/app/biz/agent"
+	"github.com/gonotelm-lab/gonotelm/internal/app/agent"
+	bizagent "github.com/gonotelm-lab/gonotelm/internal/app/agent"
+	"github.com/gonotelm-lab/gonotelm/internal/app/agent/tool"
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
-	studiotool "github.com/gonotelm-lab/gonotelm/internal/app/logic/studio/tool"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/app/prompts"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
@@ -16,6 +19,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/slices"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
+	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 
 	"github.com/bytedance/sonic"
 	eino "github.com/cloudwego/eino/components/model"
@@ -59,7 +63,7 @@ type reportExpectation struct {
 	Report string `json:"report"`
 }
 
-type reportAgentState struct{}
+type dummayState struct{}
 
 func (m *reportGenerator) generate(
 	ctx context.Context,
@@ -74,21 +78,22 @@ func (m *reportGenerator) generate(
 		return nil, errors.Wrapf(errors.ErrInner, "get mindmap llm model failed: %v", err)
 	}
 
-	modelOption := llmchat.BuildLLMModelOption(usedModel)
+	modelOption := llmchat.WithModel(usedModel)
 	maxRound := conf.Global().Logic.Studio.Report.MaxRound
-	agentConfig := bizagent.AgentConfig[*reportAgentState]{
-		MaxRound:    maxRound,
-		LLM:         llmModel,
-		Options:     llmchat.BuildLLMOptions(modelOption),
-		BeforeRound: m.beforeAgentRoundHook,
+	agentConfig := bizagent.Config[dummayState]{
+		MaxRound: maxRound,
+		BaseLLM:  llmModel,
+		Options:  llmchat.BuildLLMOptions(modelOption),
 	}
 
-	agent := bizagent.New(agentConfig, &reportAgentState{})
+	sbz := m.l.sourceBizForAgent
+	agent := bizagent.New(agentConfig, dummayState{})
 	err = agent.BindTools(map[string]einotool.InvokableTool{
-		studiotool.ReadSourceToolName: studiotool.NewReadSourceTool(m.l.sourceBizForAgent),
-		studiotool.GrepSourceToolName: studiotool.NewGrepSourceTool(m.l.sourceBizForAgent),
-		studiotool.StatSourceToolName: studiotool.NewStatSourceTool(m.l.sourceBizForAgent),
+		tool.ReadSourceToolName: tool.NewReadSourceTool(sbz, m.checkAgentSourceAccess(params)),
+		tool.GrepSourceToolName: tool.NewGrepSourceTool(sbz, m.checkAgentSourceAccess(params)),
+		tool.StatSourceToolName: tool.NewStatSourceTool(sbz, m.checkAgentSourceAccess(params)),
 	})
+	agent.OnBeforeRound(m.beforeAgentRoundHook(agent))
 	if err != nil {
 		return nil, errors.WithMessagef(err, "bind tools failed")
 	}
@@ -98,7 +103,7 @@ func (m *reportGenerator) generate(
 		sourceIds = append(sourceIds, sourceId.String())
 	}
 
-	msg, err := prompts.StudioReportMessage(ctx, sourceIds, "")
+	msg, err := prompts.RenderStudioReportMessage(ctx, sourceIds, "")
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "generate report message failed, err=%v", err)
 	}
@@ -112,7 +117,12 @@ func (m *reportGenerator) generate(
 	}
 
 	// generate title again
-	title, err := m.generateTitle(ctx, llmModel, modelOption, expect.Report, agent.GetAccumulatedMessages())
+	title, err := m.generateTitle(ctx,
+		llmModel,
+		modelOption,
+		expect.Report,
+		agent.AccumulatedMessages(),
+	)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "generate title failed, err=%v", err)
 	}
@@ -129,7 +139,7 @@ func (m *reportGenerator) generateTitle(
 	previousMsgs []*einoschema.Message,
 ) (string, error) {
 	title := ""
-	titleMakerMsg, err := prompts.TitleMakerMessage(ctx, report, "")
+	titleMakerMsg, err := prompts.RenderTitleMakerMessage(ctx, report, pkgcontext.GetLang(ctx))
 	if err != nil {
 		slog.ErrorContext(ctx, "generate title maker message failed", slog.Any("err", err))
 	} else {
@@ -138,7 +148,7 @@ func (m *reportGenerator) generateTitle(
 		msgs = append(msgs, titleMakerMsg)
 		result, err := llmModel.Generate(ctx, msgs, modelOption)
 		if err == nil {
-			title = strings.Split(result.Content, "\n")[0]
+			title = strings.TrimSpace(result.Content)
 		} else {
 			slog.ErrorContext(ctx, "generate title failed", slog.Any("err", err))
 			// take the first sentence as title
@@ -148,7 +158,7 @@ func (m *reportGenerator) generateTitle(
 			}
 		}
 	}
-	
+
 	title = pkgstring.TruncateRune(title, constants.MaxNotebookNameLength)
 	title = strings.TrimSpace(title)
 
@@ -156,20 +166,33 @@ func (m *reportGenerator) generateTitle(
 }
 
 func (m *reportGenerator) beforeAgentRoundHook(
-	ctx context.Context,
-	round int,
-	state *reportAgentState,
-	msgs []*einoschema.Message,
-) ([]*einoschema.Message, error) {
-	slog.DebugContext(ctx, "generating report before round hook invoked", slog.Int("round", round))
+	ag *bizagent.Agent[dummayState],
+) agent.BeforeRoundHook[dummayState] {
+	return func(
+		ctx context.Context,
+		round int,
+		state dummayState,
+		msgs []*einoschema.Message,
+	) ([]*einoschema.Message, error) {
+		if round >= conf.Global().Logic.Studio.Report.MaxRound-1 {
+			msgs = append(msgs, &einoschema.Message{
+				Role:    einoschema.User,
+				Content: "IMPORTANT: 这轮输出是你最后一轮输出，请直接输出最终结果，**不需要再进行工具调用**，按照你已有的信息输出最终结果",
+			})
+			ag.StripTools() // 最后一轮把工具去掉
+		}
 
-	if round >= conf.Global().Logic.Studio.Report.MaxRound-1 {
-		// 注入一条msg
-		msgs = append(msgs, &einoschema.Message{
-			Role:    einoschema.User,
-			Content: "IMPORTANT: 这轮输出是你最后一轮输出，请直接输出最终结果，**不需要再进行工具调用**，按照你已有的信息输出最终结果",
-		})
+		return msgs, nil
 	}
+}
 
-	return msgs, nil
+func (m *reportGenerator) checkAgentSourceAccess(params *generateReportTaskParams) tool.SourceChecker {
+	// 检查当前agent是否有能够访问sourceId的权限
+	return tool.SourceCheckerFn(func(ctx context.Context, sourceId uuid.UUID) error {
+		if !stdslices.Contains(params.SourceIds, sourceId) {
+			return fmt.Errorf("not allowed to access source: %s", sourceId)
+		}
+
+		return nil
+	})
 }

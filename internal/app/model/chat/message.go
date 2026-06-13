@@ -27,13 +27,6 @@ func (r MessageRole) String() string {
 	}
 }
 
-type MessageType int8
-
-const (
-	MessageTypeNormal MessageType = 0
-	MessageTypeSystem MessageType = 1
-)
-
 type MessageContentKind string
 
 func (k MessageContentKind) String() string {
@@ -49,7 +42,6 @@ type Message struct {
 	ChatId  Id
 	UserId  string
 	MsgRole MessageRole
-	MsgType MessageType
 	Content *MessageContent
 	SeqNo   int64
 	Extra   *MessageExtra
@@ -86,7 +78,6 @@ func NewMessage(smsg *schema.ChatMessage) (*Message, error) {
 		ChatId:  smsg.ChatId,
 		UserId:  smsg.UserId,
 		MsgRole: MessageRole(smsg.MsgRole),
-		MsgType: MessageType(smsg.MsgType),
 		Content: &content,
 		SeqNo:   smsg.SeqNo,
 		Extra:   extra,

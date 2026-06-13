@@ -6,8 +6,9 @@ import (
 )
 
 const (
-	AttrKeyUserID    = "user_id"
-	AttrKeySceneType = "scene_type"
+	AttrKeyUserID       = "user_id"
+	AttrKeySceneType    = "scene"
+	AttrKeyOperatorType = "operator"
 )
 
 func getUserIdSlogAttr(ctx context.Context) (slog.Attr, bool) {
@@ -20,7 +21,7 @@ func getUserIdSlogAttr(ctx context.Context) (slog.Attr, bool) {
 	return attr, true
 }
 
-func getSceneTypeSlogAttr(ctx context.Context) (slog.Attr, bool) {
+func getSceneSlogAttr(ctx context.Context) (slog.Attr, bool) {
 	sceneType := GetSceneType(ctx)
 	if sceneType == UnknownScene {
 		return slog.Attr{}, false
@@ -30,9 +31,20 @@ func getSceneTypeSlogAttr(ctx context.Context) (slog.Attr, bool) {
 	return attr, true
 }
 
+func getOperatorSlogAttr(ctx context.Context) (slog.Attr, bool) {
+	operatorType := GetOperatorType(ctx)
+	if operatorType == OperatorTypeUser {
+		return slog.Attr{}, false
+	}
+
+	attr := slog.String(AttrKeyOperatorType, string(operatorType))
+	return attr, true
+}
+
 var defaultSlogAttrsExtractors = []SlogAttrExtractor{
 	getUserIdSlogAttr,
-	getSceneTypeSlogAttr,
+	getSceneSlogAttr,
+	getOperatorSlogAttr,
 }
 
 func ToSlogAttrs(ctx context.Context) []slog.Attr {

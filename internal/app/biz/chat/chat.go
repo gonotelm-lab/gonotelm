@@ -47,7 +47,6 @@ func (b *Biz) createMessage(
 	chatId Id,
 	userId string,
 	msgRole int8,
-	msgType int8,
 	content chatmodel.IMessageContent,
 	extras []byte,
 ) (Id, error) {
@@ -68,7 +67,6 @@ func (b *Biz) createMessage(
 		ChatId:  chatId,
 		UserId:  userId,
 		MsgRole: msgRole,
-		MsgType: msgType,
 		Content: contentBytes,
 		SeqNo:   seqNo,
 		Extra:   extras,
@@ -98,7 +96,6 @@ func (b *Biz) createUserMessage(
 		chatId,
 		userId,
 		int8(chatmodel.MessageRoleUser),
-		int8(chatmodel.MessageTypeNormal),
 		content,
 		nil,
 	)
@@ -132,7 +129,6 @@ func (b *Biz) createAssistantMessage(
 		chatId,
 		userId,
 		int8(chatmodel.MessageRoleAssistant),
-		int8(chatmodel.MessageTypeNormal),
 		content,
 		extraBytes,
 	)
@@ -313,7 +309,6 @@ func (b *Biz) AddAssistantSystemMessage(
 		cmd.ChatId,
 		cmd.UserId,
 		int8(chatmodel.MessageRoleAssistant),
-		int8(chatmodel.MessageTypeSystem),
 		content,
 		nil,
 	)
@@ -475,7 +470,7 @@ func (b *Biz) ClearChatContext(
 	return nil
 }
 
-func (b *Biz) DeleteChatsByNotebook(
+func (b *Biz) DeleteNotebookChats(
 	ctx context.Context,
 	notebookId Id,
 ) error {

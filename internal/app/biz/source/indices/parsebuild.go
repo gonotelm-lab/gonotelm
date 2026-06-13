@@ -2,11 +2,12 @@ package indices
 
 import (
 	"context"
+	"sort"
 	"strings"
+	"unicode/utf8"
+	"unsafe"
 
 	sourceutil "github.com/gonotelm-lab/gonotelm/internal/app/biz/source/util"
-	"github.com/gonotelm-lab/gonotelm/internal/app/prompts"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
 	vschema "github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/batch"
 	"github.com/gonotelm-lab/gonotelm/pkg/eino-ext/chunker/recursive"
@@ -76,7 +77,7 @@ type markdownDocTreeNode struct {
 	headingLevel int // 此处根节点是level=0
 	pos          int
 
-	derivedFrom []string
+	derivation []string
 
 	derived bool
 
@@ -341,13 +342,20 @@ func (b *DocTreeBuilder) ParseBuild(
 		return nil, errors.Wrapf(errors.ErrInner, "split oversized markdown tree node failed, err=%v", err)
 	}
 
-	// 4) 最后统一把 byte offset 转 rune offset，供上层写入元数据。
-	runeIndexByByteOffset := sourceutil.BuildRuneIndexByByteOffset(string(content))
+	// 4) 稀疏收集需要转换的 byte offset，一次扫描计算 rune offset，避免全量 []int 索引。
+	var byteOffsets []int
 	for _, rootNode := range rootList {
 		if rootNode == nil {
 			continue
 		}
-		applyNodeRuneOffset(rootNode, runeIndexByByteOffset)
+		byteOffsets = collectNodeByteOffsets(rootNode, byteOffsets)
+	}
+	runeOffsetMap := computeRuneOffsetsFromBytes(content, byteOffsets)
+	for _, rootNode := range rootList {
+		if rootNode == nil {
+			continue
+		}
+		applyNodeRuneOffsetFromMap(rootNode, runeOffsetMap)
 	}
 
 	root, nodes := buildDocTreeFromNode(rootList[0])
@@ -374,24 +382,10 @@ func (b *DocTreeBuilder) generateRootTitle(ctx context.Context, vroot *markdownD
 	}
 	titleContent := strings.Join(slices.Unique(titles), "\n")
 
-	providerType := chat.Provider(b.providerSelector(ctx))
-	provider, err := b.gateway.GetProvider(providerType)
+	summary, err := b.summarizer.Summarize(ctx, titleContent)
 	if err != nil {
-		return errors.Wrapf(errors.ErrInner, "get provider failed, err=%v", err)
+		return errors.WithMessagef(err, "generate vroot summary failed")
 	}
-
-	model := b.modelSelector(ctx)
-	llmOption := chat.BuildLLMModelOption(model)
-	msg, err := prompts.SummarizeMessage(ctx, titleContent, "")
-	if err != nil {
-		return errors.Wrapf(errors.ErrInner, "render summarize prompt failed, err=%v", err)
-	}
-
-	genResp, err := provider.Generate(ctx, []*einoschema.Message{msg}, llmOption)
-	if err != nil {
-		return errors.Wrapf(errors.ErrLLM, "generate vroot summary failed, err=%v", err)
-	}
-	summary := strings.TrimSpace(genResp.Content)
 	if summary == "" {
 		summary = "vroot"
 	}
@@ -403,14 +397,17 @@ func (b *DocTreeBuilder) generateRootTitle(ctx context.Context, vroot *markdownD
 }
 
 func collectNodeTitles(nodes []*markdownDocTreeNode) []string {
-	titles := make([]string, 0, len(nodes))
+	return collectNodeTitlesInto(nodes, nil)
+}
+
+func collectNodeTitlesInto(nodes []*markdownDocTreeNode, acc []string) []string {
 	for _, node := range nodes {
 		if title := strings.TrimSpace(node.title); title != "" {
-			titles = append(titles, title)
+			acc = append(acc, title)
 		}
-		titles = append(titles, collectNodeTitles(node.children)...)
+		acc = collectNodeTitlesInto(node.children, acc)
 	}
-	return titles
+	return acc
 }
 
 func extractNodeByteRange(node ast.Node, source []byte) (markdownByteRange, bool) {
@@ -482,7 +479,8 @@ func alignByteRangeByContent(
 		return markdownByteRange{}, false
 	}
 
-	scopeText := string(source[scoped.start:scoped.end])
+	scope := source[scoped.start:scoped.end]
+	scopeText := unsafe.String(unsafe.SliceData(scope), len(scope))
 	idx := strings.Index(scopeText, content)
 	if idx < 0 {
 		return markdownByteRange{}, false
@@ -699,7 +697,57 @@ func buildSplitChunkNode(
 	}
 }
 
-func applyNodeRuneOffset(node *markdownDocTreeNode, runeIndexByByteOffset []int) {
+func collectNodeByteOffsets(node *markdownDocTreeNode, offsets []int) []int {
+	if node == nil {
+		return offsets
+	}
+	if m := node.parseMetadata; m != nil && m.endByte > m.startByte {
+		offsets = append(offsets, m.startByte, m.endByte)
+	}
+	for _, child := range node.children {
+		offsets = collectNodeByteOffsets(child, offsets)
+	}
+	return offsets
+}
+
+func computeRuneOffsetsFromBytes(content []byte, byteOffsets []int) map[int]int {
+	if len(byteOffsets) == 0 {
+		return nil
+	}
+
+	sort.Ints(byteOffsets)
+	// deduplicate in-place
+	j := 0
+	for i, v := range byteOffsets {
+		if i == 0 || v != byteOffsets[i-1] {
+			byteOffsets[j] = v
+			j++
+		}
+	}
+	byteOffsets = byteOffsets[:j]
+
+	result := make(map[int]int, len(byteOffsets))
+	runeIdx := 0
+	nextTarget := 0
+
+	for bytePos := 0; bytePos < len(content) && nextTarget < len(byteOffsets); {
+		for nextTarget < len(byteOffsets) && byteOffsets[nextTarget] <= bytePos {
+			result[byteOffsets[nextTarget]] = runeIdx
+			nextTarget++
+		}
+		_, size := utf8.DecodeRune(content[bytePos:])
+		bytePos += size
+		runeIdx++
+	}
+	for nextTarget < len(byteOffsets) {
+		result[byteOffsets[nextTarget]] = runeIdx
+		nextTarget++
+	}
+
+	return result
+}
+
+func applyNodeRuneOffsetFromMap(node *markdownDocTreeNode, runeOffsetMap map[int]int) {
 	if node == nil {
 		return
 	}
@@ -708,13 +756,13 @@ func applyNodeRuneOffset(node *markdownDocTreeNode, runeIndexByByteOffset []int)
 		if node.parseMetadata.endByte <= node.parseMetadata.startByte {
 			node.parseMetadata = nil
 		} else {
-			node.parseMetadata.startRune = sourceutil.ByteOffsetToRuneOffset(runeIndexByByteOffset, node.parseMetadata.startByte)
-			node.parseMetadata.endRune = sourceutil.ByteOffsetToRuneOffset(runeIndexByByteOffset, node.parseMetadata.endByte)
+			node.parseMetadata.startRune = runeOffsetMap[node.parseMetadata.startByte]
+			node.parseMetadata.endRune = runeOffsetMap[node.parseMetadata.endByte]
 		}
 	}
 
 	for _, child := range node.children {
-		applyNodeRuneOffset(child, runeIndexByByteOffset)
+		applyNodeRuneOffsetFromMap(child, runeOffsetMap)
 	}
 }
 
@@ -834,12 +882,12 @@ func buildDocTreeFromNode(
 	var build func(node *markdownDocTreeNode) *DocTreeNode
 	build = func(node *markdownDocTreeNode) *DocTreeNode {
 		children := make([]*DocTreeNode, 0, len(node.children))
-		childDerivedFrom := make([]string, 0)
+		childDerivation := make([]string, 0)
 		maxChildLevel := 0
 		for _, child := range node.children {
 			childNode := build(child)
 			children = append(children, childNode)
-			childDerivedFrom = append(childDerivedFrom, childNode.derivedFrom...)
+			childDerivation = append(childDerivation, childNode.derivation...)
 			if childNode.level > maxChildLevel {
 				maxChildLevel = childNode.level
 			}
@@ -854,11 +902,11 @@ func buildDocTreeFromNode(
 			ChunkPos: -1,
 		}
 
-		derivedFrom := []string{id}
+		derivations := []string{id}
 		if node.derived {
-			derivedFrom = slices.Unique(childDerivedFrom)
+			derivations = slices.Unique(childDerivation)
 		}
-		node.derivedFrom = derivedFrom
+		node.derivation = derivations
 
 		level := 0
 		if len(children) > 0 {
@@ -872,13 +920,7 @@ func buildDocTreeFromNode(
 			state.nonDerivedPos++
 		}
 
-		docNode := &DocTreeNode{
-			core:        core,
-			level:       level,
-			pos:         pos,
-			children:    children,
-			derivedFrom: derivedFrom,
-		}
+		docNode := NewDocTreeNode(core, level, pos, children, derivations)
 		if !node.derived {
 			docNode.parseMetadata = cloneParseMetadata(node.parseMetadata)
 			if docNode.parseMetadata != nil && !docNode.parseMetadata.Valid() {
@@ -903,7 +945,12 @@ func nodeEmbeddingContent(title string, content string) string {
 	case content == "":
 		return title
 	default:
-		return title + "\n\n" + content
+		var sb strings.Builder
+		sb.Grow(len(title) + 2 + len(content))
+		sb.WriteString(title)
+		sb.WriteString("\n\n")
+		sb.WriteString(content)
+		return sb.String()
 	}
 }
 

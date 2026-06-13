@@ -1,4 +1,5 @@
 package source
+
 import (
 	"context"
 	"log/slog"
@@ -62,7 +63,7 @@ func (b *Biz) ClearSourceIndices(
 	return nil
 }
 
-type RetrieveSourceDocsQuery struct {
+type SimilaritySearchSourceDocsQuery struct {
 	NotebookId uuid.UUID
 	Query      string
 	SourceIds  []uuid.UUID
@@ -97,7 +98,11 @@ func (b *Biz) GetSourceDoc(
 		return nil, errors.WithMessage(err, "new source doc failed")
 	}
 	if query.Populate {
-		if err := b.PopulateSourceDocs(ctx, query.NotebookId, []*model.SourceDoc{sourceDoc}); err != nil {
+		if err := b.PopulateSourceDocs(
+			ctx,
+			query.NotebookId,
+			[]*model.SourceDoc{sourceDoc},
+		); err != nil {
 			slog.WarnContext(ctx, "populate source doc failed",
 				slog.Any("err", err),
 				slog.String("notebook_id", query.NotebookId.String()),
@@ -203,9 +208,9 @@ func (b *Biz) ListSourceDocs(
 // 召回来源片段
 //
 // 需要注意的是 来源片段中可能会存在派生的片段, 这些派生片段一般为一些总结性的语句片段
-func (b *Biz) RetrieveSourceDocs(
+func (b *Biz) SimilaritySearchSourceDocs(
 	ctx context.Context,
-	query *RetrieveSourceDocsQuery,
+	query *SimilaritySearchSourceDocsQuery,
 ) ([]*model.SourceDoc, error) {
 	var (
 		notebookId = query.NotebookId.String()
@@ -292,7 +297,9 @@ func (b *Biz) GetSourceDocTree(
 	return recoverDocTree(ctx, docs)
 }
 
-// 额外填充SourceDoc字段
+// 额外填充 SourceDoc 字段。
+//
+// 额外字段定义见 [model.SourceDoc]
 func (s *Biz) PopulateSourceDocs(
 	ctx context.Context,
 	notebookId uuid.UUID,
@@ -302,135 +309,305 @@ func (s *Biz) PopulateSourceDocs(
 		return nil
 	}
 
-	notebookID := notebookId.String()
-	type deriveMeta struct {
-		doc      *model.SourceDoc
-		sourceId string
-		poses    []int32
+	helper := newSourceDocPopulateHelper(s, notebookId.String())
+	deriveMetas, treeMetas, posesBySource := helper.collectPopulateMetas(ctx, docs)
+	if len(deriveMetas) == 0 && len(treeMetas) == 0 {
+		return nil
 	}
 
-	metas := make([]*deriveMeta, 0, len(docs))
+	docsBySourcePos, err := helper.loadDocsBySourcePos(ctx, posesBySource)
+	if err != nil {
+		return err
+	}
+
+	helper.populateDerivationIDs(ctx, deriveMetas, docsBySourcePos)
+	helper.populateTreeMetaIDs(ctx, treeMetas, docsBySourcePos)
+
+	return nil
+}
+
+type deriveMeta struct {
+	doc      *model.SourceDoc
+	sourceId string
+	poses    []int32
+}
+
+type treeMetaResolve struct {
+	doc         *model.SourceDoc
+	sourceId    string
+	parentPos   *int
+	childrenPos []int
+}
+
+type sourceDocPopulateHelper struct {
+	biz        *Biz
+	notebookID string
+}
+
+func newSourceDocPopulateHelper(
+	biz *Biz,
+	notebookID string,
+) *sourceDocPopulateHelper {
+	return &sourceDocPopulateHelper{
+		biz:        biz,
+		notebookID: notebookID,
+	}
+}
+
+func (h *sourceDocPopulateHelper) collectPopulateMetas(
+	ctx context.Context,
+	docs []*model.SourceDoc,
+) ([]*deriveMeta, []*treeMetaResolve, map[string][]int32) {
+	deriveMetas := make([]*deriveMeta, 0, len(docs))
+	treeMetas := make([]*treeMetaResolve, 0, len(docs))
 	posesBySource := make(map[string][]int32)
+
 	for _, doc := range docs {
 		if doc == nil {
 			continue
 		}
+		sourceID := doc.SourceId.String()
 
-		derivingPos := doc.DerivingPos()
-		if derivingPos == "" {
-			continue
+		if dmeta, queryPoses := h.buildDeriveMeta(ctx, doc, sourceID); dmeta != nil {
+			deriveMetas = append(deriveMetas, dmeta)
+			posesBySource[sourceID] = append(posesBySource[sourceID], queryPoses...)
 		}
+		if tmeta, queryPoses := h.buildTreeMetaResolve(doc, sourceID); tmeta != nil {
+			treeMetas = append(treeMetas, tmeta)
+			posesBySource[sourceID] = append(posesBySource[sourceID], queryPoses...)
+		}
+	}
 
-		bm, err := bitmap.NewFrom(derivingPos)
-		if err != nil {
-			slog.WarnContext(ctx, "decode source doc deriving pos failed",
-				slog.String("doc_id", doc.Id),
-				slog.String("source_id", doc.SourceId.String()),
-				slog.String("notebook_id", notebookID),
-				slog.Any("err", err),
-			)
-			continue
-		}
+	return deriveMetas, treeMetas, posesBySource
+}
 
-		setPos := bm.GetAllSet()
-		if len(setPos) == 0 {
-			continue
-		}
+func (h *sourceDocPopulateHelper) buildDeriveMeta(
+	ctx context.Context,
+	doc *model.SourceDoc,
+	sourceID string,
+) (*deriveMeta, []int32) {
+	derivationPos := doc.DerivationPos()
+	if derivationPos == "" {
+		return nil, nil
+	}
 
-		chunkPoses := make([]int32, 0, len(setPos))
-		for _, pos := range setPos {
-			chunkPoses = append(chunkPoses, int32(pos))
-		}
-		if len(chunkPoses) == 0 {
-			continue
-		}
-
-		sourceId := doc.SourceId.String()
-		metas = append(metas, &deriveMeta{
-			doc:      doc,
-			sourceId: sourceId,
-			poses:    chunkPoses,
-		},
+	bm, err := bitmap.NewFrom(derivationPos)
+	if err != nil {
+		slog.WarnContext(ctx, "decode source doc derivation pos failed",
+			slog.String("doc_id", doc.Id),
+			slog.String("source_id", sourceID),
+			slog.String("notebook_id", h.notebookID),
+			slog.Any("err", err),
 		)
-		posesBySource[sourceId] = append(posesBySource[sourceId], chunkPoses...)
-	}
-	if len(metas) == 0 {
-		return nil
+		return nil, nil
 	}
 
-	docsBySourcePos := make(
-		map[string]map[int32]*vecschema.SourceDoc,
-		len(posesBySource),
-	)
+	setPos := bm.GetAllSet()
+	if len(setPos) == 0 {
+		return nil, nil
+	}
+	chunkPoses := make([]int32, 0, len(setPos))
+	for _, pos := range setPos {
+		chunkPoses = append(chunkPoses, int32(pos))
+	}
+	if len(chunkPoses) == 0 {
+		return nil, nil
+	}
+
+	return &deriveMeta{
+		doc:      doc,
+		sourceId: sourceID,
+		poses:    chunkPoses,
+	}, chunkPoses
+}
+
+func (h *sourceDocPopulateHelper) buildTreeMetaResolve(
+	doc *model.SourceDoc,
+	sourceID string,
+) (*treeMetaResolve, []int32) {
+	if doc == nil || doc.TreeMeta == nil {
+		return nil, nil
+	}
+
+	parentPos, hasParent := doc.TreeMeta.ParentPos()
+	childrenPos := doc.TreeMeta.ChildrenPos()
+	if !hasParent && len(childrenPos) == 0 {
+		return nil, nil
+	}
+
+	meta := &treeMetaResolve{
+		doc:         doc,
+		sourceId:    sourceID,
+		childrenPos: childrenPos,
+	}
+	queryPoses := make([]int32, 0, len(childrenPos)+1)
+	if hasParent {
+		parentPosCopy := parentPos
+		meta.parentPos = &parentPosCopy
+		queryPoses = append(queryPoses, int32(parentPosCopy))
+	}
+	for _, childPos := range childrenPos {
+		queryPoses = append(queryPoses, int32(childPos))
+	}
+
+	return meta, queryPoses
+}
+
+func (h *sourceDocPopulateHelper) loadDocsBySourcePos(
+	ctx context.Context,
+	posesBySource map[string][]int32,
+) (map[string]map[int32]*vecschema.SourceDoc, error) {
+	docsBySourcePos := make(map[string]map[int32]*vecschema.SourceDoc, len(posesBySource))
 	var (
 		mu sync.Mutex
 		eg errgroup.Group
 	)
 	for sourceId, chunkPoses := range posesBySource {
-		posList := slices.Unique(chunkPoses)
+		sourceID := sourceId
+		posList := append([]int32(nil), slices.Unique(chunkPoses)...)
 		eg.Go(func() error {
-			sourceDocs, err := s.sourceDocStore.ListByChunkPos(ctx,
+			sourceDocs, err := h.biz.sourceDocStore.ListByChunkPos(ctx,
 				&vecschema.SourceDocListByChunkPosParams{
-					NotebookId: notebookID,
-					SourceId:   sourceId,
+					NotebookId: h.notebookID,
+					SourceId:   sourceID,
 					ChunkPoses: posList,
 				})
 			if err != nil {
 				return errors.WithMessagef(err,
 					"list source docs by chunk pos failed, notebook_id=%s, source_id=%s",
-					notebookID,
-					sourceId,
+					h.notebookID,
+					sourceID,
 				)
 			}
-
 			docsByPos := make(map[int32]*vecschema.SourceDoc, len(sourceDocs))
 			for _, sourceDoc := range sourceDocs {
 				docsByPos[sourceDoc.ChunkPos] = sourceDoc
 			}
 			mu.Lock()
-			docsBySourcePos[sourceId] = docsByPos
+			docsBySourcePos[sourceID] = docsByPos
 			mu.Unlock()
-
 			return nil
 		})
 	}
 	if err := eg.Wait(); err != nil {
-		return err
+		return nil, err
 	}
+	return docsBySourcePos, nil
+}
 
-	for _, meta := range metas {
+func (h *sourceDocPopulateHelper) populateDerivationIDs(
+	ctx context.Context,
+	deriveMetas []*deriveMeta,
+	docsBySourcePos map[string]map[int32]*vecschema.SourceDoc,
+) {
+	for _, meta := range deriveMetas {
 		docsByPos := docsBySourcePos[meta.sourceId]
 		if len(docsByPos) == 0 {
 			continue
 		}
 
-		derivedFrom := make([]uuid.UUID, 0, len(meta.poses))
+		derivation := make([]uuid.UUID, 0, len(meta.poses))
 		seen := make(map[uuid.UUID]struct{}, len(meta.poses))
 		for _, pos := range meta.poses {
 			derivedDoc, ok := docsByPos[pos]
 			if !ok || derivedDoc == nil {
 				continue
 			}
-
-			derivedFromId, err := uuid.ParseString(derivedDoc.Id)
+			derivationID, err := uuid.ParseString(derivedDoc.Id)
 			if err != nil {
-				slog.WarnContext(ctx, "ignore invalid source doc id while populating deriving ids",
+				slog.WarnContext(ctx, "ignore invalid source doc id while populating derivation ids",
 					slog.String("doc_id", derivedDoc.Id),
 					slog.Int64("chunk_pos", int64(pos)),
 					slog.String("source_id", meta.sourceId),
-					slog.String("notebook_id", notebookID),
+					slog.String("notebook_id", h.notebookID),
 					slog.Any("err", err),
 				)
 				continue
 			}
-			if _, ok := seen[derivedFromId]; ok {
+			if _, ok := seen[derivationID]; ok {
 				continue
 			}
-			seen[derivedFromId] = struct{}{}
-			derivedFrom = append(derivedFrom, derivedFromId)
+			seen[derivationID] = struct{}{}
+			derivation = append(derivation, derivationID)
 		}
-		meta.doc.DerivedFrom = derivedFrom
+		meta.doc.Derivation = derivation
+	}
+}
+
+func (h *sourceDocPopulateHelper) populateTreeMetaIDs(
+	ctx context.Context,
+	treeMetas []*treeMetaResolve,
+	docsBySourcePos map[string]map[int32]*vecschema.SourceDoc,
+) {
+	for _, meta := range treeMetas {
+		docsByPos := docsBySourcePos[meta.sourceId]
+		if len(docsByPos) == 0 || meta.doc == nil || meta.doc.TreeMeta == nil {
+			continue
+		}
+		h.populateParentID(ctx, meta, docsByPos)
+		meta.doc.TreeMeta.Children = h.collectChildIDs(ctx, meta, docsByPos)
+	}
+}
+
+func (h *sourceDocPopulateHelper) populateParentID(
+	ctx context.Context,
+	meta *treeMetaResolve,
+	docsByPos map[int32]*vecschema.SourceDoc,
+) {
+	if meta == nil || meta.parentPos == nil {
+		return
+	}
+	parentDoc, ok := docsByPos[int32(*meta.parentPos)]
+	if !ok || parentDoc == nil {
+		return
+	}
+	parentID, err := uuid.ParseString(parentDoc.Id)
+	if err != nil {
+		slog.WarnContext(ctx, "ignore invalid parent source doc id while populating tree meta",
+			slog.String("doc_id", parentDoc.Id),
+			slog.Int64("chunk_pos", int64(*meta.parentPos)),
+			slog.String("source_id", meta.sourceId),
+			slog.String("notebook_id", h.notebookID),
+			slog.Any("err", err),
+		)
+		return
+	}
+	meta.doc.TreeMeta.ParentId = parentID
+}
+
+func (h *sourceDocPopulateHelper) collectChildIDs(
+	ctx context.Context,
+	meta *treeMetaResolve,
+	docsByPos map[int32]*vecschema.SourceDoc,
+) []uuid.UUID {
+	if meta == nil {
+		return nil
 	}
 
-	return nil
+	children := make([]uuid.UUID, 0, len(meta.childrenPos))
+	seen := make(map[uuid.UUID]struct{}, len(meta.childrenPos))
+	for _, childPos := range meta.childrenPos {
+		childDoc, ok := docsByPos[int32(childPos)]
+		if !ok || childDoc == nil {
+			continue
+		}
+		childID, err := uuid.ParseString(childDoc.Id)
+		if err != nil {
+			slog.WarnContext(ctx, "ignore invalid child source doc id while populating tree meta",
+				slog.String("doc_id", childDoc.Id),
+				slog.Int64("chunk_pos", int64(childPos)),
+				slog.String("source_id", meta.sourceId),
+				slog.String("notebook_id", h.notebookID),
+				slog.Any("err", err),
+			)
+			continue
+		}
+		if _, ok := seen[childID]; ok {
+			continue
+		}
+		seen[childID] = struct{}{}
+		children = append(children, childID)
+	}
+
+	return children
 }

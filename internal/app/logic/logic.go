@@ -9,16 +9,20 @@ import (
 	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
 	chatlogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/chat"
+	notebooklogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/notebook"
 	sourcelogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/source"
 	studiologic "github.com/gonotelm-lab/gonotelm/internal/app/logic/studio"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infra"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/cache"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/embedding"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/rerank"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
 )
 
 type Logic struct {
-	NotebookLogic *NotebookLogic
+	NotebookLogic *notebooklogic.Logic
 	SourceLogic   *sourcelogic.Logic
 	ChatLogic     *chatlogic.Logic
 	StudioLogic   *studiologic.Logic
@@ -29,7 +33,22 @@ func MustNewLogic(
 	infrastructures *infra.Instances,
 	objectStorage storage.Storage,
 ) *Logic {
-	gateway, err := gateway.New(&conf.Global().Provider)
+	llmGateway, err := gateway.New(&conf.Global().Provider)
+	if err != nil {
+		panic(err)
+	}
+
+	embeddingGateway, err := embedding.NewGateway(
+		&conf.Global().Embedding,
+		embedding.NewRedisCacher(cache.GetRedis()),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	rerankerGateway, err := rerank.NewGateway(
+		&conf.Global().Rerank,
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -48,15 +67,16 @@ func MustNewLogic(
 		objectStorage,
 		infrastructures.Dal.SourceStore,
 		infrastructures.VectorDal.SourceDocStore,
-		gateway,
+		llmGateway,
+		embeddingGateway,
 	)
 	if err != nil {
 		panic(err)
 	}
 
-	sourceBizForAgent, err := bizsource.NewBizForAgent(ctx,
+	agentSourceBiz, err := bizsource.NewAgentBiz(ctx,
 		sourceBiz,
-		bizsource.BizForAgentConfig{
+		bizsource.AgentBizConfig{
 			SourceCacheEviction: conf.Global().Logic.Source.BizCache.Eviction,
 			SourceCacheMaxMB:    conf.Global().Logic.Source.BizCache.MaxMB,
 		})
@@ -70,19 +90,22 @@ func MustNewLogic(
 		objectStorage,
 		notebookBiz,
 		sourceBiz,
-		gateway,
+		llmGateway,
 	)
 
-	notebookLogic := NewNotebookLogic(
+	notebookLogic := notebooklogic.NewLogic(
 		notebookBiz,
 		sourceBiz,
 		chatBiz,
+		artifactBiz,
 	)
 
 	chatLogic := chatlogic.MustNewLogic(
-		gateway,
+		llmGateway,
+		rerankerGateway,
 		notebookBiz,
 		sourceBiz,
+		agentSourceBiz,
 		chatBiz,
 		chatEventManager,
 	)
@@ -91,10 +114,10 @@ func MustNewLogic(
 		ctx,
 		objectStorage,
 		sourceBiz,
-		sourceBizForAgent,
+		agentSourceBiz,
 		notebookBiz,
 		artifactBiz,
-		gateway,
+		llmGateway,
 	)
 
 	return &Logic{

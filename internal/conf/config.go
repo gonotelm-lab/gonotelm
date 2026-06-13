@@ -10,7 +10,8 @@ import (
 	"github.com/a8m/envsubst"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/cache"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
-	embedimpl "github.com/gonotelm-lab/gonotelm/internal/infra/llm/embedding"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/embedding"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/rerank"
 	mqimpl "github.com/gonotelm-lab/gonotelm/internal/infra/mq/impl"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
 	storageimpl "github.com/gonotelm-lab/gonotelm/internal/infra/storage/impl"
@@ -33,8 +34,9 @@ type Config struct {
 	Redis     cache.RedisCacheConfig `toml:"redis"`
 	VectorDB  vecimpl.Config         `toml:"vectorDb"`
 	Storage   StorageConfig          `toml:"storage"`
-	MsgQueue  MsgQueueConfig         `toml:"msgQueue"`
-	Embedding embedimpl.Config       `toml:"embedding"`
+	MsgQueue  mqimpl.Config          `toml:"msgQueue"`
+	Embedding embedding.Config       `toml:"embedding"`
+	Rerank    rerank.Config          `toml:"rerank"`
 	Logging   LoggingConfig          `toml:"logging"`
 	Chunking  ChunkingConfig         `toml:"chunking"`
 	Provider  chat.ProviderConfig    `toml:"provider"`
@@ -77,19 +79,6 @@ type MinioConfig struct {
 	PresignExpiry time.Duration `toml:"presignExpiry"`
 }
 
-type MsgQueueConfig struct {
-	Type  mqimpl.Type `toml:"type"`
-	Kafka KafkaConfig `toml:"kafka"`
-}
-
-type KafkaConfig struct {
-	Brokers                []string      `toml:"brokers"`
-	Username               string        `toml:"username"`
-	Password               string        `toml:"password"`
-	ConsumerQueueCapacity  int           `toml:"consumerQueueCapacity"`
-	ConsumerCommitInterval time.Duration `toml:"consumerCommitInterval"`
-}
-
 type LoggingConfig struct {
 	Level string `toml:"level"`
 }
@@ -117,7 +106,10 @@ func Load(path string) (*Config, error) {
 		cfg.MsgQueue.Type = mqimpl.Kafka
 	}
 	if cfg.Embedding.Type == "" {
-		cfg.Embedding.Type = embedimpl.DashScope
+		cfg.Embedding.Type = embedding.DashScope
+	}
+	if cfg.Rerank.Type == "" {
+		cfg.Rerank.Type = rerank.DashScope
 	}
 	if cfg.Embedding.BatchSize <= 0 {
 		cfg.Embedding.BatchSize = 10

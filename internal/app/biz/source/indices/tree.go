@@ -1,9 +1,7 @@
 package indices
 
 import (
-	"context"
-
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
+	"github.com/gonotelm-lab/gonotelm/internal/app/biz/textgen/summarizer"
 	vschema "github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/schema"
 
 	einoembed "github.com/cloudwego/eino/components/embedding"
@@ -15,12 +13,14 @@ type DocTreeNode struct {
 
 	// 表示文档在来源中所处的位置（和 core.ChunkPos 一致）。
 	// 当前分配策略下通常 pos<0 为派生节点、pos>=0 为非派生节点（非派生节点表示文本块内容来自原始来源）。
-	pos      int
+	pos    int
+	parent *DocTreeNode
+
 	children []*DocTreeNode
 
 	// 衍生自哪些非派生节点
 	// 如果是非派生节点 这个字段就是自己的id
-	derivedFrom []string
+	derivation []string
 
 	// 只有使用ParseBuild时节点才有parse的metadata
 	parseMetadata *parseMetadata
@@ -31,14 +31,27 @@ func NewDocTreeNode(
 	level int,
 	pos int,
 	children []*DocTreeNode,
-	derivedFrom []string,
+	derivation []string,
 ) *DocTreeNode {
-	return &DocTreeNode{
-		core:        core,
-		level:       level,
-		pos:         pos,
-		children:    children,
-		derivedFrom: derivedFrom,
+	node := &DocTreeNode{
+		core:       core,
+		level:      level,
+		pos:        pos,
+		children:   children,
+		derivation: derivation,
+	}
+	bindParentForChildren(node.children, node)
+	return node
+}
+
+// bindParentForChildren 只负责连接当前层的 parent -> children 关系，
+// 递归层级由各构建流程按需触发，避免在基础结构层引入隐式深遍历。
+func bindParentForChildren(children []*DocTreeNode, parent *DocTreeNode) {
+	for _, child := range children {
+		if child == nil {
+			continue
+		}
+		child.parent = parent
 	}
 }
 
@@ -77,11 +90,18 @@ func (n *DocTreeNode) Children() []*DocTreeNode {
 	return n.children
 }
 
-func (n *DocTreeNode) DerivedFrom() []string {
+func (n *DocTreeNode) Parent() *DocTreeNode {
 	if n == nil {
 		return nil
 	}
-	return n.derivedFrom
+	return n.parent
+}
+
+func (n *DocTreeNode) Derivation() []string {
+	if n == nil {
+		return nil
+	}
+	return n.derivation
 }
 
 func (n *DocTreeNode) ParseMetadata() *parseMetadata {
@@ -92,30 +112,18 @@ func (n *DocTreeNode) ParseMetadata() *parseMetadata {
 	return n.parseMetadata
 }
 
-type (
-	LLMProviderSelector func(ctx context.Context) string
-	LLMModelSelector    func(ctx context.Context) string
-)
-
 type DocTreeBuilder struct {
-	embedder einoembed.Embedder
-	gateway  *gateway.Gateway
-
-	providerSelector LLMProviderSelector
-	modelSelector    LLMModelSelector
+	embedder   einoembed.Embedder
+	summarizer summarizer.Summarizer
 }
 
 func NewDocTreeBuilder(
 	embedder einoembed.Embedder,
-	gateway *gateway.Gateway,
-	providerSelector LLMProviderSelector,
-	modelSelector LLMModelSelector,
+	summarizer summarizer.Summarizer,
 ) *DocTreeBuilder {
 	return &DocTreeBuilder{
-		embedder:         embedder,
-		gateway:          gateway,
-		providerSelector: providerSelector,
-		modelSelector:    modelSelector,
+		embedder:   embedder,
+		summarizer: summarizer,
 	}
 }
 

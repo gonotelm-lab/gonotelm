@@ -88,6 +88,16 @@ func (a *ArtifactTaskStoreImpl) ListByNotebookId(
 	return tasks, nil
 }
 
+func (a *ArtifactTaskStoreImpl) DeleteByNotebookId(ctx context.Context, notebookId dal.Id) error {
+	if err := a.db.WithContext(ctx).
+		Where("notebook_id = ?", notebookId).
+		Delete(&schema.ArtifactTask{}).Error; err != nil {
+		return sql.WrapErr(err)
+	}
+
+	return nil
+}
+
 func (a *ArtifactTaskStoreImpl) PageListByNotebookId(
 	ctx context.Context,
 	notebookId dal.Id,

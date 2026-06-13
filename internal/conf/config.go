@@ -12,6 +12,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/embedding"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/rerank"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/text2image"
 	mqimpl "github.com/gonotelm-lab/gonotelm/internal/infra/mq/impl"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
 	storageimpl "github.com/gonotelm-lab/gonotelm/internal/infra/storage/impl"
@@ -29,17 +30,18 @@ type Config struct {
 
 	Logic LogicConfig `toml:"logic"`
 
-	Api       ApiConfig              `toml:"api"`
-	Database  DatabaseConfig         `toml:"database"`
-	Redis     cache.RedisCacheConfig `toml:"redis"`
-	VectorDB  vecimpl.Config         `toml:"vectorDb"`
-	Storage   StorageConfig          `toml:"storage"`
-	MsgQueue  mqimpl.Config          `toml:"msgQueue"`
-	Embedding embedding.Config       `toml:"embedding"`
-	Rerank    rerank.Config          `toml:"rerank"`
-	Logging   LoggingConfig          `toml:"logging"`
-	Chunking  ChunkingConfig         `toml:"chunking"`
-	Provider  chat.ProviderConfig    `toml:"provider"`
+	Api        ApiConfig              `toml:"api"`
+	Database   DatabaseConfig         `toml:"database"`
+	Redis      cache.RedisCacheConfig `toml:"redis"`
+	VectorDB   vecimpl.Config         `toml:"vectorDb"`
+	Storage    StorageConfig          `toml:"storage"`
+	MsgQueue   mqimpl.Config          `toml:"msgQueue"`
+	Embedding  embedding.Config       `toml:"embedding"`
+	Rerank     rerank.Config          `toml:"rerank"`
+	Text2Image text2image.Config      `toml:"text2image"`
+	Logging    LoggingConfig          `toml:"logging"`
+	Chunking   ChunkingConfig         `toml:"chunking"`
+	Provider   chat.ProviderConfig    `toml:"provider"`
 }
 
 func (c *Config) IsDev() bool {
@@ -110,6 +112,9 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Rerank.Type == "" {
 		cfg.Rerank.Type = rerank.DashScope
+	}
+	if cfg.Text2Image.Type == "" {
+		cfg.Text2Image.Type = text2image.DashScope
 	}
 	if cfg.Embedding.BatchSize <= 0 {
 		cfg.Embedding.BatchSize = 10

@@ -156,8 +156,7 @@ type = "${ENV_GONOTELM_RERANK_TYPE:-dashscope}"
 
 [rerank.dashscope]
 apiKey = "${ENV_GONOTELM_DASHSCOPE_API_KEY:-}"
-baseURL = "${ENV_GONOTELM_RERANK_DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com}"
-path = "${ENV_GONOTELM_RERANK_DASHSCOPE_PATH:-/compatible-api/v1/reranks}"
+baseUrl = "${ENV_GONOTELM_RERANK_DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/compatible-api/v1/reranks}"
 model = "${ENV_GONOTELM_RERANK_DASHSCOPE_MODEL:-qwen3-rerank}"
 timeout = "${ENV_GONOTELM_RERANK_DASHSCOPE_TIMEOUT:-30s}"
 
@@ -189,3 +188,12 @@ maxTokens = ${ENV_GONOTELM_QWEN_MAX_TOKENS:-16384}
 temperature = ${ENV_GONOTELM_QWEN_TEMPERATURE:-1.0}
 topP = ${ENV_GONOTELM_QWEN_TOP_P:-1.0}
 enableThinking = ${ENV_GONOTELM_QWEN_ENABLE_THINKING:-false}
+
+[text2image]
+type = "${ENV_GONOTELM_TEXT2IMAGE_TYPE:-dashscope}"
+
+[text2image.dashscope]
+apiKey = "${ENV_GONOTELM_DASHSCOPE_API_KEY:-}"
+baseUrl = "${ENV_GONOTELM_TEXT2IMAGE_DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation}"
+model = "${ENV_GONOTELM_TEXT2IMAGE_DASHSCOPE_MODEL:-qwen-image-2.0-pro}"
+timeout = "${ENV_GONOTELM_TEXT2IMAGE_DASHSCOPE_TIMEOUT:-1h}"

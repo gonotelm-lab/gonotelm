@@ -18,6 +18,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/embedding"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/rerank"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/text2image"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
 )
 
@@ -52,6 +53,15 @@ func MustNewLogic(
 	if err != nil {
 		panic(err)
 	}
+
+	text2imageGateway, err := text2image.NewGateway(
+		&conf.Global().Text2Image,
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	_ = text2imageGateway // TODO: 在需要生成图像的业务逻辑中使用
 
 	// biz instances initialization
 	notebookBiz := biznotebook.New(infrastructures.Dal.NotebookStore)

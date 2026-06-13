@@ -29,11 +29,8 @@ func TestNew(t *testing.T) {
 			t.Fatalf("new failed: %v", err)
 		}
 
-		if rr.cfg.BaseURL != defaultBaseURL {
-			t.Fatalf("unexpected default base url: %q", rr.cfg.BaseURL)
-		}
-		if rr.cfg.Path != defaultPath {
-			t.Fatalf("unexpected default path: %q", rr.cfg.Path)
+		if rr.cfg.BaseUrl != defaultBaseUrl {
+			t.Fatalf("unexpected default base url: %q", rr.cfg.BaseUrl)
 		}
 		if rr.cfg.Model != defaultModel {
 			t.Fatalf("unexpected default model: %q", rr.cfg.Model)
@@ -82,8 +79,7 @@ func TestRerank_RequestAndResponse(t *testing.T) {
 	rr, err := New(
 		Config{
 			APIKey:  "test-key",
-			BaseURL: srv.URL,
-			Path:    "/paas/v4/rerank",
+			BaseUrl: srv.URL + "/paas/v4/rerank",
 			Model:   "rerank",
 		},
 		pkgrerank.WithHTTPClient(srv.Client()),

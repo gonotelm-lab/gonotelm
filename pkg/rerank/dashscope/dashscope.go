@@ -16,8 +16,7 @@ import (
 // https://bailian.console.aliyun.com/cn-beijing/?spm=5176.29619931.J_SEsSjsNv72yRuRFS2VknO.2.738b10d7oyVJ7e&tab=api#/api/?type=model&url=2780056
 
 const (
-	defaultBaseURL = "https://dashscope.aliyuncs.com"
-	defaultPath    = "/compatible-api/v1/reranks"
+	defaultBaseUrl = "https://dashscope.aliyuncs.com/compatible-api/v1/reranks"
 	defaultModel   = "qwen3-rerank"
 )
 
@@ -30,11 +29,8 @@ func New(cfg Config, opts ...rerank.ClientOption) (*Reranker, error) {
 	if strings.TrimSpace(cfg.APIKey) == "" {
 		return nil, fmt.Errorf("dashscope api key is required")
 	}
-	if strings.TrimSpace(cfg.BaseURL) == "" {
-		cfg.BaseURL = defaultBaseURL
-	}
-	if strings.TrimSpace(cfg.Path) == "" {
-		cfg.Path = defaultPath
+	if strings.TrimSpace(cfg.BaseUrl) == "" {
+		cfg.BaseUrl = defaultBaseUrl
 	}
 	if strings.TrimSpace(cfg.Model) == "" {
 		cfg.Model = defaultModel
@@ -95,7 +91,7 @@ func (r *Reranker) Rerank(ctx context.Context, req *schema.Request, opts ...rera
 		return schema.Response{}, fmt.Errorf("marshal dashscope rerank request failed: %w", err)
 	}
 
-	url := strings.TrimRight(r.cfg.BaseURL, "/") + r.cfg.Path
+	url := r.cfg.BaseUrl
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return schema.Response{}, fmt.Errorf("build dashscope rerank request failed: %w", err)

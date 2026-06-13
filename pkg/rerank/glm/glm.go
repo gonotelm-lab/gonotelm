@@ -16,8 +16,7 @@ import (
 // https://docs.bigmodel.cn/api-reference/%E6%A8%A1%E5%9E%8B-api/%E6%96%87%E6%9C%AC%E9%87%8D%E6%8E%92%E5%BA%8F
 
 const (
-	defaultBaseURL = "https://open.bigmodel.cn"
-	defaultPath    = "/api/paas/v4/rerank"
+	defaultBaseUrl = "https://open.bigmodel.cn/api/paas/v4/rerank"
 	defaultModel   = "rerank"
 	fieldText      = "text"
 	fieldImage     = "image"
@@ -39,11 +38,8 @@ func New(cfg Config, opts ...rerank.ClientOption) (*Reranker, error) {
 	if strings.TrimSpace(cfg.APIKey) == "" {
 		return nil, fmt.Errorf("glm api key is required")
 	}
-	if strings.TrimSpace(cfg.BaseURL) == "" {
-		cfg.BaseURL = defaultBaseURL
-	}
-	if strings.TrimSpace(cfg.Path) == "" {
-		cfg.Path = defaultPath
+	if strings.TrimSpace(cfg.BaseUrl) == "" {
+		cfg.BaseUrl = defaultBaseUrl
 	}
 	if strings.TrimSpace(cfg.Model) == "" {
 		cfg.Model = defaultModel
@@ -105,7 +101,7 @@ func (r *Reranker) Rerank(ctx context.Context, req *schema.Request, opts ...rera
 		return schema.Response{}, fmt.Errorf("marshal glm rerank request failed: %w", err)
 	}
 
-	url := strings.TrimRight(r.cfg.BaseURL, "/") + "/" + strings.TrimLeft(r.cfg.Path, "/")
+	url := r.cfg.BaseUrl
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return schema.Response{}, fmt.Errorf("build glm rerank request failed: %w", err)

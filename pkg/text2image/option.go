@@ -40,7 +40,7 @@ type ClientOptions struct {
 
 func BuildClientOptions(timeout time.Duration, opts ...ClientOption) *ClientOptions {
 	if timeout <= 0 {
-		timeout = 1 * time.Hour // 图像生成通常耗时较长
+		timeout = 30 * time.Minute // 图像生成通常耗时较长
 	}
 	co := &ClientOptions{
 		HTTPClient: &http.Client{Timeout: timeout},

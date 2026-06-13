@@ -72,6 +72,7 @@ eviction = "${ENV_GONOTELM_LOGIC_SOURCE_BIZCACHE_EVICTION:-15m}"
 maxMB = ${ENV_GONOTELM_LOGIC_SOURCE_BIZCACHE_MAX_MB:-1024}
 
 [logic.studio.mindmap]
+maxRound = ${ENV_GONOTELM_LOGIC_STUDIO_MINDMAP_MAX_ROUND:-50}
 modelProvider = "${ENV_GONOTELM_LOGIC_STUDIO_MINDMAP_PROVIDER:-deepseek}"
 model = "${ENV_GONOTELM_LOGIC_STUDIO_MINDMAP_MODEL:-deepseek-v4-flash}"
 
@@ -79,6 +80,13 @@ model = "${ENV_GONOTELM_LOGIC_STUDIO_MINDMAP_MODEL:-deepseek-v4-flash}"
 maxRound = ${ENV_GONOTELM_LOGIC_STUDIO_REPORT_MAX_ROUND:-50}
 modelProvider = "${ENV_GONOTELM_LOGIC_STUDIO_REPORT_PROVIDER:-deepseek}"
 model = "${ENV_GONOTELM_LOGIC_STUDIO_REPORT_MODEL:-deepseek-v4-flash}"
+
+[logic.studio.infographic]
+maxRound = ${ENV_GONOTELM_LOGIC_STUDIO_INFOGRAPHIC_MAX_ROUND:-50}
+modelProvider = "${ENV_GONOTELM_LOGIC_STUDIO_INFOGRAPHIC_PROVIDER:-deepseek}"
+model = "${ENV_GONOTELM_LOGIC_STUDIO_INFOGRAPHIC_MODEL:-deepseek-v4-flash}"
+imageModelProvider = "${ENV_GONOTELM_LOGIC_STUDIO_INFOGRAPHIC_IMAGE_MODEL_PROVIDER:-dashscope}"
+imageModel = "${ENV_GONOTELM_LOGIC_STUDIO_INFOGRAPHIC_IMAGE_MODEL:-qwen-image-2.0-pro}"
 
 [chunking]
 size = ${ENV_GONOTELM_CHUNKING_SIZE:-500}
@@ -189,6 +197,15 @@ temperature = ${ENV_GONOTELM_QWEN_TEMPERATURE:-1.0}
 topP = ${ENV_GONOTELM_QWEN_TOP_P:-1.0}
 enableThinking = ${ENV_GONOTELM_QWEN_ENABLE_THINKING:-false}
 
+[provider.agnes]
+apiKey = "${ENV_GONOTELM_AGNES_API_KEY:-}"
+baseUrl = "${ENV_GONOTELM_AGNES_BASE_URL:-https://apihub.agnes-ai.com/v1}"
+model = "${ENV_GONOTELM_AGNES_MODEL:-agnes-2.0-flash}"
+timeout = "${ENV_GONOTELM_AGNES_TIMEOUT:-5m}"
+maxTokens = ${ENV_GONOTELM_AGNES_MAX_TOKENS:-16384}
+temperature = ${ENV_GONOTELM_AGNES_TEMPERATURE:-1.0}
+topP = ${ENV_GONOTELM_AGNES_TOP_P:-1.0}
+
 [text2image]
 type = "${ENV_GONOTELM_TEXT2IMAGE_TYPE:-dashscope}"
 
@@ -197,3 +214,9 @@ apiKey = "${ENV_GONOTELM_DASHSCOPE_API_KEY:-}"
 baseUrl = "${ENV_GONOTELM_TEXT2IMAGE_DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation}"
 model = "${ENV_GONOTELM_TEXT2IMAGE_DASHSCOPE_MODEL:-qwen-image-2.0-pro}"
 timeout = "${ENV_GONOTELM_TEXT2IMAGE_DASHSCOPE_TIMEOUT:-1h}"
+
+[text2image.agnes]
+apiKey = "${ENV_GONOTELM_AGNES_API_KEY:-}"
+baseUrl = "${ENV_GONOTELM_TEXT2IMAGE_AGNES_BASE_URL:-https://apihub.agnes-ai.com/v1/images/generations}"
+model = "${ENV_GONOTELM_TEXT2IMAGE_AGNES_MODEL:-agnes-image-2.1-flash}"
+timeout = "${ENV_GONOTELM_TEXT2IMAGE_AGNES_TIMEOUT:-1h}"

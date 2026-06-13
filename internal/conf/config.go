@@ -6,8 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/BurntSushi/toml"
-	"github.com/a8m/envsubst"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/cache"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/embedding"
@@ -18,6 +16,9 @@ import (
 	storageimpl "github.com/gonotelm-lab/gonotelm/internal/infra/storage/impl"
 	vecimpl "github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/impl"
 	"github.com/gonotelm-lab/gonotelm/pkg/sql"
+
+	"github.com/BurntSushi/toml"
+	"github.com/a8m/envsubst"
 )
 
 var (

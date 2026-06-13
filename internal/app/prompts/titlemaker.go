@@ -42,12 +42,12 @@ func NewTitleMakerTemplate(lang string) *TitleMakerTemplate {
 	return newTemplate[TitleMakerTemplateVars](templateNameTitleMaker, lang)
 }
 
-func RenderTitleMakerMessage(ctx context.Context, text, lang string) (*schema.Message, error) {
+func RenderTitleMakerMessage(ctx context.Context, text, lang string) ([]*schema.Message, error) {
 	tmpl := NewTitleMakerTemplate(lang)
 	msg, err := tmpl.Message(ctx, TitleMakerTemplateVars{Text: text})
 	if err != nil {
 		return nil, err
 	}
 
-	return msg, nil
+	return prependSystemMessage([]*schema.Message{msg}), nil
 }

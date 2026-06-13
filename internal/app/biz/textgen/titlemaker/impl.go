@@ -9,8 +9,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
-
-	einoschema "github.com/cloudwego/eino/schema"
 )
 
 type titlemakerImpl struct {
@@ -40,7 +38,7 @@ func (t *titlemakerImpl) Generate(ctx context.Context, text string) (string, err
 
 func (t *titlemakerImpl) GenerateWith(ctx context.Context, provider chat.Provider, model string, text string) (string, error) {
 	lang := pkgcontext.GetLang(ctx)
-	msg, err := prompts.RenderTitleMakerMessage(ctx, text, lang)
+	msgs, err := prompts.RenderTitleMakerMessage(ctx, text, lang)
 	if err != nil {
 		return "", errors.Wrapf(errors.ErrInner, "render title maker prompt failed, err=%v", err)
 	}
@@ -51,7 +49,7 @@ func (t *titlemakerImpl) GenerateWith(ctx context.Context, provider chat.Provide
 	}
 
 	opt := chat.WithModel(model)
-	result, err := p.Generate(ctx, []*einoschema.Message{msg}, opt)
+	result, err := p.Generate(ctx, msgs, opt)
 	if err != nil {
 		return "", errors.Wrapf(errors.ErrLLM, "generate title failed, err=%v", err)
 	}

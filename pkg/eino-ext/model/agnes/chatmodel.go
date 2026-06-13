@@ -12,10 +12,7 @@ import (
 	"github.com/cloudwego/eino/schema"
 )
 
-var (
-	_ model.ToolCallingChatModel = (*ChatModel)(nil)
-	_ model.ChatModel            = (*ChatModel)(nil)
-)
+var _ model.ToolCallingChatModel = (*ChatModel)(nil)
 
 type ChatModelConfig struct {
 	APIKey              string        `json:"api_key"`

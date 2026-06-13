@@ -26,6 +26,7 @@ const (
 	templateNameStudioMindmap     templateName = "studio-mindmap"
 	templateNameStudioMindmapV2   templateName = "studio-mindmap-v2"
 	templateNameStudioReport      templateName = "studio-report"
+	templateNameStudioInfographic templateName = "studio-infographic"
 	templateNameTitleMaker        templateName = "title-maker"
 )
 
@@ -86,7 +87,7 @@ func newTemplate[T templateVars](tmplName templateName, lang string) *template[T
 	return &template[T]{
 		name: normalizedName,
 		lang: normalizedLang,
-		tmpl: prompt.FromMessages(schema.Jinja2, schema.SystemMessage(content)),
+		tmpl: prompt.FromMessages(schema.Jinja2, schema.UserMessage(content)),
 	}
 }
 

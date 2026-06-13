@@ -287,7 +287,7 @@ func (s *SourceDocRetriever) agentRetrieve(
 		})
 	}
 
-	msg, err := prompts.RenderRetrieveSourceDocMessage(
+	msgs, err := prompts.RenderRetrieveSourceDocMessage(
 		ctx,
 		userPrompt,
 		notebookId.String(),
@@ -299,7 +299,7 @@ func (s *SourceDocRetriever) agentRetrieve(
 	}
 
 	// 执行
-	output, err := agent.React(ctx, pkgslices.FromSingle(msg))
+	output, err := agent.React(ctx, msgs)
 	if err != nil {
 		return nil, continuing, errors.WithMessage(err, "react retrieve source doc prompt failed")
 	}

@@ -61,9 +61,6 @@ func MustNewLogic(
 		panic(err)
 	}
 
-	_ = text2imageGateway // TODO: 在需要生成图像的业务逻辑中使用
-
-	// biz instances initialization
 	notebookBiz := biznotebook.New(infrastructures.Dal.NotebookStore)
 	chatBiz := bizchat.New(
 		infrastructures.Dal.ChatStore,
@@ -128,6 +125,7 @@ func MustNewLogic(
 		notebookBiz,
 		artifactBiz,
 		llmGateway,
+		text2imageGateway,
 	)
 
 	return &Logic{

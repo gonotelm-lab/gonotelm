@@ -22,7 +22,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 
 	"github.com/bytedance/sonic"
-	einoschema "github.com/cloudwego/eino/schema"
 )
 
 const (
@@ -327,7 +326,7 @@ func (l *Logic) generateNotebookSummary(
 	}
 
 	// generate prompt message
-	msg, err := prompts.RenderNotebookSummaryMessage(
+	msgs, err := prompts.RenderNotebookSummaryMessage(
 		ctx, abstracts, pkgcontext.GetLang(ctx),
 	)
 	if err != nil {
@@ -354,7 +353,7 @@ func (l *Logic) generateNotebookSummary(
 	}
 	result, err := chatModel.Generate(
 		ctx,
-		[]*einoschema.Message{msg},
+		msgs,
 		llmchat.WithModel(model),
 		llmchat.WithResponseJsonObject(provider),
 	)

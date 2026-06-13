@@ -3,10 +3,11 @@ package context
 type SceneType string
 
 const (
-	UnknownScene       = SceneType("unknown")
-	ChatScene          = SceneType("chat")
-	StudioMindmapScene = SceneType("studio.mindmap")
-	StudioReportScene  = SceneType("studio.report")
+	UnknownScene           = SceneType("unknown")
+	ChatScene              = SceneType("chat")
+	StudioMindmapScene     = SceneType("studio.mindmap")
+	StudioReportScene      = SceneType("studio.report")
+	StudioInfographicScene = SceneType("studio.infographic")
 )
 
 func (s SceneType) String() string {

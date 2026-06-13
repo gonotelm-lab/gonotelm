@@ -9,7 +9,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/bytedance/sonic"
-	"github.com/gonotelm-lab/gonotelm/internal/app/agent"
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/app/prompts"
@@ -41,7 +40,10 @@ type mindmapGenerator struct {
 	l *Logic
 }
 
-var _ taskHandler = &mindmapGenerator{}
+var (
+	_ taskHandler       = &mindmapGenerator{}
+	_ iCommonTaskParams = &generateMindmapTaskParams{}
+)
 
 type generateMindmapTaskParams struct {
 	*commonTaskParams
@@ -130,28 +132,19 @@ func (m *mindmapGenerator) generate(
 	slog.DebugContext(ctx, "perform agent create mindmap", slog.Int("total_tokens", totalTokens))
 
 	// return m.twoshotCreateMindmap(ctx, params.NotebookId, parsedContents, tokensCounts)
-	return m.agentCreateMindmap(ctx, params.NotebookId, sources)
+	return m.agentCreateMindmap(ctx, params, sources)
 }
 
-func (m *mindmapGenerator) llmOptions() (
-	einomodel.ToolCallingChatModel,
-	[]einomodel.Option,
-	error,
-) {
+func (m *mindmapGenerator) llmOptions() []einomodel.Option {
 	var (
 		provider = conf.Global().Logic.Studio.Mindmap.ModelProvider
 		model    = conf.Global().Logic.Studio.Mindmap.Model
 	)
-	chatModel, err := m.l.llmGateway.GetProvider(provider)
-	if err != nil {
-		return nil, nil, errors.Wrapf(errors.ErrInner, "failed to get studio mindmap model, err=%v", err)
-	}
-
-	return chatModel, []einomodel.Option{
+	return []einomodel.Option{
 		llmchat.WithModel(model),
 		llmchat.WithResponseJsonObject(provider),
 		llmchat.WithThinking(provider, false),
-	}, nil
+	}
 }
 
 func (m *mindmapGenerator) oneshotCreateMindmap(
@@ -166,28 +159,29 @@ func (m *mindmapGenerator) oneshotCreateMindmap(
 	}
 
 	var (
-		msg  *einoschema.Message
-		err  error
-		lang = pkgcontext.GetLang(ctx)
+		provider = conf.Global().Logic.Studio.Mindmap.ModelProvider
+		msgs     []*einoschema.Message
+		err      error
+		lang     = pkgcontext.GetLang(ctx)
 	)
 
 	if mode == mindmapAbstractMode {
-		msg, err = prompts.RenderStudioMindmapAbstractMessage(ctx, tmps, lang)
+		msgs, err = prompts.RenderStudioMindmapAbstractMessage(ctx, tmps, lang)
 	} else {
-		msg, err = prompts.RenderStudioMindmapContentMessage(ctx, tmps, lang)
+		msgs, err = prompts.RenderStudioMindmapContentMessage(ctx, tmps, lang)
 	}
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner,
 			"failed to get mindmap template message, mode=%s, err=%v", mode, err)
 	}
 
-	chatModel, llmOptions, err := m.llmOptions()
-	if err != nil {
-		return nil, errors.Wrapf(errors.ErrInner, "failed to get studio mindmap model and options, err=%v", err)
-	}
-	msgs := pkgslices.FromSingle(msg)
-
+	llmOptions := m.llmOptions()
+	msgs = append([]*einoschema.Message{}, msgs...)
 	const retryTimes = 3
+	chatModel, err := m.l.llmGateway.GetProvider(provider)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get llm gateway provider %s", provider)
+	}
 	for idx := range retryTimes {
 		llmResp, err := chatModel.Generate(ctx, msgs, llmOptions...)
 		if err != nil {
@@ -290,36 +284,29 @@ func (m *mindmapGenerator) twoshotCreateMindmap(
 // 然后再让agent生成思维导图
 func (m *mindmapGenerator) agentCreateMindmap(
 	ctx context.Context,
-	notebookId uuid.UUID,
+	params *generateMindmapTaskParams,
 	sources []*model.DecodedSource,
 ) (*mindmapExpectation, error) {
-	chatModel, llmOptions, err := m.llmOptions()
+	llmOptions := m.llmOptions()
+
+	ag, err := m.l.buildSourceExploreAgent(
+		conf.Global().Logic.Studio.Mindmap.ModelProvider,
+		conf.Global().Logic.Studio.Mindmap.Model,
+		conf.Global().Logic.Studio.Mindmap.MaxRound,
+		llmOptions,
+		params,
+		true,
+	)
 	if err != nil {
-		return nil, errors.Wrapf(errors.ErrInner, "failed to get studio mindmap model and options, err=%v", err)
+		return nil, errors.WithMessagef(err, "failed to build source explore agent for mindmap")
 	}
 
-	cfg := agent.Config[struct{}]{
-		MaxRound: conf.DefaultMaxRound,
-		BaseLLM:  chatModel,
-		Options:  llmOptions,
-	}
-	ag := agent.New(cfg, struct{}{})
-
-	sourceIDs := decodedSourcesToSourceIDs(sources)
-	sourceChecker := sourceCheckerFromSourceIDs(sourceIDs)
-	err = bindAgentSourceTools(ag, m.l.sourceBizForAgent, notebookId, sourceChecker)
-	if err != nil {
-		return nil, errors.WithMessagef(err, "bind tools failed")
-	}
-	ag.OnBeforeRound(newFinalRoundHook(ag, cfg.MaxRound))
-
-	sourceIds := sourceIDsToStrings(sourceIDs)
-
-	msg, err := prompts.RenderStudioMindmapV2Message(ctx, sourceIds, pkgcontext.GetLang(ctx))
+	sourceIds := sourceIDsToStrings(decodedSourcesToSourceIDs(sources))
+	msgs, err := prompts.RenderStudioMindmapV2Message(ctx, sourceIds, pkgcontext.GetLang(ctx))
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "generate mindmap message failed, err=%v", err)
 	}
-	output, err := ag.React(ctx, pkgslices.FromSingle(msg))
+	output, err := ag.React(ctx, msgs)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "generate mindmap output failed, err=%v", err)
 	}
@@ -332,13 +319,13 @@ func (m *mindmapGenerator) agentCreateMindmap(
 	}
 
 	slog.WarnContext(ctx, "mindmap agent output invalid, compensating",
-		slog.String("notebook_id", notebookId.String()),
+		slog.String("notebook_id", params.getNotebookId().String()),
 		slog.String("output", string(output.Content)),
 		slog.Any("usage", ag.TokenUsage()),
 	)
 
 	// agent 最终输出可能夹带思考文本；这里做一次无工具纠偏，强制只输出目标 JSON。
-	msgs := append([]*einoschema.Message{}, ag.AccumulatedMessages()...)
+	msgs = append([]*einoschema.Message{}, ag.AccumulatedMessages()...)
 	compensateMsg := &einoschema.Message{
 		Role: einoschema.User,
 		Content: fmt.Sprintf(
@@ -354,7 +341,7 @@ func (m *mindmapGenerator) agentCreateMindmap(
 	}
 	msgs = append(msgs, compensateMsg)
 
-	llmResp, genErr := chatModel.Generate(ctx, msgs, llmOptions...)
+	llmResp, genErr := ag.BaseLLM().Generate(ctx, msgs, llmOptions...)
 	if genErr != nil {
 		return nil, errors.Wrapf(errors.ErrLLM,
 			"mindmap compensate generate failed, err=%v",

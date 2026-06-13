@@ -9,8 +9,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
-
-	einoschema "github.com/cloudwego/eino/schema"
 )
 
 type summazierImpl struct {
@@ -45,7 +43,7 @@ func (s *summazierImpl) SummarizeWith(
 	text string,
 ) (string, error) {
 	lang := pkgcontext.GetLang(ctx)
-	msg, err := prompts.RenderSummarizeMessage(ctx, text, lang)
+	msgs, err := prompts.RenderSummarizeMessage(ctx, text, lang)
 	if err != nil {
 		return "", errors.Wrapf(errors.ErrInner, "render summarize prompt failed, err=%v", err)
 	}
@@ -56,7 +54,7 @@ func (s *summazierImpl) SummarizeWith(
 	}
 
 	opt := chat.WithModel(model)
-	result, err := p.Generate(ctx, []*einoschema.Message{msg}, opt)
+	result, err := p.Generate(ctx, msgs, opt)
 	if err != nil {
 		return "", errors.Wrapf(errors.ErrLLM, "generate summary failed, err=%v", err)
 	}

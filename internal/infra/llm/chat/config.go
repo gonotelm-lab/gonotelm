@@ -6,6 +6,7 @@ import (
 	"github.com/cloudwego/eino-ext/components/model/deepseek"
 	"github.com/cloudwego/eino-ext/components/model/openai"
 	"github.com/cloudwego/eino-ext/components/model/qwen"
+	"github.com/gonotelm-lab/gonotelm/pkg/eino-ext/model/agnes"
 )
 
 type Provider string
@@ -18,12 +19,14 @@ const (
 	Openai   Provider = "openai"
 	DeepSeek Provider = "deepseek"
 	Qwen     Provider = "qwen"
+	Agnes    Provider = "agnes"
 )
 
 type ProviderConfig struct {
 	Openai   OpenaiConfig   `toml:"openai"`
 	DeepSeek DeepSeekConfig `toml:"deepseek"`
 	Qwen     QwenConfig     `toml:"qwen"`
+	Agnes    AgnesConfig    `toml:"agnes"`
 }
 
 type OpenaiConfig struct {
@@ -130,4 +133,33 @@ func (c *DeepSeekConfig) ToEino() *deepseek.ChatModelConfig {
 	}
 
 	return dc
+}
+
+type AgnesConfig struct {
+	ApiKey           string        `toml:"apiKey"`
+	Timeout          time.Duration `toml:"timeout"`
+	BaseUrl          string        `toml:"baseUrl"`
+	Model            string        `toml:"model"`
+	MaxTokens        *int          `toml:"maxTokens"`
+	Temperature      *float32      `toml:"temperature"`
+	TopP             *float32      `toml:"topP"`
+	PresencePenalty  *float32      `toml:"presencePenalty"`
+	Seed             *int          `toml:"seed"`
+	FrequencyPenalty *float32      `toml:"frequencyPenalty"`
+	MaxConcurrency   int           `toml:"maxConcurrency"`
+}
+
+func (c *AgnesConfig) ToEino() *agnes.ChatModelConfig {
+	return &agnes.ChatModelConfig{
+		APIKey:              c.ApiKey,
+		Timeout:             c.Timeout,
+		BaseURL:             c.BaseUrl,
+		Model:               c.Model,
+		MaxCompletionTokens: c.MaxTokens,
+		Temperature:         c.Temperature,
+		TopP:                c.TopP,
+		PresencePenalty:     c.PresencePenalty,
+		FrequencyPenalty:    c.FrequencyPenalty,
+		Seed:                c.Seed,
+	}
 }

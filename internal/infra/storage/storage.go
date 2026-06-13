@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"io"
 	"time"
 
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -90,7 +91,7 @@ type PresignedGetObjectRequest struct {
 
 	// Attachment indicates download response disposition.
 	// Content-Disposition: attachment; filename="filename.ext"
-	// 
+	//
 	// Either Inline or Attachment is set. If both are set, Attachment takes precedence.
 	Attachment bool
 
@@ -125,7 +126,11 @@ type BatchDeleteObjectRequest struct {
 type UploadObjectRequest struct {
 	Key string
 
+	// 和BodyReader参数二选一
 	Body []byte
+
+	// 和Bod参数二选一
+	BodyReader io.Reader
 
 	// 可选: 上传时设置对象内容类型
 	ContentType string

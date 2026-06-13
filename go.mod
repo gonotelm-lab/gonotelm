@@ -26,8 +26,10 @@ require (
 	github.com/cloudwego/eino-ext/components/model/deepseek v0.1.5
 	github.com/cloudwego/eino-ext/components/model/openai v0.1.13
 	github.com/cloudwego/eino-ext/components/model/qwen v0.1.9
+	github.com/cloudwego/eino-ext/libs/acl/openai v0.1.17
 	github.com/cloudwego/hertz v0.10.4
 	github.com/coregx/coregex v0.12.21
+	github.com/gabriel-vasile/mimetype v1.4.13
 	github.com/go-playground/validator/v10 v10.30.2
 	github.com/go-redsync/redsync/v4 v4.16.0
 	github.com/golang/snappy v1.0.0
@@ -35,6 +37,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/hertz-contrib/logger/slog v1.0.0
 	github.com/klippa-app/go-pdfium v1.17.3
+	github.com/meguminnnnnnnnn/go-openai v0.1.2
 	github.com/milvus-io/milvus/client/v2 v2.6.3
 	github.com/minio/minio-go/v7 v7.0.100
 	github.com/mitchellh/mapstructure v1.5.0
@@ -44,6 +47,7 @@ require (
 	github.com/segmentio/kafka-go v0.4.50
 	github.com/smartystreets/goconvey v1.8.1
 	github.com/spf13/cast v1.6.0
+	github.com/stretchr/testify v1.11.1
 	github.com/vmihailenco/msgpack/v5 v5.4.1
 	github.com/yuin/goldmark v1.8.2
 	golang.org/x/exp v0.0.0-20260312153236-7ab1446f8b90
@@ -74,7 +78,6 @@ require (
 	github.com/cilium/ebpf v0.11.0 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
-	github.com/cloudwego/eino-ext/libs/acl/openai v0.1.17 // indirect
 	github.com/cloudwego/gopkg v0.1.4 // indirect
 	github.com/cloudwego/netpoll v0.7.2 // indirect
 	github.com/cockroachdb/errors v1.9.1 // indirect
@@ -95,7 +98,6 @@ require (
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
-	github.com/gabriel-vasile/mimetype v1.4.13 // indirect
 	github.com/getsentry/sentry-go v0.12.0 // indirect
 	github.com/go-ini/ini v1.67.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
@@ -146,7 +148,6 @@ require (
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mailru/easyjson v0.9.0 // indirect
 	github.com/mattn/go-runewidth v0.0.21 // indirect
-	github.com/meguminnnnnnnnn/go-openai v0.1.2 // indirect
 	github.com/milvus-io/milvus-proto/go-api/v2 v2.6.13 // indirect
 	github.com/milvus-io/milvus/pkg/v2 v2.6.7-0.20251201120310-af64f2acba38 // indirect
 	github.com/minio/crc64nvme v1.1.1 // indirect
@@ -183,7 +184,6 @@ require (
 	github.com/spf13/afero v1.11.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.18.2 // indirect
-	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.0.1093 // indirect
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/hunyuan v1.0.1093 // indirect

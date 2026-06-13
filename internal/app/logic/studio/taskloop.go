@@ -211,13 +211,14 @@ func (t *taskLoop) handleWork(task *model.ArtifactTask) {
 		}
 	}
 
-	if err := t.taskBiz.CompleteTask(ctx, &bizartifact.CompleteTaskCommand{
-		TaskId:     task.Id,
-		RunId:      task.RunId,
-		Title:      result.title,
-		Result:     result.result,
-		ResultKind: result.resultKind,
-	}); err != nil {
+	if err := t.taskBiz.CompleteTask(ctx,
+		&bizartifact.CompleteTaskCommand{
+			TaskId:     task.Id,
+			RunId:      task.RunId,
+			Title:      result.title,
+			Result:     result.result,
+			ResultKind: result.resultKind,
+		}); err != nil {
 		slog.ErrorContext(ctx, "task handle work complete task failed", slog.Any("err", err))
 		return
 	}

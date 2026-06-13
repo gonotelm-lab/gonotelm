@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"strings"
 
-	bizagent "github.com/gonotelm-lab/gonotelm/internal/app/agent"
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/app/prompts"
@@ -14,7 +13,6 @@ import (
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
-	"github.com/gonotelm-lab/gonotelm/pkg/slices"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 
 	"github.com/bytedance/sonic"
@@ -26,7 +24,10 @@ type reportGenerator struct {
 	l *Logic
 }
 
-var _ taskHandler = &reportGenerator{}
+var (
+	_ taskHandler       = &reportGenerator{}
+	_ iCommonTaskParams = &generateReportTaskParams{}
+)
 
 type generateReportTaskParams struct {
 	*commonTaskParams
@@ -65,38 +66,32 @@ func (m *reportGenerator) generate(
 	params *generateReportTaskParams,
 ) (*reportExpectation, error) {
 	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioReportScene)
-	usedModel := conf.Global().Logic.Studio.Report.Model
-	llmModel, err := m.l.llmGateway.GetProvider(
-		conf.Global().Logic.Studio.Report.ModelProvider,
+	var (
+		reportModel         = conf.Global().Logic.Studio.Report.Model
+		reportModelProvider = conf.Global().Logic.Studio.Report.ModelProvider
+		modelOption         = llmchat.WithModel(reportModel)
+		maxRound            = conf.Global().Logic.Studio.Report.MaxRound
+		lang                = pkgcontext.GetLang(ctx)
+	)
+
+	ag, err := m.l.buildSourceExploreAgent(
+		reportModelProvider,
+		reportModel,
+		maxRound,
+		[]eino.Option{modelOption},
+		params,
+		true,
 	)
 	if err != nil {
-		return nil, errors.Wrapf(errors.ErrInner, "get mindmap llm model failed: %v", err)
-	}
-
-	modelOption := llmchat.WithModel(usedModel)
-	maxRound := conf.Global().Logic.Studio.Report.MaxRound
-	agentConfig := bizagent.Config[dummayState]{
-		MaxRound: maxRound,
-		BaseLLM:  llmModel,
-		Options:  llmchat.BuildLLMOptions(modelOption),
-	}
-
-	sbz := m.l.sourceBizForAgent
-	ag := bizagent.New(agentConfig, dummayState{})
-	sourceChecker := sourceCheckerFromSourceIDs(params.SourceIds)
-	err = bindAgentSourceTools(ag, sbz, params.NotebookId, sourceChecker)
-	ag.OnBeforeRound(newFinalRoundHook(ag, maxRound))
-	if err != nil {
-		return nil, errors.WithMessagef(err, "bind tools failed")
+		return nil, errors.WithMessagef(err, "build source explore agent failed")
 	}
 
 	sourceIds := sourceIDsToStrings(params.SourceIds)
-
-	msg, err := prompts.RenderStudioReportMessage(ctx, sourceIds, "")
+	msgs, err := prompts.RenderStudioReportMessage(ctx, sourceIds, lang)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "generate report message failed, err=%v", err)
 	}
-	output, err := ag.React(ctx, slices.FromSingle(msg))
+	output, err := ag.React(ctx, msgs)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "generate report output failed, err=%v", err)
 	}
@@ -109,7 +104,7 @@ func (m *reportGenerator) generate(
 
 	// generate title again
 	title, err := m.generateTitle(ctx,
-		llmModel,
+		ag.BaseLLM(),
 		modelOption,
 		expect.Report,
 		ag.AccumulatedMessages(),
@@ -130,13 +125,15 @@ func (m *reportGenerator) generateTitle(
 	previousMsgs []*einoschema.Message,
 ) (string, error) {
 	title := ""
-	titleMakerMsg, err := prompts.RenderTitleMakerMessage(ctx, report, pkgcontext.GetLang(ctx))
+	titleMakerMsgs, err := prompts.RenderTitleMakerMessage(
+		ctx, report, pkgcontext.GetLang(ctx),
+	)
 	if err != nil {
 		slog.ErrorContext(ctx, "generate title maker message failed", slog.Any("err", err))
 	} else {
-		msgs := make([]*einoschema.Message, 0, 1+len(previousMsgs))
+		msgs := make([]*einoschema.Message, 0, len(previousMsgs)+len(titleMakerMsgs))
 		msgs = append(msgs, previousMsgs...)
-		msgs = append(msgs, titleMakerMsg)
+		msgs = append(msgs, titleMakerMsgs...)
 		result, err := llmModel.Generate(ctx, msgs, modelOption)
 		if err == nil {
 			title = strings.TrimSpace(result.Content)

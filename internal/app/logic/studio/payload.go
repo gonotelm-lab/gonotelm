@@ -1,48 +1,27 @@
 package studio
 
 import (
-	"github.com/bytedance/sonic"
-	"github.com/gonotelm-lab/gonotelm/internal/app/model"
-	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 
+// must embed in task params
 type commonTaskParams struct {
 	NotebookId uuid.UUID   `json:"notebook_id"`
 	SourceIds  []uuid.UUID `json:"source_ids"`
 }
 
-type payloadUnmarshaler interface {
-	extractSourceIds(payload []byte) ([]uuid.UUID, error)
+func (p *commonTaskParams) getNotebookId() uuid.UUID {
+	return p.NotebookId
 }
 
-var _ payloadUnmarshaler = &mindmapPayloadUnmarshaler{}
-
-type mindmapPayloadUnmarshaler struct{}
-
-func (m *mindmapPayloadUnmarshaler) extractSourceIds(payload []byte) ([]uuid.UUID, error) {
-	var params generateMindmapTaskParams
-	err := sonic.Unmarshal(payload, &params)
-	if err != nil {
-		return nil, errors.Wrapf(errors.ErrSerde, "unmarshal mindmap task params err=%v", err)
-	}
-
-	return params.SourceIds, nil
+func (p *commonTaskParams) getSourceIds() []uuid.UUID {
+	return p.SourceIds
 }
 
-type reportPayloadUnmarshaler struct{}
-
-func (r *reportPayloadUnmarshaler) extractSourceIds(payload []byte) ([]uuid.UUID, error) {
-	var params generateReportTaskParams
-	err := sonic.Unmarshal(payload, &params)
-	if err != nil {
-		return nil, errors.Wrapf(errors.ErrSerde, "unmarshal report task params err=%v", err)
-	}
-
-	return params.SourceIds, nil
+type iCommonTaskParams interface {
+	getNotebookId() uuid.UUID
+	getSourceIds() []uuid.UUID
 }
 
-var sourceIdsExtractors = map[model.ArtifactKind]payloadUnmarshaler{
-	model.ArtifactKindMindmap: &mindmapPayloadUnmarshaler{},
-	model.ArtifactKindReport:  &reportPayloadUnmarshaler{},
-}
+var _ iCommonTaskParams = &commonTaskParams{}
+

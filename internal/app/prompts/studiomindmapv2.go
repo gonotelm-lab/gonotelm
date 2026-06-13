@@ -26,7 +26,7 @@ func RenderStudioMindmapV2Message(
 	ctx context.Context,
 	sourceIds []string,
 	lang string,
-) (*schema.Message, error) {
+) ([]*schema.Message, error) {
 	tmpl := NewStudioMindmapV2Template(lang)
 	msg, err := tmpl.Message(ctx, StudioMindmapV2TemplateVars{
 		SourceIds: sourceIds,
@@ -35,5 +35,5 @@ func RenderStudioMindmapV2Message(
 		return nil, err
 	}
 
-	return msg, nil
+	return prependSystemMessage([]*schema.Message{msg}), nil
 }

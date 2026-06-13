@@ -39,12 +39,12 @@ func NewSummarizeTemplate(lang string) *SummarizeTemplate {
 	return newTemplate[SummarizeTemplateVars](templateNameSummarize, lang)
 }
 
-func RenderSummarizeMessage(ctx context.Context, text, lang string) (*schema.Message, error) {
+func RenderSummarizeMessage(ctx context.Context, text, lang string) ([]*schema.Message, error) {
 	tmpl := NewSummarizeTemplate(lang)
 	msg, err := tmpl.Message(ctx, SummarizeTemplateVars{Text: text})
 	if err != nil {
 		return nil, err
 	}
 
-	return msg, nil
+	return prependSystemMessage([]*schema.Message{msg}), nil
 }

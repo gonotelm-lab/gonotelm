@@ -8,13 +8,15 @@ import (
 type ArtifactKind string
 
 const (
-	ArtifactKindMindmap ArtifactKind = "mindmap"
-	ArtifactKindReport  ArtifactKind = "report"
+	ArtifactKindMindmap     ArtifactKind = "mindmap"
+	ArtifactKindReport      ArtifactKind = "report"
+	ArtifactKindInfoGraphic ArtifactKind = "info_graphic"
 )
 
 var validArtifactKinds = map[ArtifactKind]struct{}{
-	ArtifactKindMindmap: {},
-	ArtifactKindReport:  {},
+	ArtifactKindMindmap:     {},
+	ArtifactKindReport:      {},
+	ArtifactKindInfoGraphic: {},
 }
 
 func (k ArtifactKind) String() string {
@@ -24,6 +26,56 @@ func (k ArtifactKind) String() string {
 func (k ArtifactKind) Supported() bool {
 	_, ok := validArtifactKinds[k]
 	return ok
+}
+
+type ArtifactInfoGraphicOrientation string
+
+func (o ArtifactInfoGraphicOrientation) String() string {
+	return string(o)
+}
+
+// portrait 竖版 / landscape 横版 / square 方形
+const (
+	ArtifactInfoGraphicOrientationPortrait  ArtifactInfoGraphicOrientation = "portrait"
+	ArtifactInfoGraphicOrientationLandscape ArtifactInfoGraphicOrientation = "landscape"
+	ArtifactInfoGraphicOrientationSquare    ArtifactInfoGraphicOrientation = "square"
+)
+
+func (o ArtifactInfoGraphicOrientation) Supported() bool {
+	return o == ArtifactInfoGraphicOrientationPortrait ||
+		o == ArtifactInfoGraphicOrientationLandscape ||
+		o == ArtifactInfoGraphicOrientationSquare
+}
+
+func (o ArtifactInfoGraphicOrientation) ImageSize() string {
+	switch o {
+	case ArtifactInfoGraphicOrientationPortrait:
+		return "768*1024"
+	case ArtifactInfoGraphicOrientationLandscape:
+		return "1024*768"
+	case ArtifactInfoGraphicOrientationSquare:
+		return "1024*1024"
+	}
+
+	return "1024*768"
+}
+
+type ArtifactInfoGraphicDetailLevel string
+
+func (l ArtifactInfoGraphicDetailLevel) String() string {
+	return string(l)
+}
+
+const (
+	ArtifactInfoGraphicDetailLevelConcise  ArtifactInfoGraphicDetailLevel = "concise"
+	ArtifactInfoGraphicDetailLevelStandard ArtifactInfoGraphicDetailLevel = "standard"
+	ArtifactInfoGraphicDetailLevelDetailed ArtifactInfoGraphicDetailLevel = "detailed"
+)
+
+func (l ArtifactInfoGraphicDetailLevel) Supported() bool {
+	return l == ArtifactInfoGraphicDetailLevelConcise ||
+		l == ArtifactInfoGraphicDetailLevelStandard ||
+		l == ArtifactInfoGraphicDetailLevelDetailed
 }
 
 type ArtifactStatus string

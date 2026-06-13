@@ -5,6 +5,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/rerank"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/text2image"
 )
 
 const (
@@ -77,6 +78,7 @@ type SourceLogicConfig struct {
 
 type StudioLogicConfig struct {
 	Mindmap struct {
+		MaxRound      int           `toml:"maxRound"`
 		ModelProvider chat.Provider `toml:"modelProvider"`
 		Model         string        `toml:"model"`
 	} `toml:"mindmap"`
@@ -86,6 +88,14 @@ type StudioLogicConfig struct {
 		ModelProvider chat.Provider `toml:"modelProvider"`
 		Model         string        `toml:"model"`
 	} `toml:"report"`
+
+	InfoGraphic struct {
+		MaxRound           int                 `toml:"maxRound"`
+		ModelProvider      chat.Provider       `toml:"modelProvider"`
+		Model              string              `toml:"model"`
+		ImageModelProvider text2image.Provider `toml:"imageModelProvider"`
+		ImageModel         string              `toml:"imageModel"`
+	} `toml:"infographic"`
 
 	TaskConfig struct {
 		NumClaimers        int           `toml:"numClaimers"`

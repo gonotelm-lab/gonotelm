@@ -19,7 +19,7 @@ type RetrieveSource struct {
 }
 
 type RetrieveSourceDocTemplateVars struct {
-	Question string
+	Question   string
 	NotebookId string
 	Sources    []*RetrieveSource
 }
@@ -44,7 +44,7 @@ func RenderRetrieveSourceDocMessage(
 	notebookId string,
 	sources []*RetrieveSource,
 	lang string,
-) (*schema.Message, error) {
+) ([]*schema.Message, error) {
 	tmpl := NewRetrieveSourceDocTemplate(lang)
 	msg, err := tmpl.Message(ctx, RetrieveSourceDocTemplateVars{
 		Question:   question,
@@ -55,7 +55,7 @@ func RenderRetrieveSourceDocMessage(
 		return nil, err
 	}
 
-	return msg, nil
+	return prependSystemMessage([]*schema.Message{msg}), nil
 }
 
 func normalizeRetrieveSources(sources []*RetrieveSource) []*RetrieveSource {

@@ -59,7 +59,7 @@ func RenderStudioMindmapContentMessage(
 	ctx context.Context,
 	contents []string,
 	lang string,
-) (*schema.Message, error) {
+) ([]*schema.Message, error) {
 	return RenderStudioMindmapMessageWithMode(
 		ctx,
 		StudioMindmapModeContent,
@@ -73,7 +73,7 @@ func RenderStudioMindmapAbstractMessage(
 	ctx context.Context,
 	abstracts []string,
 	lang string,
-) (*schema.Message, error) {
+) ([]*schema.Message, error) {
 	return RenderStudioMindmapMessageWithMode(
 		ctx,
 		StudioMindmapModeAbstract,
@@ -89,7 +89,7 @@ func RenderStudioMindmapMessageWithMode(
 	contents []string,
 	abstracts []string,
 	lang string,
-) (*schema.Message, error) {
+) ([]*schema.Message, error) {
 	tmpl := NewStudioMindmapTemplate(lang)
 	msg, err := tmpl.Message(ctx,
 		StudioMindmapTemplateVars{
@@ -101,7 +101,7 @@ func RenderStudioMindmapMessageWithMode(
 		return nil, err
 	}
 
-	return msg, nil
+	return prependSystemMessage([]*schema.Message{msg}), nil
 }
 
 // 检查大模型返回的思维导图输出是否符合格式

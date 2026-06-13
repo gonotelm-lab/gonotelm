@@ -3,6 +3,8 @@ package chat
 import (
 	"strings"
 
+	"github.com/gonotelm-lab/gonotelm/pkg/eino-ext/model/agnes"
+
 	"github.com/cloudwego/eino-ext/components/model/deepseek"
 	"github.com/cloudwego/eino-ext/components/model/openai"
 	"github.com/cloudwego/eino-ext/components/model/qwen"
@@ -36,6 +38,12 @@ func WithThinking(
 		return deepseek.WithExtraFields(map[string]any{
 			"thinking": map[string]string{
 				"type": thinkingType,
+			},
+		})
+	case Agnes:
+		return agnes.WithExtraFields(map[string]any{
+			"chat_template_kwargs": map[string]any{
+				"enable_thinking": enableThinking,
 			},
 		})
 	default:

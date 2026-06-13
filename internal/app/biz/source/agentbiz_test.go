@@ -25,10 +25,10 @@ func TestBizForAgent_ReadSource_CacheMissUsesPatchedFetch(t *testing.T) {
 		patches := gomonkey.NewPatches()
 		defer patches.Reset()
 		patches.ApplyPrivateMethod(biz, "fetchSourceContent",
-			func(_ *AgentBiz, _ context.Context, gotSourceID uuid.UUID) ([]byte, error) {
+			func(_ *AgentBiz, _ context.Context, gotSourceID uuid.UUID) ([]byte, string, error) {
 				called++
 				So(gotSourceID.EqualsTo(sourceID), ShouldBeTrue)
-				return []byte("core-line-1\ncore-line-2\ncore-line-3"), nil
+				return []byte("core-line-1\ncore-line-2\ncore-line-3"), "abstract", nil
 			})
 
 		got, err := biz.ReadSource(context.Background(), &AgentReadSourceQuery{
@@ -82,9 +82,9 @@ func TestBizForAgent_ReadSource_CacheHitSkipsFetchAndAppliesRange(t *testing.T) 
 		patches := gomonkey.NewPatches()
 		defer patches.Reset()
 		patches.ApplyPrivateMethod(biz, "fetchSourceContent",
-			func(_ *AgentBiz, _ context.Context, _ uuid.UUID) ([]byte, error) {
+			func(_ *AgentBiz, _ context.Context, _ uuid.UUID) ([]byte, string, error) {
 				called++
-				return []byte("mock-line-1\nmock-line-2"), nil
+				return []byte("mock-line-1\nmock-line-2"), "abstract", nil
 			})
 
 		got, err := biz.ReadSource(context.Background(), &AgentReadSourceQuery{
@@ -118,10 +118,10 @@ func TestBizForAgent_StatSource_CacheMissUsesPatchedFetch(t *testing.T) {
 		patches := gomonkey.NewPatches()
 		defer patches.Reset()
 		patches.ApplyPrivateMethod(biz, "fetchSourceContent",
-			func(_ *AgentBiz, _ context.Context, gotSourceID uuid.UUID) ([]byte, error) {
+			func(_ *AgentBiz, _ context.Context, gotSourceID uuid.UUID) ([]byte, string, error) {
 				called++
 				So(gotSourceID.EqualsTo(sourceID), ShouldBeTrue)
-				return expectedContent, nil
+				return expectedContent, "abstract", nil
 			})
 
 		got, err := biz.StatSource(context.Background(), sourceID)

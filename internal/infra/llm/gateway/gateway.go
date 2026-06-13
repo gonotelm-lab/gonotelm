@@ -68,6 +68,13 @@ func (g *Gateway) initProviders(cfg *chat.ProviderConfig) error {
 	}
 	g.providers[chat.Qwen] = newWrappedChatModel(qwenModel, chat.Qwen, cfg.Qwen.MaxConcurrency)
 
+	// 4. agnes
+	agnesModel, err := chat.New(ctx, chat.Agnes, cfg)
+	if err != nil {
+		return err
+	}
+	g.providers[chat.Agnes] = newWrappedChatModel(agnesModel, chat.Agnes, cfg.Agnes.MaxConcurrency)
+
 	return nil
 }
 

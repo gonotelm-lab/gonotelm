@@ -188,7 +188,12 @@ func (s *Storage) UploadObject(
 		return errors.ErrParams.Msg("upload object request key is empty")
 	}
 
-	reader := bytes.NewReader(req.Body)
+	var reader io.Reader
+	if req.Body != nil {
+		reader = bytes.NewReader(req.Body)
+	} else {
+		reader = req.BodyReader
+	}
 	_, err := s.client.PutObject(
 		ctx,
 		s.bucket,
@@ -291,7 +296,7 @@ func (s *Storage) PresignedGetObject(
 		}
 		params.Set("response-content-disposition", disposition)
 	}
-	
+
 	if req.ContentType != "" {
 		params.Set("response-content-type", req.ContentType)
 	}

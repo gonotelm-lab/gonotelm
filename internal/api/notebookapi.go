@@ -354,10 +354,10 @@ func (r *ListNotebookStudioArtifactsRequest) Validate() error {
 }
 
 type NotebookStudioArtifactResponse struct {
-	Artifacts []*ArtifactResult `json:"artifacts"`
-	Limit     int               `json:"limit"`
-	Offset    int               `json:"offset"`
-	HasMore   bool              `json:"has_more"`
+	Artifacts []*schema.ArtifactResult `json:"artifacts"`
+	Limit     int                      `json:"limit"`
+	Offset    int                      `json:"offset"`
+	HasMore   bool                     `json:"has_more"`
 }
 
 func (s *Server) ListNotebookStudioArtifacts(ctx context.Context, c *app.RequestContext) {
@@ -380,7 +380,7 @@ func (s *Server) ListNotebookStudioArtifacts(ctx context.Context, c *app.Request
 	}
 
 	http.OkResp(c, NotebookStudioArtifactResponse{
-		Artifacts: toArtifactResults(result.Artifacts),
+		Artifacts: schema.ToArtifactResults(result.Artifacts),
 		Limit:     req.Limit,
 		Offset:    req.Offset,
 		HasMore:   result.HasMore,

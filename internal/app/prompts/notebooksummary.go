@@ -39,14 +39,14 @@ func RenderNotebookSummaryMessage(
 	ctx context.Context,
 	sources []string,
 	lang string,
-) (*schema.Message, error) {
+) ([]*schema.Message, error) {
 	tmpl := NewNotebookSummaryTemplate(lang)
 	msg, err := tmpl.Message(ctx, NotebookSummaryTemplateVars{Sources: sources})
 	if err != nil {
 		return nil, err
 	}
 
-	return msg, nil
+	return prependSystemMessage([]*schema.Message{msg}), nil
 }
 
 func normalizeStrings(sources []string) []string {

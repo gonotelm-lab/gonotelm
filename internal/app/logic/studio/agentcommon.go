@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 
+	einomodel "github.com/cloudwego/eino/components/model"
 	"github.com/gonotelm-lab/gonotelm/internal/app/agent"
 	"github.com/gonotelm-lab/gonotelm/internal/app/agent/tool"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
+	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 
 	einotool "github.com/cloudwego/eino/components/tool"
@@ -52,6 +55,18 @@ func bindAgentSourceTools[T any](
 	})
 }
 
+func bindAgentSimpleSourceTools[T any](
+	ag *agent.Agent[T],
+	sbz *bizsource.AgentBiz,
+	notebookId uuid.UUID,
+	checker tool.SourceChecker,
+) error {
+	return ag.BindTools(map[string]einotool.InvokableTool{
+		tool.StatSourceToolName: tool.NewStatSourceTool(sbz, checker),
+		tool.GrepSourceToolName: tool.NewGrepSourceTool(sbz, checker),
+	})
+}
+
 func sourceCheckerFromSourceIDs(sourceIDs []uuid.UUID) tool.SourceChecker {
 	allowedSourceIDs := make(map[uuid.UUID]struct{}, len(sourceIDs))
 	for _, sourceID := range sourceIDs {
@@ -86,4 +101,49 @@ func sourceIDsToStrings(sourceIDs []uuid.UUID) []string {
 	}
 
 	return ids
+}
+
+func (l *Logic) buildSourceExploreAgent(
+	provider chat.Provider,
+	modelName string,
+	maxRound int,
+	options []einomodel.Option,
+	params iCommonTaskParams,
+	bindAllTools bool,
+) (*agent.Agent[dummayState], error) {
+	llmModel, err := l.llmGateway.GetProvider(provider)
+	if err != nil {
+		return nil, errors.Wrapf(errors.ErrInner, "get source explore llm model failed: %v", err)
+	}
+
+	agConfig := agent.Config[dummayState]{
+		MaxRound: maxRound,
+		BaseLLM:  llmModel,
+		Options:  options,
+	}
+
+	ag := agent.New(agConfig, dummayState{})
+	spChecker := sourceCheckerFromSourceIDs(params.getSourceIds())
+	if bindAllTools {
+		err = bindAgentSourceTools(
+			ag,
+			l.sourceBizForAgent,
+			params.getNotebookId(),
+			spChecker,
+		)
+	} else {
+		err = bindAgentSimpleSourceTools(
+			ag,
+			l.sourceBizForAgent,
+			params.getNotebookId(),
+			spChecker,
+		)
+	}
+	if err != nil {
+		return nil, errors.Wrapf(errors.ErrInner, "bind source tools failed: %v", err)
+	}
+
+	ag.OnBeforeRound(newFinalRoundHook(ag, maxRound))
+
+	return ag, nil
 }

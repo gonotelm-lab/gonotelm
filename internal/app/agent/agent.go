@@ -191,6 +191,10 @@ func (a *Agent[State]) TokenUsage() einoschema.TokenUsage {
 	return *a.usage
 }
 
+func (a *Agent[State]) BaseLLM() eino.ToolCallingChatModel {
+	return a.cfg.BaseLLM
+}
+
 func (a *Agent[State]) setAccumulatedMessages(msgs []*EinoMessage) {
 	if len(msgs) == 0 {
 		a.accMsgs = nil

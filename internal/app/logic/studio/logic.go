@@ -2,7 +2,9 @@ package studio
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 
 	"github.com/cloudwego/eino/components/document"
@@ -13,6 +15,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/text2image"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/eino-ext/chunker/recursive"
@@ -34,9 +37,10 @@ type Logic struct {
 	notebookBiz       *biznotebook.Biz
 	artifactBiz       *bizartifact.Biz
 
-	objectStorage storage.Storage
-	llmGateway    *gateway.Gateway
-	splitter      document.Transformer
+	objectStorage     storage.Storage
+	llmGateway        *gateway.Gateway
+	text2imageGateway *text2image.Gateway
+	splitter          document.Transformer
 
 	loop *taskLoop
 }
@@ -49,6 +53,7 @@ func MustNewLogic(
 	notebookBiz *biznotebook.Biz,
 	artifactBiz *bizartifact.Biz,
 	llmGateway *gateway.Gateway,
+	text2imageGateway *text2image.Gateway,
 ) *Logic {
 	splitter, err := recursive.NewSplitter(context.TODO(), &recursive.Config{
 		ChunkSize: constants.MindmapMaxOnceToken,
@@ -66,6 +71,7 @@ func MustNewLogic(
 		notebookBiz:       notebookBiz,
 		artifactBiz:       artifactBiz,
 		llmGateway:        llmGateway,
+		text2imageGateway: text2imageGateway,
 		splitter:          splitter,
 	}
 
@@ -79,6 +85,7 @@ func (l *Logic) initBackgroundWorks() {
 	dispatcher := newTaskDispatcher()
 	dispatcher.register(model.ArtifactKindMindmap, &mindmapGenerator{l: l})
 	dispatcher.register(model.ArtifactKindReport, &reportGenerator{l: l})
+	dispatcher.register(model.ArtifactKindInfoGraphic, &infographicGenerator{l: l})
 
 	cfg := conf.Global().Logic.Studio.TaskConfig
 
@@ -100,6 +107,9 @@ type GenerateArtifactParams struct {
 	NotebookId uuid.UUID
 	Kind       model.ArtifactKind
 	SourceIds  []uuid.UUID
+
+	// InfoGraphic extras paramters
+	InfoGraphic *InfoGraphicExtrasParams
 }
 
 func (l *Logic) GenerateArtifact(
@@ -117,24 +127,29 @@ func (l *Logic) GenerateArtifact(
 		return uuid.EmptyUUID(), errors.ErrPermission.Msgf("notebook access denied, notebook_id=%s", params.NotebookId)
 	}
 
+	var (
+		taskParams       iCommonTaskParams
+		commonTaskParams = commonTaskParams{
+			NotebookId: params.NotebookId,
+			SourceIds:  params.SourceIds,
+		}
+	)
+
 	switch params.Kind {
 	case model.ArtifactKindMindmap:
-		return l.generateMindmapTask(ctx, &generateMindmapTaskParams{
-			commonTaskParams: &commonTaskParams{
-				NotebookId: params.NotebookId,
-				SourceIds:  params.SourceIds,
-			},
-		})
+		taskParams = &generateMindmapTaskParams{commonTaskParams: &commonTaskParams}
 	case model.ArtifactKindReport:
-		return l.generateReportTask(ctx, &generateReportTaskParams{
-			commonTaskParams: &commonTaskParams{
-				NotebookId: params.NotebookId,
-				SourceIds:  params.SourceIds,
-			},
-		})
+		taskParams = &generateReportTaskParams{commonTaskParams: &commonTaskParams}
+	case model.ArtifactKindInfoGraphic:
+		taskParams = &generateInfographicTaskParams{
+			commonTaskParams:        &commonTaskParams,
+			InfoGraphicExtrasParams: params.InfoGraphic,
+		}
 	default:
 		return uuid.EmptyUUID(), errors.ErrParams.Msgf("unsupported artifact kind: %s", params.Kind)
 	}
+
+	return l.generateArtifactTask(ctx, taskParams, params.Kind)
 }
 
 func (l *Logic) GetArtifactTaskStatus(
@@ -162,24 +177,13 @@ func (l *Logic) GetArtifactTask(
 		return nil, errors.WithMessage(err, "get artifact task failed")
 	}
 
-	artifact, err := constractArtifact(task)
+	artifact, err := constructArtifact(task)
 	if err != nil {
 		return nil, errors.WithMessage(err, "new artifact from task failed")
 	}
 
 	if task.Status.Completed() {
-		if artifact.ResultKind.Storage() {
-			// 补充content url
-			resp, err := l.objectStorage.PresignedGetObject(ctx,
-				&storage.PresignedGetObjectRequest{
-					Key:         artifact.ContentKey,
-					ContentType: artifact.ContentType,
-				})
-			if err != nil {
-				return nil, errors.WithMessage(err, "get content url failed")
-			}
-			artifact.ContentUrl = resp.Url
-		}
+		l.fillArtifactTaskContentUrl(ctx, []*Artifact{artifact})
 	}
 
 	return artifact, nil
@@ -214,7 +218,8 @@ func (l *Logic) ListNotebookArtifacts(
 		},
 	)
 	if err != nil {
-		return nil, errors.WithMessagef(err, "list notebook artifact tasks failed, notebook_id=%s", params.NotebookId)
+		return nil, errors.WithMessagef(err,
+			"list notebook artifact tasks failed, notebook_id=%s", params.NotebookId)
 	}
 
 	hasMore := len(tasks) > params.Limit
@@ -224,7 +229,7 @@ func (l *Logic) ListNotebookArtifacts(
 
 	artifacts := make([]*Artifact, 0, len(tasks))
 	for _, task := range tasks {
-		artifact, err := constractArtifact(task)
+		artifact, err := constructArtifact(task)
 		if err != nil {
 			return nil, errors.WithMessagef(err, "new artifact from task failed, task_id=%s", task.Id)
 		}
@@ -244,6 +249,8 @@ func (l *Logic) ListNotebookArtifacts(
 
 		artifacts = append(artifacts, artifact)
 	}
+
+	l.fillArtifactTaskContentUrl(ctx, artifacts)
 
 	return &ListNotebookArtifactsResult{
 		Artifacts: artifacts,
@@ -406,26 +413,54 @@ func (l *Logic) generateTask(
 	return taskId, nil
 }
 
-func (l *Logic) generateMindmapTask(
+func (l *Logic) generateArtifactTask(
 	ctx context.Context,
-	params *generateMindmapTaskParams,
+	params iCommonTaskParams,
+	kind model.ArtifactKind,
 ) (uuid.UUID, error) {
 	payload, err := sonic.Marshal(params)
 	if err != nil {
-		return uuid.EmptyUUID(), errors.Wrapf(errors.ErrSerde, "marshal mindmap params err=%v", err)
+		return uuid.EmptyUUID(), errors.Wrapf(errors.ErrSerde, "marshal artifact params err=%v", err)
 	}
 
-	return l.generateTask(ctx, params.NotebookId, payload, model.ArtifactKindMindmap)
+	return l.generateTask(ctx, params.getNotebookId(), payload, kind)
 }
 
-func (l *Logic) generateReportTask(
-	ctx context.Context,
-	params *generateReportTaskParams,
-) (uuid.UUID, error) {
-	payload, err := sonic.Marshal(params)
-	if err != nil {
-		return uuid.EmptyUUID(), errors.Wrapf(errors.ErrSerde, "marshal report params err=%v", err)
+func (l *Logic) fillArtifactTaskContentUrl(ctx context.Context, artifacts []*Artifact) {
+	if len(artifacts) == 0 {
+		return
 	}
 
-	return l.generateTask(ctx, params.NotebookId, payload, model.ArtifactKindReport)
+	var wg sync.WaitGroup
+	for _, task := range artifacts {
+		if task.ResultKind.Inline() || task.ContentKey == "" {
+			continue
+		}
+
+		safe.Go2(ctx, &wg, func() {
+			resp, err := l.objectStorage.PresignedGetObject(ctx,
+				&storage.PresignedGetObjectRequest{Key: task.ContentKey},
+			)
+			if err != nil {
+				slog.ErrorContext(ctx, "fill artifact task content url failed",
+					slog.String("task_id", task.Id.String()),
+					slog.String("store_key", task.ContentKey),
+					slog.Any("err", err),
+				)
+				return
+			}
+			task.ContentUrl = resp.Url
+		})
+	}
+
+	wg.Wait()
+}
+
+// ext: png/jpg/txt/pptx/pdf, etc
+func formatArtifactStoreKey(notebookID, taskID uuid.UUID, ext string) string {
+	if !strings.HasPrefix(ext, ".") {
+		ext = "." + ext
+	}
+
+	return fmt.Sprintf("artifact/%s/%s%s", notebookID.String(), taskID.String(), ext)
 }

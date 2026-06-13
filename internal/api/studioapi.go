@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 
+	"github.com/gonotelm-lab/gonotelm/internal/api/schema"
 	studiologic "github.com/gonotelm-lab/gonotelm/internal/app/logic/studio"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -78,24 +79,6 @@ func (s *Server) GetStudioArtifactStatus(ctx context.Context, c *app.RequestCont
 	})
 }
 
-type ArtifactResult struct {
-	NotebookId string               `json:"notebook_id"`
-	TaskId     string               `json:"task_id"`
-	Kind       model.ArtifactKind   `json:"kind"`
-	Status     model.ArtifactStatus `json:"status"`
-	Title      string               `json:"title"`
-	SourceIds  []uuid.UUID          `json:"source_ids,omitempty"`
-	Timestamp  int64                `json:"timestamp"` // unix timestamp
-
-	// content解释
-	//
-	// 如果contentKind=inline, 则content为inline内容
-	// 如果contentKind=storage, 则contentUrl为产物的链接 需要请求这个链接才能获取产物
-	Content     string                   `json:"content,omitempty"`
-	ContentUrl  string                   `json:"content_url,omitempty"`
-	ContentKind model.ArtifactResultKind `json:"content_kind"` // inline | storage
-}
-
 func (s *Server) GetStudioArtifactResult(ctx context.Context, c *app.RequestContext) {
 	var req ArtifactTaskIdRequest
 	err := c.BindAndValidate(&req)
@@ -110,7 +93,7 @@ func (s *Server) GetStudioArtifactResult(ctx context.Context, c *app.RequestCont
 		return
 	}
 
-	http.OkResp(c, toArtifactResult(artifact))
+	http.OkResp(c, schema.ToArtifactResult(artifact))
 }
 
 type GenerateStudioArtifactRequest struct {
@@ -118,11 +101,63 @@ type GenerateStudioArtifactRequest struct {
 	NotebookId uuid.UUID          `json:"notebook_id,required"`
 	Kind       model.ArtifactKind `json:"kind,required"`
 	SourceIds  []uuid.UUID        `json:"source_ids,required"`
+
+	// 仅在 kind=infographic 时有效
+	InfoGraphic *GenerateInfoGraphicParameters `json:"info_graphic,omitempty"`
+}
+
+type GenerateInfoGraphicParameters struct {
+	ExtraPrompt  string                               `json:"extra_prompt,omitempty"`
+	TextLanguage string                               `json:"text_language,omitempty"`
+	Orientation  model.ArtifactInfoGraphicOrientation `json:"orientation,omitempty"`
+	DetailLevel  model.ArtifactInfoGraphicDetailLevel `json:"detail_level,omitempty"`
+}
+
+func (r *GenerateInfoGraphicParameters) To() *studiologic.InfoGraphicExtrasParams {
+	if r == nil {
+		return nil
+	}
+
+	return &studiologic.InfoGraphicExtrasParams{
+		ExtraPrompt:  r.ExtraPrompt,
+		TextLanguage: r.TextLanguage,
+		Orientation:  r.Orientation,
+		DetailLevel:  r.DetailLevel,
+	}
+}
+
+func (r *GenerateInfoGraphicParameters) Validate() error {
+	if r == nil {
+		return errors.ErrParams.Msgf("info_graphic parameters is required")
+	}
+
+	if r.Orientation == "" {
+		r.Orientation = model.ArtifactInfoGraphicOrientationPortrait
+	}
+
+	if r.DetailLevel == "" {
+		r.DetailLevel = model.ArtifactInfoGraphicDetailLevelStandard
+	}
+
+	if !r.Orientation.Supported() {
+		return errors.ErrParams.Msgf("invalid info graphic orientation: %s", r.Orientation)
+	}
+
+	if !r.DetailLevel.Supported() {
+		return errors.ErrParams.Msgf("invalid info graphic detail level: %s", r.DetailLevel)
+	}
+
+	return nil
 }
 
 func (r *GenerateStudioArtifactRequest) Validate() error {
 	if !r.Kind.Supported() {
 		return errors.ErrParams.Msgf("invalid artifact kind: %s", r.Kind)
+	}
+
+	switch r.Kind {
+	case model.ArtifactKindInfoGraphic:
+		return r.InfoGraphic.Validate()
 	}
 
 	return nil
@@ -142,10 +177,12 @@ func (s *Server) GenerateStudioArtifact(ctx context.Context, c *app.RequestConte
 
 	resp, err := s.studioLogic.GenerateArtifact(ctx,
 		&studiologic.GenerateArtifactParams{
-			NotebookId: req.NotebookId,
-			Kind:       req.Kind,
-			SourceIds:  req.SourceIds,
-		})
+			NotebookId:  req.NotebookId,
+			Kind:        req.Kind,
+			SourceIds:   req.SourceIds,
+			InfoGraphic: req.InfoGraphic.To(),
+		},
+	)
 	if err != nil {
 		http.ErrResp(c, err)
 		return
@@ -205,28 +242,4 @@ func (s *Server) CancelStudioArtifactTask(ctx context.Context, c *app.RequestCon
 	}
 
 	http.OkResp(c, nil)
-}
-
-func toArtifactResult(artifact *studiologic.Artifact) *ArtifactResult {
-	return &ArtifactResult{
-		NotebookId:  artifact.NotebookId.String(),
-		TaskId:      artifact.Id.String(),
-		Status:      artifact.Status,
-		Kind:        artifact.Kind,
-		Title:       artifact.Title,
-		SourceIds:   artifact.SourceIds,
-		Timestamp:   artifact.Timestamp,
-		Content:     artifact.Content,
-		ContentUrl:  artifact.ContentUrl,
-		ContentKind: artifact.ResultKind,
-	}
-}
-
-func toArtifactResults(artifacts []*studiologic.Artifact) []*ArtifactResult {
-	results := make([]*ArtifactResult, 0, len(artifacts))
-	for _, artifact := range artifacts {
-		results = append(results, toArtifactResult(artifact))
-	}
-
-	return results
 }

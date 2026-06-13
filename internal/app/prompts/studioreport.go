@@ -26,7 +26,7 @@ func RenderStudioReportMessage(
 	ctx context.Context,
 	sourceIds []string,
 	lang string,
-) (*schema.Message, error) {
+) ([]*schema.Message, error) {
 	tmpl := NewStudioReportTemplate(lang)
 	msg, err := tmpl.Message(ctx, StudioReportTemplateVars{
 		SourceIds: sourceIds,
@@ -35,5 +35,5 @@ func RenderStudioReportMessage(
 		return nil, err
 	}
 
-	return msg, nil
+	return prependSystemMessage([]*schema.Message{msg}), nil
 }

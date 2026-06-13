@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	pkgt2i "github.com/gonotelm-lab/gonotelm/pkg/text2image"
+	"github.com/gonotelm-lab/gonotelm/pkg/text2image/agnes"
 	"github.com/gonotelm-lab/gonotelm/pkg/text2image/dashscope"
 )
 
@@ -19,6 +20,8 @@ func New(
 	switch provider {
 	case DashScope:
 		return dashscope.New(cfg.DashScope, opts...)
+	case Agnes:
+		return agnes.New(cfg.Agnes, opts...)
 	default:
 		return nil, fmt.Errorf("text2image provider %q is not supported", provider)
 	}

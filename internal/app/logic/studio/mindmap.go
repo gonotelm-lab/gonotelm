@@ -6,14 +6,17 @@ import (
 	"log/slog"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/bytedance/sonic"
+	"github.com/gonotelm-lab/gonotelm/internal/app/agent"
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/app/prompts"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
+	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/safe"
 	pkgslices "github.com/gonotelm-lab/gonotelm/pkg/slices"
@@ -29,6 +32,9 @@ import (
 const (
 	mindmapAbstractMode = "abstract"
 	mindmapContentMode  = "content"
+
+	mindmapTitleMinLen = 10
+	mindmapTitleMaxLen = 30
 )
 
 type mindmapGenerator struct {
@@ -121,7 +127,10 @@ func (m *mindmapGenerator) generate(
 		return m.oneshotCreateMindmap(ctx, params.NotebookId, parsedContents, "")
 	}
 
-	return m.twoshotCreateMindmap(ctx, params.NotebookId, parsedContents, tokensCounts)
+	slog.DebugContext(ctx, "perform agent create mindmap", slog.Int("total_tokens", totalTokens))
+
+	// return m.twoshotCreateMindmap(ctx, params.NotebookId, parsedContents, tokensCounts)
+	return m.agentCreateMindmap(ctx, params.NotebookId, sources)
 }
 
 func (m *mindmapGenerator) llmOptions() (
@@ -141,6 +150,7 @@ func (m *mindmapGenerator) llmOptions() (
 	return chatModel, []einomodel.Option{
 		llmchat.WithModel(model),
 		llmchat.WithResponseJsonObject(provider),
+		llmchat.WithThinking(provider, false),
 	}, nil
 }
 
@@ -219,6 +229,7 @@ func (m *mindmapGenerator) oneshotCreateMindmap(
 	return nil, errors.Wrap(errors.ErrLLM, "failed to generate studio mindmap")
 }
 
+// Deprecated: 这个太消耗token了 而且很慢
 func (m *mindmapGenerator) twoshotCreateMindmap(
 	ctx context.Context,
 	notebookId uuid.UUID,
@@ -272,6 +283,133 @@ func (m *mindmapGenerator) twoshotCreateMindmap(
 	}
 
 	return expect, nil
+}
+
+// 在大文本下 让agent先使用工具探索
+// 可以使用stat, grep, query等工具先探索主题相关内容 可大幅节省token
+// 然后再让agent生成思维导图
+func (m *mindmapGenerator) agentCreateMindmap(
+	ctx context.Context,
+	notebookId uuid.UUID,
+	sources []*model.DecodedSource,
+) (*mindmapExpectation, error) {
+	chatModel, llmOptions, err := m.llmOptions()
+	if err != nil {
+		return nil, errors.Wrapf(errors.ErrInner, "failed to get studio mindmap model and options, err=%v", err)
+	}
+
+	cfg := agent.Config[struct{}]{
+		MaxRound: conf.DefaultMaxRound,
+		BaseLLM:  chatModel,
+		Options:  llmOptions,
+	}
+	ag := agent.New(cfg, struct{}{})
+
+	sourceIDs := decodedSourcesToSourceIDs(sources)
+	sourceChecker := sourceCheckerFromSourceIDs(sourceIDs)
+	err = bindAgentSourceTools(ag, m.l.sourceBizForAgent, notebookId, sourceChecker)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "bind tools failed")
+	}
+	ag.OnBeforeRound(newFinalRoundHook(ag, cfg.MaxRound))
+
+	sourceIds := sourceIDsToStrings(sourceIDs)
+
+	msg, err := prompts.RenderStudioMindmapV2Message(ctx, sourceIds, pkgcontext.GetLang(ctx))
+	if err != nil {
+		return nil, errors.Wrapf(errors.ErrInner, "generate mindmap message failed, err=%v", err)
+	}
+	output, err := ag.React(ctx, pkgslices.FromSingle(msg))
+	if err != nil {
+		return nil, errors.Wrapf(errors.ErrInner, "generate mindmap output failed, err=%v", err)
+	}
+
+	slog.InfoContext(ctx, fmt.Sprintf("generate mindmap agent usage: %+v", ag.TokenUsage()))
+
+	expect, err := m.parseAgentOutput(ctx, output.Content)
+	if err == nil {
+		return expect, nil
+	}
+
+	slog.WarnContext(ctx, "mindmap agent output invalid, compensating",
+		slog.String("notebook_id", notebookId.String()),
+		slog.String("output", string(output.Content)),
+		slog.Any("usage", ag.TokenUsage()),
+	)
+
+	// agent 最终输出可能夹带思考文本；这里做一次无工具纠偏，强制只输出目标 JSON。
+	msgs := append([]*einoschema.Message{}, ag.AccumulatedMessages()...)
+	compensateMsg := &einoschema.Message{
+		Role: einoschema.User,
+		Content: fmt.Sprintf(
+			"你刚才输出的结果不符合要求，请严格重输。\n当前输出：\n%s\n\n"+
+				"要求：\n"+
+				"1) 只输出一个合法 JSON 对象，不要任何解释性文字\n"+
+				"2) JSON 字段必须且仅能包含 title 和 mindmap\n"+
+				"3) title 长度必须为 10-30 字\n"+
+				"4) mindmap 必须是完整 mermaid mindmap 代码块字符串\n"+
+				"5) 不允许输出 ```json 代码块包裹",
+			output.Content,
+		),
+	}
+	msgs = append(msgs, compensateMsg)
+
+	llmResp, genErr := chatModel.Generate(ctx, msgs, llmOptions...)
+	if genErr != nil {
+		return nil, errors.Wrapf(errors.ErrLLM,
+			"mindmap compensate generate failed, err=%v",
+			genErr,
+		)
+	}
+
+	expect, err = m.parseAgentOutput(ctx, llmResp.Content)
+	if err == nil {
+		return expect, nil
+	}
+
+	return nil, errors.Wrapf(errors.ErrLLM,
+		"mindmap agent output invalid after compensation, first_output=%q, compensate_output=%q, err=%v",
+		output.Content,
+		llmResp.Content,
+		err,
+	)
+}
+
+func (m *mindmapGenerator) parseAgentOutput(ctx context.Context, content string) (*mindmapExpectation, error) {
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return nil, fmt.Errorf("empty output")
+	}
+
+	var expect mindmapExpectation
+	decoder := pkgjson.Decoder{
+		DisallowUnknownFields: true,
+		LogOnDirectFailure: func(err error, _ []byte) {
+			slog.WarnContext(ctx, "mindmap direct output unmarshal failed, fallback to extracted json candidates",
+				slog.Any("err", err))
+		},
+	}
+	// Decoder.Unmarshal 会先直接解析，失败时自动提取 JSON 片段再解析。
+	if err := decoder.Unmarshal(pkgstring.AsBytes(content), &expect); err != nil {
+		slog.WarnContext(ctx, "mindmap output unmarshal failed after compatibility fallback",
+			slog.Any("err", err))
+		return nil, err
+	}
+
+	expect.Title = strings.TrimSpace(expect.Title)
+	expect.Mindmap = strings.TrimSpace(expect.Mindmap)
+
+	titleLen := utf8.RuneCountInString(expect.Title)
+	if titleLen > mindmapTitleMinLen {
+		// truncate title
+		expect.Title = pkgstring.TruncateRune(expect.Title, mindmapTitleMaxLen)
+	}
+
+	if !prompts.CheckStudioMindmapResult(expect.Mindmap) {
+		return nil, fmt.Errorf("mindmap format invalid")
+	}
+
+	return &expect, nil
 }
 
 type batchContent struct {

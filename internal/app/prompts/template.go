@@ -24,6 +24,7 @@ const (
 	templateNameRetrieveSourceDoc templateName = "retrieve-soucedoc"
 	templateNameNotebookSummary   templateName = "notebook-summary"
 	templateNameStudioMindmap     templateName = "studio-mindmap"
+	templateNameStudioMindmapV2   templateName = "studio-mindmap-v2"
 	templateNameStudioReport      templateName = "studio-report"
 	templateNameTitleMaker        templateName = "title-maker"
 )

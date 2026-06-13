@@ -4,12 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	stdslices "slices"
 	"strings"
 
-	"github.com/gonotelm-lab/gonotelm/internal/app/agent"
 	bizagent "github.com/gonotelm-lab/gonotelm/internal/app/agent"
-	"github.com/gonotelm-lab/gonotelm/internal/app/agent/tool"
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/app/prompts"
@@ -19,11 +16,9 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/slices"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
-	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 
 	"github.com/bytedance/sonic"
 	eino "github.com/cloudwego/eino/components/model"
-	einotool "github.com/cloudwego/eino/components/tool"
 	einoschema "github.com/cloudwego/eino/schema"
 )
 
@@ -87,30 +82,26 @@ func (m *reportGenerator) generate(
 	}
 
 	sbz := m.l.sourceBizForAgent
-	agent := bizagent.New(agentConfig, dummayState{})
-	err = agent.BindTools(map[string]einotool.InvokableTool{
-		tool.ReadSourceToolName: tool.NewReadSourceTool(sbz, m.checkAgentSourceAccess(params)),
-		tool.GrepSourceToolName: tool.NewGrepSourceTool(sbz, m.checkAgentSourceAccess(params)),
-		tool.StatSourceToolName: tool.NewStatSourceTool(sbz, m.checkAgentSourceAccess(params)),
-	})
-	agent.OnBeforeRound(m.beforeAgentRoundHook(agent))
+	ag := bizagent.New(agentConfig, dummayState{})
+	sourceChecker := sourceCheckerFromSourceIDs(params.SourceIds)
+	err = bindAgentSourceTools(ag, sbz, params.NotebookId, sourceChecker)
+	ag.OnBeforeRound(newFinalRoundHook(ag, maxRound))
 	if err != nil {
 		return nil, errors.WithMessagef(err, "bind tools failed")
 	}
 
-	sourceIds := make([]string, 0, len(params.SourceIds))
-	for _, sourceId := range params.SourceIds {
-		sourceIds = append(sourceIds, sourceId.String())
-	}
+	sourceIds := sourceIDsToStrings(params.SourceIds)
 
 	msg, err := prompts.RenderStudioReportMessage(ctx, sourceIds, "")
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "generate report message failed, err=%v", err)
 	}
-	output, err := agent.React(ctx, slices.FromSingle(msg))
+	output, err := ag.React(ctx, slices.FromSingle(msg))
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "generate report output failed, err=%v", err)
 	}
+
+	slog.InfoContext(ctx, fmt.Sprintf("generate report agent usage: %+v", ag.TokenUsage()))
 
 	expect := reportExpectation{
 		Report: string(output.Content),
@@ -121,7 +112,7 @@ func (m *reportGenerator) generate(
 		llmModel,
 		modelOption,
 		expect.Report,
-		agent.AccumulatedMessages(),
+		ag.AccumulatedMessages(),
 	)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "generate title failed, err=%v", err)
@@ -163,36 +154,4 @@ func (m *reportGenerator) generateTitle(
 	title = strings.TrimSpace(title)
 
 	return title, nil
-}
-
-func (m *reportGenerator) beforeAgentRoundHook(
-	ag *bizagent.Agent[dummayState],
-) agent.BeforeRoundHook[dummayState] {
-	return func(
-		ctx context.Context,
-		round int,
-		state dummayState,
-		msgs []*einoschema.Message,
-	) ([]*einoschema.Message, error) {
-		if round >= conf.Global().Logic.Studio.Report.MaxRound-1 {
-			msgs = append(msgs, &einoschema.Message{
-				Role:    einoschema.User,
-				Content: "IMPORTANT: 这轮输出是你最后一轮输出，请直接输出最终结果，**不需要再进行工具调用**，按照你已有的信息输出最终结果",
-			})
-			ag.StripTools() // 最后一轮把工具去掉
-		}
-
-		return msgs, nil
-	}
-}
-
-func (m *reportGenerator) checkAgentSourceAccess(params *generateReportTaskParams) tool.SourceChecker {
-	// 检查当前agent是否有能够访问sourceId的权限
-	return tool.SourceCheckerFn(func(ctx context.Context, sourceId uuid.UUID) error {
-		if !stdslices.Contains(params.SourceIds, sourceId) {
-			return fmt.Errorf("not allowed to access source: %s", sourceId)
-		}
-
-		return nil
-	})
 }

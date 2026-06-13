@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"slices"
+	"strings"
 
 	"github.com/bytedance/sonic"
 	"github.com/gonotelm-lab/gonotelm/internal/app/agent"
@@ -296,13 +298,16 @@ func (s *SourceDocRetriever) agentRetrieve(
 		return nil, continuing, errors.WithMessage(err, "render retrieve source doc prompt failed")
 	}
 
+	// 执行
 	output, err := agent.React(ctx, pkgslices.FromSingle(msg))
 	if err != nil {
 		return nil, continuing, errors.WithMessage(err, "react retrieve source doc prompt failed")
 	}
 
+	slog.InfoContext(ctx, fmt.Sprintf("retrieve source doc agent usage: %+v", agent.TokenUsage()))
+
 	var expect llmRetrivalExpect
-	err = sonic.Unmarshal(pkgstring.AsBytes(output.Content), &expect)
+	err = expect.extract(ctx, output.Content)
 	if err != nil {
 		slog.ErrorContext(ctx, "unmarshal retrieve source doc expect failed",
 			slog.String("task_id", taskId), slog.Any("err", err),
@@ -359,20 +364,6 @@ func (s *SourceDocRetriever) agentRetrieve(
 	return &agentRetrivalResult{
 		intention: expect.Intention,
 	}, continuing, nil
-}
-
-type llmRetrivalExpect struct {
-	Intention      string      `json:"intention"`
-	DocIds         []uuid.UUID `json:"doc_ids"`
-	ShouldContinue *bool       `json:"should_continue,omitempty"`
-}
-
-func (e llmRetrivalExpect) Continuing() bool {
-	if e.ShouldContinue == nil {
-		return true
-	}
-
-	return *e.ShouldContinue
 }
 
 func (s *SourceDocRetriever) beforeRoundHook(
@@ -435,4 +426,66 @@ func (s *SourceDocRetriever) rerankSourceDocs(
 
 	// 只返回选中的文档
 	return pkgslices.Select(sourceDocs, selected), nil
+}
+
+type llmRetrivalExpect struct {
+	Intention      string      `json:"intention"`
+	DocIds         []uuid.UUID `json:"doc_ids"`
+	ShouldContinue *bool       `json:"should_continue,omitempty"`
+}
+
+func (e llmRetrivalExpect) Continuing() bool {
+	if e.ShouldContinue == nil {
+		return true
+	}
+
+	return *e.ShouldContinue
+}
+
+func (s *llmRetrivalExpect) extract(ctx context.Context, content string) error {
+	err := sonic.Unmarshal(pkgstring.AsBytes(content), s)
+	if err == nil {
+		return nil
+	}
+
+	slog.WarnContext(ctx, "unmarshal llm retrival expect failed",
+		slog.Any("err", err),
+		slog.String("content", content))
+
+	extracted, ok := s.tryExtract(content)
+	if !ok {
+		return nil
+	}
+
+	if err = sonic.Unmarshal(pkgstring.AsBytes(extracted), s); err != nil {
+		slog.WarnContext(ctx, "unmarshal extracted llm retrival expect failed",
+			slog.Any("err", err),
+			slog.String("content", extracted))
+	}
+
+	return nil
+}
+
+var llmRetrivalExpectJSONRegex = regexp.MustCompile(`(?s)\{[^{}]*\}`)
+
+func (s *llmRetrivalExpect) tryExtract(content string) (string, bool) {
+	candidates := llmRetrivalExpectJSONRegex.FindAllString(content, -1)
+	for _, candidate := range candidates {
+		if !strings.Contains(candidate, `"intention"`) || !strings.Contains(candidate, `"doc_ids"`) {
+			continue
+		}
+
+		var parsed llmRetrivalExpect
+		if err := sonic.Unmarshal(pkgstring.AsBytes(candidate), &parsed); err != nil {
+			continue
+		}
+
+		if parsed.Intention == "" && len(parsed.DocIds) == 0 && parsed.ShouldContinue == nil {
+			continue
+		}
+
+		return candidate, true
+	}
+
+	return "", false
 }

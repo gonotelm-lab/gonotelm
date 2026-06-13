@@ -63,7 +63,9 @@ type Agent[State any] struct {
 
 	tooledLLM eino.ToolCallingChatModel
 	tools     map[string]einotool.InvokableTool
-	accMsgs   []*EinoMessage // 累计的历史消息
+
+	accMsgs []*EinoMessage         // 累计的历史消息
+	usage   *einoschema.TokenUsage // 累计token使用
 
 	// 全部工具被调用前回调
 	beforeToolCall BeforeToolCallHook[State]
@@ -90,7 +92,20 @@ func New[State any](cfg Config[State], state State) *Agent[State] {
 		cfg.MaxRound = defaultAgentRound
 	}
 
-	return &Agent[State]{cfg: cfg, state: state, tooledLLM: cfg.BaseLLM}
+	initUsage := &einoschema.TokenUsage{
+		PromptTokens:            0,
+		PromptTokenDetails:      einoschema.PromptTokenDetails{},
+		CompletionTokens:        0,
+		TotalTokens:             0,
+		CompletionTokensDetails: einoschema.CompletionTokensDetails{},
+	}
+
+	return &Agent[State]{
+		cfg:       cfg,
+		state:     state,
+		tooledLLM: cfg.BaseLLM,
+		usage:     initUsage,
+	}
 }
 
 func (a *Agent[State]) OnReasoningStart(hook OnStartHook[State]) {
@@ -168,8 +183,12 @@ func (a *Agent[State]) StripTools() {
 	clear(a.tools)
 }
 
-func (a *Agent[State]) GetAccumulatedMessages() []*EinoMessage {
+func (a *Agent[State]) AccumulatedMessages() []*EinoMessage {
 	return a.accMsgs
+}
+
+func (a *Agent[State]) TokenUsage() einoschema.TokenUsage {
+	return *a.usage
 }
 
 func (a *Agent[State]) setAccumulatedMessages(msgs []*EinoMessage) {
@@ -256,6 +275,7 @@ func (a *Agent[State]) ReactStream(
 				finishErr = err
 			},
 			OnDone: func(msg *EinoMessage) {
+				a.updateTokenUsage(msg.ResponseMeta.Usage)
 				if msg.ResponseMeta.FinishReason == chat.FinishReasonToolCalls {
 					// 需要处理工具调用
 					toolMsgs := a.handleToolCalls(ctx, msg.ToolCalls)
@@ -267,6 +287,7 @@ func (a *Agent[State]) ReactStream(
 					if a.msgAppender != nil {
 						a.msgAppender(ctx, a.state, roundMsgs)
 					}
+
 				} else {
 					// 认为已经结束
 					msgs = append(msgs, msg)
@@ -319,6 +340,8 @@ func (a *Agent[State]) React(
 			return nil, errors.WithMessage(err, "generate chat failed")
 		}
 
+		a.updateTokenUsage(responseMsg.ResponseMeta.Usage)
+
 		if responseMsg.ResponseMeta.FinishReason == chat.FinishReasonToolCalls {
 			toolMsgs := a.handleToolCalls(ctx, responseMsg.ToolCalls)
 			roundMsgs := make([]*EinoMessage, 0, 1+len(toolMsgs))
@@ -340,6 +363,14 @@ func (a *Agent[State]) React(
 	}
 
 	return nil, errors.ErrParams.Msgf("chat round exceeded max rounds=%d", a.cfg.MaxRound)
+}
+
+func (a *Agent[State]) updateTokenUsage(usage *einoschema.TokenUsage) {
+	a.usage.PromptTokens += usage.PromptTokens
+	a.usage.PromptTokenDetails.CachedTokens += usage.PromptTokenDetails.CachedTokens
+	a.usage.CompletionTokens += usage.CompletionTokens
+	a.usage.TotalTokens += usage.TotalTokens
+	a.usage.CompletionTokensDetails.ReasoningTokens += usage.CompletionTokensDetails.ReasoningTokens
 }
 
 func (a *Agent[State]) handleBeforeChat(

@@ -121,7 +121,7 @@ func (m *reportGenerator) generate(
 		llmModel,
 		modelOption,
 		expect.Report,
-		agent.GetAccumulatedMessages(),
+		agent.AccumulatedMessages(),
 	)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "generate title failed, err=%v", err)

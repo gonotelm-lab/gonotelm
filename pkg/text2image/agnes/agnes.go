@@ -62,9 +62,15 @@ func (g *Generator) Generate(ctx context.Context, req *schema.Request, opts ...t
 		Prompt:       req.Prompt,
 		ReturnBase64: req.ResponseFormat == schema.ResponseFormatBase64,
 	}
+	if !payload.ReturnBase64 {
+		payload.ExtraBody = &apiRequestExtraBody{
+			ResponseFormat: "url",
+		}
+	}
 
 	if strings.TrimSpace(req.Size) != "" {
 		payload.Size = req.Size
+		payload.Size = schema.ConvSizeX(req.Size)
 	}
 
 	bodyBytes, err := json.Marshal(payload)
@@ -101,10 +107,15 @@ func (g *Generator) Generate(ctx context.Context, req *schema.Request, opts ...t
 // --- request payload ---
 
 type apiRequest struct {
-	Model        string `json:"model"`
-	Prompt       string `json:"prompt"`
-	Size         string `json:"size,omitempty"`
-	ReturnBase64 bool   `json:"return_base64,omitempty"`
+	Model        string               `json:"model"`
+	Prompt       string               `json:"prompt"`
+	Size         string               `json:"size,omitempty"`
+	ReturnBase64 bool                 `json:"return_base64,omitempty"`
+	ExtraBody    *apiRequestExtraBody `json:"extra_body,omitempty"`
+}
+
+type apiRequestExtraBody struct {
+	ResponseFormat string `json:"response_format,omitempty"`
 }
 
 // --- response parsing ---

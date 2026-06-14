@@ -14,9 +14,9 @@ import (
 
 func getAPIKey(t *testing.T) string {
 	t.Helper()
-	key := os.Getenv("ENV_GONOTELM_AGNES_API_KEY")
+	key := os.Getenv("GONOTELM_AGNES_API_KEY")
 	if key == "" {
-		t.Skip("ENV_GONOTELM_AGNES_APIKEY not set, skipping integration test")
+		t.Skip("GONOTELM_AGNES_APIKEY not set, skipping integration test")
 	}
 	return key
 }

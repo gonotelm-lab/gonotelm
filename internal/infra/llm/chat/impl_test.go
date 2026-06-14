@@ -11,9 +11,9 @@ import (
 func TestNew(t *testing.T) {
 	model, err := New(t.Context(), Qwen, &ProviderConfig{
 		Qwen: QwenConfig{
-			ApiKey:  os.Getenv("ENV_GONOTELM_OPENAI_API_KEY"),
-			BaseUrl: os.Getenv("ENV_GONOTELM_OPENAI_BASE_URL"),
-			Model:   os.Getenv("ENV_GONOTELM_OPENAI_MODEL"),
+			ApiKey:  os.Getenv("GONOTELM_OPENAI_API_KEY"),
+			BaseUrl: os.Getenv("GONOTELM_OPENAI_BASE_URL"),
+			Model:   os.Getenv("GONOTELM_OPENAI_MODEL"),
 		},
 	})
 	if err != nil {

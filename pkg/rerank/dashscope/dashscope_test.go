@@ -11,9 +11,9 @@ import (
 
 func getAPIKey(t *testing.T) string {
 	t.Helper()
-	key := os.Getenv("ENV_GONOTELM_DASHSCOPE_APIKEY")
+	key := os.Getenv("GONOTELM_DASHSCOPE_APIKEY")
 	if key == "" {
-		t.Skip("ENV_GONOTELM_DASHSCOPE_APIKEY not set, skipping integration test")
+		t.Skip("GONOTELM_DASHSCOPE_APIKEY not set, skipping integration test")
 	}
 	return key
 }

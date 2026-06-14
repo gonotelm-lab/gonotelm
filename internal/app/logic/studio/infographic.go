@@ -102,7 +102,6 @@ func (ig *infographicGenerator) handle(
 
 	slog.InfoContext(ctx, "generate infographic completed",
 		slog.String("task_id", task.Id.String()),
-		slog.String("title", expect.Title),
 		slog.String("store_key", storageResult.StoreKey),
 	)
 
@@ -133,7 +132,7 @@ func (ig *infographicGenerator) generate(
 		return nil, nil, err
 	}
 
-	slog.DebugContext(ctx, "generate infographic expectation",
+	slog.DebugContext(ctx, "generate infographic expectation done, now generate image",
 		slog.String("task_id", taskID.String()),
 		slog.String("title", expect.Title),
 	)

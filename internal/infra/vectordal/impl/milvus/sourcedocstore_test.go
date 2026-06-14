@@ -422,14 +422,14 @@ func TestMilvusClient_QueryIteratorWithoutMatches(t *testing.T) {
 func mustNewTestStore(t *testing.T) (*SourceDocStoreImpl, func()) {
 	t.Helper()
 
-	addr := os.Getenv("ENV_GONOTELM_MILVUS_ADDR")
+	addr := os.Getenv("GONOTELM_MILVUS_ADDR")
 	if addr == "" {
-		t.Skip("skip milvus integration test: ENV_GONOTELM_MILVUS_ADDR is empty")
+		t.Skip("skip milvus integration test: GONOTELM_MILVUS_ADDR is empty")
 	}
 
-	username := os.Getenv("ENV_GONOTELM_MILVUS_USERNAME")
-	password := os.Getenv("ENV_GONOTELM_MILVUS_PASSWORD")
-	dbName := os.Getenv("ENV_GONOTELM_MILVUS_DB_NAME")
+	username := os.Getenv("GONOTELM_MILVUS_USERNAME")
+	password := os.Getenv("GONOTELM_MILVUS_PASSWORD")
+	dbName := os.Getenv("GONOTELM_MILVUS_DB_NAME")
 	if dbName == "" {
 		dbName = "gonotelm"
 	}

@@ -19,11 +19,11 @@ import (
 var pgIdentifierPattern = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]{0,62}$`)
 
 const (
-	EnvGonotelmDBHost   = "ENV_GONOTELM_DB_HOST"
-	EnvGonotelmDBPort   = "ENV_GONOTELM_DB_PORT"
-	EnvGonotelmDBUser   = "ENV_GONOTELM_DB_USER"
-	EnvGonotelmDBPass   = "ENV_GONOTELM_DB_PASS"
-	EnvGonotelmDBDBName = "ENV_GONOTELM_DB_DBNAME"
+	EnvGonotelmDBHost   = "GONOTELM_DB_HOST"
+	EnvGonotelmDBPort   = "GONOTELM_DB_PORT"
+	EnvGonotelmDBUser   = "GONOTELM_DB_USER"
+	EnvGonotelmDBPass   = "GONOTELM_DB_PASS"
+	EnvGonotelmDBDBName = "GONOTELM_DB_DBNAME"
 )
 
 type TestDb struct {

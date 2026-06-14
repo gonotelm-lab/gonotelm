@@ -12,9 +12,9 @@ import (
 )
 
 func TestAgnesChatModel(t *testing.T) {
-	apiKey := os.Getenv("ENV_GONOTELM_AGNES_API_KEY")
+	apiKey := os.Getenv("GONOTELM_AGNES_API_KEY")
 	if apiKey == "" {
-		t.Skip("ENV_GONOTELM_AGNES_API_KEY not set, skipping test")
+		t.Skip("GONOTELM_AGNES_API_KEY not set, skipping test")
 	}
 
 	cfg := &ChatModelConfig{
@@ -52,9 +52,9 @@ func TestAgnesChatModel(t *testing.T) {
 }
 
 func TestAgnesChatModel_StreamAndThinking(t *testing.T) {
-	apiKey := os.Getenv("ENV_GONOTELM_AGNES_API_KEY")
+	apiKey := os.Getenv("GONOTELM_AGNES_API_KEY")
 	if apiKey == "" {
-		t.Skip("ENV_GONOTELM_AGNES_API_KEY not set, skipping test")
+		t.Skip("GONOTELM_AGNES_API_KEY not set, skipping test")
 	}
 
 	cfg := &ChatModelConfig{

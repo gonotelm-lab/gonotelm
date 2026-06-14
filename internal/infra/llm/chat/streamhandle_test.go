@@ -36,9 +36,9 @@ func mustNewTestModelWithTools(t *testing.T) einomodel.ToolCallingChatModel {
 
 	model, err := New(t.Context(), Openai, &ProviderConfig{
 		Openai: OpenaiConfig{
-			ApiKey:  os.Getenv("ENV_GONOTELM_OPENAI_API_KEY"),
-			BaseUrl: os.Getenv("ENV_GONOTELM_OPENAI_BASE_URL"),
-			Model:   os.Getenv("ENV_GONOTELM_OPENAI_MODEL"),
+			ApiKey:  os.Getenv("GONOTELM_OPENAI_API_KEY"),
+			BaseUrl: os.Getenv("GONOTELM_OPENAI_BASE_URL"),
+			Model:   os.Getenv("GONOTELM_OPENAI_MODEL"),
 		},
 	})
 	if err != nil {

@@ -47,17 +47,18 @@ func (o ArtifactInfoGraphicOrientation) Supported() bool {
 		o == ArtifactInfoGraphicOrientationSquare
 }
 
+// WxH
 func (o ArtifactInfoGraphicOrientation) ImageSize() string {
 	switch o {
 	case ArtifactInfoGraphicOrientationPortrait:
-		return "768*1024"
+		return "720*1280"
 	case ArtifactInfoGraphicOrientationLandscape:
-		return "1024*768"
+		return "1280*720"
 	case ArtifactInfoGraphicOrientationSquare:
-		return "1024*1024"
+		return "720*720"
 	}
 
-	return "1024*768"
+	return "720*1280"
 }
 
 type ArtifactInfoGraphicDetailLevel string

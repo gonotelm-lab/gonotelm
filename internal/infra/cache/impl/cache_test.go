@@ -17,7 +17,7 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	addrs := os.Getenv("ENV_GONOTELM_REDIS_ADDRS")
+	addrs := os.Getenv("GONOTELM_REDIS_ADDRS")
 	testRedis = redis.NewUniversalClient(&redis.UniversalOptions{
 		Addrs:                 strings.Split(addrs, ","),
 		ContextTimeoutEnabled: true,

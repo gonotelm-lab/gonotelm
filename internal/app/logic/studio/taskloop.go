@@ -152,6 +152,7 @@ func (t *taskLoop) wait() {
 	t.g.ReleaseTimeout(time.Second * 10)
 }
 
+// 在协程池中的协程中执行的任务处理
 func (t *taskLoop) handleWork(task *model.ArtifactTask) {
 	defer func() {
 		if err := recover(); err != nil {
@@ -179,7 +180,7 @@ func (t *taskLoop) handleWork(task *model.ArtifactTask) {
 		slog.String("task_kind", task.Kind.String()),
 	)
 
-	result, err := t.dispatcher.dispatch(ctx, task)
+	result, err := t.dispatcher.dispatch(ctx, task) // 执行任务
 	if err != nil {
 		slog.ErrorContext(ctx, "task handle work failed",
 			slog.Any("err", err),

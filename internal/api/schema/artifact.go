@@ -23,8 +23,18 @@ type ArtifactResult struct {
 	ContentUrl  string                   `json:"content_url,omitempty"`
 	ContentKind model.ArtifactResultKind `json:"content_kind"` // inline | storage
 
+	// contentKind=storage 时才有值
+	MimeType string `json:"mime_type"` // eg. image/png, image/jpeg, etc.
+
+	ImageInfo *ArtifactResultImageInfo `json:"image_info,omitempty"`
+
 	// either InfoGraphicArtifactExtras
 	Extras any `json:"extras,omitempty"`
+}
+
+type ArtifactResultImageInfo struct {
+	Width  int `json:"width"`
+	Height int `json:"height"`
 }
 
 type InfoGraphicArtifactExtras struct {
@@ -55,6 +65,14 @@ func ToArtifactResult(artifact *studio.Artifact) *ArtifactResult {
 		Content:     artifact.Content,
 		ContentUrl:  artifact.ContentUrl,
 		ContentKind: artifact.ResultKind,
+		MimeType:    artifact.ContentType,
+	}
+
+	if artifact.ImageInfo != nil {
+		r.ImageInfo = &ArtifactResultImageInfo{
+			Width:  artifact.ImageInfo.GetWidth(),
+			Height: artifact.ImageInfo.GetHeight(),
+		}
 	}
 
 	switch artifact.Kind {

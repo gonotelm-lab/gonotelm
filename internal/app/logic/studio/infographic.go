@@ -1,8 +1,12 @@
 package studio
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"image"
+	_ "image/jpeg"
+	_ "image/png"
 	"io"
 	"log/slog"
 	"strings"
@@ -316,8 +320,23 @@ func (ig *infographicGenerator) generateAndStoreImage(
 		return nil, errors.WithMessagef(err, "upload infographic image failed")
 	}
 
+	width, height := decodeImageConfigOrIgnore(imageData)
+
 	return &model.ArtifactStorageResult{
 		StoreKey:    storeKey,
 		ContentType: contentType,
+		Image: &model.ArtifactStorageResultImage{
+			Width:  width,
+			Height: height,
+		},
 	}, nil
+}
+
+func decodeImageConfigOrIgnore(imageData []byte) (width, height int) {
+	c, _, err := image.DecodeConfig(bytes.NewReader(imageData))
+	if err == nil {
+		return c.Width, c.Height
+	}
+
+	return
 }

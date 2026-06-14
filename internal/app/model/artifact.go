@@ -178,8 +178,30 @@ type ArtifactInlineResult struct {
 }
 
 type ArtifactStorageResult struct {
-	StoreKey    string `json:"store_key"`
-	ContentType string `json:"content_type"`
+	StoreKey    string                      `json:"store_key"`
+	ContentType string                      `json:"content_type"`
+	Image       *ArtifactStorageResultImage `json:"image,omitempty"`
+}
+
+type ArtifactStorageResultImage struct {
+	Width  int `json:"w"`
+	Height int `json:"h"`
+}
+
+func (i *ArtifactStorageResultImage) GetWidth() int {
+	if i == nil {
+		return 0
+	}
+
+	return i.Width
+}
+
+func (i *ArtifactStorageResultImage) GetHeight() int {
+	if i == nil {
+		return 0
+	}
+
+	return i.Height
 }
 
 type FlavoredArtifactTask struct {

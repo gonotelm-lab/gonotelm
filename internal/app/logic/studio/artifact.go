@@ -30,13 +30,37 @@ type Artifact struct {
 	ContentKey  string // storage
 	ContentType string
 
+	ImageInfo *ArtifactImageInfo
+
 	// 一些类型的Artifact有特有的可自定义的参数 如下定义
 	// 这些参数恢复是都是从payload中恢复
 
 	// 信息图
 	InfoGraphic *InfoGraphicExtrasParams
 
+	// 初始payload参数
 	payload []byte
+}
+
+type ArtifactImageInfo struct {
+	Width  int
+	Height int
+}
+
+func (i *ArtifactImageInfo) GetWidth() int {
+	if i != nil {
+		return i.Width
+	}
+
+	return 0
+}
+
+func (i *ArtifactImageInfo) GetHeight() int {
+	if i != nil {
+		return i.Height
+	}
+
+	return 0
 }
 
 func constructArtifact(task *model.ArtifactTask) (*Artifact, error) {
@@ -74,6 +98,12 @@ func constructArtifact(task *model.ArtifactTask) (*Artifact, error) {
 			if err := sonic.Unmarshal(task.Result, &storageResult); err == nil {
 				a.ContentKey = storageResult.StoreKey
 				a.ContentType = storageResult.ContentType
+			}
+			if storageResult.Image != nil {
+				a.ImageInfo = &ArtifactImageInfo{
+					Width:  storageResult.Image.Width,
+					Height: storageResult.Image.Height,
+				}
 			}
 		}
 	}

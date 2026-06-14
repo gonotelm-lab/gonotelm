@@ -31,7 +31,7 @@ func normalizeStudioInfoGraphicOrientation(orientation string) string {
 	case "portrait", "landscape", "square":
 		return normalized
 	default:
-		return "portrait"
+		return "landscape"
 	}
 }
 

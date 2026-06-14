@@ -73,7 +73,7 @@ func (p *InfoGraphicExtrasParams) GetOrientation() model.ArtifactInfoGraphicOrie
 		return p.Orientation
 	}
 
-	return model.ArtifactInfoGraphicOrientationPortrait
+	return model.ArtifactInfoGraphicOrientationLandscape
 }
 
 func (p *InfoGraphicExtrasParams) GetDetailLevel() model.ArtifactInfoGraphicDetailLevel {

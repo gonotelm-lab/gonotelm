@@ -132,7 +132,7 @@ func (r *GenerateInfoGraphicParameters) Validate() error {
 	}
 
 	if r.Orientation == "" {
-		r.Orientation = model.ArtifactInfoGraphicOrientationPortrait
+		r.Orientation = model.ArtifactInfoGraphicOrientationLandscape
 	}
 
 	if r.DetailLevel == "" {

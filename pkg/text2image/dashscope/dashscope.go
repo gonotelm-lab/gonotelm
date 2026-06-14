@@ -116,7 +116,7 @@ func buildParameters(req *schema.Request, callOpts *text2image.CallOptions) map[
 
 	// 从请求中设置 size
 	if strings.TrimSpace(req.Size) != "" {
-		parameters[paramSize] = req.Size
+		parameters[paramSize] = schema.ConvSizeMul(req.Size)
 	}
 
 	// 从 callOpts 中解析额外参数

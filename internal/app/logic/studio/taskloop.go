@@ -180,7 +180,8 @@ func (t *taskLoop) handleWork(task *model.ArtifactTask) {
 		slog.String("task_kind", task.Kind.String()),
 	)
 
-	result, err := t.dispatcher.dispatch(ctx, task) // 执行任务
+	// 分发+执行任务
+	result, err := t.dispatcher.dispatch(ctx, task) 
 	if err != nil {
 		slog.ErrorContext(ctx, "task handle work failed",
 			slog.Any("err", err),

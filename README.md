@@ -15,3 +15,24 @@
 
 ![GoNoteLM](docs/readme/cover.png)
 
+## Studio Showcase
+
+<table border="1" cellspacing="0" cellpadding="8">
+  <tbody>
+    <tr>
+      <td align="center" valign="top">
+        <img src="docs/readme/studio-infographic.png" alt="Studio Infographic" width="320" /><br />
+        <sub>Infographic</sub>
+      </td>
+      <td align="center" valign="top">
+        <img src="docs/readme/studio-mindmap.png" alt="Studio Mindmap" width="320" /><br />
+        <sub>Mindmap</sub>
+      </td>
+      <td align="center" valign="top">
+        <img src="docs/readme/studio-report.png" alt="Studio Report" width="320" /><br />
+        <sub>Report</sub>
+      </td>
+    </tr>
+  </tbody>
+</table>
+

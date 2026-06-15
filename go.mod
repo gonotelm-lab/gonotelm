@@ -34,6 +34,7 @@ require (
 	github.com/go-redsync/redsync/v4 v4.16.0
 	github.com/golang/snappy v1.0.0
 	github.com/gomlx/gomlx v0.27.3
+	github.com/gonotelm-lab/multimodal v0.1.0
 	github.com/google/uuid v1.6.0
 	github.com/hertz-contrib/logger/slog v1.0.0
 	github.com/klippa-app/go-pdfium v1.17.3

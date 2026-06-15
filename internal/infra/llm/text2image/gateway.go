@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	pkgt2i "github.com/gonotelm-lab/gonotelm/pkg/text2image"
+	pkgt2i "github.com/gonotelm-lab/multimodal/image"
 )
 
 // Gateway 管理项目中的 text2image 提供商实例，并按需返回对应 generator。

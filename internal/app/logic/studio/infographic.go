@@ -22,13 +22,13 @@ import (
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
-	t2ischema "github.com/gonotelm-lab/gonotelm/pkg/text2image/schema"
-	t2iutil "github.com/gonotelm-lab/gonotelm/pkg/text2image/util"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 
 	"github.com/bytedance/sonic"
 	einomodel "github.com/cloudwego/eino/components/model"
 	einoschema "github.com/cloudwego/eino/schema"
+	t2ischema "github.com/gonotelm-lab/multimodal/image/schema"
+	t2iutil "github.com/gonotelm-lab/multimodal/image/util"
 )
 
 type infographicGenerator struct {

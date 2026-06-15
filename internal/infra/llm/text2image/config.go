@@ -1,8 +1,8 @@
 package text2image
 
 import (
-	"github.com/gonotelm-lab/gonotelm/pkg/text2image/dashscope"
-	"github.com/gonotelm-lab/gonotelm/pkg/text2image/agnes"
+	"github.com/gonotelm-lab/multimodal/image/dashscope"
+	"github.com/gonotelm-lab/multimodal/image/agnes"
 )
 
 type Provider string

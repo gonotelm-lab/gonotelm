@@ -3,9 +3,9 @@ package text2image
 import (
 	"fmt"
 
-	pkgt2i "github.com/gonotelm-lab/gonotelm/pkg/text2image"
-	"github.com/gonotelm-lab/gonotelm/pkg/text2image/agnes"
-	"github.com/gonotelm-lab/gonotelm/pkg/text2image/dashscope"
+	pkgt2i "github.com/gonotelm-lab/multimodal/image"
+	"github.com/gonotelm-lab/multimodal/image/agnes"
+	"github.com/gonotelm-lab/multimodal/image/dashscope"
 )
 
 func New(

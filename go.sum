@@ -293,6 +293,8 @@ github.com/gomlx/gomlx v0.27.3/go.mod h1:gqqTny0q1kcxml72T313SZy5U9pfX9c54NmzcYt
 github.com/gomodule/redigo v1.7.1-0.20190724094224-574c33c3df38/go.mod h1:B4C85qUVwatsJoIUNIfCRsp7qO0iAmpGFZ4EELWSbC4=
 github.com/gomodule/redigo v1.9.3 h1:dNPSXeXv6HCq2jdyWfjgmhBdqnR6PRO3m/G05nvpPC8=
 github.com/gomodule/redigo v1.9.3/go.mod h1:KsU3hiK/Ay8U42qpaJk+kuNa3C+spxapWpM+ywhcgtw=
+github.com/gonotelm-lab/multimodal v0.1.0 h1:gUeefSVvcV0qJxvUu6h6tY3NXyo4z/mSxC5kGA4hmLo=
+github.com/gonotelm-lab/multimodal v0.1.0/go.mod h1:VyQmUs50KDwFzm8sRoaarP6krTNoEWg1OUfVi4P5NRs=
 github.com/google/btree v1.1.2 h1:xf4v41cLI2Z6FxbKm+8Bu+m8ifhj15JuZ9sa0jZCMUU=
 github.com/google/btree v1.1.2/go.mod h1:qOPhT0dTNdNzV6Z/lhRX0YXUafgPLFUh+gZMl761Gm4=
 github.com/google/go-cmp v0.2.0/go.mod h1:oXzfMopK8JAjlY9xF4vHSVASa0yLyX7SntLO5aqRK0M=

@@ -72,3 +72,28 @@ func TestNewChatTemplateManagerWithoutLoader(t *testing.T) {
 		t.Fatalf("expected error when loader is nil")
 	}
 }
+
+func TestPromptNew(t *testing.T) {
+	p := New("zh")
+	if p == nil {
+		t.Fatal("prompt should not be nil")
+	}
+	if p.defaultLang != "zh" {
+		t.Fatalf("unexpected default lang: %s", p.defaultLang)
+	}
+	tmpl := p.ChatTemplate("zh")
+	if tmpl == nil {
+		t.Fatal("chat template should not be nil")
+	}
+}
+
+func TestPromptRenderSummarizeMessage(t *testing.T) {
+	p := New("zh")
+	msgs, err := p.RenderSummarizeMessage(t.Context(), "测试文本", "zh")
+	if err != nil {
+		t.Fatalf("render summarize message failed: %v", err)
+	}
+	if len(msgs) != 2 {
+		t.Fatalf("expected 2 messages (system + user), got %d", len(msgs))
+	}
+}

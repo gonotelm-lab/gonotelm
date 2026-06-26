@@ -10,7 +10,8 @@ import (
 )
 
 func TestTemplateMessage(t *testing.T) {
-	tmpl := newTemplate[ChatTemplateVars](templateNameChat, "zh")
+	p := New("zh")
+	tmpl := p.ChatTemplate("zh")
 
 	msg, err := tmpl.Message(context.Background(), ChatTemplateVars{
 		Notebook: "项目笔记",
@@ -31,7 +32,7 @@ func TestTemplateMessage(t *testing.T) {
 		t.Fatalf("render message failed: %v", err)
 	}
 
-	if msg.Role != schema.System {
+	if msg.Role != schema.User {
 		t.Fatalf("unexpected role: %s", msg.Role)
 	}
 
@@ -46,7 +47,8 @@ func TestTemplateMessage(t *testing.T) {
 }
 
 func TestTemplateMessageWithoutSelectedSources_NoCitationSpec(t *testing.T) {
-	tmpl := newTemplate[ChatTemplateVars](templateNameChat, "zh")
+	p := New("zh")
+	tmpl := p.ChatTemplate("zh")
 
 	msg, err := tmpl.Message(context.Background(), ChatTemplateVars{
 		Notebook: "项目笔记",
@@ -61,7 +63,8 @@ func TestTemplateMessageWithoutSelectedSources_NoCitationSpec(t *testing.T) {
 }
 
 func TestTemplateMessageStyleVariants(t *testing.T) {
-	tmpl := newTemplate[ChatTemplateVars](templateNameChat, "zh")
+	p := New("zh")
+	tmpl := p.ChatTemplate("zh")
 
 	cases := []struct {
 		name           string
@@ -102,30 +105,29 @@ func TestTemplateMessageStyleVariants(t *testing.T) {
 }
 
 func TestTemplateDefaultLang(t *testing.T) {
-	tmpl, err := NewChatTemplate("")
-	if err != nil {
-		t.Fatalf("new template with default lang failed: %v", err)
-	}
+	p := New("zh")
+	tmpl := p.ChatTemplate("zh")
 
 	msg, err := tmpl.Message(context.Background(), ChatTemplateVars{})
 	if err != nil {
 		t.Fatalf("render default lang message failed: %v", err)
 	}
 
-	if msg.Role != schema.System {
+	if msg.Role != schema.User {
 		t.Fatalf("unexpected role: %s", msg.Role)
 	}
 }
 
 func TestTemplateUnknownLang(t *testing.T) {
-	tmpl := newTemplate[ChatTemplateVars](templateNameChat, "en")
+	p := New("zh")
+	tmpl := p.ChatTemplate("en")
 
 	msg, err := tmpl.Message(context.Background(), ChatTemplateVars{})
 	if err != nil {
 		t.Fatalf("render fallback lang message failed: %v", err)
 	}
 
-	if msg.Role != schema.System {
+	if msg.Role != schema.User {
 		t.Fatalf("unexpected role: %s", msg.Role)
 	}
 }

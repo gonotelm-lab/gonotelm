@@ -1,10 +1,7 @@
 package prompt
 
 import (
-	"context"
 	"strings"
-
-	"github.com/cloudwego/eino/schema"
 )
 
 type StudioInfoGraphicTemplateVars struct {
@@ -47,20 +44,3 @@ func normalizeStudioInfoGraphicDetailLevel(level string) string {
 
 type StudioInfoGraphicTemplate = template[StudioInfoGraphicTemplateVars]
 
-func NewStudioInfoGraphicTemplate(lang string) *StudioInfoGraphicTemplate {
-	return newTemplate[StudioInfoGraphicTemplateVars](templateNameStudioInfographic, lang)
-}
-
-func RenderStudioInfoGraphicMessage(
-	ctx context.Context,
-	vars StudioInfoGraphicTemplateVars,
-	lang string,
-) ([]*schema.Message, error) {
-	tmpl := NewStudioInfoGraphicTemplate(lang)
-	msg, err := tmpl.Message(ctx, vars)
-	if err != nil {
-		return nil, err
-	}
-
-	return prependSystemMessage([]*schema.Message{msg}), nil
-}

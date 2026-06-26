@@ -62,7 +62,7 @@ func (v ChatTemplateVars) PromptVars() map[string]any {
 
 type ChatTemplate = template[ChatTemplateVars]
 
-func NewChatTemplate(lang string) (*ChatTemplate, error) {
+func newChatTemplate(lang string) (*ChatTemplate, error) {
 	return newTemplate[ChatTemplateVars](templateNameChat, lang), nil
 }
 
@@ -85,7 +85,7 @@ type ChatTemplateManager struct {
 }
 
 func NewChatTemplateManager(defaultLanguage string) (*ChatTemplateManager, error) {
-	return newChatTemplateManager(defaultLanguage, NewChatTemplate)
+	return newChatTemplateManager(defaultLanguage, newChatTemplate)
 }
 
 func newChatTemplateManager(

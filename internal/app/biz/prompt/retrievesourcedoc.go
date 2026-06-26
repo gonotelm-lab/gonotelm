@@ -1,10 +1,7 @@
 package prompt
 
 import (
-	"context"
 	"strings"
-
-	"github.com/cloudwego/eino/schema"
 )
 
 type RetrieveSource struct {
@@ -33,30 +30,6 @@ func (v RetrieveSourceDocTemplateVars) PromptVars() map[string]any {
 }
 
 type RetrieveSourceDocTemplate = template[RetrieveSourceDocTemplateVars]
-
-func NewRetrieveSourceDocTemplate(lang string) *RetrieveSourceDocTemplate {
-	return newTemplate[RetrieveSourceDocTemplateVars](templateNameRetrieveSourceDoc, lang)
-}
-
-func RenderRetrieveSourceDocMessage(
-	ctx context.Context,
-	question string,
-	notebookId string,
-	sources []*RetrieveSource,
-	lang string,
-) ([]*schema.Message, error) {
-	tmpl := NewRetrieveSourceDocTemplate(lang)
-	msg, err := tmpl.Message(ctx, RetrieveSourceDocTemplateVars{
-		Question:   question,
-		NotebookId: notebookId,
-		Sources:    sources,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return prependSystemMessage([]*schema.Message{msg}), nil
-}
 
 func normalizeRetrieveSources(sources []*RetrieveSource) []*RetrieveSource {
 	normalized := make([]*RetrieveSource, 0, len(sources))

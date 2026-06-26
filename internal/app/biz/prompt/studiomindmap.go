@@ -1,11 +1,8 @@
 package prompt
 
 import (
-	"context"
 	"regexp"
 	"strings"
-
-	"github.com/cloudwego/eino/schema"
 )
 
 var studioMindmapRootLineRegexp = regexp.MustCompile(`^\s*root\(\(.+\)\)\s*$`)
@@ -50,59 +47,6 @@ func (v StudioMindmapTemplateVars) PromptVars() map[string]any {
 }
 
 type StudioMindmapTemplate = template[StudioMindmapTemplateVars]
-
-func NewStudioMindmapTemplate(lang string) *StudioMindmapTemplate {
-	return newTemplate[StudioMindmapTemplateVars](templateNameStudioMindmap, lang)
-}
-
-func RenderStudioMindmapContentMessage(
-	ctx context.Context,
-	contents []string,
-	lang string,
-) ([]*schema.Message, error) {
-	return RenderStudioMindmapMessageWithMode(
-		ctx,
-		StudioMindmapModeContent,
-		contents,
-		nil,
-		lang,
-	)
-}
-
-func RenderStudioMindmapAbstractMessage(
-	ctx context.Context,
-	abstracts []string,
-	lang string,
-) ([]*schema.Message, error) {
-	return RenderStudioMindmapMessageWithMode(
-		ctx,
-		StudioMindmapModeAbstract,
-		nil,
-		abstracts,
-		lang,
-	)
-}
-
-func RenderStudioMindmapMessageWithMode(
-	ctx context.Context,
-	mode string,
-	contents []string,
-	abstracts []string,
-	lang string,
-) ([]*schema.Message, error) {
-	tmpl := NewStudioMindmapTemplate(lang)
-	msg, err := tmpl.Message(ctx,
-		StudioMindmapTemplateVars{
-			Mode:      mode,
-			Contents:  contents,
-			Abstracts: abstracts,
-		})
-	if err != nil {
-		return nil, err
-	}
-
-	return prependSystemMessage([]*schema.Message{msg}), nil
-}
 
 // 检查大模型返回的思维导图输出是否符合格式
 func CheckStudioMindmapResult(content string) bool {

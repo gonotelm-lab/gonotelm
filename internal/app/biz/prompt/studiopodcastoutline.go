@@ -1,10 +1,6 @@
 package prompt
 
-import (
-	"context"
-
-	einoschema "github.com/cloudwego/eino/schema"
-)
+import ()
 
 type PodcastStyle string
 
@@ -135,36 +131,3 @@ func (v StudioPodcastOutlineTemplateVars) PromptVars() map[string]any {
 
 type StudioPodcastOutlineTemplate = template[StudioPodcastOutlineTemplateVars]
 
-func NewStudioPodcastOutlineTemplate(lang string) *StudioPodcastOutlineTemplate {
-	return newTemplate[StudioPodcastOutlineTemplateVars](templateNameStudioPodcastOutline, lang)
-}
-
-func RenderStudioPodcastOutlineMessage(
-	ctx context.Context,
-	sourceIds []string,
-	lang string,
-	tips string,
-	style PodcastStyle,
-) ([]*einoschema.Message, error) {
-	tmpl := NewStudioPodcastOutlineTemplate(lang)
-	vars := StudioPodcastOutlineTemplateVars{
-		SourceIds: sourceIds,
-		Language:  lang,
-		Tips:      tips,
-	}
-	info, ok := builtinPodcastInfos[style]
-	if !ok {
-		info = builtinPodcastInfos[PodcastStyleAbstract]
-	}
-	vars.Style = info.Style
-	vars.StyleDesc = info.Description
-	vars.Speakers = info.Speakers
-	vars.NumOfSegments = info.NumOfSegments
-
-	msg, err := tmpl.Message(ctx, vars)
-	if err != nil {
-		return nil, err
-	}
-
-	return prependSystemMessage([]*einoschema.Message{msg}), nil
-}

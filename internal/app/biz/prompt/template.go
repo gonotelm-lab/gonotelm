@@ -155,3 +155,7 @@ func normalizeTemplateName(name templateName) templateName {
 	normalizedName := templateName(strings.TrimSpace(string(name)))
 	return normalizedName
 }
+
+func fromMessages(tplType schema.FormatType, msgs ...schema.MessagesTemplate) prompt.ChatTemplate {
+	return prompt.FromMessages(tplType, msgs...)
+}

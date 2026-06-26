@@ -14,7 +14,7 @@ import (
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
-	"github.com/gonotelm-lab/gonotelm/internal/app/prompts"
+	"github.com/gonotelm-lab/gonotelm/internal/app/prompt"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
@@ -31,16 +31,16 @@ import (
 	t2iutil "github.com/gonotelm-lab/multimodal/image/util"
 )
 
-type infographicGenerator struct {
+type infoGraphicGenerator struct {
 	l *Logic
 }
 
 var (
-	_ taskHandler       = &infographicGenerator{}
-	_ iCommonTaskParams = &generateInfographicTaskParams{}
+	_ taskHandler       = &infoGraphicGenerator{}
+	_ iCommonTaskParams = &generateInfoGraphicTaskParams{}
 )
 
-type generateInfographicTaskParams struct {
+type generateInfoGraphicTaskParams struct {
 	*commonTaskParams
 	*InfoGraphicExtrasParams
 }
@@ -84,11 +84,11 @@ func (p *InfoGraphicExtrasParams) GetDetailLevel() model.ArtifactInfoGraphicDeta
 	return model.ArtifactInfoGraphicDetailLevelStandard
 }
 
-func (ig *infographicGenerator) handle(
+func (ig *infoGraphicGenerator) handle(
 	ctx context.Context,
 	task *model.ArtifactTask,
 ) (*taskHandleResult, error) {
-	var params generateInfographicTaskParams
+	var params generateInfoGraphicTaskParams
 	err := sonic.Unmarshal(task.Payload, &params)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrSerde, "unmarshal generate infographic task params err=%v", err)
@@ -124,10 +124,10 @@ type infographicExpectation struct {
 // 生成信息图
 //
 // step: 1. 使用 LLM 生成文生图的 prompt; 2. 使用文生图模型生成一张图片
-func (ig *infographicGenerator) generate(
+func (ig *infoGraphicGenerator) generate(
 	ctx context.Context,
 	taskID uuid.UUID,
-	params *generateInfographicTaskParams,
+	params *generateInfoGraphicTaskParams,
 ) (*infographicExpectation, *model.ArtifactStorageResult, error) {
 	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioInfographicScene)
 
@@ -151,9 +151,9 @@ func (ig *infographicGenerator) generate(
 	return expect, storageResult, nil
 }
 
-func (ig *infographicGenerator) generateImagePrompt(
+func (ig *infoGraphicGenerator) generateImagePrompt(
 	ctx context.Context,
-	params *generateInfographicTaskParams,
+	params *generateInfoGraphicTaskParams,
 ) (*infographicExpectation, error) {
 	cfg := conf.Global().Logic.Studio.InfoGraphic
 	modelOption := llmchat.WithModel(cfg.Model)
@@ -172,8 +172,8 @@ func (ig *infographicGenerator) generateImagePrompt(
 		return nil, errors.WithMessagef(err, "failed to build source explore agent for infographic")
 	}
 
-	msgs, err := prompts.RenderStudioInfoGraphicMessage(ctx,
-		prompts.StudioInfoGraphicTemplateVars{
+	msgs, err := prompt.RenderStudioInfoGraphicMessage(ctx,
+		prompt.StudioInfoGraphicTemplateVars{
 			SourceIds:    sourceIDsToStrings(params.SourceIds),
 			TextLanguage: params.GetTextLanguage(),
 			ExtraPrompt:  params.GetExtraPrompt(),
@@ -239,7 +239,7 @@ func (ig *infographicGenerator) generateImagePrompt(
 	)
 }
 
-func (ig *infographicGenerator) parseAgentOutput(
+func (ig *infoGraphicGenerator) parseAgentOutput(
 	ctx context.Context,
 	content string,
 ) (*infographicExpectation, error) {
@@ -272,10 +272,10 @@ func (ig *infographicGenerator) parseAgentOutput(
 	return &expect, nil
 }
 
-func (ig *infographicGenerator) generateAndStoreImage(
+func (ig *infoGraphicGenerator) generateAndStoreImage(
 	ctx context.Context,
 	taskID uuid.UUID,
-	params *generateInfographicTaskParams,
+	params *generateInfoGraphicTaskParams,
 	imagePrompt string,
 ) (*model.ArtifactStorageResult, error) {
 	cfg := conf.Global().Logic.Studio.InfoGraphic

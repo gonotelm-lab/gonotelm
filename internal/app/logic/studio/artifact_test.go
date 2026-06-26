@@ -11,7 +11,7 @@ import (
 )
 
 func TestPayload_GetNotebookID(t *testing.T) {
-	p := &generateInfographicTaskParams{
+	p := &generateInfoGraphicTaskParams{
 		commonTaskParams: &commonTaskParams{
 			NotebookId: uuid.NewV7(),
 		},

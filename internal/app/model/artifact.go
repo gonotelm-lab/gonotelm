@@ -8,15 +8,17 @@ import (
 type ArtifactKind string
 
 const (
-	ArtifactKindMindmap     ArtifactKind = "mindmap"
-	ArtifactKindReport      ArtifactKind = "report"
-	ArtifactKindInfoGraphic ArtifactKind = "info_graphic"
+	ArtifactKindMindmap       ArtifactKind = "mindmap"
+	ArtifactKindReport        ArtifactKind = "report"
+	ArtifactKindInfoGraphic   ArtifactKind = "info_graphic"
+	ArtifactKindAudioOverview ArtifactKind = "audio_overview"
 )
 
 var validArtifactKinds = map[ArtifactKind]struct{}{
-	ArtifactKindMindmap:     {},
-	ArtifactKindReport:      {},
-	ArtifactKindInfoGraphic: {},
+	ArtifactKindMindmap:       {},
+	ArtifactKindReport:        {},
+	ArtifactKindInfoGraphic:   {},
+	ArtifactKindAudioOverview: {},
 }
 
 func (k ArtifactKind) String() string {
@@ -77,6 +79,26 @@ func (l ArtifactInfoGraphicDetailLevel) Supported() bool {
 	return l == ArtifactInfoGraphicDetailLevelConcise ||
 		l == ArtifactInfoGraphicDetailLevelStandard ||
 		l == ArtifactInfoGraphicDetailLevelDetailed
+}
+
+type ArtifactAudioOverviewStyle string
+
+const (
+	ArtifactAudioOverviewStyleDeepResearch ArtifactAudioOverviewStyle = "deep-research"
+	ArtifactAudioOverviewStyleAbstract     ArtifactAudioOverviewStyle = "abstract"
+	ArtifactAudioOverviewStyleDiscussion   ArtifactAudioOverviewStyle = "discussion"
+	ArtifactAudioOverviewStyleDebate       ArtifactAudioOverviewStyle = "debate"
+)
+
+func (s ArtifactAudioOverviewStyle) String() string {
+	return string(s)
+}
+
+func (s ArtifactAudioOverviewStyle) Supported() bool {
+	return s == ArtifactAudioOverviewStyleDeepResearch ||
+		s == ArtifactAudioOverviewStyleAbstract ||
+		s == ArtifactAudioOverviewStyleDiscussion ||
+		s == ArtifactAudioOverviewStyleDebate
 }
 
 type ArtifactStatus string

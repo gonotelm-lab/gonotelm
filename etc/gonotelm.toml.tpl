@@ -81,12 +81,17 @@ maxRound = ${GONOTELM_LOGIC_STUDIO_REPORT_MAX_ROUND:-50}
 modelProvider = "${GONOTELM_LOGIC_STUDIO_REPORT_PROVIDER:-deepseek}"
 model = "${GONOTELM_LOGIC_STUDIO_REPORT_MODEL:-deepseek-v4-flash}"
 
-[logic.studio.infographic]
+[logic.studio.infoGraphic]
 maxRound = ${GONOTELM_LOGIC_STUDIO_INFOGRAPHIC_MAX_ROUND:-50}
 modelProvider = "${GONOTELM_LOGIC_STUDIO_INFOGRAPHIC_PROVIDER:-deepseek}"
 model = "${GONOTELM_LOGIC_STUDIO_INFOGRAPHIC_MODEL:-deepseek-v4-flash}"
 imageModelProvider = "${GONOTELM_LOGIC_STUDIO_INFOGRAPHIC_IMAGE_MODEL_PROVIDER:-dashscope}"
 imageModel = "${GONOTELM_LOGIC_STUDIO_INFOGRAPHIC_IMAGE_MODEL:-qwen-image-2.0-pro}"
+
+[logic.studio.audioOverview]
+maxRound = ${GONOTELM_LOGIC_STUDIO_AUDIOOVERVIEW_MAX_ROUND:-50}
+modelProvider = "${GONOTELM_LOGIC_STUDIO_AUDIOOVERVIEW_PROVIDER:-deepseek}"
+model = "${GONOTELM_LOGIC_STUDIO_AUDIOOVERVIEW_MODEL:-deepseek-v4-flash}"
 
 [chunking]
 size = ${GONOTELM_CHUNKING_SIZE:-500}

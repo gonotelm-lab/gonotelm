@@ -11,7 +11,7 @@ import (
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
-	"github.com/gonotelm-lab/gonotelm/internal/app/prompts"
+	"github.com/gonotelm-lab/gonotelm/internal/app/prompt"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/mq"
@@ -326,7 +326,7 @@ func (l *Logic) generateNotebookSummary(
 	}
 
 	// generate prompt message
-	msgs, err := prompts.RenderNotebookSummaryMessage(
+	msgs, err := prompt.RenderNotebookSummaryMessage(
 		ctx, abstracts, pkgcontext.GetLang(ctx),
 	)
 	if err != nil {

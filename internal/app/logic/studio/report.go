@@ -8,7 +8,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
-	"github.com/gonotelm-lab/gonotelm/internal/app/prompts"
+	"github.com/gonotelm-lab/gonotelm/internal/app/prompt"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
@@ -87,7 +87,7 @@ func (m *reportGenerator) generate(
 	}
 
 	sourceIds := sourceIDsToStrings(params.SourceIds)
-	msgs, err := prompts.RenderStudioReportMessage(ctx, sourceIds, lang)
+	msgs, err := prompt.RenderStudioReportMessage(ctx, sourceIds, lang)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "generate report message failed, err=%v", err)
 	}
@@ -125,7 +125,7 @@ func (m *reportGenerator) generateTitle(
 	previousMsgs []*einoschema.Message,
 ) (string, error) {
 	title := ""
-	titleMakerMsgs, err := prompts.RenderTitleMakerMessage(
+	titleMakerMsgs, err := prompt.RenderTitleMakerMessage(
 		ctx, report, pkgcontext.GetLang(ctx),
 	)
 	if err != nil {

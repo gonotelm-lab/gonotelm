@@ -1,4 +1,4 @@
-package prompts
+package prompt
 
 import (
 	"context"
@@ -28,6 +28,7 @@ const (
 	templateNameStudioReport      templateName = "studio-report"
 	templateNameStudioInfographic templateName = "studio-infographic"
 	templateNameTitleMaker        templateName = "title-maker"
+	templateNameStudioPodcastOutline templateName = "studio-podcast-outline"
 )
 
 //go:embed */*.jinja

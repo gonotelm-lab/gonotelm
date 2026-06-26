@@ -85,7 +85,8 @@ func (l *Logic) initBackgroundWorks() {
 	dispatcher := newTaskDispatcher()
 	dispatcher.register(model.ArtifactKindMindmap, &mindmapGenerator{l: l})
 	dispatcher.register(model.ArtifactKindReport, &reportGenerator{l: l})
-	dispatcher.register(model.ArtifactKindInfoGraphic, &infographicGenerator{l: l})
+	dispatcher.register(model.ArtifactKindInfoGraphic, &infoGraphicGenerator{l: l})
+	dispatcher.register(model.ArtifactKindAudioOverview, &audioOverviewGenerator{l: l})
 
 	cfg := conf.Global().Logic.Studio.TaskConfig
 
@@ -110,6 +111,9 @@ type GenerateArtifactParams struct {
 
 	// InfoGraphic extras paramters
 	InfoGraphic *InfoGraphicExtrasParams
+
+	// AudioOverview extras paramters
+	AudioOverview *AudioOverviewExtrasParams
 }
 
 func (l *Logic) GenerateArtifact(
@@ -141,9 +145,14 @@ func (l *Logic) GenerateArtifact(
 	case model.ArtifactKindReport:
 		taskParams = &generateReportTaskParams{commonTaskParams: &commonTaskParams}
 	case model.ArtifactKindInfoGraphic:
-		taskParams = &generateInfographicTaskParams{
+		taskParams = &generateInfoGraphicTaskParams{
 			commonTaskParams:        &commonTaskParams,
 			InfoGraphicExtrasParams: params.InfoGraphic,
+		}
+	case model.ArtifactKindAudioOverview:
+		taskParams = &generateAudioOverviewTaskParams{
+			commonTaskParams:          &commonTaskParams,
+			AudioOverviewExtrasParams: params.AudioOverview,
 		}
 	default:
 		return uuid.EmptyUUID(), errors.ErrParams.Msgf("unsupported artifact kind: %s", params.Kind)

@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/gonotelm-lab/gonotelm/internal/app/prompts"
+	"github.com/gonotelm-lab/gonotelm/internal/app/prompt"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
@@ -38,7 +38,7 @@ func (t *titlemakerImpl) Generate(ctx context.Context, text string) (string, err
 
 func (t *titlemakerImpl) GenerateWith(ctx context.Context, provider chat.Provider, model string, text string) (string, error) {
 	lang := pkgcontext.GetLang(ctx)
-	msgs, err := prompts.RenderTitleMakerMessage(ctx, text, lang)
+	msgs, err := prompt.RenderTitleMakerMessage(ctx, text, lang)
 	if err != nil {
 		return "", errors.Wrapf(errors.ErrInner, "render title maker prompt failed, err=%v", err)
 	}

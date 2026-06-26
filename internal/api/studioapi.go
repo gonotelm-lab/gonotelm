@@ -104,6 +104,8 @@ type GenerateStudioArtifactRequest struct {
 
 	// 仅在 kind=infographic 时有效
 	InfoGraphic *GenerateInfoGraphicParameters `json:"info_graphic,omitempty"`
+	// 仅在 kind=audio_overview 时有效
+	AudioOverview *GenerateAudioOverviewParameters `json:"audio_overview,omitempty"`
 }
 
 type GenerateInfoGraphicParameters struct {
@@ -150,6 +152,44 @@ func (r *GenerateInfoGraphicParameters) Validate() error {
 	return nil
 }
 
+type GenerateAudioOverviewParameters struct {
+	Tip      string                           `json:"tip,omitempty"`
+	Language string                           `json:"language,omitempty"`
+	Style    model.ArtifactAudioOverviewStyle `json:"style,omitempty"`
+}
+
+func (r *GenerateAudioOverviewParameters) To() *studiologic.AudioOverviewExtrasParams {
+	if r == nil {
+		return nil
+	}
+
+	return &studiologic.AudioOverviewExtrasParams{
+		Tip:      r.Tip,
+		Language: r.Language,
+		Style:    r.Style,
+	}
+}
+
+func (r *GenerateAudioOverviewParameters) Validate() error {
+	if r == nil {
+		return errors.ErrParams.Msgf("audio overview parameters is required")
+	}
+
+	if r.Language == "" {
+		return errors.ErrParams.Msgf("language is required")
+	}
+
+	if r.Style == "" {
+		r.Style = model.ArtifactAudioOverviewStyleAbstract
+	}
+
+	if !r.Style.Supported() {
+		return errors.ErrParams.Msgf("invalid audio overview style: %s", r.Style)
+	}
+
+	return nil
+}
+
 func (r *GenerateStudioArtifactRequest) Validate() error {
 	if !r.Kind.Supported() {
 		return errors.ErrParams.Msgf("invalid artifact kind: %s", r.Kind)
@@ -158,6 +198,8 @@ func (r *GenerateStudioArtifactRequest) Validate() error {
 	switch r.Kind {
 	case model.ArtifactKindInfoGraphic:
 		return r.InfoGraphic.Validate()
+	case model.ArtifactKindAudioOverview:
+		return r.AudioOverview.Validate()
 	}
 
 	return nil
@@ -177,10 +219,11 @@ func (s *Server) GenerateStudioArtifact(ctx context.Context, c *app.RequestConte
 
 	resp, err := s.studioLogic.GenerateArtifact(ctx,
 		&studiologic.GenerateArtifactParams{
-			NotebookId:  req.NotebookId,
-			Kind:        req.Kind,
-			SourceIds:   req.SourceIds,
-			InfoGraphic: req.InfoGraphic.To(),
+			NotebookId:    req.NotebookId,
+			Kind:          req.Kind,
+			SourceIds:     req.SourceIds,
+			InfoGraphic:   req.InfoGraphic.To(),
+			AudioOverview: req.AudioOverview.To(),
 		},
 	)
 	if err != nil {

@@ -11,7 +11,7 @@ import (
 	"github.com/bytedance/sonic"
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
-	"github.com/gonotelm-lab/gonotelm/internal/app/prompts"
+	"github.com/gonotelm-lab/gonotelm/internal/app/prompt"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
@@ -166,9 +166,9 @@ func (m *mindmapGenerator) oneshotCreateMindmap(
 	)
 
 	if mode == mindmapAbstractMode {
-		msgs, err = prompts.RenderStudioMindmapAbstractMessage(ctx, tmps, lang)
+		msgs, err = prompt.RenderStudioMindmapAbstractMessage(ctx, tmps, lang)
 	} else {
-		msgs, err = prompts.RenderStudioMindmapContentMessage(ctx, tmps, lang)
+		msgs, err = prompt.RenderStudioMindmapContentMessage(ctx, tmps, lang)
 	}
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner,
@@ -193,7 +193,7 @@ func (m *mindmapGenerator) oneshotCreateMindmap(
 
 		var expect mindmapExpectation
 		err = sonic.Unmarshal(pkgstring.AsBytes(llmResp.Content), &expect)
-		if err != nil || !prompts.CheckStudioMindmapResult(expect.Mindmap) {
+		if err != nil || !prompt.CheckStudioMindmapResult(expect.Mindmap) {
 			// 给多一次机会
 			var builder strings.Builder
 			builder.WriteString("你刚才生成的思维导图不符合要求的格式，请重新输出，这个是你当前生成的结果:\n")
@@ -302,7 +302,7 @@ func (m *mindmapGenerator) agentCreateMindmap(
 	}
 
 	sourceIds := sourceIDsToStrings(decodedSourcesToSourceIDs(sources))
-	msgs, err := prompts.RenderStudioMindmapV2Message(ctx, sourceIds, pkgcontext.GetLang(ctx))
+	msgs, err := prompt.RenderStudioMindmapV2Message(ctx, sourceIds, pkgcontext.GetLang(ctx))
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "generate mindmap message failed, err=%v", err)
 	}
@@ -392,7 +392,7 @@ func (m *mindmapGenerator) parseAgentOutput(ctx context.Context, content string)
 		expect.Title = pkgstring.TruncateRune(expect.Title, mindmapTitleMaxLen)
 	}
 
-	if !prompts.CheckStudioMindmapResult(expect.Mindmap) {
+	if !prompt.CheckStudioMindmapResult(expect.Mindmap) {
 		return nil, fmt.Errorf("mindmap format invalid")
 	}
 

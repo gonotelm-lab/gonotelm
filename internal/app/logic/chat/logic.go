@@ -10,7 +10,7 @@ import (
 	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
 	chatmodel "github.com/gonotelm-lab/gonotelm/internal/app/model/chat"
-	"github.com/gonotelm-lab/gonotelm/internal/app/prompts"
+	"github.com/gonotelm-lab/gonotelm/internal/app/prompt"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/rerank"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
@@ -31,7 +31,7 @@ type Logic struct {
 	sourceDocRetriever *SourceDocRetriever
 
 	llmGateway          *gateway.Gateway
-	chatTemplateManager *prompts.ChatTemplateManager
+	chatTemplateManager *prompt.ChatTemplateManager
 }
 
 func MustNewLogic(
@@ -43,7 +43,7 @@ func MustNewLogic(
 	chatBiz *bizchat.Biz,
 	eventManager *bizchat.ChatEventManager,
 ) *Logic {
-	chatTemplateManager, err := prompts.NewChatTemplateManager(defaultPromptLang)
+	chatTemplateManager, err := prompt.NewChatTemplateManager(defaultPromptLang)
 	if err != nil {
 		panic(err)
 	}

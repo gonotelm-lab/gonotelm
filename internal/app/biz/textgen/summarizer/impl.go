@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/gonotelm-lab/gonotelm/internal/app/prompts"
+	"github.com/gonotelm-lab/gonotelm/internal/app/prompt"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
@@ -43,7 +43,7 @@ func (s *summazierImpl) SummarizeWith(
 	text string,
 ) (string, error) {
 	lang := pkgcontext.GetLang(ctx)
-	msgs, err := prompts.RenderSummarizeMessage(ctx, text, lang)
+	msgs, err := prompt.RenderSummarizeMessage(ctx, text, lang)
 	if err != nil {
 		return "", errors.Wrapf(errors.ErrInner, "render summarize prompt failed, err=%v", err)
 	}

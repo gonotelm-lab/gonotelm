@@ -13,7 +13,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/app/agent/tool"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
-	"github.com/gonotelm-lab/gonotelm/internal/app/prompts"
+	"github.com/gonotelm-lab/gonotelm/internal/app/prompt"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
@@ -271,7 +271,7 @@ func (s *SourceDocRetriever) agentRetrieve(
 		sourcesMap[source.Id] = source
 	}
 
-	promptSources := make([]*prompts.RetrieveSource, 0, len(sources))
+	promptSources := make([]*prompt.RetrieveSource, 0, len(sources))
 	for _, id := range sourceIds {
 		var name, abstract string
 		source, ok := sourcesMap[id]
@@ -280,14 +280,14 @@ func (s *SourceDocRetriever) agentRetrieve(
 			abstract = source.Abstract
 		}
 
-		promptSources = append(promptSources, &prompts.RetrieveSource{
+		promptSources = append(promptSources, &prompt.RetrieveSource{
 			Id:       id.String(),
 			Name:     name,
 			Abstract: abstract,
 		})
 	}
 
-	msgs, err := prompts.RenderRetrieveSourceDocMessage(
+	msgs, err := prompt.RenderRetrieveSourceDocMessage(
 		ctx,
 		userPrompt,
 		notebookId.String(),

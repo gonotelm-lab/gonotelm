@@ -95,7 +95,13 @@ type StudioLogicConfig struct {
 		Model              string              `toml:"model"`
 		ImageModelProvider text2image.Provider `toml:"imageModelProvider"`
 		ImageModel         string              `toml:"imageModel"`
-	} `toml:"infographic"`
+	} `toml:"infoGraphic"`
+
+	AudioOverview struct {
+		MaxRound      int           `toml:"maxRound"`
+		ModelProvider chat.Provider `toml:"modelProvider"`
+		Model         string        `toml:"model"`
+	} `toml:"audioOverview"`
 
 	TaskConfig struct {
 		NumClaimers        int           `toml:"numClaimers"`

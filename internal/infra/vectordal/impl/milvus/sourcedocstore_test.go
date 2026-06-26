@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/schema"
-	pkgerrors "github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/milvus-io/milvus/client/v2/milvusclient"
 	. "github.com/smartystreets/goconvey/convey"
 )
@@ -261,7 +261,7 @@ func TestSourceDocStore_BatchGetWithoutMatches(t *testing.T) {
 		})
 		So(docs, ShouldBeNil)
 		So(err, ShouldNotBeNil)
-		So(pkgerrors.Is(err, pkgerrors.ErrNoRecord), ShouldBeTrue)
+		So(errors.Is(err, errors.ErrNoRecord), ShouldBeTrue)
 	})
 }
 
@@ -341,7 +341,7 @@ func TestSourceDocStore_GetWithoutMatches(t *testing.T) {
 		})
 		So(doc, ShouldBeNil)
 		So(err, ShouldNotBeNil)
-		So(pkgerrors.Is(err, pkgerrors.ErrNoRecord), ShouldBeTrue)
+		So(errors.Is(err, errors.ErrNoRecord), ShouldBeTrue)
 	})
 }
 

@@ -386,7 +386,7 @@ func (l *Logic) agentBeforeChatHook(
 	msgs []*einoschema.Message) (
 	[]*einoschema.Message, error,
 ) {
-	chatTemplate := l.chatTemplateManager.Get(state.userLang)
+	chatTemplate := l.prompt.ChatTemplate(state.userLang)
 	templateVars := buildChatTemplateVars(state)
 
 	systemPrompt, err := chatTemplate.Message(ctx, templateVars)

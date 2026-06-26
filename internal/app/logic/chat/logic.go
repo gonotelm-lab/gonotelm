@@ -10,7 +10,7 @@ import (
 	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
 	chatmodel "github.com/gonotelm-lab/gonotelm/internal/app/model/chat"
-	"github.com/gonotelm-lab/gonotelm/internal/app/prompt"
+	bizprompt "github.com/gonotelm-lab/gonotelm/internal/app/biz/prompt"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/rerank"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
@@ -20,8 +20,6 @@ import (
 	einoschema "github.com/cloudwego/eino/schema"
 )
 
-const defaultPromptLang = "zh"
-
 type Logic struct {
 	wg                 sync.WaitGroup
 	notebookBiz        *biznotebook.Biz
@@ -30,8 +28,8 @@ type Logic struct {
 	eventManager       *bizchat.ChatEventManager
 	sourceDocRetriever *SourceDocRetriever
 
-	llmGateway          *gateway.Gateway
-	chatTemplateManager *prompt.ChatTemplateManager
+	llmGateway *gateway.Gateway
+	prompt     *bizprompt.Prompt
 }
 
 func MustNewLogic(
@@ -42,20 +40,16 @@ func MustNewLogic(
 	agentSourceBiz *bizsource.AgentBiz,
 	chatBiz *bizchat.Biz,
 	eventManager *bizchat.ChatEventManager,
+	prompt *bizprompt.Prompt,
 ) *Logic {
-	chatTemplateManager, err := prompt.NewChatTemplateManager(defaultPromptLang)
-	if err != nil {
-		panic(err)
-	}
-
 	logic := &Logic{
-		notebookBiz:         notebookBiz,
-		sourceBiz:           sourceBiz,
-		chatBiz:             chatBiz,
-		eventManager:        eventManager,
-		llmGateway:          llmGateway,
-		chatTemplateManager: chatTemplateManager,
-		sourceDocRetriever:  NewSourceDocRetriever(sourceBiz, agentSourceBiz, llmGateway, rerankerGateway),
+		notebookBiz:        notebookBiz,
+		sourceBiz:          sourceBiz,
+		chatBiz:            chatBiz,
+		eventManager:       eventManager,
+		llmGateway:         llmGateway,
+		prompt:             prompt,
+		sourceDocRetriever: NewSourceDocRetriever(sourceBiz, agentSourceBiz, llmGateway, rerankerGateway, prompt),
 	}
 
 	return logic

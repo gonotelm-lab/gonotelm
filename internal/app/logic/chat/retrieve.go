@@ -13,7 +13,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/app/agent/tool"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
-	"github.com/gonotelm-lab/gonotelm/internal/app/prompt"
+	bizprompt "github.com/gonotelm-lab/gonotelm/internal/app/biz/prompt"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
@@ -37,6 +37,7 @@ type SourceDocRetriever struct {
 	agentSourceBiz  *bizsource.AgentBiz
 	llmGateway      *gateway.Gateway
 	rerankerGateway *rerank.Gateway
+	prompt          *bizprompt.Prompt
 }
 
 func NewSourceDocRetriever(
@@ -44,12 +45,14 @@ func NewSourceDocRetriever(
 	agentSourceBiz *bizsource.AgentBiz,
 	llmGateway *gateway.Gateway,
 	rerankerGateway *rerank.Gateway,
+	prompt *bizprompt.Prompt,
 ) *SourceDocRetriever {
 	return &SourceDocRetriever{
 		sourceBiz:       sourceBiz,
 		agentSourceBiz:  agentSourceBiz,
 		llmGateway:      llmGateway,
 		rerankerGateway: rerankerGateway,
+		prompt:          prompt,
 	}
 }
 
@@ -271,7 +274,7 @@ func (s *SourceDocRetriever) agentRetrieve(
 		sourcesMap[source.Id] = source
 	}
 
-	promptSources := make([]*prompt.RetrieveSource, 0, len(sources))
+	promptSources := make([]*bizprompt.RetrieveSource, 0, len(sources))
 	for _, id := range sourceIds {
 		var name, abstract string
 		source, ok := sourcesMap[id]
@@ -280,14 +283,14 @@ func (s *SourceDocRetriever) agentRetrieve(
 			abstract = source.Abstract
 		}
 
-		promptSources = append(promptSources, &prompt.RetrieveSource{
+		promptSources = append(promptSources, &bizprompt.RetrieveSource{
 			Id:       id.String(),
 			Name:     name,
 			Abstract: abstract,
 		})
 	}
 
-	msgs, err := prompt.RenderRetrieveSourceDocMessage(
+	msgs, err := s.prompt.RenderRetrieveSourceDocMessage(
 		ctx,
 		userPrompt,
 		notebookId.String(),

@@ -3,7 +3,7 @@ package chat
 import (
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	chatmodel "github.com/gonotelm-lab/gonotelm/internal/app/model/chat"
-	"github.com/gonotelm-lab/gonotelm/internal/app/prompt"
+	bizprompt "github.com/gonotelm-lab/gonotelm/internal/app/biz/prompt"
 	"github.com/gonotelm-lab/gonotelm/pkg/slices"
 )
 
@@ -107,9 +107,9 @@ func buildPhaseCitation(sourceDocs []*model.SourceDoc) []*chatmodel.PhaseCitatio
 	return items
 }
 
-func buildChatTemplateVars(state *sessionState) prompt.ChatTemplateVars {
+func buildChatTemplateVars(state *sessionState) bizprompt.ChatTemplateVars {
 	sourceDocs := state.sourceDocs
-	templateVars := prompt.ChatTemplateVars{}
+	templateVars := bizprompt.ChatTemplateVars{}
 
 	for _, sourceDoc := range sourceDocs {
 		if sourceDoc == nil {
@@ -126,7 +126,7 @@ func buildChatTemplateVars(state *sessionState) prompt.ChatTemplateVars {
 		}
 		if groupIdx < 0 {
 			templateVars.SelectedSources = append(templateVars.SelectedSources,
-				prompt.ChatSelectedSourceGroup{
+				bizprompt.ChatSelectedSourceGroup{
 					SourceIndex: int64(len(templateVars.SelectedSources)),
 					SourceID:    sourceID,
 				})
@@ -136,7 +136,7 @@ func buildChatTemplateVars(state *sessionState) prompt.ChatTemplateVars {
 
 		templateVars.SelectedSources[groupIdx].Docs = append(
 			templateVars.SelectedSources[groupIdx].Docs,
-			prompt.ChatSelectedSourceDoc{
+			bizprompt.ChatSelectedSourceDoc{
 				DocIndex: docIndex,
 				DocID:    sourceDoc.Id,
 				Content:  sourceDoc.Content,

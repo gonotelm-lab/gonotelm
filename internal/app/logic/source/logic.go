@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
+	bizprompt "github.com/gonotelm-lab/gonotelm/internal/app/biz/prompt"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
 	"github.com/gonotelm-lab/gonotelm/internal/app/biz/textgen/summarizer"
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
@@ -59,6 +60,7 @@ type Logic struct {
 
 	llmGateway *gateway.Gateway
 	summarizer summarizer.Summarizer
+	prompt     *bizprompt.Prompt
 
 	wg sync.WaitGroup
 }
@@ -85,6 +87,7 @@ func MustNewLogic(
 	notebookBiz *biznotebook.Biz,
 	sourceBiz *bizsource.Biz,
 	llmGateway *gateway.Gateway,
+	prompt *bizprompt.Prompt,
 ) *Logic {
 	sl := &Logic{
 		rootCtx:       rootCtx,
@@ -94,6 +97,7 @@ func MustNewLogic(
 		mqFactory:     infras.MQ,
 		llmGateway:    llmGateway,
 		redis:         infras.Redis,
+		prompt:        prompt,
 	}
 
 	summarizer := summarizer.NewWithOption(llmGateway,

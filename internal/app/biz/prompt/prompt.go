@@ -2,6 +2,7 @@ package prompt
 
 import (
 	"context"
+	"strings"
 
 	"github.com/cloudwego/eino/schema"
 )
@@ -9,7 +10,6 @@ import (
 // Prompt manages prompt template rendering. Template files are loaded
 // from embedded FS at construction via New().
 type Prompt struct {
-	store       preloadedTemplates
 	defaultLang string
 	systemMsg   *schema.Message
 	chatManager *ChatTemplateManager
@@ -25,7 +25,6 @@ func New(defaultLang string) *Prompt {
 	}
 
 	return &Prompt{
-		store:       templateStore,
 		defaultLang: normalizedLang,
 		systemMsg:   schema.SystemMessage(systemPrompt),
 		chatManager: chatManager,
@@ -195,7 +194,7 @@ func (p *Prompt) prependSystemMessage(msgs []*schema.Message) []*schema.Message 
 // back to defaultLang when the requested lang is empty.
 func newPromptTemplate[T templateVars](tmplName templateName, lang, defaultLang string) *template[T] {
 	normalizedName := normalizeTemplateName(tmplName)
-	normalizedLang := normalizeTemplateLang(lang)
+	normalizedLang := strings.TrimSpace(lang)
 	if normalizedLang == "" {
 		normalizedLang = defaultLang
 	}

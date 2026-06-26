@@ -130,4 +130,3 @@ func (v StudioPodcastOutlineTemplateVars) PromptVars() map[string]any {
 }
 
 type StudioPodcastOutlineTemplate = template[StudioPodcastOutlineTemplateVars]
-

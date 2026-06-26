@@ -19,15 +19,15 @@ type templateName string
 const (
 	defaultLang = "zh"
 
-	templateNameChat              templateName = "chat"
-	templateNameSummarize         templateName = "summarize"
-	templateNameRetrieveSourceDoc templateName = "retrieve-soucedoc"
-	templateNameNotebookSummary   templateName = "notebook-summary"
-	templateNameStudioMindmap     templateName = "studio-mindmap"
-	templateNameStudioMindmapV2   templateName = "studio-mindmap-v2"
-	templateNameStudioReport      templateName = "studio-report"
-	templateNameStudioInfographic templateName = "studio-infographic"
-	templateNameTitleMaker        templateName = "title-maker"
+	templateNameChat                 templateName = "chat"
+	templateNameSummarize            templateName = "summarize"
+	templateNameRetrieveSourceDoc    templateName = "retrieve-soucedoc"
+	templateNameNotebookSummary      templateName = "notebook-summary"
+	templateNameStudioMindmap        templateName = "studio-mindmap"
+	templateNameStudioMindmapV2      templateName = "studio-mindmap-v2"
+	templateNameStudioReport         templateName = "studio-report"
+	templateNameStudioInfographic    templateName = "studio-infographic"
+	templateNameTitleMaker           templateName = "title-maker"
 	templateNameStudioPodcastOutline templateName = "studio-podcast-outline"
 )
 

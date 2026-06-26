@@ -13,4 +13,3 @@ func (v StudioMindmapV2TemplateVars) PromptVars() map[string]any {
 }
 
 type StudioMindmapV2Template = template[StudioMindmapV2TemplateVars]
-

@@ -34,4 +34,3 @@ func (v TitleMakerTemplateVars) PromptVars() map[string]any {
 }
 
 type TitleMakerTemplate = template[TitleMakerTemplateVars]
-

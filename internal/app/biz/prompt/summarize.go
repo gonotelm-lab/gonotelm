@@ -31,4 +31,3 @@ func (v SummarizeTemplateVars) PromptVars() map[string]any {
 }
 
 type SummarizeTemplate = template[SummarizeTemplateVars]
-

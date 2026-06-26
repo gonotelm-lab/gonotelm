@@ -43,4 +43,3 @@ func normalizeStudioInfoGraphicDetailLevel(level string) string {
 }
 
 type StudioInfoGraphicTemplate = template[StudioInfoGraphicTemplateVars]
-

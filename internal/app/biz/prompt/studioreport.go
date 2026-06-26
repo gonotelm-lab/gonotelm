@@ -13,4 +13,3 @@ func (v StudioReportTemplateVars) PromptVars() map[string]any {
 }
 
 type StudioReportTemplate = template[StudioReportTemplateVars]
-

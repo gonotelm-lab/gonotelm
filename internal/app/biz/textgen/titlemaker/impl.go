@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/gonotelm-lab/gonotelm/internal/app/prompt"
+	bizprompt "github.com/gonotelm-lab/gonotelm/internal/app/biz/prompt"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
@@ -14,6 +14,7 @@ import (
 type titlemakerImpl struct {
 	gateway *gateway.Gateway
 	option  GenerateOption
+	prompt  *bizprompt.Prompt
 }
 
 type GenerateOption struct {
@@ -21,14 +22,15 @@ type GenerateOption struct {
 	Model    string
 }
 
-func New(gateway *gateway.Gateway) Maker {
-	return NewWithOption(gateway, GenerateOption{})
+func New(gateway *gateway.Gateway, prompt *bizprompt.Prompt) Maker {
+	return NewWithOption(gateway, GenerateOption{}, prompt)
 }
 
-func NewWithOption(gateway *gateway.Gateway, option GenerateOption) Maker {
+func NewWithOption(gateway *gateway.Gateway, option GenerateOption, prompt *bizprompt.Prompt) Maker {
 	return &titlemakerImpl{
 		gateway: gateway,
 		option:  option,
+		prompt:  prompt,
 	}
 }
 
@@ -38,7 +40,7 @@ func (t *titlemakerImpl) Generate(ctx context.Context, text string) (string, err
 
 func (t *titlemakerImpl) GenerateWith(ctx context.Context, provider chat.Provider, model string, text string) (string, error) {
 	lang := pkgcontext.GetLang(ctx)
-	msgs, err := prompt.RenderTitleMakerMessage(ctx, text, lang)
+	msgs, err := t.prompt.RenderTitleMakerMessage(ctx, text, lang)
 	if err != nil {
 		return "", errors.Wrapf(errors.ErrInner, "render title maker prompt failed, err=%v", err)
 	}

@@ -8,6 +8,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/app/biz/source/convertdoc"
 	"github.com/gonotelm-lab/gonotelm/internal/app/biz/source/indices"
 	"github.com/gonotelm-lab/gonotelm/internal/app/biz/source/util"
+	bizprompt "github.com/gonotelm-lab/gonotelm/internal/app/biz/prompt"
 	"github.com/gonotelm-lab/gonotelm/internal/app/biz/textgen/summarizer"
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
@@ -45,6 +46,7 @@ func NewSourceIndexer(
 	sourceDocStore vectordal.SourceDocStore,
 	objectStorage storage.Storage,
 	llmGateway *gateway.Gateway,
+	prompt *bizprompt.Prompt,
 ) *SourceIndexer {
 	hc := convertdoc.HandlerConfig{
 		ChunkSize:   conf.Global().Chunking.Size,
@@ -60,6 +62,7 @@ func NewSourceIndexer(
 			Provider: conf.Global().Logic.Source.ModelProvider,
 			Model:    conf.Global().Logic.Source.Model,
 		},
+		prompt,
 	)
 
 	return &SourceIndexer{

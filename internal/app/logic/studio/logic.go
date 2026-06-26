@@ -10,6 +10,7 @@ import (
 	"github.com/cloudwego/eino/components/document"
 	bizartifact "github.com/gonotelm-lab/gonotelm/internal/app/biz/artifact"
 	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
+	bizprompt "github.com/gonotelm-lab/gonotelm/internal/app/biz/prompt"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
@@ -37,6 +38,8 @@ type Logic struct {
 	notebookBiz       *biznotebook.Biz
 	artifactBiz       *bizartifact.Biz
 
+	prompt *bizprompt.Prompt
+
 	objectStorage     storage.Storage
 	llmGateway        *gateway.Gateway
 	text2imageGateway *text2image.Gateway
@@ -54,6 +57,7 @@ func MustNewLogic(
 	artifactBiz *bizartifact.Biz,
 	llmGateway *gateway.Gateway,
 	text2imageGateway *text2image.Gateway,
+	prompt *bizprompt.Prompt,
 ) *Logic {
 	splitter, err := recursive.NewSplitter(context.TODO(), &recursive.Config{
 		ChunkSize: constants.MindmapMaxOnceToken,
@@ -70,6 +74,7 @@ func MustNewLogic(
 		sourceBizForAgent: sourceBizForAgent,
 		notebookBiz:       notebookBiz,
 		artifactBiz:       artifactBiz,
+		prompt:            prompt,
 		llmGateway:        llmGateway,
 		text2imageGateway: text2imageGateway,
 		splitter:          splitter,

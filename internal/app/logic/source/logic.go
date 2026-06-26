@@ -104,7 +104,8 @@ func MustNewLogic(
 		summarizer.SummarizeOption{
 			Provider: conf.Global().Logic.Source.ModelProvider,
 			Model:    conf.Global().Logic.Source.Model,
-		})
+		},
+		sl.prompt)
 
 	sl.summarizer = summarizer
 	sl.mustInitMsgQueue()

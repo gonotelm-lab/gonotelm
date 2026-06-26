@@ -6,7 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
-	"github.com/gonotelm-lab/gonotelm/internal/app/prompt"
+	bizprompt "github.com/gonotelm-lab/gonotelm/internal/app/biz/prompt"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
@@ -133,12 +133,12 @@ func (ag *audioOverviewGenerator) generateTitleAndOutline(
 		return nil, errors.WithMessage(err, "build source explore agent failed")
 	}
 
-	msgs, err := prompt.RenderStudioPodcastOutlineMessage(
+	msgs, err := ag.l.prompt.RenderStudioPodcastOutlineMessage(
 		ctx,
 		sourceIDsToStrings(params.SourceIds),
 		params.GetLanguage(),
 		params.GetTip(),
-		prompt.PodcastStyle(params.GetStyle()),
+		bizprompt.PodcastStyle(params.GetStyle()),
 	)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "render podcast outline prompt failed, err=%v", err)

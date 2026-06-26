@@ -14,7 +14,7 @@ import (
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
-	"github.com/gonotelm-lab/gonotelm/internal/app/prompt"
+	bizprompt "github.com/gonotelm-lab/gonotelm/internal/app/biz/prompt"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
@@ -172,8 +172,8 @@ func (ig *infoGraphicGenerator) generateImagePrompt(
 		return nil, errors.WithMessagef(err, "failed to build source explore agent for infographic")
 	}
 
-	msgs, err := prompt.RenderStudioInfoGraphicMessage(ctx,
-		prompt.StudioInfoGraphicTemplateVars{
+	msgs, err := ig.l.prompt.RenderStudioInfoGraphicMessage(ctx,
+		bizprompt.StudioInfoGraphicTemplateVars{
 			SourceIds:    sourceIDsToStrings(params.SourceIds),
 			TextLanguage: params.GetTextLanguage(),
 			ExtraPrompt:  params.GetExtraPrompt(),

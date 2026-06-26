@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/gonotelm-lab/gonotelm/internal/app/prompt"
+	bizprompt "github.com/gonotelm-lab/gonotelm/internal/app/biz/prompt"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
@@ -14,6 +14,7 @@ import (
 type summazierImpl struct {
 	gateway *gateway.Gateway
 	option  SummarizeOption
+	prompt  *bizprompt.Prompt
 }
 
 type SummarizeOption struct {
@@ -21,14 +22,15 @@ type SummarizeOption struct {
 	Model    string
 }
 
-func New(gateway *gateway.Gateway) Summarizer {
-	return NewWithOption(gateway, SummarizeOption{})
+func New(gateway *gateway.Gateway, prompt *bizprompt.Prompt) Summarizer {
+	return NewWithOption(gateway, SummarizeOption{}, prompt)
 }
 
-func NewWithOption(gateway *gateway.Gateway, option SummarizeOption) Summarizer {
+func NewWithOption(gateway *gateway.Gateway, option SummarizeOption, prompt *bizprompt.Prompt) Summarizer {
 	return &summazierImpl{
 		gateway: gateway,
 		option:  option,
+		prompt:  prompt,
 	}
 }
 
@@ -43,7 +45,7 @@ func (s *summazierImpl) SummarizeWith(
 	text string,
 ) (string, error) {
 	lang := pkgcontext.GetLang(ctx)
-	msgs, err := prompt.RenderSummarizeMessage(ctx, text, lang)
+	msgs, err := s.prompt.RenderSummarizeMessage(ctx, text, lang)
 	if err != nil {
 		return "", errors.Wrapf(errors.ErrInner, "render summarize prompt failed, err=%v", err)
 	}

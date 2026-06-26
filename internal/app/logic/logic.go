@@ -7,6 +7,7 @@ import (
 	bizartifact "github.com/gonotelm-lab/gonotelm/internal/app/biz/artifact"
 	bizchat "github.com/gonotelm-lab/gonotelm/internal/app/biz/chat"
 	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
+	bizprompt "github.com/gonotelm-lab/gonotelm/internal/app/biz/prompt"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
 	chatlogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/chat"
 	notebooklogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/notebook"
@@ -70,12 +71,15 @@ func MustNewLogic(
 	chatEventManager := bizchat.NewChatEventManager(
 		infrastructures.Cache.ChatMessageStreamCache)
 
+	prompt := bizprompt.New("zh")
+
 	sourceBiz, err := bizsource.New(
 		objectStorage,
 		infrastructures.Dal.SourceStore,
 		infrastructures.VectorDal.SourceDocStore,
 		llmGateway,
 		embeddingGateway,
+		prompt,
 	)
 	if err != nil {
 		panic(err)
@@ -98,6 +102,7 @@ func MustNewLogic(
 		notebookBiz,
 		sourceBiz,
 		llmGateway,
+		prompt,
 	)
 
 	notebookLogic := notebooklogic.NewLogic(
@@ -115,6 +120,7 @@ func MustNewLogic(
 		agentSourceBiz,
 		chatBiz,
 		chatEventManager,
+		prompt,
 	)
 
 	studioLogic := studiologic.MustNewLogic(
@@ -126,6 +132,7 @@ func MustNewLogic(
 		artifactBiz,
 		llmGateway,
 		text2imageGateway,
+		prompt,
 	)
 
 	return &Logic{

@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	bizprompt "github.com/gonotelm-lab/gonotelm/internal/app/biz/prompt"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal"
@@ -46,6 +47,7 @@ func New(
 	sourceDocStore vectordal.SourceDocStore,
 	llmGateway *gateway.Gateway,
 	embeddingGateway *embedding.Gateway,
+	prompt *bizprompt.Prompt,
 ) (*Biz, error) {
 	providerType := conf.Global().Embedding.Type
 	embedder, err := embeddingGateway.GetProvider(providerType)
@@ -58,7 +60,7 @@ func New(
 		sourceStore:    sourceStore,
 		sourceDocStore: sourceDocStore,
 		embedder:       embedder,
-		sourceIndexer:  NewSourceIndexer(embedder, sourceDocStore, objectStorage, llmGateway),
+		sourceIndexer:  NewSourceIndexer(embedder, sourceDocStore, objectStorage, llmGateway, prompt),
 		llmGateway:     llmGateway,
 	}
 

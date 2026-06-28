@@ -8,6 +8,8 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/api/schema"
 	"github.com/gonotelm-lab/gonotelm/internal/app/logic/notebook"
 	"github.com/gonotelm-lab/gonotelm/internal/app/logic/studio"
+	notebookapp "github.com/gonotelm-lab/gonotelm/internal/application/notebook"
+	pkgctx "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
@@ -64,19 +66,18 @@ func (s *Server) CreateNotebook(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp, err := s.notebookLogic.CreateNotebook(ctx,
-		&notebook.CreateNotebookParams{
-			Name: req.Name,
-			Desc: req.Desc,
-		})
+	userId := pkgctx.GetUserId(ctx)
+	id, err := s.createNotebookHandler.Handle(ctx, &notebookapp.CreateNotebookHandleCommand{
+		Name:    req.Name,
+		Desc:    req.Desc,
+		OwnerId: userId,
+	})
 	if err != nil {
 		http.ErrResp(c, err)
 		return
 	}
 
-	http.OkResp(c, CreateNotebookResponse{
-		Id: resp.Id.String(),
-	})
+	http.OkResp(c, CreateNotebookResponse{Id: id.String()})
 }
 
 type GetNotebookRequest struct {
@@ -92,6 +93,8 @@ type GetNotebookResponse struct {
 	Name        string `json:"name"`
 	Desc        string `json:"desc"`
 	SourceCount int64  `json:"source_count"`
+	UpdatedAt   int64  `json:"updated_at"` // unix ms
+	CreatedAt   int64  `json:"created_at"` // unix ms
 }
 
 func (s *Server) GetNotebook(ctx context.Context, c *app.RequestContext) {
@@ -102,17 +105,19 @@ func (s *Server) GetNotebook(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	notebook, err := s.notebookLogic.GetNotebook(ctx, req.Id)
+	notebook, err := s.getNotebookHandler.Handle(ctx, req.Id)
 	if err != nil {
 		http.ErrResp(c, err)
 		return
 	}
 
 	http.OkResp(c, GetNotebookResponse{
-		Id:          notebook.Notebook.Id.String(),
-		Name:        notebook.Notebook.Name,
-		Desc:        notebook.Notebook.Description,
+		Id:          notebook.Id.String(),
+		Name:        notebook.Name,
+		Desc:        notebook.Description,
 		SourceCount: notebook.SourceCount,
+		UpdatedAt:   notebook.UpdateTime.Value(),
+		CreatedAt:   notebook.CreateTime.Value(),
 	})
 }
 
@@ -123,15 +128,15 @@ const (
 	ListNotebooksSortByCreateTime ListNotebooksSortBy = "create_time"
 )
 
-func (s ListNotebooksSortBy) ToSortBy() notebook.ListNotebooksSortBy {
+func (s ListNotebooksSortBy) ToSortBy() notebookapp.SortBy {
 	switch s {
 	case ListNotebooksSortByLastActive:
-		return notebook.ListNotebooksSortByLastActive
+		return notebookapp.SortByLastActive
 	case ListNotebooksSortByCreateTime:
-		return notebook.ListNotebooksSortByCreateTime
+		return notebookapp.SortByCreateTime
 	}
 
-	return notebook.ListNotebooksSortByCreateTime
+	return notebookapp.SortByCreateTime
 }
 
 type ListNotebooksRequest struct {
@@ -180,11 +185,12 @@ func (s *Server) ListNotebooks(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	result, err := s.notebookLogic.ListNotebooks(ctx,
-		&notebook.ListNotebooksParams{
-			Limit:  req.Limit,
-			Offset: req.Offset,
-			SortBy: req.SortBy.ToSortBy(),
+	result, err := s.listNotebooksHandler.Handle(ctx,
+		&notebookapp.ListNotebooksHandleQuery{
+			OwnerId: "", // TODO get owner id from context
+			Limit:   req.Limit,
+			Offset:  req.Offset,
+			SortBy:  req.SortBy.ToSortBy(),
 		})
 	if err != nil {
 		http.ErrResp(c, err)
@@ -194,12 +200,12 @@ func (s *Server) ListNotebooks(ctx context.Context, c *app.RequestContext) {
 	notebooks := make([]*ListNotebookItemResponse, 0, len(result.Notebooks))
 	for _, notebook := range result.Notebooks {
 		notebooks = append(notebooks, &ListNotebookItemResponse{
-			Id:          notebook.Notebook.Id.String(),
-			Name:        notebook.Notebook.Name,
-			Desc:        notebook.Notebook.Description,
+			Id:          notebook.Id.String(),
+			Name:        notebook.Name,
+			Desc:        notebook.Description,
 			SourceCount: notebook.SourceCount,
-			UpdatedAt:   notebook.Notebook.UpdatedAt,
-			CreatedAt:   notebook.Notebook.Id.UnixMilli(),
+			UpdatedAt:   notebook.UpdateTime.Value(),
+			CreatedAt:   notebook.CreateTime.Value(),
 		})
 	}
 
@@ -275,7 +281,7 @@ func (s *Server) UpdateNotebookName(ctx context.Context, c *app.RequestContext) 
 		return
 	}
 
-	err = s.notebookLogic.UpdateNotebookName(ctx, req.Id, req.Name)
+	err = s.updateNotebookNameHandler.Handle(ctx, req.Id, req.Name)
 	if err != nil {
 		http.ErrResp(c, err)
 		return
@@ -327,7 +333,7 @@ func (s *Server) DeleteNotebook(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	err = s.notebookLogic.DeleteNotebook(ctx, req.Id)
+	err = s.deleteNotebookHandler.Handle(ctx, req.Id)
 	if err != nil {
 		http.ErrResp(c, err)
 		return

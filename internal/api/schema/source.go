@@ -1,6 +1,9 @@
 package schema
 
-import "github.com/gonotelm-lab/gonotelm/internal/app/model"
+import (
+	"github.com/gonotelm-lab/gonotelm/internal/app/model"
+	sourcedomain "github.com/gonotelm-lab/gonotelm/internal/domain/source"
+)
 
 type TextSourceContent struct {
 	Text string `json:"text"`
@@ -59,6 +62,46 @@ func ToSource(source *model.FullSource) *Source {
 			Filename: source.DecodedSource.ContentFile.Filename,
 			Format:   source.DecodedSource.ContentFile.Format,
 			Url:      source.DecodedSource.ContentFile.Url,
+		}
+	}
+
+	return s
+}
+
+func ToSourceFromDomain(
+	source *sourcedomain.Source,
+	fileContentUrl, parsedContentUrl string,
+) *Source {
+	if source == nil {
+		return nil
+	}
+
+	s := &Source{
+		Id:     source.Id.String(),
+		Kind:   model.SourceKind(source.Kind),
+		Status: model.SourceStatus(source.Status),
+		Title:  source.Title,
+		ParsedContent: &SourceParsedContent{
+			Url: parsedContentUrl,
+		},
+	}
+
+	switch {
+	case source.Kind.IsText():
+		if textContent, err := source.GetTextContent(); err == nil {
+			s.Text = &TextSourceContent{Text: textContent.Text}
+		}
+	case source.Kind.IsUrl():
+		if urlContent, ok := source.Content.(*sourcedomain.UrlSourceContent); ok {
+			s.Url = &UrlSourceContent{Url: urlContent.Url}
+		}
+	case source.Kind.IsFile():
+		if fileContent, err := source.GetFileContent(); err == nil {
+			s.File = &FileSourceContent{
+				Filename: fileContent.Filename,
+				Format:   fileContent.Format,
+				Url:      fileContentUrl,
+			}
 		}
 	}
 

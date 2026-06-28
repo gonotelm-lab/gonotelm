@@ -12,7 +12,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/rerank"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/text2image"
 	mqimpl "github.com/gonotelm-lab/gonotelm/internal/infra/mq/impl"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
 	storageimpl "github.com/gonotelm-lab/gonotelm/internal/infra/storage/impl"
 	vecimpl "github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/impl"
 	"github.com/gonotelm-lab/gonotelm/pkg/sql"
@@ -35,7 +34,7 @@ type Config struct {
 	Database   DatabaseConfig         `toml:"database"`
 	Redis      cache.RedisCacheConfig `toml:"redis"`
 	VectorDB   vecimpl.Config         `toml:"vectorDb"`
-	Storage    StorageConfig          `toml:"storage"`
+	Storage    storageimpl.Config     `toml:"storage"`
 	MsgQueue   mqimpl.Config          `toml:"msgQueue"`
 	Embedding  embedding.Config       `toml:"embedding"`
 	Rerank     rerank.Config          `toml:"rerank"`
@@ -65,21 +64,6 @@ type DatabaseConfig struct {
 	User     string `toml:"user"`
 	Password string `toml:"password"`
 	DBName   string `toml:"dbName"`
-}
-
-type StorageConfig struct {
-	Type  storageimpl.Type `toml:"type"`
-	Minio MinioConfig      `toml:"minio"`
-}
-
-type MinioConfig struct {
-	Endpoint      string        `toml:"endpoint"`
-	AccessKey     string        `toml:"accessKey"`
-	SecretKey     string        `toml:"secretKey"`
-	Bucket        string        `toml:"bucket"`
-	Region        string        `toml:"region"`
-	Secure        bool          `toml:"secure"`
-	PresignExpiry time.Duration `toml:"presignExpiry"`
 }
 
 type LoggingConfig struct {
@@ -153,37 +137,6 @@ func (d *DatabaseConfig) ToSQLConfig() *sql.Config {
 		User:     d.User,
 		Password: d.Password,
 		DbName:   d.DBName,
-	}
-}
-
-func (c *Config) StorageBucket() string {
-	switch c.Storage.Type {
-	case storageimpl.Minio:
-		return c.Storage.Minio.Bucket
-	default:
-		return ""
-	}
-}
-
-func (c *Config) ObjectStorageConfig() (*storage.Config, error) {
-	switch c.Storage.Type {
-	case storageimpl.Minio:
-		presignExpiry := 15 * time.Minute
-		if c.Storage.Minio.PresignExpiry != 0 {
-			presignExpiry = c.Storage.Minio.PresignExpiry
-		}
-
-		return &storage.Config{
-			Endpoint:      c.Storage.Minio.Endpoint,
-			Region:        c.Storage.Minio.Region,
-			Bucket:        c.Storage.Minio.Bucket,
-			AccessKey:     c.Storage.Minio.AccessKey,
-			SecretKey:     c.Storage.Minio.SecretKey,
-			Secure:        c.Storage.Minio.Secure,
-			PresignExpiry: presignExpiry,
-		}, nil
-	default:
-		return nil, fmt.Errorf("storage type %q is not supported", c.Storage.Type)
 	}
 }
 

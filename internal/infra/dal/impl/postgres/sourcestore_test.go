@@ -458,6 +458,75 @@ func TestSourceStoreUpdateParsedContent(t *testing.T) {
 	})
 }
 
+func TestSourceStoreUpsert(t *testing.T) {
+	Convey("SourceStore Upsert", t, func() {
+		store := testSourceStore
+		ctx := t.Context()
+		notebookID := createNotebookForSourceTest(t, testDB)
+
+		sourceID := dal.Id(uuid.NewV7())
+		ownerID := "owner_" + uuid.NewV7().String()[4:]
+		initialContent := []byte("initial content")
+
+		source := &schema.Source{
+			Id:               sourceID,
+			NotebookId:       notebookID,
+			Kind:             "doc",
+			Status:           "preparing",
+			Title:            "initial title",
+			Content:          initialContent,
+			ParsedContentKey: "parsed/old",
+			Abstract:         "initial abstract",
+			OwnerId:          ownerID,
+			UpdatedAt:        1000,
+		}
+
+		err := store.Upsert(ctx, source)
+		So(err, ShouldBeNil)
+		t.Cleanup(func() {
+			_ = testDB.WithContext(ctx).Where("id = ?", sourceID).Delete(&schema.Source{}).Error
+		})
+
+		got, err := store.GetById(ctx, sourceID)
+		So(err, ShouldBeNil)
+		So(got, ShouldNotBeNil)
+		So(got.NotebookId, ShouldEqual, notebookID)
+		So(strings.TrimSpace(got.Status), ShouldEqual, "preparing")
+		So(got.Title, ShouldEqual, "initial title")
+		So(string(got.Content), ShouldEqual, string(initialContent))
+		So(string(got.ParsedContentKey), ShouldEqual, "parsed/old")
+		So(got.Abstract, ShouldEqual, "initial abstract")
+		So(got.OwnerId, ShouldEqual, ownerID)
+		So(got.UpdatedAt, ShouldEqual, int64(1000))
+
+		source.NotebookId = dal.Id(uuid.NewV7())
+		source.Kind = "nochange"
+		source.Status = "ready"
+		source.Title = "updated title"
+		source.Content = []byte("content should not change")
+		source.ParsedContentKey = "parsed/new"
+		source.Abstract = "updated abstract"
+		source.OwnerId = "12903"
+		source.UpdatedAt = 2000
+
+		err = store.Upsert(ctx, source)
+		So(err, ShouldBeNil)
+
+		gotAfterUpsert, err := store.GetById(ctx, sourceID)
+		So(err, ShouldBeNil)
+		So(gotAfterUpsert, ShouldNotBeNil)
+		So(gotAfterUpsert.NotebookId, ShouldEqual, notebookID)
+		So(gotAfterUpsert.Kind, ShouldEqual, "doc")
+		So(strings.TrimSpace(gotAfterUpsert.Status), ShouldEqual, "ready")
+		So(gotAfterUpsert.Title, ShouldEqual, "updated title")
+		So(string(gotAfterUpsert.Content), ShouldEqual, string(initialContent))
+		So(string(gotAfterUpsert.ParsedContentKey), ShouldEqual, "parsed/new")
+		So(gotAfterUpsert.Abstract, ShouldEqual, "updated abstract")
+		So(gotAfterUpsert.OwnerId, ShouldEqual, ownerID)
+		So(gotAfterUpsert.UpdatedAt, ShouldEqual, int64(2000))
+	})
+}
+
 func TestSourceStoreListByIds(t *testing.T) {
 	Convey("SourceStore ListByIds", t, func() {
 		store := testSourceStore

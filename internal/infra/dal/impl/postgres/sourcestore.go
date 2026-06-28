@@ -10,6 +10,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/sql"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type SourceStoreImpl struct {
@@ -26,6 +27,28 @@ func NewSourceStoreImpl(db *gorm.DB) *SourceStoreImpl {
 
 func (s *SourceStoreImpl) Create(ctx context.Context, source *schema.Source) error {
 	if err := s.db.WithContext(ctx).Create(source).Error; err != nil {
+		return sql.WrapErr(err)
+	}
+
+	return nil
+}
+
+func (s *SourceStoreImpl) Upsert(ctx context.Context, source *schema.Source) error {
+	cl := clause.OnConflict{
+		Columns: []clause.Column{{Name: "id"}},
+		DoUpdates: clause.Assignments(map[string]any{
+			"status":             source.Status,
+			"title":              source.Title,
+			"abstract":           source.Abstract,
+			"parsed_content_key": source.ParsedContentKey,
+			"updated_at":         source.UpdatedAt,
+		}),
+	}
+
+	if err := s.db.WithContext(ctx).
+		Model(&schema.Source{}).
+		Clauses(cl).
+		Create(source).Error; err != nil {
 		return sql.WrapErr(err)
 	}
 
@@ -58,6 +81,30 @@ func (s *SourceStoreImpl) CountByNotebookId(
 	}
 
 	return count, nil
+}
+
+func (s *SourceStoreImpl) BatchCountByNotebookIds(ctx context.Context, notebookIds []dal.Id) (map[dal.Id]int64, error) {
+	var rows []struct {
+		NotebookId dal.Id `gorm:"column:notebook_id"`
+		Count      int64  `gorm:"column:count"`
+	}
+
+	err := s.db.WithContext(ctx).
+		Model(&schema.Source{}).
+		Where("notebook_id IN ? AND status <> ?", notebookIds, schema.SourceStatusInited).
+		Group("notebook_id").
+		Select("notebook_id, COUNT(*) as count").
+		Find(&rows).Error
+	if err != nil {
+		return nil, sql.WrapErr(err)
+	}
+
+	countsByNotebookId := make(map[dal.Id]int64, len(notebookIds))
+	for _, row := range rows {
+		countsByNotebookId[row.NotebookId] = row.Count
+	}
+
+	return countsByNotebookId, nil
 }
 
 func (s *SourceStoreImpl) ListByNotebookId(

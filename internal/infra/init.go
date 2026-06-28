@@ -11,6 +11,8 @@ import (
 	dalimpl "github.com/gonotelm-lab/gonotelm/internal/infra/dal/impl"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/mq"
 	mqimpl "github.com/gonotelm-lab/gonotelm/internal/infra/mq/impl"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
+	storageimpl "github.com/gonotelm-lab/gonotelm/internal/infra/storage/impl"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/vectordal"
 	vectordalimpl "github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/impl"
 
@@ -20,11 +22,12 @@ import (
 var gInstances *Instances
 
 type Instances struct {
-	Dal       *dal.DAL
-	VectorDal *vectordal.DAL
-	MQ        *mq.MQ
-	Cache     *cacheimpl.Cache
-	Redis     redis.UniversalClient
+	Dal           *dal.DAL
+	VectorDal     *vectordal.DAL
+	MQ            *mq.MQ
+	Cache         *cacheimpl.Cache
+	Redis         redis.UniversalClient
+	ObjectStorage storage.Storage
 }
 
 func MustInit(c *conf.Config) *Instances {
@@ -55,12 +58,18 @@ func MustInit(c *conf.Config) *Instances {
 
 	cacheImpl := cacheimpl.NewCache(cache.GetRedis())
 
+	objectStorage, err := storageimpl.New(&c.Storage)
+	if err != nil {
+		panic(err)
+	}
+
 	gInstances = &Instances{
 		Dal:       d,
 		VectorDal: vd,
 		MQ:        mqInfra,
 		Cache:     cacheImpl,
 		Redis:     cache.GetRedis(),
+		ObjectStorage: objectStorage,
 	}
 
 	return gInstances

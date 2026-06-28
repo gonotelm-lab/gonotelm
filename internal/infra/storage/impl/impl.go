@@ -13,11 +13,20 @@ const (
 	Minio Type = "minio"
 )
 
-func New(implType Type, cfg *storage.Config) (storage.Storage, error) {
-	switch implType {
+func New(cfg *Config) (storage.Storage, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("storage config is nil")
+	}
+
+	storageCfg, err := cfg.ObjectStorageConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	switch cfg.Type {
 	case Minio:
-		return minio.New(cfg)
+		return minio.New(storageCfg)
 	default:
-		return nil, fmt.Errorf("impl type %s is not supported", implType)
+		return nil, fmt.Errorf("impl type %s is not supported", cfg.Type)
 	}
 }

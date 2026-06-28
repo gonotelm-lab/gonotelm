@@ -226,6 +226,54 @@ func TestNotebookStoreUpdateDescription(t *testing.T) {
 	})
 }
 
+func TestNotebookStoreUpsert(t *testing.T) {
+	Convey("NotebookStore Upsert", t, func() {
+		store := testNotebookStore
+		ctx := t.Context()
+
+		notebookID := dal.Id(uuid.NewV7())
+		ownerID := "owner_" + uuid.NewV7().String()
+
+		notebook := &schema.Notebook{
+			Id:          notebookID,
+			Name:        "nb_upsert_" + uuid.NewV7().String(),
+			Description: "initial desc",
+			OwnerId:     ownerID,
+			UpdatedAt:   1000,
+		}
+
+		err := store.Upsert(ctx, notebook)
+		So(err, ShouldBeNil)
+		t.Cleanup(func() {
+			_ = testDB.WithContext(ctx).Where("id = ?", notebookID).Delete(&schema.Notebook{}).Error
+		})
+
+		got, err := store.GetById(ctx, notebookID)
+		So(err, ShouldBeNil)
+		So(got, ShouldNotBeNil)
+		So(got.Name, ShouldEqual, notebook.Name)
+		So(got.Description, ShouldEqual, notebook.Description)
+		So(got.OwnerId, ShouldEqual, ownerID)
+		So(got.UpdatedAt, ShouldEqual, int64(1000))
+
+		notebook.Name = "nb_upsert_updated_" + uuid.NewV7().String()
+		notebook.Description = "updated desc"
+		notebook.OwnerId = "owner_should_not_change"
+		notebook.UpdatedAt = 2000
+
+		err = store.Upsert(ctx, notebook)
+		So(err, ShouldBeNil)
+
+		gotAfterUpsert, err := store.GetById(ctx, notebookID)
+		So(err, ShouldBeNil)
+		So(gotAfterUpsert, ShouldNotBeNil)
+		So(gotAfterUpsert.Name, ShouldEqual, notebook.Name)
+		So(gotAfterUpsert.Description, ShouldEqual, "updated desc")
+		So(gotAfterUpsert.OwnerId, ShouldEqual, ownerID)
+		So(gotAfterUpsert.UpdatedAt, ShouldEqual, int64(2000))
+	})
+}
+
 func TestNotebookStoreFillNameAndDescriptionIfEmpty(t *testing.T) {
 	Convey("NotebookStore FillNameAndDescriptionIfEmpty", t, func() {
 		store := testNotebookStore

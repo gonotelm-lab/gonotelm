@@ -41,49 +41,49 @@ type CreateNotebookParams struct {
 	Desc string
 }
 
-func (l *Logic) CreateNotebook(
-	ctx context.Context,
-	params *CreateNotebookParams,
-) (*model.Notebook, error) {
-	userId := pkgcontext.GetUserId(ctx)
-	notebook, err := l.notebookBiz.CreateNotebook(
-		ctx, &biznotebook.CreateNotebookCommand{
-			Name:        params.Name,
-			OwnerId:     userId,
-			Description: params.Desc,
-		})
-	if err != nil {
-		return nil, errors.WithMessage(err, "create notebook failed")
-	}
+// func (l *Logic) CreateNotebook(
+// 	ctx context.Context,
+// 	params *CreateNotebookParams,
+// ) (*model.Notebook, error) {
+// 	userId := pkgcontext.GetUserId(ctx)
+// 	notebook, err := l.notebookBiz.CreateNotebook(
+// 		ctx, &biznotebook.CreateNotebookCommand{
+// 			Name:        params.Name,
+// 			OwnerId:     userId,
+// 			Description: params.Desc,
+// 		})
+// 	if err != nil {
+// 		return nil, errors.WithMessage(err, "create notebook failed")
+// 	}
 
-	return notebook, nil
-}
+// 	return notebook, nil
+// }
 
 type NotebookSummary struct {
 	Notebook    *model.Notebook
 	SourceCount int64
 }
 
-func (l *Logic) GetNotebook(
-	ctx context.Context,
-	id uuid.UUID,
-) (*NotebookSummary, error) {
-	notebook, err := l.notebookBiz.GetNotebook(ctx, id)
-	if err != nil {
-		if errors.Is(err, biznotebook.ErrNotebookNotFound) {
-			return nil, errors.ErrParams.Msgf("notebook not found, notebook_id=%s", id)
-		}
+// func (l *Logic) GetNotebook(
+// 	ctx context.Context,
+// 	id uuid.UUID,
+// ) (*NotebookSummary, error) {
+// 	notebook, err := l.notebookBiz.GetNotebook(ctx, id)
+// 	if err != nil {
+// 		if errors.Is(err, biznotebook.ErrNotebookNotFound) {
+// 			return nil, errors.ErrParams.Msgf("notebook not found, notebook_id=%s", id)
+// 		}
 
-		return nil, errors.WithMessage(err, "get notebook failed")
-	}
+// 		return nil, errors.WithMessage(err, "get notebook failed")
+// 	}
 
-	output, err := l.buildNotebookSummary(ctx, notebook)
-	if err != nil {
-		return nil, errors.WithMessage(err, "build notebook output failed")
-	}
+// 	output, err := l.buildNotebookSummary(ctx, notebook)
+// 	if err != nil {
+// 		return nil, errors.WithMessage(err, "build notebook output failed")
+// 	}
 
-	return output, nil
-}
+// 	return output, nil
+// }
 
 type ListNotebooksSortBy int
 
@@ -214,26 +214,26 @@ func (l *Logic) buildNotebookSummary(
 	}, nil
 }
 
-func (l *Logic) UpdateNotebookName(
-	ctx context.Context,
-	id uuid.UUID,
-	name string,
-) error {
-	_, err := l.notebookBiz.GetNotebook(ctx, id)
-	if err != nil {
-		if errors.Is(err, biznotebook.ErrNotebookNotFound) {
-			return errors.ErrParams.Msgf("notebook not found, notebook_id=%s", id)
-		}
-		return errors.WithMessage(err, "update notebook name failed")
-	}
+// func (l *Logic) UpdateNotebookName(
+// 	ctx context.Context,
+// 	id uuid.UUID,
+// 	name string,
+// ) error {
+// 	_, err := l.notebookBiz.GetNotebook(ctx, id)
+// 	if err != nil {
+// 		if errors.Is(err, biznotebook.ErrNotebookNotFound) {
+// 			return errors.ErrParams.Msgf("notebook not found, notebook_id=%s", id)
+// 		}
+// 		return errors.WithMessage(err, "update notebook name failed")
+// 	}
 
-	err = l.notebookBiz.UpdateNotebookName(ctx, id, name)
-	if err != nil {
-		return errors.WithMessage(err, "update notebook name failed")
-	}
+// 	err = l.notebookBiz.UpdateNotebookName(ctx, id, name)
+// 	if err != nil {
+// 		return errors.WithMessage(err, "update notebook name failed")
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
 func (l *Logic) UpdateNotebookDescription(
 	ctx context.Context,
@@ -277,6 +277,7 @@ func (l *Logic) GetOrCreateNotebookChat(
 	return chat, nil
 }
 
+// TODO 需要进行领域事件的通知改造
 func (l *Logic) DeleteNotebook(
 	ctx context.Context,
 	id uuid.UUID,

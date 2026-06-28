@@ -8,8 +8,8 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/app/logic"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infra"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
-	storageimpl "github.com/gonotelm-lab/gonotelm/internal/infra/storage/impl"
+	"github.com/gonotelm-lab/gonotelm/internal/interfaces/event"
+	wire "github.com/gonotelm-lab/gonotelm/internal/wire"
 	pkglog "github.com/gonotelm-lab/gonotelm/pkg/log"
 )
 
@@ -45,35 +45,16 @@ func initLogger() {
 	}
 }
 
-func initObjectStorage() storage.Storage {
-	cfg := conf.Global()
-	if cfg == nil {
-		panic("config is not set")
-	}
-
-	storageCfg, err := cfg.ObjectStorageConfig()
-	if err != nil {
-		panic(err)
-	}
-
-	s, err := storageimpl.New(storageimpl.Type(cfg.Storage.Type), storageCfg)
-	if err != nil {
-		panic(err)
-	}
-
-	return s
-}
-
 func run() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	infras := infra.MustInit(conf.Global())
-	objectStorage := initObjectStorage()
+	wire.Init(infras)
 	app := logic.MustNewLogic(
 		ctx,
 		infras,
-		objectStorage,
+		infras.ObjectStorage,
 	)
 
 	defer func() {
@@ -82,5 +63,6 @@ func run() {
 		infra.Close(ctx)
 	}()
 
-	api.NewServer(app).Run()
+	event.Init(ctx, wire.GetWire())
+	api.NewServer(app, infras, wire.GetWire()).Run()
 }

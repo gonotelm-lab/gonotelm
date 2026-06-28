@@ -13,6 +13,7 @@ type Id = uuid.UUID
 
 type NotebookStore interface {
 	Create(ctx context.Context, notebook *schema.Notebook) error
+	Upsert(ctx context.Context, notebook *schema.Notebook) error
 	GetById(ctx context.Context, id Id) (*schema.Notebook, error)
 	GetByNameAndOwnerId(ctx context.Context, name, ownerId string) (*schema.Notebook, error)
 	// orderBy=0 -> default order; orderBy=1 -> order by updated_at
@@ -27,8 +28,10 @@ type NotebookStore interface {
 
 type SourceStore interface {
 	Create(ctx context.Context, source *schema.Source) error
+	Upsert(ctx context.Context, source *schema.Source) error
 	GetById(ctx context.Context, id Id) (*schema.Source, error)
 	CountByNotebookId(ctx context.Context, notebookId Id) (int64, error)
+	BatchCountByNotebookIds(ctx context.Context, notebookIds []Id) (map[Id]int64, error)
 	ListByNotebookId(ctx context.Context, notebookId Id, limit, offset int) ([]*schema.Source, error)
 	DeleteById(ctx context.Context, id Id) error
 	BatchDelete(ctx context.Context, ids []Id) error

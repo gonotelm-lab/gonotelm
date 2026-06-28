@@ -3,12 +3,14 @@ package postgres
 import (
 	"context"
 
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal/schema"
-	xerror "github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/sql"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type NotebookStoreImpl struct {
@@ -26,6 +28,29 @@ func (s *NotebookStoreImpl) Create(
 	notebook *schema.Notebook,
 ) error {
 	if err := s.db.WithContext(ctx).Create(notebook).Error; err != nil {
+		return sql.WrapErr(err)
+	}
+
+	return nil
+}
+
+func (s *NotebookStoreImpl) Upsert(
+	ctx context.Context,
+	notebook *schema.Notebook,
+) error {
+	// insert into xxx on conflict do update set ...
+	cl := clause.OnConflict{
+		Columns: []clause.Column{{Name: "id"}},
+		DoUpdates: clause.Assignments(map[string]any{
+			"name":        notebook.Name,
+			"description": notebook.Description,
+			"updated_at":  notebook.UpdatedAt,
+		}),
+	}
+	if err := s.db.WithContext(ctx).
+		Model(&schema.Notebook{}).
+		Clauses(cl).
+		Create(notebook).Error; err != nil {
 		return sql.WrapErr(err)
 	}
 
@@ -67,7 +92,7 @@ func (s *NotebookStoreImpl) ListByOwnerId(
 	limit, offset, orderBy int,
 ) ([]*schema.Notebook, error) {
 	if limit <= 0 || offset < 0 {
-		return nil, xerror.ErrParams.Msgf("invalid pagination params: limit=%d offset=%d", limit, offset)
+		return nil, errors.ErrParams.Msgf("invalid pagination params: limit=%d offset=%d", limit, offset)
 	}
 
 	query := s.db.WithContext(ctx).
@@ -103,7 +128,7 @@ func (s *NotebookStoreImpl) Update(ctx context.Context, notebook *schema.Noteboo
 	return nil
 }
 
-func (s *NotebookStoreImpl) DeleteById(ctx context.Context, id dal.Id) error {
+func (s *NotebookStoreImpl) DeleteById(ctx context.Context, id valobj.Id) error {
 	if err := s.db.WithContext(ctx).
 		Where("id = ?", id).
 		Delete(&schema.Notebook{}).Error; err != nil {

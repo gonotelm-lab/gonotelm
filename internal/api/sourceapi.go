@@ -12,6 +12,9 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	logic "github.com/gonotelm-lab/gonotelm/internal/app/logic/source"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
+	sourceapp "github.com/gonotelm-lab/gonotelm/internal/application/source"
+	sourcedomain "github.com/gonotelm-lab/gonotelm/internal/domain/source"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 	"github.com/gonotelm-lab/gonotelm/pkg/slices"
@@ -31,7 +34,7 @@ func (s *Server) registerSourcesRoutes(g *route.RouterGroup) {
 		sourceIdGroup.POST("/reload", s.RetrySourcePreparation) // retry source preparation
 		sourceIdGroup.GET("/doc/:doc_id", s.GetSourceDoc)
 		sourceIdGroup.GET("/batch/docs", s.BatchGetSourceDocs)
-		sourceIdGroup.GET("/parsed/tree", s.GetSourceParsedTree)
+		// sourceIdGroup.GET("/parsed/tree", s.GetSourceParsedTree) // TODO remove this endpoint
 		sourceIdGroup.PUT("/title", s.UpdateSourceTitle)
 	}
 }
@@ -111,9 +114,11 @@ func (s *Server) CreateSource(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp, err := s.sourceLogic.CreateSource(ctx, &logic.CreateSourceParams{
+	userId := pkgcontext.GetUserId(ctx)
+	result, err := s.createSourceHandler.Handle(ctx, &sourceapp.CreateSourceHandleCommand{
 		NotebookId: req.NotebookId,
-		Kind:       model.SourceKind(req.Kind),
+		OwnerId:    userId,
+		Kind:       sourcedomain.SourceKind(req.Kind),
 		Text:       req.Text,
 		Url:        req.parsedUrl,
 	})
@@ -123,7 +128,7 @@ func (s *Server) CreateSource(ctx context.Context, c *app.RequestContext) {
 	}
 
 	http.OkResp(c, CreateSourceResponse{
-		Id: resp.Id.String(),
+		Id: result.String(),
 	})
 }
 
@@ -164,7 +169,7 @@ func (s *Server) UploadFileSource(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp, err := s.sourceLogic.UploadFileSource(ctx, &logic.UploadSourceParams{
+	result, err := s.presignUploadFileHandler.Handle(ctx, &sourceapp.PresignUploadFileHandleCommand{
 		SourceId: req.Id,
 		Filename: req.Filename,
 		MimeType: req.MimeType,
@@ -177,10 +182,10 @@ func (s *Server) UploadFileSource(ctx context.Context, c *app.RequestContext) {
 	}
 
 	http.OkResp(c, &UploadFileSourceResponse{
-		Url:     resp.Url,
-		Method:  resp.Method,
-		Forms:   resp.Forms,
-		Headers: resp.Headers,
+		Url:     result.Url,
+		Method:  result.Method,
+		Forms:   result.Forms,
+		Headers: result.Headers,
 	})
 }
 
@@ -189,7 +194,7 @@ type PollSourceStatusRequest struct {
 }
 
 type PollSourceStatusResponse struct {
-	Status model.SourceStatus `json:"status"`
+	Status sourcedomain.SourceStatus `json:"status"`
 }
 
 func (s *Server) PollSourceStatus(ctx context.Context, c *app.RequestContext) {
@@ -200,7 +205,8 @@ func (s *Server) PollSourceStatus(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	status, err := s.sourceLogic.PollSourceStatus(ctx, req.Id)
+	// status, err := s.sourceLogic.PollSourceStatus(ctx, req.Id)
+	status, err := s.pollSourceStatusHandler.Handle(ctx, req.Id)
 	if err != nil {
 		http.ErrResp(c, err)
 		return
@@ -223,7 +229,7 @@ func (s *Server) RetrySourcePreparation(ctx context.Context, c *app.RequestConte
 		return
 	}
 
-	err = s.sourceLogic.RetrySourcePreparation(ctx, req.Id)
+	err = s.retrySourcePreparationHandler.Handle(ctx, req.Id)
 	if err != nil {
 		http.ErrResp(c, err)
 		return
@@ -244,7 +250,7 @@ func (s *Server) DeleteSource(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	err = s.sourceLogic.DeleteSource(ctx, req.Id)
+	err = s.deleteSourceHandler.Handle(ctx, req.Id)
 	if err != nil {
 		http.ErrResp(c, err)
 		return
@@ -415,16 +421,21 @@ func (s *Server) GetSource(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp, err := s.sourceLogic.GetFullSource(ctx, req.Id,
-		&logic.GetFullSourceParams{
-			Download: req.Download,
-		})
+	// resp, err := s.sourceLogic.GetFullSource(ctx, req.Id,
+	// 	&logic.GetFullSourceParams{
+	// 		Download: req.Download,
+	// 	})
+	result, err := s.getSourceHandler.Handle(ctx, req.Id)
 	if err != nil {
 		http.ErrResp(c, err)
 		return
 	}
 
-	http.OkResp(c, schema.ToSource(resp))
+	http.OkResp(c, schema.ToSourceFromDomain(
+		result.Source,
+		result.FileContentUrl,
+		result.ParsedContentUrl,
+	))
 }
 
 type GetSourceParsedTreeRequest struct {
@@ -470,7 +481,7 @@ func (s *Server) UpdateSourceTitle(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	err = s.sourceLogic.UpdateSourceTitle(ctx, req.Id, req.Title)
+	err = s.updateSourceTitleHandler.Handle(ctx, req.Id, req.Title)
 	if err != nil {
 		http.ErrResp(c, err)
 		return

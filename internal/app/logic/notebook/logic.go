@@ -103,38 +103,38 @@ type ListNotebooksResult struct {
 	HasMore   bool
 }
 
-func (l *Logic) ListNotebooks(
-	ctx context.Context,
-	params *ListNotebooksParams,
-) (*ListNotebooksResult, error) {
-	userId := pkgcontext.GetUserId(ctx)
-	result, err := l.notebookBiz.ListNotebooks(
-		ctx,
-		&biznotebook.ListNotebooksQuery{
-			Limit:   params.Limit,
-			OwnerId: userId,
-			Offset:  params.Offset,
-			SortBy:  int(params.SortBy),
-		},
-	)
-	if err != nil {
-		return nil, errors.WithMessage(err, "list notebooks failed")
-	}
+// func (l *Logic) ListNotebooks(
+// 	ctx context.Context,
+// 	params *ListNotebooksParams,
+// ) (*ListNotebooksResult, error) {
+// 	userId := pkgcontext.GetUserId(ctx)
+// 	result, err := l.notebookBiz.ListNotebooks(
+// 		ctx,
+// 		&biznotebook.ListNotebooksQuery{
+// 			Limit:   params.Limit,
+// 			OwnerId: userId,
+// 			Offset:  params.Offset,
+// 			SortBy:  int(params.SortBy),
+// 		},
+// 	)
+// 	if err != nil {
+// 		return nil, errors.WithMessage(err, "list notebooks failed")
+// 	}
 
-	notebooks := make([]*NotebookSummary, 0, len(result.Notebooks))
-	for _, notebook := range result.Notebooks {
-		output, err := l.buildNotebookSummary(ctx, notebook)
-		if err != nil {
-			return nil, errors.WithMessagef(err, "build notebook output failed, notebook_id=%s", notebook.Id)
-		}
-		notebooks = append(notebooks, output)
-	}
+// 	notebooks := make([]*NotebookSummary, 0, len(result.Notebooks))
+// 	for _, notebook := range result.Notebooks {
+// 		output, err := l.buildNotebookSummary(ctx, notebook)
+// 		if err != nil {
+// 			return nil, errors.WithMessagef(err, "build notebook output failed, notebook_id=%s", notebook.Id)
+// 		}
+// 		notebooks = append(notebooks, output)
+// 	}
 
-	return &ListNotebooksResult{
-		Notebooks: notebooks,
-		HasMore:   result.HasMore,
-	}, nil
-}
+// 	return &ListNotebooksResult{
+// 		Notebooks: notebooks,
+// 		HasMore:   result.HasMore,
+// 	}, nil
+// }
 
 type ListNotebookSourcesParams struct {
 	NotebookId uuid.UUID
@@ -199,20 +199,20 @@ func (l *Logic) ListNotebookSources(
 	}, nil
 }
 
-func (l *Logic) buildNotebookSummary(
-	ctx context.Context,
-	notebook *model.Notebook,
-) (*NotebookSummary, error) {
-	sourceCount, err := l.sourceBiz.CountSourcesByNotebook(ctx, notebook.Id)
-	if err != nil {
-		return nil, errors.WithMessagef(err, "count sources failed, notebook_id=%s", notebook.Id)
-	}
+// func (l *Logic) buildNotebookSummary(
+// 	ctx context.Context,
+// 	notebook *model.Notebook,
+// ) (*NotebookSummary, error) {
+// 	sourceCount, err := l.sourceBiz.CountSourcesByNotebook(ctx, notebook.Id)
+// 	if err != nil {
+// 		return nil, errors.WithMessagef(err, "count sources failed, notebook_id=%s", notebook.Id)
+// 	}
 
-	return &NotebookSummary{
-		Notebook:    notebook,
-		SourceCount: sourceCount,
-	}, nil
-}
+// 	return &NotebookSummary{
+// 		Notebook:    notebook,
+// 		SourceCount: sourceCount,
+// 	}, nil
+// }
 
 // func (l *Logic) UpdateNotebookName(
 // 	ctx context.Context,

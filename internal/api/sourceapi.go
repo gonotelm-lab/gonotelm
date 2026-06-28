@@ -421,10 +421,6 @@ func (s *Server) GetSource(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	// resp, err := s.sourceLogic.GetFullSource(ctx, req.Id,
-	// 	&logic.GetFullSourceParams{
-	// 		Download: req.Download,
-	// 	})
 	result, err := s.getSourceHandler.Handle(ctx, req.Id)
 	if err != nil {
 		http.ErrResp(c, err)
@@ -442,22 +438,22 @@ type GetSourceParsedTreeRequest struct {
 	Id uuid.UUID `path:"id,required"`
 }
 
-func (s *Server) GetSourceParsedTree(ctx context.Context, c *app.RequestContext) {
-	var req GetSourceParsedTreeRequest
-	err := c.BindAndValidate(&req)
-	if err != nil {
-		http.ErrResp(c, err)
-		return
-	}
+// func (s *Server) GetSourceParsedTree(ctx context.Context, c *app.RequestContext) {
+// 	var req GetSourceParsedTreeRequest
+// 	err := c.BindAndValidate(&req)
+// 	if err != nil {
+// 		http.ErrResp(c, err)
+// 		return
+// 	}
 
-	resp, err := s.sourceLogic.GetSourceParsedTree(ctx, req.Id)
-	if err != nil {
-		http.ErrResp(c, err)
-		return
-	}
+// 	resp, err := s.sourceLogic.GetSourceParsedTree(ctx, req.Id)
+// 	if err != nil {
+// 		http.ErrResp(c, err)
+// 		return
+// 	}
 
-	http.OkResp(c, resp)
-}
+// 	http.OkResp(c, resp)
+// }
 
 type UpdateSourceTitleRequest struct {
 	Id    uuid.UUID `path:"id,required"`

@@ -67,11 +67,12 @@ func (s *Server) CreateNotebook(ctx context.Context, c *app.RequestContext) {
 	}
 
 	userId := pkgctx.GetUserId(ctx)
-	id, err := s.createNotebookHandler.Handle(ctx, &notebookapp.CreateNotebookHandleCommand{
-		Name:    req.Name,
-		Desc:    req.Desc,
-		OwnerId: userId,
-	})
+	id, err := s.createNotebookHandler.Handle(ctx,
+		&notebookapp.CreateNotebookHandleCommand{
+			Name:    req.Name,
+			Desc:    req.Desc,
+			OwnerId: userId,
+		})
 	if err != nil {
 		http.ErrResp(c, err)
 		return

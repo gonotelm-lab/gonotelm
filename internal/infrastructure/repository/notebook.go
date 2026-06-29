@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	"github.com/gonotelm-lab/gonotelm/internal/domain/notebook"
 	notebookdomain "github.com/gonotelm-lab/gonotelm/internal/domain/notebook"
+	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal/schema/mapper"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -19,14 +19,14 @@ type NotebookRepositoryImpl struct {
 func NewNotebookRepository(
 	notebookStore dal.NotebookStore,
 	sourceStore dal.SourceStore,
-) notebook.Repository {
+) notebookrepo.Repository {
 	return &NotebookRepositoryImpl{
 		notebookStore: notebookStore,
 		sourceStore:   sourceStore,
 	}
 }
 
-var _ notebook.Repository = &NotebookRepositoryImpl{}
+var _ notebookrepo.Repository = &NotebookRepositoryImpl{}
 
 func (s *NotebookRepositoryImpl) Save(ctx context.Context, notebook *notebookdomain.Notebook) error {
 	if notebook.IsDeleted() {
@@ -61,14 +61,14 @@ func (s *NotebookRepositoryImpl) FindById(ctx context.Context, id valobj.Id) (*n
 func (s *NotebookRepositoryImpl) ListByOwner(
 	ctx context.Context,
 	ownerId string,
-	spec *notebookdomain.ListSpec,
+	spec *notebookrepo.ListSpec,
 ) ([]*notebookdomain.Notebook, error) {
 	if err := spec.Validate(); err != nil {
 		return nil, err
 	}
 
 	orderBy := 0
-	if spec.Order == notebookdomain.ListSpecOrderUpdateTime {
+	if spec.Order == notebookrepo.ListSpecOrderUpdateTime {
 		orderBy = 1
 	}
 

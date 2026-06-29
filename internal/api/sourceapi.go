@@ -13,7 +13,7 @@ import (
 	logic "github.com/gonotelm-lab/gonotelm/internal/app/logic/source"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	sourceapp "github.com/gonotelm-lab/gonotelm/internal/application/source"
-	sourcedomain "github.com/gonotelm-lab/gonotelm/internal/domain/source"
+	sourcevo "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity/vo"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
@@ -118,7 +118,7 @@ func (s *Server) CreateSource(ctx context.Context, c *app.RequestContext) {
 	result, err := s.createSourceHandler.Handle(ctx, &sourceapp.CreateSourceHandleCommand{
 		NotebookId: req.NotebookId,
 		OwnerId:    userId,
-		Kind:       sourcedomain.SourceKind(req.Kind),
+		Kind:       sourcevo.SourceKind(req.Kind),
 		Text:       req.Text,
 		Url:        req.parsedUrl,
 	})
@@ -169,13 +169,14 @@ func (s *Server) UploadFileSource(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	result, err := s.presignUploadFileHandler.Handle(ctx, &sourceapp.PresignUploadFileHandleCommand{
-		SourceId: req.Id,
-		Filename: req.Filename,
-		MimeType: req.MimeType,
-		Size:     req.Size,
-		Md5:      req.Md5,
-	})
+	result, err := s.presignUploadFileHandler.Handle(ctx,
+		&sourceapp.PresignUploadFileHandleCommand{
+			SourceId: req.Id,
+			Filename: req.Filename,
+			MimeType: req.MimeType,
+			Size:     req.Size,
+			Md5:      req.Md5,
+		})
 	if err != nil {
 		http.ErrResp(c, err)
 		return
@@ -194,7 +195,7 @@ type PollSourceStatusRequest struct {
 }
 
 type PollSourceStatusResponse struct {
-	Status sourcedomain.SourceStatus `json:"status"`
+	Status sourcevo.SourceStatus `json:"status"`
 }
 
 func (s *Server) PollSourceStatus(ctx context.Context, c *app.RequestContext) {

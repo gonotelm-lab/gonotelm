@@ -6,21 +6,23 @@ import (
 	"net/url"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	"github.com/gonotelm-lab/gonotelm/internal/domain/notebook"
-	"github.com/gonotelm-lab/gonotelm/internal/domain/source"
+	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
+	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
+	sourcevo "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity/vo"
+	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type CreateSourceHandler struct {
-	sourceRepo   source.Repository
-	notebookRepo notebook.Repository
+	sourceRepo   sourcerepo.Repository
+	notebookRepo notebookrepo.Repository
 	eventBus     eventbus.EventBus
 }
 
 func NewCreateSourceHandler(
-	sourceRepo source.Repository,
-	notebookRepo notebook.Repository,
+	sourceRepo sourcerepo.Repository,
+	notebookRepo notebookrepo.Repository,
 	eventBus eventbus.EventBus,
 ) *CreateSourceHandler {
 	return &CreateSourceHandler{
@@ -33,7 +35,7 @@ func NewCreateSourceHandler(
 type CreateSourceHandleCommand struct {
 	NotebookId valobj.Id
 	OwnerId    string
-	Kind       source.SourceKind
+	Kind       sourcevo.SourceKind
 	Text       string
 	Url        *url.URL
 }
@@ -52,11 +54,11 @@ func (h *CreateSourceHandler) Handle(
 		return newId, errors.WithMessage(err, "notebook not allowed to create source")
 	}
 
-	newSource, err := source.NewSource(
+	newSource, err := sourceentity.NewSource(
 		cmd.NotebookId,
 		cmd.Kind,
 		cmd.OwnerId,
-		&source.ContentIntegrate{
+		&sourceentity.ContentUnion{
 			Kind: cmd.Kind,
 			Text: cmd.Text,
 			Url:  cmd.Url,
@@ -73,6 +75,10 @@ func (h *CreateSourceHandler) Handle(
 
 	// send source created event
 	events := newSource.PullEvents()
+	slog.DebugContext(ctx, "source created",
+		slog.String("source_id", newSource.Id.String()),
+		slog.Int("num_events", len(events)),
+	)
 	for _, event := range events {
 		err = h.eventBus.Publish(ctx, event)
 		if err != nil {

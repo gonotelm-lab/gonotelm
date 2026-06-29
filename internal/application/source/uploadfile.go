@@ -3,19 +3,20 @@ package source
 import (
 	"context"
 
-	domain "github.com/gonotelm-lab/gonotelm/internal/domain/source"
+	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
+	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 
 type PresignUploadFileHandler struct {
-	sourceRepo  domain.Repository
-	storageRepo domain.StorageRepository
+	sourceRepo  sourcerepo.Repository
+	storageRepo sourcerepo.StorageRepository
 }
 
 func NewPresignUploadFileHandler(
-	sourceRepo domain.Repository,
-	storageRepo domain.StorageRepository,
+	sourceRepo sourcerepo.Repository,
+	storageRepo sourcerepo.StorageRepository,
 ) *PresignUploadFileHandler {
 	return &PresignUploadFileHandler{
 		sourceRepo:  sourceRepo,
@@ -34,13 +35,13 @@ type PresignUploadFileHandleCommand struct {
 func (h *PresignUploadFileHandler) Handle(
 	ctx context.Context,
 	cmd *PresignUploadFileHandleCommand,
-) (*domain.PresignUploadResult, error) {
+) (*sourcerepo.PresignUploadResult, error) {
 	targetSource, err := h.sourceRepo.FindById(ctx, cmd.SourceId)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "find source failed, source_id=%s", cmd.SourceId)
 	}
 
-	err = targetSource.UploadFile(ctx, &domain.UploadFileParams{
+	err = targetSource.UploadFile(ctx, &sourceentity.UploadFileParams{
 		Filename: cmd.Filename,
 		MimeType: cmd.MimeType,
 		Size:     cmd.Size,
@@ -61,6 +62,7 @@ func (h *PresignUploadFileHandler) Handle(
 		return nil, errors.WithMessagef(err, "presign upload object failed, source_id=%s", cmd.SourceId)
 	}
 
+	targetSource.MarkUploading()
 	err = h.sourceRepo.Save(ctx, targetSource)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "save source failed, source_id=%s", cmd.SourceId)

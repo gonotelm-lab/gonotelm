@@ -5,18 +5,19 @@ import (
 	"log/slog"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	domain "github.com/gonotelm-lab/gonotelm/internal/domain/source"
+	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
+	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type GetSourceHandler struct {
-	sourceRepo  domain.Repository
-	storageRepo domain.StorageRepository
+	sourceRepo  sourcerepo.Repository
+	storageRepo sourcerepo.StorageRepository
 }
 
 func NewGetSourceHandler(
-	sourceRepo domain.Repository,
-	storageRepo domain.StorageRepository,
+	sourceRepo sourcerepo.Repository,
+	storageRepo sourcerepo.StorageRepository,
 ) *GetSourceHandler {
 	return &GetSourceHandler{
 		sourceRepo:  sourceRepo,
@@ -25,7 +26,7 @@ func NewGetSourceHandler(
 }
 
 type GetSourceHandleResult struct {
-	Source           *domain.Source
+	Source           *sourceentity.Source
 	FileContentUrl   string
 	ParsedContentUrl string
 }

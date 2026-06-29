@@ -3,11 +3,12 @@ package mapper
 import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	domain "github.com/gonotelm-lab/gonotelm/internal/domain/source"
+	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
+	sourcevo "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity/vo"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal/schema"
 )
 
-func SourceToSchema(source *domain.Source) *schema.Source {
+func SourceToSchema(source *sourceentity.Source) *schema.Source {
 	return &schema.Source{
 		Id:               source.Id,
 		NotebookId:       source.NotebookId,
@@ -22,23 +23,23 @@ func SourceToSchema(source *domain.Source) *schema.Source {
 	}
 }
 
-func SourceFromSchema(source *schema.Source) (*domain.Source, error) {
-	domainSource := &domain.Source{
+func SourceFromSchema(source *schema.Source) (*sourceentity.Source, error) {
+	domainSource := &sourceentity.Source{
 		Base: entity.Base{
 			Id:         source.Id,
 			CreateTime: valobj.NewTimeFromId(source.Id),
 			UpdateTime: valobj.NewTimeFromId(source.Id),
 		},
 		NotebookId: source.NotebookId,
-		Kind:       domain.SourceKind(source.Kind),
-		Status:     domain.SourceStatus(source.Status),
+		Kind:       sourcevo.SourceKind(source.Kind),
+		Status:     sourcevo.SourceStatus(source.Status),
 		Title:      source.Title,
 		// Content: source.Content, // TODO
 		ParsedContentKey: source.ParsedContentKey,
 		Abstract:         source.Abstract,
 		OwnerId:          source.OwnerId,
 	}
-	content, err := domain.NewSourceContent(domain.SourceKind(source.Kind), source.Content)
+	content, err := sourceentity.NewSourceContent(sourcevo.SourceKind(source.Kind), source.Content)
 	if err != nil {
 		return nil, err
 	}
@@ -47,8 +48,8 @@ func SourceFromSchema(source *schema.Source) (*domain.Source, error) {
 	return domainSource, nil
 }
 
-func SourcesFromSchemas(sources []*schema.Source) ([]*domain.Source, error) {
-	results := make([]*domain.Source, 0, len(sources))
+func SourcesFromSchemas(sources []*schema.Source) ([]*sourceentity.Source, error) {
+	results := make([]*sourceentity.Source, 0, len(sources))
 	for i := range sources {
 		source, err := SourceFromSchema(sources[i])
 		if err != nil {

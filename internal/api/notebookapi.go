@@ -186,9 +186,10 @@ func (s *Server) ListNotebooks(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
+	userId := pkgctx.GetUserId(ctx)
 	result, err := s.listNotebooksHandler.Handle(ctx,
 		&notebookapp.ListNotebooksHandleQuery{
-			OwnerId: "", // TODO get owner id from context
+			OwnerId: userId,
 			Limit:   req.Limit,
 			Offset:  req.Offset,
 			SortBy:  req.SortBy.ToSortBy(),

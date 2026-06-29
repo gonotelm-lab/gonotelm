@@ -4,15 +4,15 @@ import (
 	"context"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	domain "github.com/gonotelm-lab/gonotelm/internal/domain/source"
+	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type UpdateSourceTitleHandler struct {
-	sourceRepo domain.Repository
+	sourceRepo sourcerepo.Repository
 }
 
-func NewUpdateSourceTitleHandler(sourceRepo domain.Repository) *UpdateSourceTitleHandler {
+func NewUpdateSourceTitleHandler(sourceRepo sourcerepo.Repository) *UpdateSourceTitleHandler {
 	return &UpdateSourceTitleHandler{
 		sourceRepo: sourceRepo,
 	}

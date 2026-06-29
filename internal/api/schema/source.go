@@ -2,7 +2,7 @@ package schema
 
 import (
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
-	sourcedomain "github.com/gonotelm-lab/gonotelm/internal/domain/source"
+	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 )
 
 type TextSourceContent struct {
@@ -69,7 +69,7 @@ func ToSource(source *model.FullSource) *Source {
 }
 
 func ToSourceFromDomain(
-	source *sourcedomain.Source,
+	source *sourceentity.Source,
 	fileContentUrl, parsedContentUrl string,
 ) *Source {
 	if source == nil {
@@ -92,7 +92,7 @@ func ToSourceFromDomain(
 			s.Text = &TextSourceContent{Text: textContent.Text}
 		}
 	case source.Kind.IsUrl():
-		if urlContent, ok := source.Content.(*sourcedomain.UrlSourceContent); ok {
+		if urlContent, ok := source.Content.(*sourceentity.UrlSourceContent); ok {
 			s.Url = &UrlSourceContent{Url: urlContent.Url}
 		}
 	case source.Kind.IsFile():

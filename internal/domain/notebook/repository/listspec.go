@@ -1,9 +1,6 @@
-package notebook
+package repository
 
 import (
-	"context"
-
-	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	xerror "github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
@@ -13,12 +10,6 @@ const (
 	ListSpecOrderCreateTime ListSpecOrder = 0
 	ListSpecOrderUpdateTime ListSpecOrder = 1
 )
-
-type Repository interface {
-	Save(ctx context.Context, ns *Notebook) error
-	FindById(ctx context.Context, id valobj.Id) (*Notebook, error)
-	ListByOwner(ctx context.Context, ownerId string, spec *ListSpec) ([]*Notebook, error)
-}
 
 type ListSpec struct {
 	Offset int

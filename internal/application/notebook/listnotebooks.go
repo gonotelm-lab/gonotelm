@@ -4,14 +4,15 @@ import (
 	"context"
 
 	"github.com/gonotelm-lab/gonotelm/internal/domain/notebook"
+	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type ListNotebooksHandler struct {
-	notebookRepo notebook.Repository
+	notebookRepo notebookrepo.Repository
 }
 
-func NewListNotebooksHandler(notebookRepo notebook.Repository) *ListNotebooksHandler {
+func NewListNotebooksHandler(notebookRepo notebookrepo.Repository) *ListNotebooksHandler {
 	return &ListNotebooksHandler{
 		notebookRepo: notebookRepo,
 	}
@@ -31,12 +32,12 @@ type ListNotebooksHandleQuery struct {
 	SortBy  SortBy
 }
 
-func (q *ListNotebooksHandleQuery) ToSpec() *notebook.ListSpec {
-	order := notebook.ListSpecOrderCreateTime
+func (q *ListNotebooksHandleQuery) ToSpec() *notebookrepo.ListSpec {
+	order := notebookrepo.ListSpecOrderCreateTime
 	if q.SortBy == SortByLastActive {
-		order = notebook.ListSpecOrderUpdateTime
+		order = notebookrepo.ListSpecOrderUpdateTime
 	}
-	return &notebook.ListSpec{
+	return &notebookrepo.ListSpec{
 		Offset: q.Offset,
 		Limit:  q.Limit,
 		Order:  order,
@@ -54,7 +55,8 @@ func (h *ListNotebooksHandler) Handle(
 	ctx context.Context,
 	query *ListNotebooksHandleQuery,
 ) (*ListNotebooksHandleResult, error) {
-	spec := query.ToSpec() // TODO query one more to check has more
+	spec := query.ToSpec()
+	spec.Limit += 1
 	notebooks, err := h.notebookRepo.ListByOwner(ctx, query.OwnerId, spec)
 	if err != nil {
 		return nil, errors.WithMessage(err, "list notebooks failed")
@@ -64,6 +66,6 @@ func (h *ListNotebooksHandler) Handle(
 		Notebooks: notebooks,
 		Limit:     query.Limit,
 		Offset:    query.Offset,
-		HasMore:   len(notebooks) > query.Limit, // TODO query one more
+		HasMore:   len(notebooks) > query.Limit,
 	}, nil
 }

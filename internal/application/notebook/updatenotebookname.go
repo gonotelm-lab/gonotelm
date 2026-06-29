@@ -4,15 +4,15 @@ import (
 	"context"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	"github.com/gonotelm-lab/gonotelm/internal/domain/notebook"
+	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type UpdateNotebookNameHandler struct {
-	notebookRepo notebook.Repository
+	notebookRepo notebookrepo.Repository
 }
 
-func NewUpdateNotebookNameHandler(notebookRepo notebook.Repository) *UpdateNotebookNameHandler {
+func NewUpdateNotebookNameHandler(notebookRepo notebookrepo.Repository) *UpdateNotebookNameHandler {
 	return &UpdateNotebookNameHandler{
 		notebookRepo: notebookRepo,
 	}

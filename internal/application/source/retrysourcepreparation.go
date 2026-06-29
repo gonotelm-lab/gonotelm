@@ -5,18 +5,18 @@ import (
 	"log/slog"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	domain "github.com/gonotelm-lab/gonotelm/internal/domain/source"
+	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type RetrySourcePreparationHandler struct {
-	sourceRepo domain.Repository
+	sourceRepo sourcerepo.Repository
 	eventBus   eventbus.EventBus
 }
 
 func NewRetrySourcePreparationHandler(
-	sourceRepo domain.Repository,
+	sourceRepo sourcerepo.Repository,
 	eventBus eventbus.EventBus,
 ) *RetrySourcePreparationHandler {
 	return &RetrySourcePreparationHandler{

@@ -10,7 +10,11 @@ import (
 func Init(ctx context.Context, wire *wire.Wire) {
 	err := eventhandle.RegisterPreparationConsumer(ctx,
 		wire.EventBus,
-		eventhandle.NewPrepareSourceHandler(wire.SourceRepo),
+		eventhandle.NewPrepareSourceHandler(
+			wire.SourceRepo,
+			wire.SourceStorageRepo,
+			wire.SourceDocRepo,
+		),
 	)
 	if err != nil {
 		panic(err)

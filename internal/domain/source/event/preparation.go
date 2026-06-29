@@ -1,8 +1,9 @@
-package source
+package event
 
 import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/event"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	"github.com/gonotelm-lab/gonotelm/internal/domain/source/entity/vo"
 )
 
 const (
@@ -13,11 +14,11 @@ const (
 )
 
 type PreparationEvent struct {
-	Id         valobj.Id    `json:"id"`
-	NotebookId valobj.Id    `json:"notebook_id"`
-	Kind       SourceKind   `json:"kind"`
-	Status     SourceStatus `json:"status"`
-	UserId     string       `json:"user_id"`
+	Id         valobj.Id       `json:"id"`
+	NotebookId valobj.Id       `json:"notebook_id"`
+	Kind       vo.SourceKind   `json:"kind"`
+	Status     vo.SourceStatus `json:"status"`
+	UserId     string          `json:"user_id"`
 
 	isRetry bool
 }
@@ -52,8 +53,8 @@ func (e *PreparationEvent) Headers() []event.Header {
 func NewPreparationEvent(
 	id valobj.Id,
 	notebookId valobj.Id,
-	kind SourceKind,
-	status SourceStatus,
+	kind vo.SourceKind,
+	status vo.SourceStatus,
 	userId string,
 	isRetry bool,
 ) *PreparationEvent {
@@ -65,40 +66,4 @@ func NewPreparationEvent(
 		UserId:     userId,
 		isRetry:    isRetry,
 	}
-}
-
-const (
-	DeleteTopic = "inner.gonotelm.source.deleted"
-)
-
-type DeleteEvent struct {
-	Id         valobj.Id
-	NotebookId valobj.Id
-}
-
-func NewDeleteEvent(id valobj.Id, notebookId valobj.Id) event.Event {
-	return &DeleteEvent{
-		Id:         id,
-		NotebookId: notebookId,
-	}
-}
-
-func (e *DeleteEvent) Category() event.Category {
-	return event.CategoryOuter
-}
-
-func (e *DeleteEvent) Topic() string {
-	return DeleteTopic
-}
-
-func (e *DeleteEvent) Key() string {
-	return e.Id.String()
-}
-
-func (e *DeleteEvent) Value() any {
-	return e
-}
-
-func (e *DeleteEvent) Headers() []event.Header {
-	return nil
 }

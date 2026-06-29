@@ -1,4 +1,4 @@
-package source
+package entity
 
 import (
 	"context"
@@ -7,8 +7,10 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/gonotelm-lab/gonotelm/internal/core/entity"
+	coreentity "github.com/gonotelm-lab/gonotelm/internal/core/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	"github.com/gonotelm-lab/gonotelm/internal/domain/source/entity/vo"
+	sourceevent "github.com/gonotelm-lab/gonotelm/internal/domain/source/event"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
@@ -16,6 +18,9 @@ const (
 	MaxSourceTitleLength   = 255
 	MaxOwnerIdLength       = 255
 	MaxUploadFileSizeBytes = 100 * 1024 * 1024 // 100MB
+
+	// 一篇来源最大允许token数量
+	MaxSourceTextContentToken = 1_000_000 // 100k
 )
 
 // Supported source file mime types
@@ -35,79 +40,12 @@ func SupportedFileMimeType(mimeType string) bool {
 	return false
 }
 
-type SourceKind string
-
-const (
-	SourceKindText SourceKind = "text"
-	SourceKindUrl  SourceKind = "url"
-	SourceKindFile SourceKind = "file"
-)
-
-func (s SourceKind) IsFile() bool {
-	return s == SourceKindFile
-}
-
-func (s SourceKind) IsText() bool {
-	return s == SourceKindText
-}
-
-func (s SourceKind) IsUrl() bool {
-	return s == SourceKindUrl
-}
-
-func (s SourceKind) String() string {
-	return string(s)
-}
-
-type SourceStatus string
-
-func (s SourceStatus) String() string {
-	return string(s)
-}
-
-const (
-	SourceStatusInited    SourceStatus = "inited"
-	SourceStatusUploading SourceStatus = "uploading"
-	SourceStatusPreparing SourceStatus = "preparing"
-	SourceStatusReady     SourceStatus = "ready"
-	SourceStatusFailed    SourceStatus = "failed"
-)
-
-func (s SourceKind) Supported() bool {
-	switch s {
-	case SourceKindText, SourceKindUrl, SourceKindFile:
-		return true
-	}
-
-	return false
-}
-
-func (s SourceStatus) IsInited() bool {
-	return s == SourceStatusInited
-}
-
-func (s SourceStatus) IsUploading() bool {
-	return s == SourceStatusUploading
-}
-
-func (s SourceStatus) IsPreparing() bool {
-	return s == SourceStatusPreparing
-}
-
-func (s SourceStatus) IsReady() bool {
-	return s == SourceStatusReady
-}
-
-func (s SourceStatus) IsFailed() bool {
-	return s == SourceStatusFailed
-}
-
 type Source struct {
-	entity.Base
+	coreentity.Base
 
 	NotebookId       valobj.Id
-	Kind             SourceKind
-	Status           SourceStatus
+	Kind             vo.SourceKind
+	Status           vo.SourceStatus
 	Title            string
 	Abstract         string
 	OwnerId          string
@@ -117,15 +55,15 @@ type Source struct {
 
 func NewSource(
 	notebookId valobj.Id,
-	kind SourceKind,
+	kind vo.SourceKind,
 	ownerId string,
-	content *ContentIntegrate,
+	content *ContentUnion,
 ) (*Source, error) {
 	s := &Source{
-		Base:       entity.NewBase(),
+		Base:       coreentity.NewBase(),
 		NotebookId: notebookId,
 		Kind:       kind,
-		Status:     SourceStatusInited,
+		Status:     vo.SourceStatusInited,
 		OwnerId:    ownerId,
 	}
 	sourceContent, err := content.toSourceContent()
@@ -171,7 +109,7 @@ func (s *Source) validate() error {
 
 func (s *Source) addPreparationEvent(isRetry bool) {
 	s.Base.AddEvent(
-		NewPreparationEvent(
+		sourceevent.NewPreparationEvent(
 			s.Id,
 			s.NotebookId,
 			s.Kind,
@@ -220,6 +158,15 @@ func (s *Source) UploadFile(ctx context.Context, params *UploadFileParams) error
 		Format:   params.MimeType,
 	}
 	s.Content = fileContent
+	s.UpdateTime = valobj.NewTime()
+
+	return nil
+}
+
+func (s *Source) UploadParsedContent() error {
+	storeKey := s.formatParsedContentStoreKey()
+	s.UpdateTime = valobj.NewTime()
+	s.ParsedContentKey = storeKey
 
 	return nil
 }
@@ -239,11 +186,20 @@ func (s *Source) formatFileStoreKey(params *UploadFileParams) string {
 	var (
 		notebookId = s.NotebookId.String()
 		sourceId   = s.Id.String()
-		// take extension from input filename
-		ext = filepath.Ext(params.Filename)
+		ext        = filepath.Ext(params.Filename)
 	)
 
 	return fmt.Sprintf("file/%s/%s%s", notebookId, sourceId, ext)
+}
+
+func (s *Source) formatParsedContentStoreKey() string {
+	const parsedContentStorePrefix = "parsed_file/"
+	var (
+		notebookId = s.NotebookId.String()
+		sourceId   = s.Id.String()
+	)
+
+	return parsedContentStorePrefix + notebookId + "/" + sourceId
 }
 
 func (s *Source) GetFileContent() (*FileSourceContent, error) {
@@ -251,7 +207,7 @@ func (s *Source) GetFileContent() (*FileSourceContent, error) {
 		return nil, errors.ErrParams.Msgf("source content is nil")
 	}
 
-	if s.Content.Kind() != SourceKindFile {
+	if s.Content.Kind() != vo.SourceKindFile {
 		return nil, errors.ErrParams.Msgf("source content is not a file, kind=%s", s.Content.Kind())
 	}
 
@@ -268,7 +224,7 @@ func (s *Source) GetTextContent() (*TextSourceContent, error) {
 		return nil, errors.ErrParams.Msgf("source content is nil")
 	}
 
-	if s.Content.Kind() != SourceKindText {
+	if s.Content.Kind() != vo.SourceKindText {
 		return nil, errors.ErrParams.Msgf("source content is not a text, kind=%s", s.Content.Kind())
 	}
 
@@ -280,13 +236,42 @@ func (s *Source) GetTextContent() (*TextSourceContent, error) {
 	return textContent, nil
 }
 
+func (s *Source) GetUrlContent() (*UrlSourceContent, error) {
+	if s.Content == nil {
+		return nil, errors.ErrParams.Msgf("source content is nil")
+	}
+
+	if s.Content.Kind() != vo.SourceKindUrl {
+		return nil, errors.ErrParams.Msgf("source content is not a url, kind=%s", s.Content.Kind())
+	}
+
+	urlContent, ok := s.Content.(*UrlSourceContent)
+	if !ok {
+		return nil, errors.ErrParams.Msgf("source content is not a url, kind=%s", s.Content.Kind())
+	}
+
+	return urlContent, nil
+}
+
 func (s *Source) MarkPreparing() {
-	s.Status = SourceStatusPreparing
+	s.Status = vo.SourceStatusPreparing
 	s.addPreparationEvent(false)
+	s.UpdateTime = valobj.NewTime()
 }
 
 func (s *Source) MarkFailed() {
-	s.Status = SourceStatusFailed
+	s.Status = vo.SourceStatusFailed
+	s.UpdateTime = valobj.NewTime()
+}
+
+func (s *Source) MarkUploading() {
+	s.Status = vo.SourceStatusUploading
+	s.UpdateTime = valobj.NewTime()
+}
+
+func (s *Source) MarkReady() {
+	s.Status = vo.SourceStatusReady
+	s.UpdateTime = valobj.NewTime()
 }
 
 func (s *Source) RetryPreparation() error {
@@ -294,7 +279,7 @@ func (s *Source) RetryPreparation() error {
 		return errors.ErrParams.Msg("no need to retry")
 	}
 
-	s.Status = SourceStatusPreparing
+	s.Status = vo.SourceStatusPreparing
 	s.addPreparationEvent(true)
 	return nil
 }
@@ -312,19 +297,16 @@ func (s *Source) UpdateTitle(title string) error {
 	}
 
 	s.Title = nextTitle
+	s.UpdateTime = valobj.NewTime()
 	return nil
 }
 
 func (s *Source) Delete() {
 	s.Base.Delete()
 	s.addDeleteEvent()
+	s.UpdateTime = valobj.NewTime()
 }
 
 func (s *Source) addDeleteEvent() {
-	s.Base.AddEvent(
-		NewDeleteEvent(
-			s.Id,
-			s.NotebookId,
-		),
-	)
+	s.Base.AddEvent(sourceevent.NewDeleteEvent(s.Id, s.NotebookId))
 }

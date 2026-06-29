@@ -14,6 +14,7 @@ import (
 
 	einohtml "github.com/cloudwego/eino-ext/components/document/transformer/splitter/html"
 	eniomarkdown "github.com/cloudwego/eino-ext/components/document/transformer/splitter/markdown"
+	markdownmeta "github.com/gonotelm-lab/gonotelm/pkg/eino-ext/chunker/markdown"
 )
 
 func splitDocIdGenerator(ctx context.Context, originalID string, splitIndex int) string {
@@ -209,18 +210,27 @@ func annotateChunkPositions(sourceContent string, docs []*schema.Document) {
 	if sourceContent == "" || len(docs) == 0 {
 		return
 	}
-	runeIndexByByteOffset := util.BuildRuneIndexByByteOffset(sourceContent)
-	nonEmptyDocs := make([]*schema.Document, 0, len(docs))
-	chunkContents := make([]string, 0, len(docs))
+
+	needCompute := make([]*schema.Document, 0, len(docs))
+	needContents := make([]string, 0, len(docs))
 	for _, doc := range docs {
 		if doc == nil || doc.Content == "" {
 			continue
 		}
-		nonEmptyDocs = append(nonEmptyDocs, doc)
-		chunkContents = append(chunkContents, doc.Content)
+		if tryUseEmbeddedPositionMeta(sourceContent, doc) {
+			continue
+		}
+		needCompute = append(needCompute, doc)
+		needContents = append(needContents, doc.Content)
 	}
-	chunkSpans := util.BuildChunkByteSpans(sourceContent, chunkContents)
-	for idx, doc := range nonEmptyDocs {
+
+	if len(needCompute) == 0 {
+		return
+	}
+
+	runeIndexByByteOffset := util.BuildRuneIndexByByteOffset(sourceContent)
+	chunkSpans := util.BuildChunkByteSpans(sourceContent, needContents)
+	for idx, doc := range needCompute {
 		span := chunkSpans[idx]
 		if span.StartByte < 0 || span.EndByte <= span.StartByte {
 			continue
@@ -230,6 +240,41 @@ func annotateChunkPositions(sourceContent string, docs []*schema.Document) {
 		startRune := util.ByteOffsetToRuneOffset(runeIndexByByteOffset, startByte)
 		endRune := util.ByteOffsetToRuneOffset(runeIndexByByteOffset, endByte)
 		setChunkPositionMeta(doc, startByte, endByte, startRune, endRune)
+	}
+}
+
+func tryUseEmbeddedPositionMeta(sourceContent string, doc *schema.Document) bool {
+	mdByteStart, ok1 := getMetaInt(doc.MetaData, markdownmeta.MetaChunkByteStartKey)
+	mdByteEnd, ok2 := getMetaInt(doc.MetaData, markdownmeta.MetaChunkByteEndKey)
+	mdRuneStart, ok3 := getMetaInt(doc.MetaData, markdownmeta.MetaChunkRuneStartKey)
+	mdRuneEnd, ok4 := getMetaInt(doc.MetaData, markdownmeta.MetaChunkRuneEndKey)
+	if !ok1 || !ok2 || !ok3 || !ok4 {
+		return false
+	}
+	if mdByteStart < 0 || mdByteEnd <= mdByteStart || mdByteEnd > len(sourceContent) {
+		return false
+	}
+	if sourceContent[mdByteStart:mdByteEnd] != doc.Content {
+		return false
+	}
+	setChunkPositionMeta(doc, mdByteStart, mdByteEnd, mdRuneStart, mdRuneEnd)
+	return true
+}
+
+func getMetaInt(meta map[string]any, key string) (int, bool) {
+	raw, ok := meta[key]
+	if !ok {
+		return 0, false
+	}
+	switch v := raw.(type) {
+	case int:
+		return v, true
+	case int64:
+		return int(v), true
+	case float64:
+		return int(v), true
+	default:
+		return 0, false
 	}
 }
 

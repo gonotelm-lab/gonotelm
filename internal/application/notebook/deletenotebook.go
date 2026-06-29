@@ -6,16 +6,17 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/notebook"
+	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type DeleteNotebookHandler struct {
-	notebookRepo notebook.Repository
+	notebookRepo notebookrepo.Repository
 	eventBus   eventbus.EventBus
 }
 
-func NewDeleteNotebookHandler(notebookRepo notebook.Repository, eventBus eventbus.EventBus) *DeleteNotebookHandler {
+func NewDeleteNotebookHandler(notebookRepo notebookrepo.Repository, eventBus eventbus.EventBus) *DeleteNotebookHandler {
 	return &DeleteNotebookHandler{
 		notebookRepo: notebookRepo,
 		eventBus:   eventBus,

@@ -5,28 +5,45 @@ import (
 	"log/slog"
 	"runtime/debug"
 
-	"github.com/bytedance/sonic"
-	domain "github.com/gonotelm-lab/gonotelm/internal/domain/source"
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	"github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
+	sourceevent "github.com/gonotelm-lab/gonotelm/internal/domain/source/event"
+	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
+	"github.com/gonotelm-lab/gonotelm/internal/domain/source/service/index"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+
+	"github.com/bytedance/sonic"
 )
 
 const PreparationConsumerGroup = "gonotelm.source.preparation.group"
 
 // PrepareSourceHandler handles source preparation events consumed from the outer bus.
 type PrepareSourceHandler struct {
-	sourceRepo domain.Repository
+	sourceRepo         sourcerepo.Repository
+	sourceIndexService *index.Service
+	sourceStorageRepo  sourcerepo.StorageRepository
+	sourceDocRepo      sourcerepo.SourceDocRepository
 }
 
-func NewPrepareSourceHandler(sourceRepo domain.Repository) *PrepareSourceHandler {
-	return &PrepareSourceHandler{
-		sourceRepo: sourceRepo,
+func NewPrepareSourceHandler(
+	sourceRepo sourcerepo.Repository,
+	sourceStorageRepo sourcerepo.StorageRepository,
+	sourceDocRepo sourcerepo.SourceDocRepository,
+) *PrepareSourceHandler {
+	handler := &PrepareSourceHandler{
+		sourceRepo:         sourceRepo,
+		sourceIndexService: index.New(index.ServiceConfig{}, sourceStorageRepo, sourceDocRepo),
+		sourceStorageRepo:  sourceStorageRepo,
+		sourceDocRepo:      sourceDocRepo,
 	}
+
+	return handler
 }
 
 func (h *PrepareSourceHandler) Handle(
 	ctx context.Context,
-	evt *domain.PreparationEvent,
+	evt *sourceevent.PreparationEvent,
 	env eventbus.Envelope,
 ) error {
 	sourceId := evt.Id
@@ -59,12 +76,64 @@ func (h *PrepareSourceHandler) Handle(
 
 	// 开始处理对来源进行处理 执行构建索引等操作
 	if isPreparationRetry(env) {
-		// TODO clear existing indices
+		// clear existing indices
+		if err := h.sourceDocRepo.BatchDeleteBySourceId(
+			ctx,
+			targetSource.NotebookId,
+			[]valobj.Id{sourceId},
+		); err != nil {
+			slog.ErrorContext(ctx, "delete source docs failed",
+				slog.String("source_id", sourceId.String()),
+				slog.Any("err", err),
+			)
+		}
+
+		// clear existing indices
+		if err := h.sourceStorageRepo.DeleteObject(ctx, targetSource.ParsedContentKey); err != nil {
+			slog.ErrorContext(ctx, "delete parsed content failed",
+				slog.String("source_id", sourceId.String()),
+				slog.Any("err", err),
+			)
+		}
 	}
 
+	result, err := h.sourceIndexService.IndexSource(ctx, targetSource)
+	if err != nil {
+		return errors.WithMessagef(err, "index source failed, source_id=%s", evt.Id)
+	}
 
+	if err := h.uploadParsedContent(ctx, targetSource, result); err != nil {
+		return errors.WithMessagef(err, "upload parsed content failed, source_id=%s", evt.Id)
+	}
 
-	// TODO: migrate preparation workflow from internal/app/logic/source/eventhandle.go
+	if err := h.sourceRepo.Save(ctx, targetSource); err != nil {
+		return errors.WithMessagef(err, "save source failed after index, source_id=%s", evt.Id)
+	}
+
+	// TODO update abstract
+
+	slog.DebugContext(ctx, "source preparation completed", slog.String("source_id", evt.Id.String()))
+
+	return nil
+}
+
+func (h *PrepareSourceHandler) uploadParsedContent(
+	ctx context.Context,
+	source *entity.Source,
+	result *index.IndexSourceResult,
+) error {
+	// 上传解析完成的文档内容
+	source.UploadParsedContent()
+	source.MarkReady()
+	if err := h.sourceStorageRepo.UploadObject(
+		ctx,
+		source.ParsedContentKey,
+		result.ParsedContent,
+		result.ParsedContentType,
+	); err != nil {
+		return errors.WithMessagef(err, "upload parsed content failed, source_id=%s", source.Id.String())
+	}
+
 	return nil
 }
 
@@ -73,9 +142,9 @@ func RegisterPreparationConsumer(
 	bus eventbus.EventBus,
 	handler *PrepareSourceHandler,
 ) error {
-	return bus.Subscribe(ctx, domain.PreparationTopic, PreparationConsumerGroup,
+	return bus.Subscribe(ctx, sourceevent.PreparationTopic, PreparationConsumerGroup,
 		func(ctx context.Context, env eventbus.Envelope) error {
-			var evt domain.PreparationEvent
+			var evt sourceevent.PreparationEvent
 			if err := sonic.Unmarshal(env.Value, &evt); err != nil {
 				return errors.Wrap(err, "unmarshal preparation event")
 			}
@@ -86,6 +155,6 @@ func RegisterPreparationConsumer(
 }
 
 func isPreparationRetry(env eventbus.Envelope) bool {
-	val, ok := env.Header(domain.PreparationRetryHeaderKey)
-	return ok && string(val) == domain.PreparationRetryHeaderValue
+	val, ok := env.Header(sourceevent.PreparationRetryHeaderKey)
+	return ok && string(val) == sourceevent.PreparationRetryHeaderValue
 }

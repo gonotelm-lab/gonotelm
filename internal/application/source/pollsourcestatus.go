@@ -4,20 +4,22 @@ import (
 	"context"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	domain "github.com/gonotelm-lab/gonotelm/internal/domain/source"
+	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
+	sourcevo "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity/vo"
+	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type PollSourceStatusHandler struct {
-	sourceRepo  domain.Repository
-	storageRepo domain.StorageRepository
+	sourceRepo  sourcerepo.Repository
+	storageRepo sourcerepo.StorageRepository
 	eventBus    eventbus.EventBus
 }
 
 func NewPollSourceStatusHandler(
-	sourceRepo domain.Repository,
-	storageRepo domain.StorageRepository,
+	sourceRepo sourcerepo.Repository,
+	storageRepo sourcerepo.StorageRepository,
 	eventBus eventbus.EventBus,
 ) *PollSourceStatusHandler {
 	return &PollSourceStatusHandler{
@@ -30,7 +32,7 @@ func NewPollSourceStatusHandler(
 func (h *PollSourceStatusHandler) Handle(
 	ctx context.Context,
 	sourceId valobj.Id,
-) (domain.SourceStatus, error) {
+) (sourcevo.SourceStatus, error) {
 	targetSource, err := h.sourceRepo.FindById(ctx, sourceId)
 	if err != nil {
 		return "", errors.WithMessagef(err, "find source failed, source_id=%s", sourceId)
@@ -54,8 +56,8 @@ func (h *PollSourceStatusHandler) Handle(
 
 func (h *PollSourceStatusHandler) pollFileSourceStatus(
 	ctx context.Context,
-	targetSource *domain.Source,
-) (domain.SourceStatus, error) {
+	targetSource *sourceentity.Source,
+) (sourcevo.SourceStatus, error) {
 	if !targetSource.Status.IsUploading() {
 		return targetSource.Status, nil
 	}

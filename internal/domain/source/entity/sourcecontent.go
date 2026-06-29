@@ -1,14 +1,15 @@
-package source
+package entity
 
 import (
 	"net/url"
 
 	"github.com/bytedance/sonic"
+	"github.com/gonotelm-lab/gonotelm/internal/domain/source/entity/vo"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type SourceContent interface {
-	Kind() SourceKind
+	Kind() vo.SourceKind
 	Bytes() []byte
 }
 
@@ -18,8 +19,8 @@ type TextSourceContent struct {
 
 var _ SourceContent = (*TextSourceContent)(nil)
 
-func (t *TextSourceContent) Kind() SourceKind {
-	return SourceKindText
+func (t *TextSourceContent) Kind() vo.SourceKind {
+	return vo.SourceKindText
 }
 
 func (t *TextSourceContent) Bytes() []byte {
@@ -33,8 +34,8 @@ type UrlSourceContent struct {
 
 var _ SourceContent = (*UrlSourceContent)(nil)
 
-func (u *UrlSourceContent) Kind() SourceKind {
-	return SourceKindUrl
+func (u *UrlSourceContent) Kind() vo.SourceKind {
+	return vo.SourceKindUrl
 }
 
 func (u *UrlSourceContent) Bytes() []byte {
@@ -48,14 +49,12 @@ type FileSourceContent struct {
 	Md5      string `json:"md5,omitempty"`
 	Size     int64  `json:"size,omitempty"`
 	Format   string `json:"format,omitempty"`
-
-	Url string `json:"-"` // output usage
 }
 
 var _ SourceContent = (*FileSourceContent)(nil)
 
-func (f *FileSourceContent) Kind() SourceKind {
-	return SourceKindFile
+func (f *FileSourceContent) Kind() vo.SourceKind {
+	return vo.SourceKindFile
 }
 
 func (f *FileSourceContent) Bytes() []byte {
@@ -63,21 +62,21 @@ func (f *FileSourceContent) Bytes() []byte {
 	return b
 }
 
-func NewSourceContent(k SourceKind, b []byte) (SourceContent, error) {
+func NewSourceContent(k vo.SourceKind, b []byte) (SourceContent, error) {
 	switch k {
-	case SourceKindText:
+	case vo.SourceKindText:
 		var tc TextSourceContent
 		if err := sonic.Unmarshal(b, &tc); err != nil {
 			return nil, err
 		}
 		return &tc, nil
-	case SourceKindUrl:
+	case vo.SourceKindUrl:
 		var uc UrlSourceContent
 		if err := sonic.Unmarshal(b, &uc); err != nil {
 			return nil, err
 		}
 		return &uc, nil
-	case SourceKindFile:
+	case vo.SourceKindFile:
 		var fc FileSourceContent
 		if err := sonic.Unmarshal(b, &fc); err != nil {
 			return nil, err
@@ -88,20 +87,22 @@ func NewSourceContent(k SourceKind, b []byte) (SourceContent, error) {
 	return nil, errors.ErrParams.Msgf("unsupported source kind: %s", k)
 }
 
-type ContentIntegrate struct {
-	Kind SourceKind
+type ContentUnion struct {
+	Kind vo.SourceKind
+
+	// one of the following fields must be set
 	Text string
 	Url  *url.URL
 }
 
-func (c *ContentIntegrate) toSourceContent() (SourceContent, error) {
+func (c *ContentUnion) toSourceContent() (SourceContent, error) {
 	switch c.Kind {
-	case SourceKindText:
+	case vo.SourceKindText:
 		return &TextSourceContent{Text: c.Text}, nil
-	case SourceKindUrl:
+	case vo.SourceKindUrl:
 		return &UrlSourceContent{Url: c.Url.String()}, nil
-	case SourceKindFile:
-		return &FileSourceContent{}, nil // 文件来源的数据是分两步处理的 第一步暂时不会填入内容
+	case vo.SourceKindFile:
+		return &FileSourceContent{}, nil
 	}
 	return nil, errors.ErrParams.Msgf("unsupported source kind: %s", c.Kind)
 }

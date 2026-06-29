@@ -4,6 +4,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/entity"
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 )
 
 const (
@@ -76,6 +77,7 @@ func (n *Notebook) UpdateName(name string) error {
 		return err
 	}
 
+	n.UpdateTime = valobj.NewTime()
 	return nil
 }
 

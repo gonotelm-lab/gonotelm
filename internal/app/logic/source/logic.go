@@ -114,15 +114,15 @@ func MustNewLogic(
 }
 
 func (l *Logic) mustInitMsgQueue() {
-	if l.mqFactory == nil || l.mqFactory.NewProducer == nil || l.mqFactory.NewConsumer == nil {
-		panic("message queue is not initialized")
-	}
+	// if l.mqFactory == nil || l.mqFactory.NewProducer == nil || l.mqFactory.NewConsumer == nil {
+	// 	panic("message queue is not initialized")
+	// }
 
-	// producer
-	l.prepProducer = l.mqFactory.NewProducer()
-	// consumer
-	l.prepConsumer = l.mqFactory.NewConsumer(TopicSourcePreparation, SourcePreparationConsumerGroup)
-	l.prepConsumer.Subscribe(l.rootCtx, TopicSourcePreparation, l.handleSourceEventMessage)
+	// // producer
+	// l.prepProducer = l.mqFactory.NewProducer()
+	// // consumer
+	// l.prepConsumer = l.mqFactory.NewConsumer(TopicSourcePreparation, SourcePreparationConsumerGroup)
+	// l.prepConsumer.Subscribe(l.rootCtx, TopicSourcePreparation, l.handleSourceEventMessage)
 }
 
 type CreateSourceParams struct {

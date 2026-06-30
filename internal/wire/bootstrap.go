@@ -2,10 +2,13 @@ package wire
 
 import (
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
+	adapterdefine "github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infra"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/embedding"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
+	adapterimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository"
 )
@@ -13,12 +16,17 @@ import (
 var gWire *Wire
 
 type Wire struct {
+	llmGateway   *gateway.Gateway
+	embedGateway *embedding.Gateway
+
 	NotebookRepo      notebookrepo.Repository
 	SourceRepo        sourcerepo.Repository
 	SourceStorageRepo sourcerepo.StorageRepository
 	SourceDocRepo     sourcerepo.SourceDocRepository
 
 	EventBus eventbus.EventBus
+
+	Summarizer adapterdefine.Summarizer
 }
 
 func Init(infras *infra.Instances) {
@@ -34,6 +42,13 @@ func Init(infras *infra.Instances) {
 	if err != nil {
 		panic(err)
 	}
+
+	llmGateway, err := gateway.New(&conf.Global().Provider)
+	if err != nil {
+		panic(err)
+	}
+
+	summarizer := adapterimpl.NewSummarizer(llmGateway)
 
 	notebookRepo := repository.NewNotebookRepository(
 		infras.Dal.NotebookStore,
@@ -52,11 +67,16 @@ func Init(infras *infra.Instances) {
 		})
 
 	gWire = &Wire{
+		llmGateway:   llmGateway,
+		embedGateway: embedGateway,
+
 		NotebookRepo:      notebookRepo,
 		SourceRepo:        sourceRepo,
 		SourceStorageRepo: sourceStorageRepo,
 		SourceDocRepo:     sourceDocRepo,
 		EventBus:          eventbus.NewOuterEventBus(infras.MQ),
+
+		Summarizer: summarizer,
 	}
 }
 

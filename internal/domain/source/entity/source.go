@@ -107,19 +107,6 @@ func (s *Source) validate() error {
 	return nil
 }
 
-func (s *Source) addPreparationEvent(isRetry bool) {
-	s.Base.AddEvent(
-		sourceevent.NewPreparationEvent(
-			s.Id,
-			s.NotebookId,
-			s.Kind,
-			s.Status,
-			s.OwnerId,
-			isRetry,
-		),
-	)
-}
-
 type UploadFileParams struct {
 	Filename string
 	MimeType string
@@ -272,6 +259,7 @@ func (s *Source) MarkUploading() {
 func (s *Source) MarkReady() {
 	s.Status = vo.SourceStatusReady
 	s.UpdateTime = valobj.NewTime()
+	s.addIndexEvent()
 }
 
 func (s *Source) RetryPreparation() error {
@@ -301,6 +289,11 @@ func (s *Source) UpdateTitle(title string) error {
 	return nil
 }
 
+func (s *Source) UpdateAbstract(abstract string) {
+	s.Abstract = abstract
+	s.UpdateTime = valobj.NewTime()
+}
+
 func (s *Source) Delete() {
 	s.Base.Delete()
 	s.addDeleteEvent()
@@ -309,4 +302,21 @@ func (s *Source) Delete() {
 
 func (s *Source) addDeleteEvent() {
 	s.Base.AddEvent(sourceevent.NewDeleteEvent(s.Id, s.NotebookId))
+}
+
+func (s *Source) addPreparationEvent(isRetry bool) {
+	s.Base.AddEvent(
+		sourceevent.NewPreparationEvent(
+			s.Id,
+			s.NotebookId,
+			s.Kind,
+			s.Status,
+			s.OwnerId,
+			isRetry,
+		),
+	)
+}
+
+func (s *Source) addIndexEvent() {
+	s.Base.AddEvent(sourceevent.NewIndexEvent(s.Id, s.NotebookId))
 }

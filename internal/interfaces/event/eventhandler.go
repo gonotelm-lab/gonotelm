@@ -14,6 +14,7 @@ func Init(ctx context.Context, wire *wire.Wire) {
 			wire.SourceRepo,
 			wire.SourceStorageRepo,
 			wire.SourceDocRepo,
+			wire.Summarizer,
 		),
 	)
 	if err != nil {

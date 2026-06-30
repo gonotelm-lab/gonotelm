@@ -4,14 +4,18 @@ import (
 	"context"
 	"log/slog"
 	"runtime/debug"
+	"strings"
 
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourceevent "github.com/gonotelm-lab/gonotelm/internal/domain/source/event"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/service/index"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
+	"github.com/gonotelm-lab/gonotelm/pkg/batch"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 
 	"github.com/bytedance/sonic"
 )
@@ -24,18 +28,21 @@ type PrepareSourceHandler struct {
 	sourceIndexService *index.Service
 	sourceStorageRepo  sourcerepo.StorageRepository
 	sourceDocRepo      sourcerepo.SourceDocRepository
+	summarizer         adapter.Summarizer
 }
 
 func NewPrepareSourceHandler(
 	sourceRepo sourcerepo.Repository,
 	sourceStorageRepo sourcerepo.StorageRepository,
 	sourceDocRepo sourcerepo.SourceDocRepository,
+	summarizer adapter.Summarizer,
 ) *PrepareSourceHandler {
 	handler := &PrepareSourceHandler{
 		sourceRepo:         sourceRepo,
 		sourceIndexService: index.New(index.ServiceConfig{}, sourceStorageRepo, sourceDocRepo),
 		sourceStorageRepo:  sourceStorageRepo,
 		sourceDocRepo:      sourceDocRepo,
+		summarizer:         summarizer,
 	}
 
 	return handler
@@ -106,11 +113,17 @@ func (h *PrepareSourceHandler) Handle(
 		return errors.WithMessagef(err, "upload parsed content failed, source_id=%s", evt.Id)
 	}
 
+	// update abstract
+	if err := h.updateSourceAbstract(ctx, targetSource, result); err != nil {
+		slog.ErrorContext(ctx, "update source abstract failed",
+			slog.String("source_id", evt.Id.String()),
+			slog.Any("err", err),
+		)
+	}
+
 	if err := h.sourceRepo.Save(ctx, targetSource); err != nil {
 		return errors.WithMessagef(err, "save source failed after index, source_id=%s", evt.Id)
 	}
-
-	// TODO update abstract
 
 	slog.DebugContext(ctx, "source preparation completed", slog.String("source_id", evt.Id.String()))
 
@@ -133,6 +146,67 @@ func (h *PrepareSourceHandler) uploadParsedContent(
 	); err != nil {
 		return errors.WithMessagef(err, "upload parsed content failed, source_id=%s", source.Id.String())
 	}
+
+	return nil
+}
+
+func (h *PrepareSourceHandler) updateSourceAbstract(
+	ctx context.Context,
+	source *entity.Source,
+	result *index.IndexSourceResult,
+) error {
+	if len(result.SourceDocs) == 0 {
+		return nil
+	}
+
+	const (
+		batchSize          = 1
+		maxConcurrency     = 20
+		tokenSize          = 8000
+		maxSummarizedChunk = 64
+	)
+
+	chunks := make([]string, 0, len(result.SourceDocs))
+	for _, doc := range result.SourceDocs {
+		chunks = append(chunks, doc.Content)
+	}
+
+	newChunks := pkgstring.MergeChunks(chunks, tokenSize)
+	if len(newChunks) > maxSummarizedChunk {
+		newChunks = newChunks[:maxSummarizedChunk]
+	}
+
+	// newChunks中每个元素都生成一份摘要
+	chunkSummaries, err := batch.ParallelMap(
+		ctx,
+		newChunks,
+		batchSize,
+		maxConcurrency,
+		func(ctx context.Context, batch []string) ([]string, error) {
+			summary, err := h.summarizer.Summarize(ctx, batch[0])
+			if err != nil {
+				slog.ErrorContext(ctx, "generate summary failed",
+					slog.String("source_id", source.Id.String()),
+					slog.Any("err", err),
+				)
+				return []string{}, nil
+			}
+
+			return []string{summary}, nil
+		},
+	)
+	if err != nil {
+		return errors.WithMessagef(err, "generate summary failed, source_id=%s", source.Id.String())
+	}
+
+	// 给每个chunk的summary组合后再输出一句summary 作为整个source的summary
+	summarizingTexts := strings.Join(chunkSummaries, "\n")
+	summary, err := h.summarizer.Summarize(ctx, summarizingTexts)
+	if err != nil {
+		return errors.WithMessagef(err, "generate summary failed, source_id=%s", source.Id.String())
+	}
+
+	source.UpdateAbstract(summary)
 
 	return nil
 }

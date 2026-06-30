@@ -8,6 +8,8 @@ import (
 const DeleteTopic = "inner.gonotelm.source.deleted"
 
 type DeleteEvent struct {
+	event.BaseInnerEvent
+
 	Id         valobj.Id
 	NotebookId valobj.Id
 }
@@ -17,10 +19,6 @@ func NewDeleteEvent(id valobj.Id, notebookId valobj.Id) event.Event {
 		Id:         id,
 		NotebookId: notebookId,
 	}
-}
-
-func (e *DeleteEvent) Category() event.Category {
-	return event.CategoryInner
 }
 
 func (e *DeleteEvent) Topic() string {
@@ -33,8 +31,4 @@ func (e *DeleteEvent) Key() string {
 
 func (e *DeleteEvent) Value() any {
 	return e
-}
-
-func (e *DeleteEvent) Headers() []event.Header {
-	return nil
 }

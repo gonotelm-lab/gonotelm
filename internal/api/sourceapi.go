@@ -10,9 +10,9 @@ import (
 	"github.com/cloudwego/hertz/pkg/route"
 	"github.com/gonotelm-lab/gonotelm/internal/api/schema"
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
-	logic "github.com/gonotelm-lab/gonotelm/internal/app/logic/source"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	sourceapp "github.com/gonotelm-lab/gonotelm/internal/application/source"
+	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourcevo "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity/vo"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -291,15 +291,10 @@ type GetSourceDocResponse struct {
 func toGetSourceDocResponse(
 	sourceId string,
 	sourceTitle string,
-	doc *model.SourceDoc,
+	doc *sourceentity.SourceDoc,
 ) *GetSourceDocResponse {
 	if doc == nil {
 		return nil
-	}
-
-	summarizedFrom := make([]string, 0, len(doc.Derivation))
-	for _, derivation := range doc.Derivation {
-		summarizedFrom = append(summarizedFrom, derivation.String())
 	}
 
 	resp := &GetSourceDocResponse{
@@ -307,8 +302,8 @@ func toGetSourceDocResponse(
 		DocId:          doc.Id,
 		SourceTitle:    sourceTitle,
 		Content:        doc.Content,
-		IsSummary:      doc.IsDerived(),
-		SummarizedFrom: summarizedFrom,
+		IsSummary:      false,
+		SummarizedFrom: nil,
 	}
 	if doc.RunePos != nil {
 		resp.Position = &SourceDocPosition{
@@ -333,11 +328,10 @@ func (s *Server) GetSourceDoc(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	result, err := s.sourceLogic.GetSourceDoc(ctx,
-		&logic.GetSourceDocParams{
-			SourceId: req.Id,
-			DocId:    req.DocId,
-		})
+	result, err := s.getSourceDocHandler.Handle(ctx, &sourceapp.GetSourceDocHandleQuery{
+		SourceId: req.Id,
+		DocId:    req.DocId,
+	})
 	if err != nil {
 		http.ErrResp(c, err)
 		return
@@ -389,8 +383,8 @@ func (s *Server) BatchGetSourceDocs(ctx context.Context, c *app.RequestContext) 
 		return
 	}
 
-	result, err := s.sourceLogic.BatchGetSourceDocs(ctx,
-		&logic.BatchGetSourceDocsParams{
+	result, err := s.batchGetSourceDocHandler.Handle(ctx,
+		&sourceapp.BatchGetSourceDocsHandleQuery{
 			SourceId: req.Id,
 			DocIds:   req.Ids,
 		})

@@ -24,6 +24,8 @@ func SchemaToSourceDoc(schema *schema.SourceDoc) (*entity.SourceDoc, error) {
 		Owner:      schema.Owner,
 		ChunkPos:   int(schema.ChunkPos),
 		Score:      schema.Score,
+		BytePos:    &entity.SourceDocPosition{},
+		RunePos:    &entity.SourceDocPosition{},
 	}
 
 	if byteStart, ok := schema.GetInt64Meta(entity.ChunkMetaPosByteStartKey); ok {
@@ -68,10 +70,14 @@ func SourceDocToSchema(doc *entity.SourceDoc) *schema.SourceDoc {
 	}
 
 	// all are int
-	schemaDoc.PutMeta(entity.ChunkMetaPosStartKey, doc.BytePos.Start)
-	schemaDoc.PutMeta(entity.ChunkMetaPosEndKey, doc.BytePos.End)
-	schemaDoc.PutMeta(entity.ChunkMetaPosByteStartKey, doc.BytePos.Start)
-	schemaDoc.PutMeta(entity.ChunkMetaPosByteEndKey, doc.BytePos.End)
+	if doc.BytePos != nil {
+		schemaDoc.PutMeta(entity.ChunkMetaPosByteStartKey, doc.BytePos.Start)
+		schemaDoc.PutMeta(entity.ChunkMetaPosByteEndKey, doc.BytePos.End)
+	}
+	if doc.RunePos != nil {
+		schemaDoc.PutMeta(entity.ChunkMetaPosStartKey, doc.RunePos.Start)
+		schemaDoc.PutMeta(entity.ChunkMetaPosEndKey, doc.RunePos.End)
+	}
 
 	return schemaDoc
 }

@@ -31,13 +31,16 @@ type Server struct {
 	updateNotebookNameHandler *notebookapp.UpdateNotebookNameHandler
 
 	// source handler
-	getSourceHandler         *sourceapp.GetSourceHandler
-	createSourceHandler      *sourceapp.CreateSourceHandler
-	deleteSourceHandler      *sourceapp.DeleteSourceHandler
-	presignUploadFileHandler *sourceapp.PresignUploadFileHandler
-	pollSourceStatusHandler          *sourceapp.PollSourceStatusHandler
-	retrySourcePreparationHandler    *sourceapp.RetrySourcePreparationHandler
-	updateSourceTitleHandler         *sourceapp.UpdateSourceTitleHandler
+	getSourceHandler              *sourceapp.GetSourceHandler
+	createSourceHandler           *sourceapp.CreateSourceHandler
+	deleteSourceHandler           *sourceapp.DeleteSourceHandler
+	presignUploadFileHandler      *sourceapp.PresignUploadFileHandler
+	pollSourceStatusHandler       *sourceapp.PollSourceStatusHandler
+	retrySourcePreparationHandler *sourceapp.RetrySourcePreparationHandler
+	updateSourceTitleHandler      *sourceapp.UpdateSourceTitleHandler
+
+	getSourceDocHandler      *sourceapp.GetSourceDocHandler
+	batchGetSourceDocHandler *sourceapp.BatchGetSourceDocsHandler
 
 	wire *wire.Wire
 }
@@ -72,13 +75,16 @@ func NewServer(
 		deleteNotebookHandler:     notebookapp.NewDeleteNotebookHandler(wire.NotebookRepo, wire.EventBus),
 		updateNotebookNameHandler: notebookapp.NewUpdateNotebookNameHandler(wire.NotebookRepo),
 
-		getSourceHandler:         sourceapp.NewGetSourceHandler(wire.SourceRepo, wire.SourceStorageRepo),
-		createSourceHandler:      sourceapp.NewCreateSourceHandler(wire.SourceRepo, wire.NotebookRepo, wire.EventBus),
-		deleteSourceHandler:      sourceapp.NewDeleteSourceHandler(wire.SourceRepo, wire.EventBus),
-		presignUploadFileHandler: sourceapp.NewPresignUploadFileHandler(wire.SourceRepo, wire.SourceStorageRepo),
+		getSourceHandler:              sourceapp.NewGetSourceHandler(wire.SourceRepo, wire.SourceStorageRepo),
+		createSourceHandler:           sourceapp.NewCreateSourceHandler(wire.SourceRepo, wire.NotebookRepo, wire.EventBus),
+		deleteSourceHandler:           sourceapp.NewDeleteSourceHandler(wire.SourceRepo, wire.EventBus),
+		presignUploadFileHandler:      sourceapp.NewPresignUploadFileHandler(wire.SourceRepo, wire.SourceStorageRepo),
 		pollSourceStatusHandler:       sourceapp.NewPollSourceStatusHandler(wire.SourceRepo, wire.SourceStorageRepo, wire.EventBus),
 		retrySourcePreparationHandler: sourceapp.NewRetrySourcePreparationHandler(wire.SourceRepo, wire.EventBus),
 		updateSourceTitleHandler:      sourceapp.NewUpdateSourceTitleHandler(wire.SourceRepo),
+
+		getSourceDocHandler:      sourceapp.NewGetSourceDocHandler(wire.SourceRepo, wire.SourceDocRepo),
+		batchGetSourceDocHandler: sourceapp.NewBatchGetSourceDocsHandler(wire.SourceRepo, wire.SourceDocRepo),
 	}
 
 	s.registerRoutes()

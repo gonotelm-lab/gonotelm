@@ -185,10 +185,7 @@ func (h *PrepareSourceHandler) updateSourceAbstract(
 		func(ctx context.Context, batch []string) ([]string, error) {
 			summary, err := h.summarizer.Summarize(ctx, batch[0])
 			if err != nil {
-				slog.ErrorContext(ctx, "generate summary failed",
-					slog.String("source_id", source.Id.String()),
-					slog.Any("err", err),
-				)
+				slog.ErrorContext(ctx, "generate summary failed", slog.String("source_id", source.Id.String()), slog.Any("err", err))
 				return []string{}, nil
 			}
 

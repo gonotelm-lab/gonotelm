@@ -62,6 +62,7 @@ func (h *PresignUploadFileHandler) Handle(
 		return nil, errors.WithMessagef(err, "presign upload object failed, source_id=%s", cmd.SourceId)
 	}
 
+	targetSource.UpdateTitle(cmd.Filename)
 	targetSource.MarkUploading()
 	err = h.sourceRepo.Save(ctx, targetSource)
 	if err != nil {

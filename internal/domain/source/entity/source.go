@@ -8,6 +8,7 @@ import (
 	"unicode/utf8"
 
 	coreentity "github.com/gonotelm-lab/gonotelm/internal/core/entity"
+	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/entity/vo"
 	sourceevent "github.com/gonotelm-lab/gonotelm/internal/domain/source/event"
@@ -272,21 +273,11 @@ func (s *Source) RetryPreparation() error {
 	return nil
 }
 
-func (s *Source) UpdateTitle(title string) error {
+func (s *Source) UpdateTitle(title string) {
 	nextTitle := strings.TrimSpace(title)
-	if nextTitle == "" {
-		return errors.ErrParams.Msg("source title is empty")
-	}
-	if titleLen := utf8.RuneCountInString(nextTitle); titleLen > MaxSourceTitleLength {
-		return errors.ErrParams.Msgf("source title is too long, length=%d", titleLen)
-	}
-	if s.Title == nextTitle {
-		return nil
-	}
-
+	nextTitle = pkgstring.TruncateRune(nextTitle, MaxSourceTitleLength)
 	s.Title = nextTitle
 	s.UpdateTime = valobj.NewTime()
-	return nil
 }
 
 func (s *Source) UpdateAbstract(abstract string) {

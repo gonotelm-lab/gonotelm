@@ -10,7 +10,6 @@ import (
 	"github.com/cloudwego/hertz/pkg/route"
 	"github.com/gonotelm-lab/gonotelm/internal/api/schema"
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
-	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	sourceapp "github.com/gonotelm-lab/gonotelm/internal/application/source"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourcevo "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity/vo"
@@ -73,20 +72,20 @@ type CreateSourceRequest struct {
 }
 
 func (r *CreateSourceRequest) Validate() error {
-	mk := model.SourceKind(r.Kind)
+	mk := sourcevo.SourceKind(r.Kind)
 	if !mk.Supported() {
 		return errors.Errorf("invalid source kind: %s", r.Kind)
 	}
 
 	switch mk {
-	case model.SourceKindText:
+	case sourcevo.SourceKindText:
 		if r.Text == "" {
 			return errors.Errorf("text content is required")
 		}
 		if tLen := utf8.RuneCountInString(r.Text); tLen > constants.MaxSourceTextContentLength {
 			return errors.Errorf("text content is too long")
 		}
-	case model.SourceKindUrl:
+	case sourcevo.SourceKindUrl:
 		parsedUrl, err := url.ParseRequestURI(r.Url)
 		if err != nil {
 			return errors.Errorf("invalid url: %s", r.Url)
@@ -151,7 +150,7 @@ type UploadFileSourceResponse struct {
 }
 
 func (r *UploadFileSourceRequest) Validate() error {
-	if !model.SupportedFileMimeType(r.MimeType) {
+	if !sourceentity.SupportedFileMimeType(r.MimeType) {
 		return errors.ErrParams.Msgf("unsupported mime_type: %s", r.MimeType)
 	}
 	if r.Size > maxUploadFileSizeBytes {
@@ -206,7 +205,6 @@ func (s *Server) PollSourceStatus(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	// status, err := s.sourceLogic.PollSourceStatus(ctx, req.Id)
 	status, err := s.pollSourceStatusHandler.Handle(ctx, req.Id)
 	if err != nil {
 		http.ErrResp(c, err)
@@ -328,10 +326,11 @@ func (s *Server) GetSourceDoc(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	result, err := s.getSourceDocHandler.Handle(ctx, &sourceapp.GetSourceDocHandleQuery{
-		SourceId: req.Id,
-		DocId:    req.DocId,
-	})
+	result, err := s.getSourceDocHandler.Handle(ctx,
+		&sourceapp.GetSourceDocHandleQuery{
+			SourceId: req.Id,
+			DocId:    req.DocId,
+		})
 	if err != nil {
 		http.ErrResp(c, err)
 		return
@@ -432,23 +431,6 @@ func (s *Server) GetSource(ctx context.Context, c *app.RequestContext) {
 type GetSourceParsedTreeRequest struct {
 	Id uuid.UUID `path:"id,required"`
 }
-
-// func (s *Server) GetSourceParsedTree(ctx context.Context, c *app.RequestContext) {
-// 	var req GetSourceParsedTreeRequest
-// 	err := c.BindAndValidate(&req)
-// 	if err != nil {
-// 		http.ErrResp(c, err)
-// 		return
-// 	}
-
-// 	resp, err := s.sourceLogic.GetSourceParsedTree(ctx, req.Id)
-// 	if err != nil {
-// 		http.ErrResp(c, err)
-// 		return
-// 	}
-
-// 	http.OkResp(c, resp)
-// }
 
 type UpdateSourceTitleRequest struct {
 	Id    uuid.UUID `path:"id,required"`

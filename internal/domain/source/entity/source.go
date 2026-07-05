@@ -8,11 +8,11 @@ import (
 	"unicode/utf8"
 
 	coreentity "github.com/gonotelm-lab/gonotelm/internal/core/entity"
-	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/entity/vo"
 	sourceevent "github.com/gonotelm-lab/gonotelm/internal/domain/source/event"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 )
 
 const (
@@ -292,7 +292,22 @@ func (s *Source) Delete() {
 }
 
 func (s *Source) addDeleteEvent() {
-	s.Base.AddEvent(sourceevent.NewDeleteEvent(s.Id, s.NotebookId))
+	s.Base.AddEvent(sourceevent.NewDeleteEvent(s.Id, s.NotebookId, s.objectStoreKeys()))
+}
+
+func (s *Source) ObjectStoreKeys() []string {
+	return s.objectStoreKeys()
+}
+
+func (s *Source) objectStoreKeys() []string {
+	keys := make([]string, 0, 2)
+	if s.ParsedContentKey != "" {
+		keys = append(keys, s.ParsedContentKey)
+	}
+	if fileContent, err := s.GetFileContent(); err == nil && fileContent.StoreKey != "" {
+		keys = append(keys, fileContent.StoreKey)
+	}
+	return keys
 }
 
 func (s *Source) addPreparationEvent(isRetry bool) {

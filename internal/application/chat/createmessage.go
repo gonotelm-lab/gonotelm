@@ -3,6 +3,7 @@ package chat
 import (
 	"context"
 	"log/slog"
+	"sync"
 	"time"
 
 	chatagent "github.com/gonotelm-lab/gonotelm/internal/application/chat/agent"
@@ -24,6 +25,8 @@ import (
 )
 
 type CreateMessageHandler struct {
+	wg *sync.WaitGroup
+
 	notebookRepo           notebookrepo.Repository
 	chatRepo               chatrepo.Repository
 	chatMessageRepo        chatrepo.MessageRepository
@@ -39,6 +42,7 @@ type CreateMessageHandler struct {
 }
 
 func NewCreateMessageHandler(
+	wg *sync.WaitGroup,
 	notebookRepo notebookrepo.Repository,
 	chatRepo chatrepo.Repository,
 	chatMessageRepo chatrepo.MessageRepository,
@@ -56,6 +60,7 @@ func NewCreateMessageHandler(
 		sourceDocRepo,
 	)
 	return &CreateMessageHandler{
+		wg:                     wg,
 		notebookRepo:           notebookRepo,
 		chatRepo:               chatRepo,
 		chatMessageRepo:        chatMessageRepo,
@@ -138,7 +143,6 @@ func (h *CreateMessageHandler) Handle(
 		return nil, errors.WithMessagef(err, "failed to append context message, chat_id=%s", cmd.ChatId)
 	}
 
-	// TODO we need global wait group here to wait for the stream task to finish
 	bundle := &streamTaskBundle{
 		cancel:         taskCancel,
 		taskId:         task.Id,
@@ -152,7 +156,7 @@ func (h *CreateMessageHandler) Handle(
 		targetSources:  targetSources,
 		eventChan:      eventChan,
 	}
-	go h.startStreamTask(taskCtx, cmd, bundle)
+	h.wg.Go(func() { h.startStreamTask(taskCtx, cmd, bundle) })
 
 	return &CreateMessageResult{
 		MsgId:  userMsg.Id,
@@ -406,9 +410,11 @@ func (h *CreateMessageHandler) initStreamTask(
 	task := chatentity.NewStreamTask(chatId, userId)
 	eventChan := make(chan *chatentity.StreamTaskEvent, 256)
 
-	// TODO use global wait group here to wait for the stream task to finish
-	safe.Go(ctx, func() {
-		h.consumeStreamTaskEvents(ctx, cancel, eventChan)
+	h.wg.Go(func() {
+		safe.Do(ctx, func() error {
+			h.consumeStreamTaskEvents(ctx, cancel, eventChan)
+			return nil
+		})
 	})
 
 	return task, eventChan

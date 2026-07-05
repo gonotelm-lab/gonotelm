@@ -38,7 +38,6 @@ func (h *DeleteSourceHandler) Handle(ctx context.Context, id valobj.Id) error {
 		return errors.WithMessagef(err, "delete source failed, source_id=%s", id)
 	}
 
-	// TODO handle source docs and storage cleanup via events
 	for _, event := range targetSource.PullEvents() {
 		err = h.eventBus.Publish(ctx, event)
 		if err != nil {

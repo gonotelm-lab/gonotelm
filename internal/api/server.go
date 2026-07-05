@@ -3,9 +3,6 @@ package api
 import (
 	"github.com/cloudwego/hertz/pkg/app/server"
 	"github.com/gonotelm-lab/gonotelm/internal/app/logic"
-	chatlogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/chat"
-	notebooklogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/notebook"
-	sourcelogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/source"
 	studiologic "github.com/gonotelm-lab/gonotelm/internal/app/logic/studio"
 	chatapp "github.com/gonotelm-lab/gonotelm/internal/application/chat"
 	notebookapp "github.com/gonotelm-lab/gonotelm/internal/application/notebook"
@@ -20,18 +17,17 @@ import (
 type Server struct {
 	h *server.Hertz
 
-	notebookLogic *notebooklogic.Logic
-	sourceLogic   *sourcelogic.Logic
-	chatLogic     *chatlogic.Logic
-	studioLogic   *studiologic.Logic
+	studioLogic *studiologic.Logic
 
-	getNotebookHandler        *notebookapp.GetNotebookHandler
-	createNotebookHandler     *notebookapp.CreateNotebookHandler
-	listNotebooksHandler      *notebookapp.ListNotebooksHandler
-	deleteNotebookHandler     *notebookapp.DeleteNotebookHandler
-	updateNotebookNameHandler *notebookapp.UpdateNotebookNameHandler
+	checkNotebookAccessHandler *notebookapp.CheckNotebookAccessHandler
+	getNotebookHandler         *notebookapp.GetNotebookHandler
+	createNotebookHandler      *notebookapp.CreateNotebookHandler
+	listNotebooksHandler       *notebookapp.ListNotebooksHandler
+	deleteNotebookHandler      *notebookapp.DeleteNotebookHandler
+	updateNotebookNameHandler  *notebookapp.UpdateNotebookNameHandler
 
 	// source handler
+	checkSourceAccessHandler      *sourceapp.CheckSourceAccessHandler
 	getSourceHandler              *sourceapp.GetSourceHandler
 	createSourceHandler           *sourceapp.CreateSourceHandler
 	deleteSourceHandler           *sourceapp.DeleteSourceHandler
@@ -71,20 +67,19 @@ func NewServer(
 	)
 
 	s := &Server{
-		h:             hz,
-		notebookLogic: logic.NotebookLogic,
-		sourceLogic:   logic.SourceLogic,
-		chatLogic:     logic.ChatLogic,
-		studioLogic:   logic.StudioLogic,
+		h:           hz,
+		studioLogic: logic.StudioLogic,
 
 		wire: wire,
 
-		getNotebookHandler:        notebookapp.NewGetNotebookHandler(wire.NotebookRepo),
-		createNotebookHandler:     notebookapp.NewCreateNotebookHandler(wire.NotebookRepo, wire.EventBus),
-		listNotebooksHandler:      notebookapp.NewListNotebooksHandler(wire.NotebookRepo),
-		deleteNotebookHandler:     notebookapp.NewDeleteNotebookHandler(wire.NotebookRepo, wire.EventBus),
-		updateNotebookNameHandler: notebookapp.NewUpdateNotebookNameHandler(wire.NotebookRepo),
+		checkNotebookAccessHandler: notebookapp.NewCheckNotebookAccessHandler(wire.NotebookRepo),
+		getNotebookHandler:         notebookapp.NewGetNotebookHandler(wire.NotebookRepo),
+		createNotebookHandler:      notebookapp.NewCreateNotebookHandler(wire.NotebookRepo, wire.EventBus),
+		listNotebooksHandler:       notebookapp.NewListNotebooksHandler(wire.NotebookRepo),
+		deleteNotebookHandler:      notebookapp.NewDeleteNotebookHandler(wire.NotebookRepo, wire.EventBus),
+		updateNotebookNameHandler:  notebookapp.NewUpdateNotebookNameHandler(wire.NotebookRepo),
 
+		checkSourceAccessHandler:      sourceapp.NewCheckSourceAccessHandler(wire.SourceRepo),
 		getSourceHandler:              sourceapp.NewGetSourceHandler(wire.SourceRepo, wire.SourceStorageRepo),
 		createSourceHandler:           sourceapp.NewCreateSourceHandler(wire.SourceRepo, wire.NotebookRepo, wire.EventBus),
 		deleteSourceHandler:           sourceapp.NewDeleteSourceHandler(wire.SourceRepo, wire.EventBus),
@@ -100,6 +95,7 @@ func NewServer(
 		listSourcesHandler: sourceapp.NewListSourcesHandler(wire.NotebookRepo, wire.SourceRepo, wire.SourceStorageRepo),
 
 		chatCreateMessageHandler: chatapp.NewCreateMessageHandler(
+			wire.WaitGroup,
 			wire.NotebookRepo,
 			wire.ChatRepo,
 			wire.MessageRepo,

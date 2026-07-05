@@ -7,12 +7,14 @@ import (
 )
 
 // Envelope is the transport boundary for subscribed messages.
-// Infrastructure only carries raw bytes; application layer owns deserialization.
+// Outer (MQ) consumers read Value bytes; inner consumers use Inner directly.
 type Envelope struct {
 	Topic   string
 	Key     string
 	Value   []byte
 	Headers []event.Header
+
+	Inner event.Event // set by inner bus only; no serialization
 }
 
 func (e Envelope) Header(key string) ([]byte, bool) {
@@ -25,6 +27,9 @@ func (e Envelope) Header(key string) ([]byte, bool) {
 }
 
 type EventBusMessageHandler func(ctx context.Context, env Envelope) error
+
+// InnerEventHandler receives in-process events without serialization.
+type InnerEventHandler func(ctx context.Context, evt event.Event) error
 
 type EventBus interface {
 	Publish(ctx context.Context, evt event.Event) error

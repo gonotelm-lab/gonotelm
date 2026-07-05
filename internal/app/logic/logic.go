@@ -5,12 +5,9 @@ import (
 	"sync"
 
 	bizartifact "github.com/gonotelm-lab/gonotelm/internal/app/biz/artifact"
-	bizchat "github.com/gonotelm-lab/gonotelm/internal/app/biz/chat"
 	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
 	bizprompt "github.com/gonotelm-lab/gonotelm/internal/app/biz/prompt"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
-	chatlogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/chat"
-	notebooklogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/notebook"
 	sourcelogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/source"
 	studiologic "github.com/gonotelm-lab/gonotelm/internal/app/logic/studio"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
@@ -18,16 +15,13 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infra/cache"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/embedding"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/rerank"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/text2image"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
 )
 
 type Logic struct {
-	NotebookLogic *notebooklogic.Logic
-	SourceLogic   *sourcelogic.Logic
-	ChatLogic     *chatlogic.Logic
-	StudioLogic   *studiologic.Logic
+	SourceLogic *sourcelogic.Logic
+	StudioLogic *studiologic.Logic
 }
 
 func MustNewLogic(
@@ -48,13 +42,6 @@ func MustNewLogic(
 		panic(err)
 	}
 
-	rerankerGateway, err := rerank.NewGateway(
-		&conf.Global().Rerank,
-	)
-	if err != nil {
-		panic(err)
-	}
-
 	text2imageGateway, err := text2image.NewGateway(
 		&conf.Global().Text2Image,
 	)
@@ -63,13 +50,7 @@ func MustNewLogic(
 	}
 
 	notebookBiz := biznotebook.New(infrastructures.Dal.NotebookStore)
-	chatBiz := bizchat.New(
-		infrastructures.Dal.ChatStore,
-		infrastructures.Dal.ChatMessageStore,
-		infrastructures.Cache.ChatMessageContextCache)
 	artifactBiz := bizartifact.New(infrastructures.Dal.ArtifactTaskStore)
-	chatEventManager := bizchat.NewChatEventManager(
-		infrastructures.Cache.ChatMessageStreamCache)
 
 	prompt := bizprompt.New("zh")
 
@@ -105,24 +86,6 @@ func MustNewLogic(
 		prompt,
 	)
 
-	notebookLogic := notebooklogic.NewLogic(
-		notebookBiz,
-		sourceBiz,
-		chatBiz,
-		artifactBiz,
-	)
-
-	chatLogic := chatlogic.MustNewLogic(
-		llmGateway,
-		rerankerGateway,
-		notebookBiz,
-		sourceBiz,
-		agentSourceBiz,
-		chatBiz,
-		chatEventManager,
-		prompt,
-	)
-
 	studioLogic := studiologic.MustNewLogic(
 		ctx,
 		objectStorage,
@@ -136,10 +99,8 @@ func MustNewLogic(
 	)
 
 	return &Logic{
-		NotebookLogic: notebookLogic,
-		SourceLogic:   sourceLogic,
-		ChatLogic:     chatLogic,
-		StudioLogic:   studioLogic,
+		SourceLogic: sourceLogic,
+		StudioLogic: studioLogic,
 	}
 }
 
@@ -147,9 +108,6 @@ func (l *Logic) Close(ctx context.Context) {
 	var wg sync.WaitGroup
 	wg.Go(func() {
 		l.SourceLogic.Close(ctx)
-	})
-	wg.Go(func() {
-		l.ChatLogic.Close(ctx)
 	})
 	wg.Go(func() {
 		l.StudioLogic.Close(ctx)

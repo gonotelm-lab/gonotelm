@@ -29,6 +29,7 @@ type PrepareSourceHandler struct {
 	sourceStorageRepo  sourcerepo.StorageRepository
 	sourceDocRepo      sourcerepo.SourceDocRepository
 	summarizer         adapter.Summarizer
+	eventBus           eventbus.EventBus
 }
 
 func NewPrepareSourceHandler(
@@ -36,6 +37,7 @@ func NewPrepareSourceHandler(
 	sourceStorageRepo sourcerepo.StorageRepository,
 	sourceDocRepo sourcerepo.SourceDocRepository,
 	summarizer adapter.Summarizer,
+	eventBus eventbus.EventBus,
 ) *PrepareSourceHandler {
 	handler := &PrepareSourceHandler{
 		sourceRepo:         sourceRepo,
@@ -43,6 +45,7 @@ func NewPrepareSourceHandler(
 		sourceStorageRepo:  sourceStorageRepo,
 		sourceDocRepo:      sourceDocRepo,
 		summarizer:         summarizer,
+		eventBus:           eventBus,
 	}
 
 	return handler
@@ -123,6 +126,16 @@ func (h *PrepareSourceHandler) Handle(
 
 	if err := h.sourceRepo.Save(ctx, targetSource); err != nil {
 		return errors.WithMessagef(err, "save source failed after index, source_id=%s", evt.Id)
+	}
+
+	for _, domainEvent := range targetSource.PullEvents() {
+		if err := h.eventBus.Publish(ctx, domainEvent); err != nil {
+			slog.ErrorContext(ctx, "publish source domain event failed",
+				slog.String("source_id", evt.Id.String()),
+				slog.String("topic", domainEvent.Topic()),
+				slog.Any("err", err),
+			)
+		}
 	}
 
 	slog.DebugContext(ctx, "source preparation completed", slog.String("source_id", evt.Id.String()))
@@ -208,6 +221,7 @@ func (h *PrepareSourceHandler) updateSourceAbstract(
 	return nil
 }
 
+// RegisterPreparationConsumer registers the only outer (MQ) consumer.
 func RegisterPreparationConsumer(
 	ctx context.Context,
 	bus eventbus.EventBus,

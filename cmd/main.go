@@ -57,12 +57,15 @@ func run() {
 		infras.ObjectStorage,
 	)
 
+	wireIns := wire.GetWire()
+
 	defer func() {
 		// Close MQ consumers/producers before databases to avoid shutdown writes on closed DB.
 		app.Close(ctx)
+		wireIns.Close()
 		infra.Close(ctx)
 	}()
 
-	event.Init(ctx, wire.GetWire())
-	api.NewServer(app, infras, wire.GetWire()).Run()
+	event.Init(ctx, wireIns)
+	api.NewServer(app, infras, wireIns).Run()
 }

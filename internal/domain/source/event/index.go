@@ -10,15 +10,23 @@ const IndexTopic = "inner.gonotelm.source.indexed"
 type IndexEvent struct {
 	event.BaseInnerEvent
 
-	Id         valobj.Id
-	NotebookId valobj.Id
+	sourceId   valobj.Id
+	notebookId valobj.Id
 }
 
-func NewIndexEvent(id valobj.Id, notebookId valobj.Id) event.Event {
+func NewIndexEvent(sourceId, notebookId valobj.Id) *IndexEvent {
 	return &IndexEvent{
-		Id:         id,
-		NotebookId: notebookId,
+		sourceId:   sourceId,
+		notebookId: notebookId,
 	}
+}
+
+func (e *IndexEvent) SourceId() valobj.Id {
+	return e.sourceId
+}
+
+func (e *IndexEvent) NotebookId() valobj.Id {
+	return e.notebookId
 }
 
 func (e *IndexEvent) Topic() string {
@@ -26,10 +34,9 @@ func (e *IndexEvent) Topic() string {
 }
 
 func (e *IndexEvent) Key() string {
-	return e.Id.String()
+	return e.sourceId.String()
 }
 
 func (e *IndexEvent) Value() any {
 	return e
 }
-

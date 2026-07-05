@@ -10,15 +10,29 @@ const DeleteTopic = "inner.gonotelm.source.deleted"
 type DeleteEvent struct {
 	event.BaseInnerEvent
 
-	Id         valobj.Id
-	NotebookId valobj.Id
+	sourceId   valobj.Id
+	notebookId valobj.Id
+	objectKeys []string
 }
 
-func NewDeleteEvent(id valobj.Id, notebookId valobj.Id) event.Event {
+func NewDeleteEvent(sourceId, notebookId valobj.Id, objectKeys []string) *DeleteEvent {
 	return &DeleteEvent{
-		Id:         id,
-		NotebookId: notebookId,
+		sourceId:   sourceId,
+		notebookId: notebookId,
+		objectKeys: objectKeys,
 	}
+}
+
+func (e *DeleteEvent) SourceId() valobj.Id {
+	return e.sourceId
+}
+
+func (e *DeleteEvent) NotebookId() valobj.Id {
+	return e.notebookId
+}
+
+func (e *DeleteEvent) ObjectStoreKeys() []string {
+	return e.objectKeys
 }
 
 func (e *DeleteEvent) Topic() string {
@@ -26,7 +40,7 @@ func (e *DeleteEvent) Topic() string {
 }
 
 func (e *DeleteEvent) Key() string {
-	return e.Id.String()
+	return e.sourceId.String()
 }
 
 func (e *DeleteEvent) Value() any {

@@ -75,3 +75,14 @@ func (s *SourceRepositoryImpl) GetByNotebookIdAndIds(
 
 	return mapper.SourcesFromSchemas(sources)
 }
+
+func (s *SourceRepositoryImpl) BatchDeleteByIds(ctx context.Context, ids []valobj.Id) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	return s.sourceStore.BatchDelete(ctx, ids)
+}
+
+func (s *SourceRepositoryImpl) DeleteByNotebookId(ctx context.Context, notebookId valobj.Id) error {
+	return s.sourceStore.DeleteByNotebookId(ctx, notebookId)
+}

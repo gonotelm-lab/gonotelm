@@ -12,4 +12,6 @@ type Repository interface {
 	FindById(ctx context.Context, id valobj.Id) (*entity.Source, error)
 	ListByNotebookId(ctx context.Context, notebookId valobj.Id, spec *ListSpec) ([]*entity.Source, error)
 	GetByNotebookIdAndIds(ctx context.Context, notebookId valobj.Id, ids []valobj.Id) ([]*entity.Source, error)
+	DeleteByNotebookId(ctx context.Context, notebookId valobj.Id) error
+	BatchDeleteByIds(ctx context.Context, ids []valobj.Id) error
 }

@@ -34,7 +34,6 @@ func (s *Server) registerSourcesRoutes(g *route.RouterGroup) {
 		sourceIdGroup.POST("/reload", s.RetrySourcePreparation) // retry source preparation
 		sourceIdGroup.GET("/doc/:doc_id", s.GetSourceDoc)
 		sourceIdGroup.GET("/batch/docs", s.BatchGetSourceDocs)
-		// sourceIdGroup.GET("/parsed/tree", s.GetSourceParsedTree) // TODO remove this endpoint
 		sourceIdGroup.PUT("/title", s.UpdateSourceTitle)
 	}
 }
@@ -52,7 +51,7 @@ func (s *Server) checkSourceUserMiddleware(ctx context.Context, c *app.RequestCo
 		return
 	}
 
-	err = s.sourceLogic.CheckSourceUserId(ctx, sid)
+	err = s.checkSourceAccessHandler.Handle(ctx, sid)
 	if err != nil {
 		http.ErrResp(c, err)
 		return

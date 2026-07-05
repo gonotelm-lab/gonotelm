@@ -27,3 +27,11 @@ func ChatFromSchema(sch *schema.Chat) *chatdomain.Chat {
 		OwnerId:    sch.OwnerId,
 	}
 }
+
+func ChatsFromSchema(schemas []*schema.Chat) []*chatdomain.Chat {
+	chats := make([]*chatdomain.Chat, 0, len(schemas))
+	for _, sch := range schemas {
+		chats = append(chats, ChatFromSchema(sch))
+	}
+	return chats
+}

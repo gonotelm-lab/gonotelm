@@ -470,6 +470,14 @@ func (l *Logic) fillArtifactTaskContentUrl(ctx context.Context, artifacts []*Art
 	wg.Wait()
 }
 
+func (l *Logic) DeleteNotebookTasks(ctx context.Context, notebookId uuid.UUID) error {
+	err := l.artifactBiz.DeleteNotebookTasks(ctx, notebookId)
+	if err != nil {
+		return errors.WithMessagef(err, "delete notebook studio tasks failed, notebook_id=%s", notebookId)
+	}
+	return nil
+}
+
 // ext: png/jpg/txt/pptx/pdf, etc
 func formatArtifactStoreKey(notebookID, taskID uuid.UUID, ext string) string {
 	if !strings.HasPrefix(ext, ".") {

@@ -56,3 +56,14 @@ func (r *MessageRepositoryImpl) ListByChatIdBeforeSeqNo(
 
 	return mapper.MessagesFromSchema(schemas)
 }
+
+func (r *MessageRepositoryImpl) DeleteByChatIds(
+	ctx context.Context,
+	chatIds []valobj.Id,
+) error {
+	if len(chatIds) == 0 {
+		return nil
+	}
+
+	return r.messageStore.BatchDeleteByChatIds(ctx, chatIds)
+}

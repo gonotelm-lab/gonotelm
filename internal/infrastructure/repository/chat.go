@@ -59,3 +59,19 @@ func (r *ChatRepositoryImpl) FindByNotebookIdAndOwnerId(ctx context.Context, not
 
 	return mapper.ChatFromSchema(sch), nil
 }
+
+func (r *ChatRepositoryImpl) ListByNotebookId(
+	ctx context.Context,
+	notebookId valobj.Id,
+) ([]*entity.Chat, error) {
+	schemas, err := r.chatStore.ListByNotebookId(ctx, notebookId)
+	if err != nil {
+		return nil, err
+	}
+
+	return mapper.ChatsFromSchema(schemas), nil
+}
+
+func (r *ChatRepositoryImpl) DeleteByNotebookId(ctx context.Context, notebookId valobj.Id) error {
+	return r.chatStore.DeleteByNotebookId(ctx, notebookId)
+}

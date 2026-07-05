@@ -1,6 +1,8 @@
 package wire
 
 import (
+	"sync"
+
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	adapterdefine "github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
@@ -25,12 +27,15 @@ type Wire struct {
 	SourceStorageRepo sourcerepo.StorageRepository
 	SourceDocRepo     sourcerepo.SourceDocRepository
 
-	ChatRepo              chatrepo.Repository
-	MessageRepo           chatrepo.MessageRepository
-	StreamTaskRepo        chatrepo.StreamTaskRepository
-	ContextMessageRepo    chatrepo.ContextMessageRepository
+	ChatRepo           chatrepo.Repository
+	MessageRepo        chatrepo.MessageRepository
+	StreamTaskRepo     chatrepo.StreamTaskRepository
+	ContextMessageRepo chatrepo.ContextMessageRepository
+	ArtifactTaskRepo   *repository.ArtifactTaskRepository
 
 	EventBus eventbus.EventBus
+
+	WaitGroup *sync.WaitGroup
 
 	Summarizer adapterdefine.Summarizer
 }
@@ -76,20 +81,26 @@ func Init(infras *infra.Instances) {
 	messageRepo := repository.NewMessageRepository(infras.Dal.ChatMessageStore)
 	streamTaskRepo := repository.NewStreamTaskRepository(infras.Cache.ChatMessageStreamCache)
 	contextMessageRepo := repository.NewContextMessageRepository(infras.Cache.ChatMessageContextCache)
+	artifactTaskRepo := repository.NewArtifactTaskRepository(infras.Dal.ArtifactTaskStore)
+
+	innerEventBus := eventbus.NewInnerEventBus()
+	outerEventBus := eventbus.NewOuterEventBus(infras.MQ)
 
 	gWire = &Wire{
+		WaitGroup:    &sync.WaitGroup{},
 		llmGateway:   llmGateway,
 		embedGateway: embedGateway,
 
-		NotebookRepo:      notebookRepo,
-		SourceRepo:        sourceRepo,
-		SourceStorageRepo: sourceStorageRepo,
-		SourceDocRepo:     sourceDocRepo,
-		ChatRepo:              chatRepo,
-		MessageRepo:           messageRepo,
-		StreamTaskRepo:        streamTaskRepo,
-		ContextMessageRepo:    contextMessageRepo,
-		EventBus:              eventbus.NewOuterEventBus(infras.MQ),
+		NotebookRepo:       notebookRepo,
+		SourceRepo:         sourceRepo,
+		SourceStorageRepo:  sourceStorageRepo,
+		SourceDocRepo:      sourceDocRepo,
+		ChatRepo:           chatRepo,
+		MessageRepo:        messageRepo,
+		StreamTaskRepo:     streamTaskRepo,
+		ContextMessageRepo: contextMessageRepo,
+		ArtifactTaskRepo:   artifactTaskRepo,
+		EventBus:           eventbus.NewCompositeEventBus(innerEventBus, outerEventBus),
 
 		Summarizer: summarizer,
 	}
@@ -101,4 +112,12 @@ func GetWire() *Wire {
 
 func (w *Wire) Gateway() *gateway.Gateway {
 	return w.llmGateway
+}
+
+func (w *Wire) Close() {
+	w.WaitGroup.Wait()
+}
+
+func (w *Wire) Go(f func()) {
+	w.WaitGroup.Go(f)
 }

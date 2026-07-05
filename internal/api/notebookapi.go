@@ -40,7 +40,7 @@ func (s *Server) checkNotebookUserId(ctx context.Context, c *app.RequestContext)
 		return
 	}
 
-	err = s.notebookLogic.CheckNotebookUserId(ctx, nid)
+	err = s.checkNotebookAccessHandler.Handle(ctx, nid)
 	if err != nil {
 		http.ErrResp(c, err)
 		return

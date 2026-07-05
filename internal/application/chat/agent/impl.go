@@ -39,6 +39,24 @@ const (
 	ChatMessageAnswerLengthLonger  ChatMessageAnswerLength = "longer"
 )
 
+func (s ChatMessageStyle) IsValid() bool {
+	switch s {
+	case ChatMessageStyleDefault, ChatMessageStyleAnalyst, ChatMessageStyleGuide:
+		return true
+	default:
+		return false
+	}
+}
+
+func (l ChatMessageAnswerLength) IsValid() bool {
+	switch l {
+	case ChatMessageAnswerLengthDefault, ChatMessageAnswerLengthShorter, ChatMessageAnswerLengthLonger:
+		return true
+	default:
+		return false
+	}
+}
+
 // 聊天Agent
 //
 // 实现类似Agentic RAG回答问题

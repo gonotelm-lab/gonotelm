@@ -43,3 +43,16 @@ func (r *MessageRepositoryImpl) ListByChatId(
 
 	return mapper.MessagesFromSchema(schemas)
 }
+
+func (r *MessageRepositoryImpl) ListByChatIdBeforeSeqNo(
+	ctx context.Context,
+	chatId valobj.Id,
+	spec chatrepo.ListByCursorSpec,
+) ([]*entity.Message, error) {
+	schemas, err := r.messageStore.ListByChatIdBeforeSeqNo(ctx, chatId, spec.BeforeSeqNo, spec.Limit)
+	if err != nil {
+		return nil, err
+	}
+
+	return mapper.MessagesFromSchema(schemas)
+}

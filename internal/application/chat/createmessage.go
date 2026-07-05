@@ -18,9 +18,9 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/service/agentize"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
-	"github.com/gonotelm-lab/gonotelm/pkg/safe"
-
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/idgen"
+	"github.com/gonotelm-lab/gonotelm/pkg/safe"
 )
 
 type CreateMessageHandler struct {
@@ -113,12 +113,12 @@ func (h *CreateMessageHandler) Handle(
 	}
 
 	newCtx := context.WithoutCancel(ctx)
-	newCtx, newCancel := context.WithCancel(newCtx)
+	taskCtx, taskCancel := context.WithCancel(newCtx)
 	// 1. add user task
-	task, eventChan := initStreamTask(newCtx, cmd.ChatId, userId, h.streamTaskRepo)
+	task, eventChan := h.initStreamTask(taskCtx, taskCancel, cmd.ChatId, userId)
 	err = h.streamTaskRepo.Save(ctx, task)
 	if err != nil {
-		newCancel()
+		taskCancel()
 		return nil, errors.WithMessagef(err, "failed to save stream task, chat_id=%s", cmd.ChatId)
 	}
 
@@ -126,7 +126,7 @@ func (h *CreateMessageHandler) Handle(
 	userMsg := chatentity.NewUserTextMessage(cmd.ChatId, task.Id, userId, cmd.Prompt)
 	err = h.chatMessageRepo.Save(ctx, userMsg)
 	if err != nil {
-		newCancel()
+		taskCancel()
 		return nil, errors.WithMessagef(err, "failed to save user message, chat_id=%s", cmd.ChatId)
 	}
 
@@ -134,13 +134,13 @@ func (h *CreateMessageHandler) Handle(
 	ctxMsg := chatentity.NewUserContextMessage(cmd.ChatId, cmd.Prompt)
 	err = h.chatContextMessageRepo.Append(ctx, cmd.ChatId, []*chatentity.ContextMessage{ctxMsg})
 	if err != nil {
-		newCancel()
+		taskCancel()
 		return nil, errors.WithMessagef(err, "failed to append context message, chat_id=%s", cmd.ChatId)
 	}
 
 	// TODO we need global wait group here to wait for the stream task to finish
 	bundle := &streamTaskBundle{
-		cancel:         newCancel,
+		cancel:         taskCancel,
 		taskId:         task.Id,
 		msgId:          userMsg.Id,
 		notebookId:     targetNotebook.Id,
@@ -152,7 +152,7 @@ func (h *CreateMessageHandler) Handle(
 		targetSources:  targetSources,
 		eventChan:      eventChan,
 	}
-	go h.startStreamTask(newCtx, cmd, bundle)
+	go h.startStreamTask(taskCtx, cmd, bundle)
 
 	return &CreateMessageResult{
 		MsgId:  userMsg.Id,
@@ -214,7 +214,7 @@ func (h *CreateMessageHandler) startStreamTask(
 
 	defer func() {
 		if p := recover(); p != nil {
-			// TODO handle panic
+			err = errors.ErrInner.Msgf("stream task panic: %v", p)
 		}
 
 		if err != nil {
@@ -223,13 +223,22 @@ func (h *CreateMessageHandler) startStreamTask(
 				slog.Any("msg_id", msgId),
 				slog.Any("err", err),
 			)
+
+			// abort stream task with error
+			bundle.eventChan <- &chatentity.StreamTaskEvent{
+				Id:         idgen.Get(taskId.String()),
+				TaskId:     taskId,
+				CreateTime: valobj.NewTime().Value(),
+				Error: &chatentity.EventError{
+					Message: "系统错误，请稍后重试",
+				},
+			}
 		}
 
 		bundle.cancel()
 	}()
 
 	agt := chatagent.New(h.sourceAgentizeService, h.gateway, h.sourceRepo, h.notebookRepo)
-
 	slog.Info("start stream task", slog.Any("task_id", taskId), slog.Any("msg_id", msgId))
 
 	// get user history messages
@@ -268,6 +277,7 @@ func (h *CreateMessageHandler) startStreamTask(
 	}
 
 	bundle.assistantMsg.SetCitations(runResponse.SourceDocCitations)
+	bundle.consumeEvents() // push citations to event channel
 
 	// save final assistant message
 	if err := h.chatMessageRepo.Save(ctx, bundle.assistantMsg); err != nil {
@@ -278,7 +288,35 @@ func (h *CreateMessageHandler) startStreamTask(
 	}
 
 	slog.Info("stream task finished", slog.Any("task_id", taskId), slog.Any("msg_id", msgId))
-	h.streamTaskRepo.SetStreamTTL(ctx, taskId, 10*time.Minute*10) // TODO make this configurable
+	h.finishStreamTask(ctx, taskId)
+}
+
+func (h *CreateMessageHandler) finishStreamTask(ctx context.Context, taskId valobj.Id) {
+	task, err := h.streamTaskRepo.FindById(ctx, taskId)
+	if err != nil {
+		slog.ErrorContext(ctx, "find stream task for finish failed",
+			slog.Any("task_id", taskId),
+			slog.Any("err", err),
+		)
+		return
+	}
+
+	if task.Status.IsRunning() {
+		task.Status = chatentity.StreamTaskStatusFinished
+		if err := h.streamTaskRepo.Save(ctx, task); err != nil {
+			slog.ErrorContext(ctx, "save finished stream task failed",
+				slog.Any("task_id", taskId),
+				slog.Any("err", err),
+			)
+		}
+	}
+
+	if err := h.streamTaskRepo.SetStreamTTL(ctx, taskId, 10*time.Minute*10); err != nil {
+		slog.ErrorContext(ctx, "set stream task ttl failed",
+			slog.Any("task_id", taskId),
+			slog.Any("err", err),
+		)
+	}
 }
 
 func (h *CreateMessageHandler) onAgentRoundFinished(bundle *streamTaskBundle) chatagent.RoundFinishedHook {
@@ -357,11 +395,11 @@ func (h *CreateMessageHandler) onAgentMarkPhase(bundle *streamTaskBundle) chatag
 	}
 }
 
-func initStreamTask(
+func (h *CreateMessageHandler) initStreamTask(
 	ctx context.Context,
+	cancel context.CancelFunc,
 	chatId valobj.Id,
 	userId string,
-	eventRepo chatrepo.StreamTaskEventRepository,
 ) (
 	*chatentity.StreamTask, chan *chatentity.StreamTaskEvent,
 ) {
@@ -370,15 +408,15 @@ func initStreamTask(
 
 	// TODO use global wait group here to wait for the stream task to finish
 	safe.Go(ctx, func() {
-		consumeStreamTaskEvents(ctx, eventRepo, eventChan)
+		h.consumeStreamTaskEvents(ctx, cancel, eventChan)
 	})
 
 	return task, eventChan
 }
 
-func consumeStreamTaskEvents(
+func (h *CreateMessageHandler) consumeStreamTaskEvents(
 	ctx context.Context,
-	eventRepo chatrepo.StreamTaskEventRepository,
+	cancel context.CancelFunc,
 	ch <-chan *chatentity.StreamTaskEvent,
 ) {
 	for {
@@ -391,7 +429,20 @@ func consumeStreamTaskEvents(
 				continue
 			}
 
-			if err := eventRepo.EmitStreamEvent(ctx, event); err != nil {
+			// check if task is already aborted
+			targetTask, err := h.streamTaskRepo.FindById(ctx, event.TaskId)
+			if err != nil {
+				slog.ErrorContext(ctx, "failed to find stream task",
+					slog.Any("task_id", event.TaskId),
+					slog.Any("err", err),
+				)
+			}
+			if targetTask != nil && targetTask.Status.IsAborted() {
+				cancel()
+				return
+			}
+
+			if err := h.streamTaskRepo.EmitStreamEvent(ctx, event); err != nil {
 				slog.ErrorContext(ctx, "failed to emit stream task event",
 					slog.Any("event_id", event.Id),
 					slog.Any("task_id", event.TaskId),

@@ -11,8 +11,7 @@ import (
 	"github.com/bytedance/sonic"
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/route"
-	chatlogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/chat"
-	chatmodel "github.com/gonotelm-lab/gonotelm/internal/app/model/chat"
+	"github.com/gonotelm-lab/gonotelm/internal/api/schema"
 	chatapp "github.com/gonotelm-lab/gonotelm/internal/application/chat"
 	chatagent "github.com/gonotelm-lab/gonotelm/internal/application/chat/agent"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
@@ -36,33 +35,32 @@ func (s *Server) registerChatRoutes(g *route.RouterGroup) {
 }
 
 type ChatCreateMessageRequest struct {
-	Id                uuid.UUID   `path:"id,required"`
-	Prompt            string      `json:"prompt"`
-	SourceIds         []uuid.UUID `json:"source_ids"`
-	EnableThinking    bool        `json:"enable_thinking"`
-	Style             string      `json:"style"`
-	AnswerLength      string      `json:"answer_length"`
-	EnhancedRetrieval bool        `json:"enhanced_retrieval"`
+	Id             uuid.UUID   `path:"id,required"`
+	Prompt         string      `json:"prompt"`
+	SourceIds      []uuid.UUID `json:"source_ids"`
+	EnableThinking bool        `json:"enable_thinking"`
+	Style          string      `json:"style"`
+	AnswerLength   string      `json:"answer_length"`
 }
 
 func (r *ChatCreateMessageRequest) Validate() error {
 	if r.Style == "" {
-		r.Style = string(chatmodel.ChatStyleDefault)
+		r.Style = string(chatagent.ChatMessageStyleDefault)
 	}
 
 	if len(r.Prompt) == 0 {
 		return errors.ErrParams.Msg("prompt is required")
 	}
 
-	if !chatmodel.ChatStyle(r.Style).IsValid() {
+	if !chatagent.ChatMessageStyle(r.Style).IsValid() {
 		return errors.ErrParams.Msgf("invalid chat style: %s", r.Style)
 	}
 
 	if r.AnswerLength == "" {
-		r.AnswerLength = string(chatmodel.ChatAnswerLengthDefault)
+		r.AnswerLength = string(chatagent.ChatMessageAnswerLengthDefault)
 	}
 
-	if !chatmodel.ChatAnswerLength(r.AnswerLength).IsValid() {
+	if !chatagent.ChatMessageAnswerLength(r.AnswerLength).IsValid() {
 		return errors.ErrParams.Msgf("invalid chat answer length: %s", r.AnswerLength)
 	}
 
@@ -133,10 +131,16 @@ func (s *Server) ChatAbortStream(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	if err := s.chatLogic.AbortStreamTask(ctx,
-		&chatlogic.AbortStreamTaskParams{
+	taskId, err := valobj.NewIdFromString(req.TaskId)
+	if err != nil {
+		http.ErrResp(c, errors.ErrParams.Msgf("invalid task_id: %s", req.TaskId))
+		return
+	}
+
+	if err := s.abortStreamHandler.Handle(ctx,
+		&chatapp.AbortStreamCommand{
 			ChatId: req.Id,
-			TaskId: req.TaskId,
+			TaskId: taskId,
 		}); err != nil {
 		http.ErrResp(c, err)
 		return
@@ -164,11 +168,17 @@ func (s *Server) GetChatStream(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	result, err := s.chatLogic.GetStreamTask(ctx,
-		&chatlogic.GetStreamTaskParams{
-			ChatId:       req.Id,
-			TaskId:       req.TaskId,
-			LastStreamId: req.LastStreamId,
+	taskId, err := valobj.NewIdFromString(req.TaskId)
+	if err != nil {
+		http.ErrResp(c, errors.ErrParams.Msgf("invalid task_id: %s", req.TaskId))
+		return
+	}
+
+	result, err := s.getStreamHandler.Handle(ctx,
+		&chatapp.GetStreamQuery{
+			ChatId:      req.Id,
+			TaskId:      taskId,
+			LastEventId: req.LastStreamId,
 		})
 	if err != nil {
 		http.ErrResp(c, err)
@@ -180,19 +190,29 @@ func (s *Server) GetChatStream(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	// consume channel
 	writer := sse.NewWriter(c)
 consumeLoop:
-	for ch := range result.StreamChan {
+	for item := range result.StreamChan {
 		select {
-		case <-ctx.Done(): // 客户端主动断开
+		case <-ctx.Done():
 			break consumeLoop
 		default:
-			data, err := sonic.Marshal(ch)
+			var (
+				data      []byte
+				eventType string
+			)
+
+			if item.Heartbeat {
+				data, err = sonic.Marshal(schema.NewStreamHeartbeat())
+				eventType = sseEventTypeHeartbeat
+			} else {
+				data, err = sonic.Marshal(item.Event)
+				eventType = sseEventTypeMessage
+			}
+
 			if err != nil {
 				slog.ErrorContext(ctx, "marshal stream event failed",
 					slog.String("task_id", req.TaskId),
-					slog.String("stream_id", ch.StreamId),
 					slog.Any("err", err),
 				)
 				continue
@@ -200,11 +220,7 @@ consumeLoop:
 
 			event := sse.NewEvent()
 			event.SetData(data)
-			if ch.Heartbeat != "" {
-				event.SetEvent(sseEventTypeHeartbeat)
-			} else {
-				event.SetEvent(sseEventTypeMessage)
-			}
+			event.SetEvent(eventType)
 			writer.Write(event)
 			event.Reset()
 			event.Release()
@@ -235,34 +251,11 @@ func (r *ListChatMessagesRequest) Validate() error {
 	return nil
 }
 
-type ListChatMessageItemResponse struct {
-	Id       string                                 `json:"id"`
-	ChatId   string                                 `json:"chat_id"`
-	Role     string                                 `json:"role"`
-	Content  *ListChatMessageContentResponse        `json:"content,omitempty"`
-	Citation []*ListChatMessageCitationItemResponse `json:"citation,omitempty"`
-}
-
-type ListChatMessageContentResponse struct {
-	CreatedAt int64                        `json:"created_at"`
-	Kind      string                       `json:"kind"`
-	Text      *ListChatMessageTextResponse `json:"text,omitempty"`
-}
-
-type ListChatMessageTextResponse struct {
-	Content string `json:"content"`
-}
-
-type ListChatMessageCitationItemResponse struct {
-	SourceId string   `json:"source_id"`
-	DocIds   []string `json:"doc_ids,omitempty"`
-}
-
 type ListChatMessagesResponse struct {
-	Messages   []*ListChatMessageItemResponse `json:"messages"`
-	Limit      int                            `json:"limit"`
-	HasMore    bool                           `json:"has_more"`
-	NextCursor int64                          `json:"next_cursor"`
+	Messages   []*schema.Message `json:"messages"`
+	Limit      int               `json:"limit"`
+	HasMore    bool              `json:"has_more"`
+	NextCursor int64             `json:"next_cursor"`
 }
 
 func (s *Server) ListChatMessages(ctx context.Context, c *app.RequestContext) {
@@ -273,8 +266,8 @@ func (s *Server) ListChatMessages(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	result, err := s.chatLogic.ListMessages(ctx,
-		&chatlogic.ListMessagesParams{
+	result, err := s.listMessagesHandler.Handle(ctx,
+		&chatapp.ListMessagesQuery{
 			ChatId: req.Id,
 			Cursor: req.Cursor,
 			Limit:  req.Limit,
@@ -285,76 +278,11 @@ func (s *Server) ListChatMessages(ctx context.Context, c *app.RequestContext) {
 	}
 
 	http.OkResp(c, ListChatMessagesResponse{
-		Messages:   toListChatMessageItemResponses(result.Messages),
+		Messages:   schema.ToMessages(result.Messages),
 		Limit:      req.Limit,
 		HasMore:    result.HasMore,
 		NextCursor: result.NextCursor,
 	})
-}
-
-func toListChatMessageItemResponses(messages []*chatmodel.Message) []*ListChatMessageItemResponse {
-	resp := make([]*ListChatMessageItemResponse, 0, len(messages))
-	for _, msg := range messages {
-		var content *ListChatMessageContentResponse
-		if msg.Content != nil {
-			content = &ListChatMessageContentResponse{
-				CreatedAt: msg.Content.CreatedAt,
-				Kind:      msg.Content.Kind,
-			}
-
-			if msg.Content.Text != nil {
-				content.Text = &ListChatMessageTextResponse{
-					Content: msg.Content.Text.Content,
-				}
-			}
-		}
-
-		var citation []*ListChatMessageCitationItemResponse
-		if msg.Extra != nil {
-			citation = toListChatMessageCitationResponse(msg.Extra.Citation)
-		}
-
-		resp = append(resp, &ListChatMessageItemResponse{
-			Id:       msg.Id.String(),
-			ChatId:   msg.ChatId.String(),
-			Role:     msg.MsgRole.String(),
-			Content:  content,
-			Citation: citation,
-		})
-	}
-
-	return resp
-}
-
-func toListChatMessageCitationResponse(citation []*chatmodel.Citation) []*ListChatMessageCitationItemResponse {
-	if len(citation) == 0 {
-		return nil
-	}
-
-	items := make([]*ListChatMessageCitationItemResponse, 0, len(citation))
-	for _, citationItem := range citation {
-		if citationItem == nil {
-			continue
-		}
-
-		docIDs := make([]string, 0, len(citationItem.DocIds))
-		for _, docID := range citationItem.DocIds {
-			if strings.TrimSpace(docID) == "" {
-				continue
-			}
-			docIDs = append(docIDs, docID)
-		}
-
-		items = append(items, &ListChatMessageCitationItemResponse{
-			SourceId: citationItem.SourceId,
-			DocIds:   docIDs,
-		})
-	}
-	if len(items) == 0 {
-		return nil
-	}
-
-	return items
 }
 
 type DeleteChatContextRequest struct {
@@ -369,7 +297,10 @@ func (s *Server) DeleteChatContext(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	err = s.chatLogic.DeleteChatContext(ctx, req.Id)
+	err = s.deleteChatContextHandler.Handle(ctx,
+		&chatapp.DeleteChatContextCommand{
+			ChatId: req.Id,
+		})
 	if err != nil {
 		http.ErrResp(c, err)
 		return

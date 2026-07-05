@@ -47,6 +47,10 @@ type Server struct {
 	createChatHandler  *chatapp.CreateChatHandler
 
 	chatCreateMessageHandler *chatapp.CreateMessageHandler
+	listMessagesHandler      *chatapp.ListMessagesHandler
+	getStreamHandler         *chatapp.GetStreamHandler
+	abortStreamHandler       *chatapp.AbortStreamHandler
+	deleteChatContextHandler *chatapp.DeleteChatContextHandler
 
 	wire *wire.Wire
 }
@@ -105,6 +109,16 @@ func NewServer(
 			wire.SourceStorageRepo,
 			wire.SourceDocRepo,
 			wire.Gateway(),
+		),
+		listMessagesHandler: chatapp.NewListMessagesHandler(
+			wire.ChatRepo,
+			wire.MessageRepo,
+		),
+		getStreamHandler:   chatapp.NewGetStreamHandler(wire.StreamTaskRepo),
+		abortStreamHandler: chatapp.NewAbortStreamHandler(wire.StreamTaskRepo),
+		deleteChatContextHandler: chatapp.NewDeleteChatContextHandler(
+			wire.ChatRepo,
+			wire.ContextMessageRepo,
 		),
 	}
 

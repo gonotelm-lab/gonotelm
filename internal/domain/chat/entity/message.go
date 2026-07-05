@@ -221,6 +221,14 @@ func (m *Message) BeginPhaseFragment(summary, thought string) {
 
 func (m *Message) SetCitations(citations []valobj.Id) {
 	m.Citations = citations
+	m.streamEvents = append(m.streamEvents, &StreamTaskEvent{
+		Id:         idgen.Get(m.taskId.String()),
+		TaskId:     m.taskId,
+		CreateTime: valobj.NewTime().Value(),
+		Action:     EventActionSet,
+		Path:       EventTargetPathCitations,
+		Citations:  m.Citations,
+	})
 }
 
 func (m *Message) ConsumeEvents() []*StreamTaskEvent {

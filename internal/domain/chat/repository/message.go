@@ -7,9 +7,15 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/domain/chat/entity"
 )
 
+type ListByCursorSpec struct {
+	BeforeSeqNo int64
+	Limit       int
+}
+
 type MessageRepository interface {
 	Save(ctx context.Context, message *entity.Message) error
 	ListByChatId(ctx context.Context, chatId valobj.Id, spec ListSpec) ([]*entity.Message, error)
+	ListByChatIdBeforeSeqNo(ctx context.Context, chatId valobj.Id, spec ListByCursorSpec) ([]*entity.Message, error)
 }
 
 type ContextMessageRepository interface {

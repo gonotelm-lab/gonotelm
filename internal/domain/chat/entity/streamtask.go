@@ -16,6 +16,18 @@ const (
 
 func (s StreamTaskStatus) String() string { return string(s) }
 
+func (s StreamTaskStatus) IsRunning() bool {
+	return s == StreamTaskStatusRunning
+}
+
+func (s StreamTaskStatus) IsFinished() bool {
+	return s == StreamTaskStatusFinished
+}
+
+func (s StreamTaskStatus) IsAborted() bool {
+	return s == StreamTaskStatusAborted
+}
+
 type StreamTask struct {
 	Id             valobj.Id
 	Status         StreamTaskStatus
@@ -80,6 +92,9 @@ type StreamTaskEvent struct {
 	Think    *EventThink    `json:"think,omitempty"    msgpack:"think,omitempty"`
 	Response *EventResponse `json:"response,omitempty" msgpack:"response,omitempty"`
 	Phase    *EventPhase    `json:"phase,omitempty"    msgpack:"phase,omitempty"`
+
+	// Error is set when there is an error during the stream task
+	Error *EventError `json:"error,omitempty" msgpack:"error,omitempty"`
 }
 
 type EventThink struct {
@@ -94,4 +109,8 @@ type EventResponse struct {
 
 type EventPhase struct {
 	Phase *FragmentPhase `json:"phase,omitempty" msgpack:"phase,omitempty"`
+}
+
+type EventError struct {
+	Message string `json:"message,omitempty" msgpack:"message,omitempty"`
 }

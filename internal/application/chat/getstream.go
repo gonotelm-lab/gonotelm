@@ -124,6 +124,10 @@ func (h *GetStreamHandler) Handle(
 					return
 				case result.StreamChan <- &StreamItem{Event: event}:
 				}
+
+				if event.Done || event.Error != nil {
+					return
+				}
 			}
 
 			lastEventId = events[len(events)-1].Id

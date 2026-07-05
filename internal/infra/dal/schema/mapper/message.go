@@ -10,7 +10,7 @@ import (
 )
 
 type MessageExtra struct {
-	Citations []valobj.Id `json:"citations"` // source doc ids 
+	Citations []chatdomain.MessageCitation `json:"citations,omitempty"`
 }
 
 func MessageToSchema(msg *chatdomain.Message) (*schema.ChatMessage, error) {
@@ -19,8 +19,11 @@ func MessageToSchema(msg *chatdomain.Message) (*schema.ChatMessage, error) {
 		return nil, errors.Wrap(errors.ErrSerde, err.Error())
 	}
 
-	extra := &MessageExtra{
-		Citations: msg.Citations,
+	var extra *MessageExtra
+	if len(msg.Citations) > 0 {
+		extra = &MessageExtra{
+			Citations: msg.Citations,
+		}
 	}
 
 	extraBytes, err := sonic.Marshal(extra)
@@ -56,8 +59,10 @@ func MessageFromSchema(sch *schema.ChatMessage) (*chatdomain.Message, error) {
 	}
 
 	var extra MessageExtra
-	if err := sonic.Unmarshal(sch.Extra, &extra); err != nil {
-		return nil, errors.Wrap(errors.ErrSerde, err.Error())
+	if len(sch.Extra) > 0 {
+		if err := sonic.Unmarshal(sch.Extra, &extra); err != nil {
+			return nil, errors.Wrap(errors.ErrSerde, err.Error())
+		}
 	}
 	msg.SetCitations(extra.Citations)
 

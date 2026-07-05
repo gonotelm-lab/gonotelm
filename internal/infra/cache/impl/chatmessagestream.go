@@ -102,12 +102,17 @@ func (c *ChatMessageStreamCacheImpl) AppendEventStream(
 		return "", errors.Wrap(errors.ErrSerde, err.Error())
 	}
 
-	eventId, err := c.rd.XAdd(ctx, &redis.XAddArgs{
+	xaddArgs := &redis.XAddArgs{
 		Stream: taskEventStreamKey(taskId),
 		Values: map[string]any{
 			streamEventDataKey: encEvent,
 		},
-	}).Result()
+	}
+	if event.Id != "" {
+		xaddArgs.ID = event.Id
+	}
+
+	eventId, err := c.rd.XAdd(ctx, xaddArgs).Result()
 	if err != nil {
 		return "", errors.Wrap(errors.ErrCache, err.Error())
 	}
@@ -186,6 +191,7 @@ func (c *ChatMessageStreamCacheImpl) PullEventStream(
 			continue
 		}
 
+		decEvent.Id = msg.ID
 		events = append(events, decEvent)
 	}
 

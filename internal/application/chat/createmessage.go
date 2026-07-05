@@ -22,6 +22,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/idgen"
 	"github.com/gonotelm-lab/gonotelm/pkg/safe"
+	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 
 type CreateMessageHandler struct {
@@ -156,7 +157,7 @@ func (h *CreateMessageHandler) Handle(
 		targetSources:  targetSources,
 		eventChan:      eventChan,
 	}
-	h.wg.Go(func() { h.startStreamTask(taskCtx, cmd, bundle) })
+	h.wg.Go(func() { h.beginStreamTask(taskCtx, cmd, bundle) })
 
 	return &CreateMessageResult{
 		MsgId:  userMsg.Id,
@@ -200,12 +201,20 @@ type streamTaskBundle struct {
 }
 
 func (b *streamTaskBundle) consumeEvents() {
-	for _, evt := range b.assistantMsg.ConsumeEvents() {
-		b.eventChan <- evt
+	events := b.assistantMsg.ConsumeEvents()
+	if len(events) == 0 {
+		return
+	}
+
+	for _, evt := range events {
+		if evt != nil {
+			b.eventChan <- evt
+		}
 	}
 }
 
-func (h *CreateMessageHandler) startStreamTask(
+// 开始处理流式消息
+func (h *CreateMessageHandler) beginStreamTask(
 	ctx context.Context,
 	cmd *CreateMessageCommand,
 	bundle *streamTaskBundle,
@@ -231,19 +240,29 @@ func (h *CreateMessageHandler) startStreamTask(
 			// abort stream task with error
 			bundle.eventChan <- &chatentity.StreamTaskEvent{
 				Id:         idgen.Get(taskId.String()),
-				TaskId:     taskId,
 				CreateTime: valobj.NewTime().Value(),
 				Error: &chatentity.EventError{
 					Message: "系统错误，请稍后重试",
 				},
 			}
+		} else {
+			bundle.eventChan <- &chatentity.StreamTaskEvent{
+				Id:         idgen.Get(taskId.String()),
+				CreateTime: valobj.NewTime().Value(),
+				Done:       true,
+			}
 		}
 
+		h.finishStreamTask(ctx, taskId)
+		close(bundle.eventChan)
 		bundle.cancel()
 	}()
 
 	agt := chatagent.New(h.sourceAgentizeService, h.gateway, h.sourceRepo, h.notebookRepo)
 	slog.Info("start stream task", slog.Any("task_id", taskId), slog.Any("msg_id", msgId))
+
+	// push assistant INIT event before agent run so clients can bind message id early
+	bundle.consumeEvents()
 
 	// get user history messages
 	userMsgs, err := h.chatContextMessageRepo.ListAll(ctx, bundle.chatId)
@@ -252,6 +271,9 @@ func (h *CreateMessageHandler) startStreamTask(
 		return
 	}
 
+	slog.DebugContext(ctx, "begin agent run",
+		slog.Any("chat_id", bundle.chatId), slog.Any("task_id", taskId), slog.Any("msg_id", msgId),
+	)
 	chatCfg := conf.Global().Logic.Chat
 	runResponse, err := agt.Run(ctx, &chatagent.RunRequest{
 		UserId:          pkgcontext.GetUserId(ctx),
@@ -280,9 +302,20 @@ func (h *CreateMessageHandler) startStreamTask(
 		return
 	}
 
-	bundle.assistantMsg.SetCitations(runResponse.SourceDocCitations)
+	citations, citeErr := h.resolveMessageCitations(ctx, bundle.targetNotebook.Id, runResponse.SourceDocCitations)
+	if citeErr != nil {
+		slog.ErrorContext(ctx, "failed to resolve message citations",
+			slog.Any("chat_id", bundle.chatId),
+			slog.Any("err", citeErr),
+		)
+	} else {
+		bundle.assistantMsg.SetCitations(citations)
+	}
 	bundle.consumeEvents() // push citations to event channel
 
+	slog.DebugContext(ctx, "agent run done, now saving final assistant message",
+		slog.Any("chat_id", bundle.chatId), slog.Any("task_id", taskId), slog.Any("msg_id", msgId),
+	)
 	// save final assistant message
 	if err := h.chatMessageRepo.Save(ctx, bundle.assistantMsg); err != nil {
 		slog.ErrorContext(ctx, "failed to save final assistant message",
@@ -292,7 +325,6 @@ func (h *CreateMessageHandler) startStreamTask(
 	}
 
 	slog.Info("stream task finished", slog.Any("task_id", taskId), slog.Any("msg_id", msgId))
-	h.finishStreamTask(ctx, taskId)
 }
 
 func (h *CreateMessageHandler) finishStreamTask(ctx context.Context, taskId valobj.Id) {
@@ -404,17 +436,15 @@ func (h *CreateMessageHandler) initStreamTask(
 	cancel context.CancelFunc,
 	chatId valobj.Id,
 	userId string,
-) (
-	*chatentity.StreamTask, chan *chatentity.StreamTaskEvent,
-) {
+) (*chatentity.StreamTask, chan *chatentity.StreamTaskEvent) {
 	task := chatentity.NewStreamTask(chatId, userId)
-	eventChan := make(chan *chatentity.StreamTaskEvent, 256)
+	eventChan := make(chan *chatentity.StreamTaskEvent, 1024)
 
 	h.wg.Go(func() {
 		safe.Do(ctx, func() error {
-			h.consumeStreamTaskEvents(ctx, cancel, eventChan)
+			h.consumeStreamTaskEvents(ctx, cancel, task.Id, eventChan)
 			return nil
-		})
+		})()
 	})
 
 	return task, eventChan
@@ -423,38 +453,72 @@ func (h *CreateMessageHandler) initStreamTask(
 func (h *CreateMessageHandler) consumeStreamTaskEvents(
 	ctx context.Context,
 	cancel context.CancelFunc,
+	taskId valobj.Id,
 	ch <-chan *chatentity.StreamTaskEvent,
 ) {
-	for {
-		select {
-		case <-ctx.Done():
-			slog.Info("consume stream task events done", slog.Any("err", ctx.Err()))
+	for event := range ch {
+		if ctx.Err() != nil {
+			break
+		}
+
+		// check if task is already aborted
+		targetTask, err := h.streamTaskRepo.FindById(ctx, taskId)
+		if err != nil {
+			slog.ErrorContext(ctx, "failed to find stream task",
+				slog.Any("task_id", taskId),
+				slog.Any("err", err),
+			)
+		}
+		if targetTask != nil && targetTask.Status.IsAborted() {
+			cancel()
 			return
-		case event, ok := <-ch:
-			if !ok {
-				continue
-			}
+		}
 
-			// check if task is already aborted
-			targetTask, err := h.streamTaskRepo.FindById(ctx, event.TaskId)
-			if err != nil {
-				slog.ErrorContext(ctx, "failed to find stream task",
-					slog.Any("task_id", event.TaskId),
-					slog.Any("err", err),
-				)
-			}
-			if targetTask != nil && targetTask.Status.IsAborted() {
-				cancel()
-				return
-			}
-
-			if err := h.streamTaskRepo.EmitStreamEvent(ctx, event); err != nil {
-				slog.ErrorContext(ctx, "failed to emit stream task event",
-					slog.Any("event_id", event.Id),
-					slog.Any("task_id", event.TaskId),
-					slog.Any("err", err),
-				)
-			}
+		if err := h.streamTaskRepo.EmitStreamEvent(ctx, taskId, event); err != nil {
+			slog.ErrorContext(ctx, "failed to emit stream task event",
+				slog.Any("task_id", taskId),
+				slog.Any("event_id", event.Id),
+				slog.Any("err", err),
+			)
 		}
 	}
+
+	slog.Info("consume stream task events done", slog.Any("err", ctx.Err()))
+}
+
+func (h *CreateMessageHandler) resolveMessageCitations(
+	ctx context.Context,
+	notebookId valobj.Id,
+	docIds []valobj.Id,
+) ([]chatentity.MessageCitation, error) {
+	if len(docIds) == 0 {
+		return nil, nil
+	}
+
+	docs, err := h.sourceDocRepo.BatchFind(ctx, notebookId, uuid.EmptyUUID(), docIds)
+	if err != nil {
+		return nil, errors.WithMessage(err, "batch find source docs for citations failed")
+	}
+
+	docByID := make(map[string]*sourceentity.SourceDoc, len(docs))
+	for _, doc := range docs {
+		if doc == nil {
+			continue
+		}
+		docByID[doc.Id.String()] = doc
+	}
+
+	citations := make([]chatentity.MessageCitation, 0, len(docIds))
+	for _, docId := range docIds {
+		doc, ok := docByID[docId.String()]
+		if !ok {
+			return nil, errors.ErrParams.Msgf("source doc not found, doc_id=%s", docId)
+		}
+		citations = append(citations, chatentity.MessageCitation{
+			DocId:    doc.Id,
+			SourceId: doc.SourceId,
+		})
+	}
+
+	return citations, nil
 }

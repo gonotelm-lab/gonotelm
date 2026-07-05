@@ -9,6 +9,8 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/pkg/idgen"
+
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 type MessageRole int8
@@ -38,13 +40,17 @@ type Message struct {
 	Fragments []*MessageFragment `json:"fragments,omitempty"`
 	SeqNo     int64              `json:"seq_no"`
 
-	// Extra
 	// source doc id citations
-	Citations []valobj.Id `json:"citations,omitempty"`
+	Citations []MessageCitation `json:"citations,omitempty"`
 
 	// fields for internal use
 	taskId       valobj.Id          `json:"-"`
 	streamEvents []*StreamTaskEvent `json:"-"`
+}
+
+type MessageCitation struct {
+	DocId    valobj.Id `json:"doc_id"`
+	SourceId valobj.Id `json:"source_id"`
 }
 
 func newMessage(chatId, taskId valobj.Id, userId string, role MessageRole) *Message {
@@ -68,7 +74,6 @@ func NewAssistantMessage(chatId, taskId valobj.Id, userId string) *Message {
 	msg := newMessage(chatId, taskId, userId, MessageRoleAssistant)
 	msg.streamEvents = append(msg.streamEvents, &StreamTaskEvent{
 		Id:         idgen.Get(taskId.String()),
-		TaskId:     taskId,
 		CreateTime: valobj.NewTime().Value(),
 		Action:     EventActionInit,
 		Path:       EventTargetPathMessage,
@@ -105,7 +110,6 @@ func (m *Message) BeginThinkFragment() {
 	m.Fragments = append(m.Fragments, NewMessageFragmentThink(m.lastFragmentId()+1, ""))
 	m.streamEvents = append(m.streamEvents, &StreamTaskEvent{
 		Id:         idgen.Get(m.taskId.String()),
-		TaskId:     m.taskId,
 		CreateTime: valobj.NewTime().Value(),
 		Action:     EventActionNew,
 		Path:       EventTargetPathFragmentThink,
@@ -122,7 +126,6 @@ func (m *Message) EndThinkFragment() {
 	m.lastFragment().Think.Status = FragmentStatusFinished
 	m.streamEvents = append(m.streamEvents, &StreamTaskEvent{
 		Id:         idgen.Get(m.taskId.String()),
-		TaskId:     m.taskId,
 		CreateTime: valobj.NewTime().Value(),
 		Action:     EventActionSet,
 		Path:       EventTargetPathFragmentThinkStatus,
@@ -139,7 +142,6 @@ func (m *Message) AppendThinkFragment(s string) {
 	m.lastFragment().Think.Append(s)
 	m.streamEvents = append(m.streamEvents, &StreamTaskEvent{
 		Id:         idgen.Get(m.taskId.String()),
-		TaskId:     m.taskId,
 		CreateTime: valobj.NewTime().Value(),
 		Action:     EventActionAppend,
 		Path:       EventTargetPathFragmentThinkContent,
@@ -152,7 +154,6 @@ func (m *Message) BeginResponseFragment() {
 	m.Fragments = append(m.Fragments, NewMessageFragmentResponse(m.lastFragmentId()+1, ""))
 	m.streamEvents = append(m.streamEvents, &StreamTaskEvent{
 		Id:         idgen.Get(m.taskId.String()),
-		TaskId:     m.taskId,
 		CreateTime: valobj.NewTime().Value(),
 		Action:     EventActionNew,
 		Path:       EventTargetPathFragmentResponse,
@@ -169,7 +170,6 @@ func (m *Message) EndResponseFragment() {
 	m.lastFragment().Response.Status = FragmentStatusFinished
 	m.streamEvents = append(m.streamEvents, &StreamTaskEvent{
 		Id:         idgen.Get(m.taskId.String()),
-		TaskId:     m.taskId,
 		CreateTime: valobj.NewTime().Value(),
 		Action:     EventActionSet,
 		Path:       EventTargetPathFragmentResponseStatus,
@@ -186,7 +186,6 @@ func (m *Message) AppendResponseFragment(s string) {
 	m.lastFragment().Response.AppendText(s)
 	m.streamEvents = append(m.streamEvents, &StreamTaskEvent{
 		Id:         idgen.Get(m.taskId.String()),
-		TaskId:     m.taskId,
 		CreateTime: valobj.NewTime().Value(),
 		Action:     EventActionAppend,
 		Path:       EventTargetPathFragmentResponseContentText,
@@ -204,7 +203,6 @@ func (m *Message) BeginPhaseFragment(summary, thought string) {
 	m.Fragments = append(m.Fragments, NewMessageFragmentPhase(m.lastFragmentId()+1, summary, thought))
 	m.streamEvents = append(m.streamEvents, &StreamTaskEvent{
 		Id:         idgen.Get(m.taskId.String()),
-		TaskId:     m.taskId,
 		CreateTime: valobj.NewTime().Value(),
 		Action:     EventActionNew,
 		Path:       EventTargetPathFragmentPhase,
@@ -219,11 +217,10 @@ func (m *Message) BeginPhaseFragment(summary, thought string) {
 	})
 }
 
-func (m *Message) SetCitations(citations []valobj.Id) {
+func (m *Message) SetCitations(citations []MessageCitation) {
 	m.Citations = citations
 	m.streamEvents = append(m.streamEvents, &StreamTaskEvent{
 		Id:         idgen.Get(m.taskId.String()),
-		TaskId:     m.taskId,
 		CreateTime: valobj.NewTime().Value(),
 		Action:     EventActionSet,
 		Path:       EventTargetPathCitations,
@@ -418,9 +415,10 @@ func (t *FragmentContentUnionText) Content() string {
 }
 
 type fragmentContentTextAlias struct {
-	Content string `json:"content"`
+	Content string `json:"content" msgpack:"content"`
 }
 
+// Implements json.Marshaler and json.Unmarshaler
 func (t *FragmentContentUnionText) MarshalJSON() ([]byte, error) {
 	if t == nil {
 		return []byte("null"), nil
@@ -436,6 +434,27 @@ func (t *FragmentContentUnionText) UnmarshalJSON(data []byte) error {
 
 	var alias fragmentContentTextAlias
 	if err := sonic.Unmarshal(data, &alias); err != nil {
+		return err
+	}
+
+	if t.builder == nil {
+		t.builder = &strings.Builder{}
+	} else {
+		t.builder.Reset()
+	}
+
+	t.builder.WriteString(alias.Content)
+	return nil
+}
+
+// Implements msgpack.Marshaler and msgpack.Unmarshaler
+func (t *FragmentContentUnionText) MarshalMsgpack() ([]byte, error) {
+	return msgpack.Marshal(fragmentContentTextAlias{Content: t.Content()})
+}
+
+func (t *FragmentContentUnionText) UnmarshalMsgpack(data []byte) error {
+	var alias fragmentContentTextAlias
+	if err := msgpack.Unmarshal(data, &alias); err != nil {
 		return err
 	}
 

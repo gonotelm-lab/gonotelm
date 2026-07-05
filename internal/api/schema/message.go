@@ -2,8 +2,12 @@ package schema
 
 import (
 	chatentity "github.com/gonotelm-lab/gonotelm/internal/domain/chat/entity"
-	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 )
+
+type MessageCitation struct {
+	DocId    string `json:"doc_id"`
+	SourceId string `json:"source_id"`
+}
 
 type Message struct {
 	Id         string                        `json:"id"`
@@ -14,7 +18,7 @@ type Message struct {
 	Role       string                        `json:"role"`
 	Fragments  []*chatentity.MessageFragment `json:"fragments,omitempty"`
 	SeqNo      int64                         `json:"seq_no"`
-	Citations  []string                      `json:"citations,omitempty"`
+	Citations  []MessageCitation             `json:"citations,omitempty"`
 }
 
 func ToMessage(msg *chatentity.Message) *Message {
@@ -31,7 +35,7 @@ func ToMessage(msg *chatentity.Message) *Message {
 		Role:       msg.Role.String(),
 		Fragments:  msg.Fragments,
 		SeqNo:      msg.SeqNo,
-		Citations:  toCitationIds(msg.Citations),
+		Citations:  toMessageCitations(msg.Citations),
 	}
 }
 
@@ -44,15 +48,18 @@ func ToMessages(messages []*chatentity.Message) []*Message {
 	return resp
 }
 
-func toCitationIds(citations []valobj.Id) []string {
+func toMessageCitations(citations []chatentity.MessageCitation) []MessageCitation {
 	if len(citations) == 0 {
 		return nil
 	}
 
-	ids := make([]string, 0, len(citations))
-	for _, id := range citations {
-		ids = append(ids, id.String())
+	items := make([]MessageCitation, 0, len(citations))
+	for _, citation := range citations {
+		items = append(items, MessageCitation{
+			DocId:    citation.DocId.String(),
+			SourceId: citation.SourceId.String(),
+		})
 	}
 
-	return ids
+	return items
 }

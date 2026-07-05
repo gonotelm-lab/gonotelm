@@ -51,23 +51,22 @@ func (r *StreamTaskRepositoryImpl) DeleteById(ctx context.Context, taskId valobj
 	return r.streamCache.DeleteTask(ctx, taskId.String())
 }
 
-func (r *StreamTaskRepositoryImpl) EmitStreamEvent(ctx context.Context, event *entity.StreamTaskEvent) error {
+func (r *StreamTaskRepositoryImpl) EmitStreamEvent(ctx context.Context, taskId valobj.Id, event *entity.StreamTaskEvent) error {
 	data, err := mapper.StreamTaskEventToData(event)
 	if err != nil {
 		return err
 	}
 
-	eventId, err := r.streamCache.AppendEventStream(ctx, event.TaskId.String(),
+	if event.Id == "" {
+		return errors.ErrParams.Msg("stream task event id is required")
+	}
+
+	_, err = r.streamCache.AppendEventStream(ctx, taskId.String(),
 		&schema.ChatMessageStreamEvent{
 			Id:   event.Id,
 			Data: data,
 		})
-	if err != nil {
-		return err
-	}
-
-	event.Id = eventId
-	return nil
+	return err
 }
 
 func (r *StreamTaskRepositoryImpl) DeleteStream(ctx context.Context, taskId valobj.Id) error {
@@ -106,30 +105,28 @@ func (r *StreamTaskRepositoryImpl) BlockOnStreamEvent(
 			)
 			continue
 		}
-		event.Id = ev.Id
+		if ev.Id != "" {
+			event.Id = ev.Id
+		}
 		results = append(results, event)
 	}
 
 	return results, nil
 }
 
-// normalizeStreamEventId 校验 Redis Stream ID 格式 <ms>-<seq>，非法时回退到 "0-1"。
+// normalizeStreamEventId 校验 Redis Stream ID 格式 <ms>-<seq>，非法时回退到 "0-0"。
 // https://redis.io/docs/latest/commands/xadd/
-//
-// When you specify an explicit ID to XADD, the minimum valid ID is 0-1, 
-// and you must specify an ID that is greater than any other ID currently inside the stream, 
-// otherwise the command fails and returns an error.
 func normalizeStreamEventId(lastId string) string {
 	parts := strings.Split(lastId, "-")
 	if len(parts) != 2 {
-		return "0-1"
+		return "0-0"
 	}
 
 	if _, err := strconv.ParseInt(parts[0], 10, 64); err != nil {
-		return "0-1"
+		return "0-0"
 	}
 	if _, err := strconv.ParseInt(parts[1], 10, 64); err != nil {
-		return "0-1"
+		return "0-0"
 	}
 
 	return lastId

@@ -163,6 +163,62 @@ func TestChatMessageStreamCache_PullEventStream_WithBlock(t *testing.T) {
 	}
 }
 
+func TestChatMessageStreamCache_PullEventStream_WithExplicitCustomId(t *testing.T) {
+	testKey := "test-stream-key-custom-id"
+	defer testChatMessageStreamCache.DeleteEventStream(t.Context(), testKey)
+
+	customIds := []string{"1000-0", "1000-1", "1000-2"}
+	for idx, customId := range customIds {
+		returnedId, err := testChatMessageStreamCache.AppendEventStream(
+			t.Context(),
+			testKey,
+			&schema.ChatMessageStreamEvent{
+				Id:   customId,
+				Data: []byte("test-data-" + strconv.Itoa(idx)),
+			},
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if returnedId != customId {
+			t.Fatalf("expected returned id %s, got %s", customId, returnedId)
+		}
+	}
+
+	lastRecvId := ""
+	fetched := make([]*schema.ChatMessageStreamEvent, 0)
+	for round := 0; round < 3; round++ {
+		events, err := testChatMessageStreamCache.PullEventStream(
+			t.Context(), testKey, schema.PullEventStreamArgs{
+				LastId: lastRecvId,
+			},
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(events) == 0 {
+			break
+		}
+		if len(events) != 1 {
+			t.Fatalf("round %d: expected 1 incremental event, got %d", round, len(events))
+		}
+		lastRecvId = events[0].Id
+		fetched = append(fetched, events...)
+	}
+
+	if len(fetched) != len(customIds) {
+		t.Fatalf("expected %d events, got %d", len(customIds), len(fetched))
+	}
+	for idx, event := range fetched {
+		if event.Id != customIds[idx] {
+			t.Fatalf("expected id %s, got %s", customIds[idx], event.Id)
+		}
+		if string(event.Data) != "test-data-"+strconv.Itoa(idx) {
+			t.Fatalf("expected test-data-%d, got %s", idx, string(event.Data))
+		}
+	}
+}
+
 func TestChatMessageStreamCache_CancelByContext(t *testing.T) {
 	testKey := "test-stream-key"
 	// ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)

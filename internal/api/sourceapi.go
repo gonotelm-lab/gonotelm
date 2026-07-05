@@ -279,11 +279,6 @@ type GetSourceDocResponse struct {
 
 	// 文档片段位置	rune offset 位置
 	Position *SourceDocPosition `json:"position,omitempty"`
-
-	// 是否为总结性文档片段
-	IsSummary bool `json:"is_summary"`
-	// 当文档为总结性文档片段时 该字段标识是从哪些文档片段总结而来
-	SummarizedFrom []string `json:"summarized_from,omitempty"`
 }
 
 func toGetSourceDocResponse(
@@ -300,8 +295,6 @@ func toGetSourceDocResponse(
 		DocId:          doc.Id.String(),
 		SourceTitle:    sourceTitle,
 		Content:        doc.Content,
-		IsSummary:      false,
-		SummarizedFrom: nil,
 	}
 	if doc.RunePos != nil {
 		resp.Position = &SourceDocPosition{

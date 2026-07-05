@@ -25,7 +25,7 @@ type BlockOnStreamEventOptions struct {
 
 // 消息流任务事件
 type StreamTaskEventRepository interface {
-	EmitStreamEvent(ctx context.Context, event *entity.StreamTaskEvent) error
+	EmitStreamEvent(ctx context.Context, taskId valobj.Id, event *entity.StreamTaskEvent) error
 	DeleteStream(ctx context.Context, taskId valobj.Id) error
 	SetStreamTTL(ctx context.Context, taskId valobj.Id, ttl time.Duration) error
 	BlockOnStreamEvent(ctx context.Context, taskId valobj.Id, opts BlockOnStreamEventOptions) ([]*entity.StreamTaskEvent, error)

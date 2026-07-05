@@ -37,7 +37,7 @@ func (p *SourceDocPosition) GetEnd() int {
 //
 // 该对象实体是Source对象的分块
 type SourceDoc struct {
-	Id         string
+	Id         valobj.Id
 	NotebookId valobj.Id
 	SourceId   valobj.Id
 	Content    string
@@ -65,7 +65,7 @@ func NewSourceDoc(
 	runeEnd, _ := doc.MetaData[ChunkMetaPosEndKey].(int)
 
 	return &SourceDoc{
-		Id:         doc.ID,
+		Id:         valobj.NewUnOrderedId(),
 		NotebookId: notebookId,
 		SourceId:   sourceId,
 		Content:    doc.Content,

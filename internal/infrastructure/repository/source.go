@@ -62,3 +62,16 @@ func (s *SourceRepositoryImpl) ListByNotebookId(
 
 	return mapper.SourcesFromSchemas(sources)
 }
+
+func (s *SourceRepositoryImpl) GetByNotebookIdAndIds(
+	ctx context.Context,
+	notebookId valobj.Id,
+	ids []valobj.Id,
+) ([]*sourceentity.Source, error) {
+	sources, err := s.sourceStore.ListByNotebookIdAndIds(ctx, notebookId, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	return mapper.SourcesFromSchemas(sources)
+}

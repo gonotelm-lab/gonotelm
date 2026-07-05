@@ -8,8 +8,12 @@ import (
 )
 
 type SourceDocRepository interface {
-	FindById(ctx context.Context, notebookId valobj.Id, sourceId valobj.Id, id string) (*entity.SourceDoc, error)
-	BatchFindById(ctx context.Context, notebookId valobj.Id, sourceId valobj.Id, ids []string) ([]*entity.SourceDoc, error)
+	FindById(ctx context.Context, notebookId valobj.Id, sourceId valobj.Id, docId valobj.Id) (*entity.SourceDoc, error)
+
+	// if sourceId == "" then find condition will be where notebookId = ? and docId in (?)
+	// if sourceId != "" then find condition will be where notebookId = ? and sourceId = ? and docId in (?)
+	BatchFind(ctx context.Context, notebookId valobj.Id, sourceId valobj.Id, docIds []valobj.Id) ([]*entity.SourceDoc, error)
+
 	BatchSave(ctx context.Context, docs []*entity.SourceDoc) error
 	BatchDeleteBySourceId(ctx context.Context, notebookId valobj.Id, sourceId []valobj.Id) error
 	Query(ctx context.Context, query *SourceDocQueryParams) ([]*entity.SourceDoc, error)

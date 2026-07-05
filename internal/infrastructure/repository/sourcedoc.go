@@ -39,12 +39,12 @@ func (r *SourceDocRepositoryImpl) FindById(
 	ctx context.Context,
 	notebookId valobj.Id,
 	sourceId valobj.Id,
-	id string,
+	id valobj.Id,
 ) (*entity.SourceDoc, error) {
 	res, err := r.vStore.Get(ctx, &schema.SourceDocGetParams{
 		NotebookId: notebookId.String(),
 		SourceId:   sourceId.String(),
-		DocId:      id,
+		DocId:      id.String(),
 	})
 	if err != nil {
 		return nil, errors.WithMessage(err, "get source doc failed")
@@ -53,16 +53,20 @@ func (r *SourceDocRepositoryImpl) FindById(
 	return mapper.SchemaToSourceDoc(res)
 }
 
-func (r *SourceDocRepositoryImpl) BatchFindById(
+func (r *SourceDocRepositoryImpl) BatchFind(
 	ctx context.Context,
 	notebookId valobj.Id,
 	sourceId valobj.Id,
-	ids []string,
+	ids []valobj.Id,
 ) ([]*entity.SourceDoc, error) {
+	docIds := make([]string, 0, len(ids))
+	for _, id := range ids {
+		docIds = append(docIds, id.String())
+	}
 	res, err := r.vStore.BatchGet(ctx, &schema.SourceDocBatchGetParams{
 		NotebookId: notebookId.String(),
 		SourceId:   sourceId.String(),
-		DocIds:     ids,
+		DocIds:     docIds,
 	})
 	if err != nil {
 		return nil, errors.WithMessage(err, "batch get source docs failed")

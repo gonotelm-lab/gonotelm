@@ -144,12 +144,12 @@ func TestChatMessageStreamCache_PullEventStream_WithBlock(t *testing.T) {
 
 		t.Logf("events length: %d", len(events))
 		for _, event := range events {
-			t.Logf("event: %s, data: %s", event.StreamId(), string(event.Data))
+			t.Logf("event: %s, data: %s", event.Id, string(event.Data))
 		}
 		if len(events) == 0 {
 			break
 		}
-		lastRecvId = events[len(events)-1].StreamId()
+		lastRecvId = events[len(events)-1].Id
 		fetched = append(fetched, events...)
 	}
 

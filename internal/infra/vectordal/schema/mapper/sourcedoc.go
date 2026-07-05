@@ -16,8 +16,13 @@ func SchemaToSourceDoc(schema *schema.SourceDoc) (*entity.SourceDoc, error) {
 		return nil, err
 	}
 
+	id, err := valobj.NewIdFromString(schema.Id)
+	if err != nil {
+		return nil, err
+	}
+
 	domainDoc := &entity.SourceDoc{
-		Id:         schema.Id,
+		Id:         id,
 		NotebookId: notebookId,
 		SourceId:   sourceId,
 		Content:    schema.Content,
@@ -61,7 +66,7 @@ func SchemasToSourceDocs(schemas []*schema.SourceDoc) ([]*entity.SourceDoc, erro
 // 注意没有embedding和score
 func SourceDocToSchema(doc *entity.SourceDoc) *schema.SourceDoc {
 	schemaDoc := &schema.SourceDoc{
-		Id:         doc.Id,
+		Id:         doc.Id.String(),
 		NotebookId: doc.NotebookId.String(),
 		SourceId:   doc.SourceId.String(),
 		Content:    doc.Content,

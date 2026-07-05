@@ -78,7 +78,7 @@ func (i *Interceptor) OnStart(
 	info *callbacks.RunInfo,
 	input callbacks.CallbackInput,
 ) context.Context {
-	slog.DebugContext(ctx, "[Interceptor] OnStart", slog.Any("info", info))
+	// slog.DebugContext(ctx, "[Interceptor] OnStart", slog.Any("info", info))
 	return ctx
 }
 

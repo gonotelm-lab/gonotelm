@@ -44,6 +44,6 @@ type ChatMessageStreamCache interface {
 	// 设置事件流过期时间
 	SetEventStreamTTL(ctx context.Context, taskId string, ttl time.Duration) error
 
-	// 阻塞获取时间流
+	// 阻塞获取事件流
 	PullEventStream(ctx context.Context, taskId string, args schema.PullEventStreamArgs) ([]*schema.ChatMessageStreamEvent, error)
 }

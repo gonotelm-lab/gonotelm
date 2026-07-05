@@ -11,6 +11,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/api/schema"
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	sourceapp "github.com/gonotelm-lab/gonotelm/internal/application/source"
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourcevo "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity/vo"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
@@ -260,7 +261,7 @@ func (s *Server) DeleteSource(ctx context.Context, c *app.RequestContext) {
 
 type GetSourceDocRequest struct {
 	Id    uuid.UUID `path:"id,required"` // source id
-	DocId string    `path:"doc_id,required"`
+	DocId uuid.UUID `path:"doc_id,required"`
 }
 
 type SourceDocPosition struct {
@@ -297,7 +298,7 @@ func toGetSourceDocResponse(
 
 	resp := &GetSourceDocResponse{
 		SourceId:       sourceId,
-		DocId:          doc.Id,
+		DocId:          doc.Id.String(),
 		SourceTitle:    sourceTitle,
 		Content:        doc.Content,
 		IsSummary:      false,
@@ -342,8 +343,9 @@ func (s *Server) GetSourceDoc(ctx context.Context, c *app.RequestContext) {
 const maxBatchGetSourceDocsCount = 50
 
 type BatchGetSourceDocsRequest struct {
-	Id  uuid.UUID `path:"id,required"` // source id
-	Ids []string  `query:"ids,required"`
+	Id     uuid.UUID   `path:"id,required"` // source id
+	Ids    []string    `query:"ids,required"`
+	docIds []valobj.Id
 }
 
 func (r *BatchGetSourceDocsRequest) Validate() error {
@@ -365,7 +367,18 @@ func (r *BatchGetSourceDocsRequest) Validate() error {
 		return errors.ErrParams.Msgf("ids count exceeds limit: %d", maxBatchGetSourceDocsCount)
 	}
 
-	r.Ids = slices.Unique(docIDs)
+	docIDs = slices.Unique(docIDs)
+	docIds := make([]valobj.Id, 0, len(docIDs))
+	for _, docID := range docIDs {
+		id, err := valobj.NewIdFromString(docID)
+		if err != nil {
+			return errors.ErrParams.Msgf("invalid doc_id: %s", docID)
+		}
+		docIds = append(docIds, id)
+	}
+
+	r.Ids = docIDs
+	r.docIds = docIds
 	return nil
 }
 
@@ -385,7 +398,7 @@ func (s *Server) BatchGetSourceDocs(ctx context.Context, c *app.RequestContext) 
 	result, err := s.batchGetSourceDocHandler.Handle(ctx,
 		&sourceapp.BatchGetSourceDocsHandleQuery{
 			SourceId: req.Id,
-			DocIds:   req.Ids,
+			DocIds:   req.docIds,
 		})
 	if err != nil {
 		http.ErrResp(c, err)
@@ -423,8 +436,8 @@ func (s *Server) GetSource(ctx context.Context, c *app.RequestContext) {
 
 	http.OkResp(c, schema.ToSourceFromDomain(
 		result.Source,
-		result.FileContentUrl,
-		result.ParsedContentUrl,
+		result.Access.FileContentUrl,
+		result.Access.ParsedContentUrl,
 	))
 }
 

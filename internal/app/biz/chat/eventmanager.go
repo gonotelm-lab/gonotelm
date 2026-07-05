@@ -2,7 +2,6 @@ package chat
 
 import (
 	"context"
-	"log/slog"
 	"strconv"
 	"strings"
 	"time"
@@ -172,20 +171,20 @@ func (m *ChatEventManager) PullEvents(
 	}
 
 	results := make([]*chatmodel.MessageStreamEvent, 0, len(events))
-	for _, event := range events {
-		var val chatmodel.MessageStreamEvent
-		err = sonic.Unmarshal(event.Data, &val)
-		if err != nil {
-			slog.ErrorContext(ctx, "pull event unmarshal event failed",
-				slog.String("task_id", taskId),
-				slog.String("stream_id", event.StreamId()),
-				slog.Any("err", err),
-			)
-		} else {
-			val.StreamId = event.StreamId()
-			results = append(results, &val)
-		}
-	}
+	// for _, event := range events {
+	// var val chatmodel.MessageStreamEvent
+	// err = sonic.Unmarshal(event.Data, &val)
+	// if err != nil {
+	// 	slog.ErrorContext(ctx, "pull event unmarshal event failed",
+	// 		slog.String("task_id", taskId),
+	// 		slog.String("stream_id", event.StreamId()),
+	// 		slog.Any("err", err),
+	// 	)
+	// } else {
+	// 	val.StreamId = event.StreamId()
+	// 	results = append(results, &val)
+	// }
+	// }
 
 	return results, nil
 }

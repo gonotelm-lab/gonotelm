@@ -13,16 +13,8 @@ type ChatMessageTask struct {
 }
 
 type ChatMessageStreamEvent struct {
-	streamId string `json:"-" msgpack:"-"`
-	Data     []byte `json:"data" msgpack:"data"` // 事件数据 具体数据定义由业务层定义
-}
-
-func (e *ChatMessageStreamEvent) SetStreamId(streamId string) {
-	e.streamId = streamId
-}
-
-func (e *ChatMessageStreamEvent) StreamId() string {
-	return e.streamId
+	Id   string
+	Data []byte `json:"data" msgpack:"data"` // 事件数据 具体数据定义由业务层定义
 }
 
 type PullEventStreamArgs struct {

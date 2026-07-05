@@ -95,3 +95,11 @@ func TestUUIDBase64(t *testing.T) {
 		synctest.Wait()
 	})
 }
+
+func TestUUIDEmpty(t *testing.T) {
+	id := EmptyUUID()
+	t.Log(id.String())
+	max := MaxUUID()
+	t.Log(max.String())
+	t.Log(max.Compare(id))
+}

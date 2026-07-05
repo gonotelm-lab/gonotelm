@@ -186,7 +186,6 @@ func (c *ChatMessageStreamCacheImpl) PullEventStream(
 			continue
 		}
 
-		decEvent.SetStreamId(msg.ID)
 		events = append(events, decEvent)
 	}
 

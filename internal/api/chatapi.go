@@ -13,6 +13,9 @@ import (
 	"github.com/cloudwego/hertz/pkg/route"
 	chatlogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/chat"
 	chatmodel "github.com/gonotelm-lab/gonotelm/internal/app/model/chat"
+	chatapp "github.com/gonotelm-lab/gonotelm/internal/application/chat"
+	chatagent "github.com/gonotelm-lab/gonotelm/internal/application/chat/agent"
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 	"github.com/gonotelm-lab/gonotelm/pkg/http/middleware"
@@ -84,15 +87,14 @@ func (s *Server) ChatCreateMessage(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	result, err := s.chatLogic.CreateUserMessage(ctx,
-		&chatlogic.CreateUserMessageParams{
-			ChatId:            req.Id,
-			Prompt:            req.Prompt,
-			SourceIds:         req.SourceIds,
-			EnableThinking:    req.EnableThinking,
-			ChatStyle:         chatmodel.ChatStyle(req.Style),
-			ChatAnswerLength:  chatmodel.ChatAnswerLength(req.AnswerLength),
-			EnhancedRetrieval: req.EnhancedRetrieval,
+	result, err := s.chatCreateMessageHandler.Handle(ctx,
+		&chatapp.CreateMessageCommand{
+			ChatId:         req.Id,
+			Prompt:         req.Prompt,
+			SourceIds:      toValobjIds(req.SourceIds),
+			Style:          chatagent.ChatMessageStyle(req.Style),
+			AnswerLength:   chatagent.ChatMessageAnswerLength(req.AnswerLength),
+			EnableThinking: req.EnableThinking,
 		})
 	if err != nil {
 		http.ErrResp(c, err)
@@ -101,8 +103,21 @@ func (s *Server) ChatCreateMessage(ctx context.Context, c *app.RequestContext) {
 
 	http.OkResp(c, ChatCreateMessageResponse{
 		MsgId:  result.MsgId.String(),
-		TaskId: result.TaskId,
+		TaskId: result.TaskId.String(),
 	})
+}
+
+func toValobjIds(ids []uuid.UUID) []valobj.Id {
+	if len(ids) == 0 {
+		return nil
+	}
+
+	result := make([]valobj.Id, 0, len(ids))
+	for _, id := range ids {
+		result = append(result, id)
+	}
+
+	return result
 }
 
 type ChatAbortStreamRequest struct {

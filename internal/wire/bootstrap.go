@@ -3,6 +3,7 @@ package wire
 import (
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	adapterdefine "github.com/gonotelm-lab/gonotelm/internal/core/adapter"
+	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infra"
@@ -23,6 +24,11 @@ type Wire struct {
 	SourceRepo        sourcerepo.Repository
 	SourceStorageRepo sourcerepo.StorageRepository
 	SourceDocRepo     sourcerepo.SourceDocRepository
+
+	ChatRepo              chatrepo.Repository
+	MessageRepo           chatrepo.MessageRepository
+	StreamTaskRepo        chatrepo.StreamTaskRepository
+	ContextMessageRepo    chatrepo.ContextMessageRepository
 
 	EventBus eventbus.EventBus
 
@@ -64,7 +70,12 @@ func Init(infras *infra.Instances) {
 		repository.SourceDocRepositoryConfig{
 			EmbedBatchSize:      conf.Global().Embedding.BatchSize,
 			EmbedMaxConcurrency: conf.Global().Embedding.MaxConcurrency,
-		})
+		},
+	)
+	chatRepo := repository.NewChatRepository(infras.Dal.ChatStore)
+	messageRepo := repository.NewMessageRepository(infras.Dal.ChatMessageStore)
+	streamTaskRepo := repository.NewStreamTaskRepository(infras.Cache.ChatMessageStreamCache)
+	contextMessageRepo := repository.NewContextMessageRepository(infras.Cache.ChatMessageContextCache)
 
 	gWire = &Wire{
 		llmGateway:   llmGateway,
@@ -74,7 +85,11 @@ func Init(infras *infra.Instances) {
 		SourceRepo:        sourceRepo,
 		SourceStorageRepo: sourceStorageRepo,
 		SourceDocRepo:     sourceDocRepo,
-		EventBus:          eventbus.NewOuterEventBus(infras.MQ),
+		ChatRepo:              chatRepo,
+		MessageRepo:           messageRepo,
+		StreamTaskRepo:        streamTaskRepo,
+		ContextMessageRepo:    contextMessageRepo,
+		EventBus:              eventbus.NewOuterEventBus(infras.MQ),
 
 		Summarizer: summarizer,
 	}
@@ -82,4 +97,8 @@ func Init(infras *infra.Instances) {
 
 func GetWire() *Wire {
 	return gWire
+}
+
+func (w *Wire) Gateway() *gateway.Gateway {
+	return w.llmGateway
 }

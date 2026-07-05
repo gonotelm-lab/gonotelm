@@ -26,7 +26,7 @@ func NewBatchGetSourceDocsHandler(
 
 type BatchGetSourceDocsHandleQuery struct {
 	SourceId valobj.Id
-	DocIds   []string
+	DocIds   []valobj.Id
 }
 
 type BatchGetSourceDocsHandleResult struct {
@@ -44,7 +44,7 @@ func (h *BatchGetSourceDocsHandler) Handle(
 		return nil, errors.WithMessagef(err, "find source failed, source_id=%s", cmd.SourceId)
 	}
 
-	docs, err := h.sourceDocRepo.BatchFindById(ctx, source.NotebookId, source.Id, cmd.DocIds)
+	docs, err := h.sourceDocRepo.BatchFind(ctx, source.NotebookId, source.Id, cmd.DocIds)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "batch find source docs failed, source_id=%s", cmd.SourceId)
 	}

@@ -7,6 +7,7 @@ import (
 	notebooklogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/notebook"
 	sourcelogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/source"
 	studiologic "github.com/gonotelm-lab/gonotelm/internal/app/logic/studio"
+	chatapp "github.com/gonotelm-lab/gonotelm/internal/application/chat"
 	notebookapp "github.com/gonotelm-lab/gonotelm/internal/application/notebook"
 	sourceapp "github.com/gonotelm-lab/gonotelm/internal/application/source"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
@@ -41,6 +42,11 @@ type Server struct {
 
 	getSourceDocHandler      *sourceapp.GetSourceDocHandler
 	batchGetSourceDocHandler *sourceapp.BatchGetSourceDocsHandler
+
+	listSourcesHandler *sourceapp.ListSourcesHandler
+	createChatHandler  *chatapp.CreateChatHandler
+
+	chatCreateMessageHandler *chatapp.CreateMessageHandler
 
 	wire *wire.Wire
 }
@@ -85,6 +91,21 @@ func NewServer(
 
 		getSourceDocHandler:      sourceapp.NewGetSourceDocHandler(wire.SourceRepo, wire.SourceDocRepo),
 		batchGetSourceDocHandler: sourceapp.NewBatchGetSourceDocsHandler(wire.SourceRepo, wire.SourceDocRepo),
+
+		createChatHandler:  chatapp.NewCreateChatHandler(wire.NotebookRepo, wire.ChatRepo),
+		listSourcesHandler: sourceapp.NewListSourcesHandler(wire.NotebookRepo, wire.SourceRepo, wire.SourceStorageRepo),
+
+		chatCreateMessageHandler: chatapp.NewCreateMessageHandler(
+			wire.NotebookRepo,
+			wire.ChatRepo,
+			wire.MessageRepo,
+			wire.ContextMessageRepo,
+			wire.StreamTaskRepo,
+			wire.SourceRepo,
+			wire.SourceStorageRepo,
+			wire.SourceDocRepo,
+			wire.Gateway(),
+		),
 	}
 
 	s.registerRoutes()

@@ -2,17 +2,18 @@ package source
 
 import (
 	"context"
-	"log/slog"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
+	sourceservice "github.com/gonotelm-lab/gonotelm/internal/domain/source/service/source"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type GetSourceHandler struct {
-	sourceRepo  sourcerepo.Repository
-	storageRepo sourcerepo.StorageRepository
+	sourceRepo    sourcerepo.Repository
+	storageRepo   sourcerepo.StorageRepository
+	sourceService sourceservice.Service
 }
 
 func NewGetSourceHandler(
@@ -20,18 +21,16 @@ func NewGetSourceHandler(
 	storageRepo sourcerepo.StorageRepository,
 ) *GetSourceHandler {
 	return &GetSourceHandler{
-		sourceRepo:  sourceRepo,
-		storageRepo: storageRepo,
+		sourceRepo:    sourceRepo,
+		sourceService: sourceservice.New(storageRepo),
+		storageRepo:   storageRepo,
 	}
 }
 
-type GetSourceHandleResult struct {
-	Source           *sourceentity.Source
-	FileContentUrl   string
-	ParsedContentUrl string
-}
-
-func (h *GetSourceHandler) Handle(ctx context.Context, sourceId valobj.Id) (*GetSourceHandleResult, error) {
+func (h *GetSourceHandler) Handle(
+	ctx context.Context,
+	sourceId valobj.Id,
+) (*sourceentity.SourceDetail, error) {
 	targetSource, err := h.sourceRepo.FindById(ctx, sourceId)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "find source failed, source_id=%s", sourceId)
@@ -41,37 +40,9 @@ func (h *GetSourceHandler) Handle(ctx context.Context, sourceId valobj.Id) (*Get
 		return nil, errors.ErrParams.Msgf("source is not ready, status=%s", targetSource.Status)
 	}
 
-	result := &GetSourceHandleResult{
-		Source: targetSource,
-	}
-
-	parsedPresignResult, err := h.storageRepo.PresignGet(ctx, targetSource.ParsedContentKey)
+	result, err := h.sourceService.GetSourceDetail(ctx, targetSource)
 	if err != nil {
-		slog.ErrorContext(ctx, "presign get object failed",
-			slog.Any("err", err),
-			slog.String("source_id", sourceId.String()),
-			slog.String("store_key", targetSource.ParsedContentKey),
-		)
-	} else {
-		result.ParsedContentUrl = parsedPresignResult.Url
-	}
-
-	if targetSource.Kind.IsFile() {
-		fileContent, err := targetSource.GetFileContent()
-		if err != nil {
-			return nil, errors.WithMessagef(err, "get file content failed, source_id=%s", sourceId)
-		}
-
-		presignResult, err := h.storageRepo.PresignGet(ctx, fileContent.StoreKey)
-		if err != nil {
-			slog.ErrorContext(ctx, "presign get object failed",
-				slog.Any("err", err),
-				slog.String("source_id", sourceId.String()),
-				slog.String("store_key", fileContent.StoreKey),
-			)
-		} else {
-			result.FileContentUrl = presignResult.Url
-		}
+		return nil, errors.WithMessagef(err, "get source detail failed, source_id=%s", sourceId)
 	}
 
 	return result, nil

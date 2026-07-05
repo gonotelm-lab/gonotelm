@@ -6,12 +6,12 @@ import (
 )
 
 type Base struct {
-	Id         valobj.Id
-	CreateTime valobj.Time
-	UpdateTime valobj.Time
+	Id         valobj.Id   `json:"id"`
+	CreateTime valobj.Time `json:"create_time"`
+	UpdateTime valobj.Time `json:"update_time"`
 
-	deleted bool
-	events  []event.Event
+	deleted bool          `json:"-"`
+	events  []event.Event `json:"-"`
 }
 
 func (e *Base) IsDeleted() bool {

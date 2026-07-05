@@ -18,4 +18,3 @@ func NewChat(notebookId valobj.Id, ownerId string) *Chat {
 		OwnerId:    ownerId,
 	}
 }
-

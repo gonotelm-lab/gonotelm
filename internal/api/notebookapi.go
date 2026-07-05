@@ -6,9 +6,10 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/route"
 	"github.com/gonotelm-lab/gonotelm/internal/api/schema"
-	"github.com/gonotelm-lab/gonotelm/internal/app/logic/notebook"
 	"github.com/gonotelm-lab/gonotelm/internal/app/logic/studio"
+	chatapp "github.com/gonotelm-lab/gonotelm/internal/application/chat"
 	notebookapp "github.com/gonotelm-lab/gonotelm/internal/application/notebook"
+	sourceapp "github.com/gonotelm-lab/gonotelm/internal/application/source"
 	pkgctx "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
@@ -251,8 +252,8 @@ func (s *Server) ListNotebookSources(ctx context.Context, c *app.RequestContext)
 		return
 	}
 
-	result, err := s.notebookLogic.ListNotebookSources(ctx,
-		&notebook.ListNotebookSourcesParams{
+	result, err := s.listSourcesHandler.Handle(ctx,
+		&sourceapp.ListSourcesQuery{
 			NotebookId: req.Id,
 			Limit:      req.Limit,
 			Offset:     req.Offset,
@@ -263,7 +264,7 @@ func (s *Server) ListNotebookSources(ctx context.Context, c *app.RequestContext)
 	}
 
 	http.OkResp(c, ListNotebookSourcesResponse{
-		Sources: schema.ToSources(result.Sources),
+		Sources: schema.ToSourcesFromDomainDetails(result.Sources),
 		Limit:   req.Limit,
 		Offset:  req.Offset,
 		HasMore: result.HasMore,
@@ -312,7 +313,11 @@ func (s *Server) GetOrCreateNotebookChat(ctx context.Context, c *app.RequestCont
 		return
 	}
 
-	chat, err := s.notebookLogic.GetOrCreateNotebookChat(ctx, req.Id)
+	chat, err := s.createChatHandler.Handle(ctx,
+		&chatapp.CreateChatCommand{
+			NotebookId: req.Id,
+			OwnerId:    pkgctx.GetUserId(ctx),
+		})
 	if err != nil {
 		http.ErrResp(c, err)
 		return

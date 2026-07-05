@@ -26,7 +26,7 @@ func NewGetSourceDocHandler(
 
 type GetSourceDocHandleQuery struct {
 	SourceId valobj.Id
-	DocId    string
+	DocId    valobj.Id
 }
 
 type GetSourceDocHandleResult struct {

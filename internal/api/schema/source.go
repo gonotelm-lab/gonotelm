@@ -108,6 +108,26 @@ func ToSourceFromDomain(
 	return s
 }
 
+func ToSourceFromDomainDetail(
+	detail *sourceentity.SourceDetail,
+) *Source {
+	return ToSourceFromDomain(
+		detail.Source,
+		detail.Access.FileContentUrl,
+		detail.Access.ParsedContentUrl,
+	)
+}
+
+func ToSourcesFromDomainDetails(
+	details []*sourceentity.SourceDetail,
+) []*Source {
+	resp := make([]*Source, 0, len(details))
+	for _, detail := range details {
+		resp = append(resp, ToSourceFromDomainDetail(detail))
+	}
+	return resp
+}
+
 func ToSources(sources []*model.FullSource) []*Source {
 	resp := make([]*Source, 0, len(sources))
 	for _, source := range sources {

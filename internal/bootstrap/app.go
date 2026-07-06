@@ -8,8 +8,8 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	oldcache "github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache"
-	oldmqimpl "github.com/gonotelm-lab/gonotelm/internal/infra/mq/impl"
-	oldstorageimpl "github.com/gonotelm-lab/gonotelm/internal/infra/storage/impl"
+	oldmqimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
+	oldstorageimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/adapter"
 	cacheredis "github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache/redis"
@@ -280,7 +280,7 @@ func newMQ(cfg *oldmqimpl.Config) (*mq.MQ, error) {
 	}
 }
 
-func newStorage(cfg *oldstorageimpl.Config) (storage.Storage, error) {
+func newStorage(cfg *oldstorageimpl.StorageTypeConfig) (storage.Storage, error) {
 	switch cfg.Type {
 	case oldstorageimpl.Minio:
 		mc := cfg.Minio

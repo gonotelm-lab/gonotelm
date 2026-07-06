@@ -7,8 +7,9 @@ import (
 	"runtime/debug"
 	"sync"
 
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
+	chatstream "github.com/gonotelm-lab/gonotelm/pkg/eino-ext/stream"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/llm"
 
 	eino "github.com/cloudwego/eino/components/model"
 	einotool "github.com/cloudwego/eino/components/tool"
@@ -248,7 +249,7 @@ func (a *Agent[State]) ReactStream(
 		)
 
 		// 处理流式消息
-		chat.HandleStreamWithCallback(ctx, stream, &chat.Callbacks{
+		chatstream.HandleStreamWithCallback(ctx, stream, &chatstream.Callbacks{
 			OnReasoningStart: func() {
 				if a.onReasoningStart != nil {
 					a.onReasoningStart(ctx, round, a.state)
@@ -284,7 +285,7 @@ func (a *Agent[State]) ReactStream(
 			},
 			OnDone: func(msg *EinoMessage) {
 				a.updateTokenUsage(msg.ResponseMeta.Usage)
-				if msg.ResponseMeta.FinishReason == chat.FinishReasonToolCalls {
+				if msg.ResponseMeta.FinishReason == llm.FinishReasonToolCalls {
 					// 需要处理工具调用
 					toolMsgs := a.handleToolCalls(ctx, msg.ToolCalls)
 					roundMsgs := make([]*EinoMessage, 0, 1+len(toolMsgs))
@@ -350,7 +351,7 @@ func (a *Agent[State]) React(
 
 		a.updateTokenUsage(responseMsg.ResponseMeta.Usage)
 
-		if responseMsg.ResponseMeta.FinishReason == chat.FinishReasonToolCalls {
+		if responseMsg.ResponseMeta.FinishReason == llm.FinishReasonToolCalls {
 			toolMsgs := a.handleToolCalls(ctx, responseMsg.ToolCalls)
 			roundMsgs := make([]*EinoMessage, 0, 1+len(toolMsgs))
 			roundMsgs = append(roundMsgs, responseMsg)

@@ -11,8 +11,8 @@ import (
 	embedding "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
 	rerank "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
 	text2image "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
-	mqimpl "github.com/gonotelm-lab/gonotelm/internal/infra/mq/impl"
-	storageimpl "github.com/gonotelm-lab/gonotelm/internal/infra/storage/impl"
+	mqimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
+	storageimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
 	"github.com/gonotelm-lab/gonotelm/pkg/sql"
 
@@ -34,7 +34,7 @@ type Config struct {
 	Database   DatabaseConfig         `toml:"database"`
 	Redis      cache.RedisCacheConfig `toml:"redis"`
 	VectorDB   vectordb.Config        `toml:"vectorDb"`
-	Storage    storageimpl.Config     `toml:"storage"`
+	Storage    storageimpl.StorageTypeConfig     `toml:"storage"`
 	MsgQueue   mqimpl.Config          `toml:"msgQueue"`
 	Embedding  embedding.EmbeddingConfig  `toml:"embedding"`
 	Rerank     rerank.RerankConfig        `toml:"rerank"`

@@ -11,7 +11,7 @@ import (
 	sourcelogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/source"
 	studiologic "github.com/gonotelm-lab/gonotelm/internal/app/logic/studio"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/dal"
+	dal "github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
 	llm "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/openai"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"

@@ -2,7 +2,7 @@ package model
 
 import (
 	"github.com/bytedance/sonic"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/dal/schema"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/schema"
 )
 
 type ArtifactKind string

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	cacheschema "github.com/gonotelm-lab/gonotelm/internal/infra/cache/schema"
+	cacheschema "github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 	"github.com/vmihailenco/msgpack/v5"
 	"github.com/golang/snappy"

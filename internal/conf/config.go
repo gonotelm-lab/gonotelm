@@ -6,11 +6,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gonotelm-lab/gonotelm/internal/infra/cache"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/embedding"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/rerank"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/text2image"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache"
+	chat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
+	embedding "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
+	rerank "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
+	text2image "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
 	mqimpl "github.com/gonotelm-lab/gonotelm/internal/infra/mq/impl"
 	storageimpl "github.com/gonotelm-lab/gonotelm/internal/infra/storage/impl"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
@@ -36,9 +36,9 @@ type Config struct {
 	VectorDB   vectordb.Config        `toml:"vectorDb"`
 	Storage    storageimpl.Config     `toml:"storage"`
 	MsgQueue   mqimpl.Config          `toml:"msgQueue"`
-	Embedding  embedding.Config       `toml:"embedding"`
-	Rerank     rerank.Config          `toml:"rerank"`
-	Text2Image text2image.Config      `toml:"text2image"`
+	Embedding  embedding.EmbeddingConfig  `toml:"embedding"`
+	Rerank     rerank.RerankConfig        `toml:"rerank"`
+	Text2Image text2image.Text2ImageConfig `toml:"text2image"`
 	Logging    LoggingConfig          `toml:"logging"`
 	Chunking   ChunkingConfig         `toml:"chunking"`
 	Provider   chat.ProviderConfig    `toml:"provider"`
@@ -93,13 +93,13 @@ func Load(path string) (*Config, error) {
 		cfg.MsgQueue.Type = mqimpl.Kafka
 	}
 	if cfg.Embedding.Type == "" {
-		cfg.Embedding.Type = embedding.DashScope
+		cfg.Embedding.Type = embedding.EmbeddingDashScope
 	}
 	if cfg.Rerank.Type == "" {
-		cfg.Rerank.Type = rerank.DashScope
+		cfg.Rerank.Type = rerank.RerankDashScope
 	}
 	if cfg.Text2Image.Type == "" {
-		cfg.Text2Image.Type = text2image.DashScope
+		cfg.Text2Image.Type = text2image.Text2ImageDashScope
 	}
 	if cfg.Embedding.BatchSize <= 0 {
 		cfg.Embedding.BatchSize = 10

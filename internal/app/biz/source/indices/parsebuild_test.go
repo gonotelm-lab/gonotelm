@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	einoembed "github.com/cloudwego/eino/components/embedding"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
+	llm "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -77,7 +77,7 @@ func (m *parseBuildMockLLM) Summarize(_ context.Context, text string) (string, e
 
 func (m *parseBuildMockLLM) SummarizeWith(
 	ctx context.Context,
-	_ chat.Provider,
+	_ llm.Provider,
 	_ string,
 	text string,
 ) (string, error) {

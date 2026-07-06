@@ -5,28 +5,28 @@ import (
 	"strings"
 
 	bizprompt "github.com/gonotelm-lab/gonotelm/internal/app/biz/prompt"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
+	llm "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/openai"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type summazierImpl struct {
-	gateway *gateway.Gateway
+	gateway *openai.Gateway
 	option  SummarizeOption
 	prompt  *bizprompt.Prompt
 }
 
 type SummarizeOption struct {
-	Provider chat.Provider
+	Provider llm.Provider
 	Model    string
 }
 
-func New(gateway *gateway.Gateway, prompt *bizprompt.Prompt) Summarizer {
+func New(gateway *openai.Gateway, prompt *bizprompt.Prompt) Summarizer {
 	return NewWithOption(gateway, SummarizeOption{}, prompt)
 }
 
-func NewWithOption(gateway *gateway.Gateway, option SummarizeOption, prompt *bizprompt.Prompt) Summarizer {
+func NewWithOption(gateway *openai.Gateway, option SummarizeOption, prompt *bizprompt.Prompt) Summarizer {
 	return &summazierImpl{
 		gateway: gateway,
 		option:  option,
@@ -40,7 +40,7 @@ func (s *summazierImpl) Summarize(ctx context.Context, text string) (string, err
 
 func (s *summazierImpl) SummarizeWith(
 	ctx context.Context,
-	provider chat.Provider,
+	provider llm.Provider,
 	model string,
 	text string,
 ) (string, error) {
@@ -55,7 +55,7 @@ func (s *summazierImpl) SummarizeWith(
 		return "", errors.Wrapf(errors.ErrParams, "get provider failed, err=%v", err)
 	}
 
-	opt := chat.WithModel(model)
+	opt := llm.WithModel(model)
 	result, err := p.Generate(ctx, msgs, opt)
 	if err != nil {
 		return "", errors.Wrapf(errors.ErrLLM, "generate summary failed, err=%v", err)

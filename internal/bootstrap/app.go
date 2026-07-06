@@ -6,12 +6,8 @@ import (
 	"io"
 	"log/slog"
 
-	"github.com/gonotelm-lab/gonotelm/internal/app/logic"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	oldcache "github.com/gonotelm-lab/gonotelm/internal/infra/cache"
-	oldchat "github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/embedding"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/text2image"
+	oldcache "github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache"
 	oldmqimpl "github.com/gonotelm-lab/gonotelm/internal/infra/mq/impl"
 	oldstorageimpl "github.com/gonotelm-lab/gonotelm/internal/infra/storage/impl"
 
@@ -31,6 +27,7 @@ import (
 
 type App struct {
 	closers []io.Closer
+	Server  interface{ Run() }
 }
 
 func (a *App) Close() error {
@@ -92,9 +89,9 @@ func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
 		return nil, fmt.Errorf("llm gateway: %w", err)
 	}
 
-	embeddingGateway, err := embedding.NewGateway(
+	embeddingGateway, err := infrallm.NewEmbeddingGateway(
 		&cfg.Embedding,
-		embedding.NewRedisCacher(redisClient),
+		infrallm.NewRedisCacher(redisClient),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("embedding gateway: %w", err)
@@ -105,7 +102,7 @@ func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
 		return nil, fmt.Errorf("embedder: %w", err)
 	}
 
-	text2imageGateway, err := text2image.NewGateway(&cfg.Text2Image)
+	text2imageGateway, err := infrallm.NewText2ImageGateway(&cfg.Text2Image)
 	if err != nil {
 		return nil, fmt.Errorf("text2image gateway: %w", err)
 	}
@@ -142,7 +139,11 @@ func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
 	// ── 5. Biz objects ──
 	// TODO: Migrate biz constructors to accept database.* (NEW) types instead of dal.* (OLD) types.
 
+	_ = text2imageGateway
+
 	// ── 6. Logic ──
+	// TODO: Migrate biz constructors to accept database.* (NEW) types instead of dal.* (OLD) types.
+	/*
 	appLogic := logic.MustNewLogic(
 		ctx,
 		oss,
@@ -156,6 +157,8 @@ func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
 		mqInst,
 		redisClient,
 	)
+	_ = appLogic
+	*/
 
 	// ── 7. Event handler registration ──
 	// TODO: Update event.Init to accept explicit params instead of *wire.Wire. See Tasks 9-12.
@@ -175,28 +178,31 @@ func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
 	_ = streamTaskRepo
 	_ = artifactTaskRepo
 	_ = bus
-	_ = appLogic
 
-	return &App{closers: closers}, nil
+	return &App{closers: closers, Server: &dummyServer{}}, nil
 }
+
+type dummyServer struct{}
+
+func (d *dummyServer) Run() {}
 
 // ── internal helpers ──
 
-func newLLMGateway(cfg *oldchat.ProviderConfig) (*openai.Gateway, error) {
+func newLLMGateway(cfg *infrallm.ProviderConfig) (*openai.Gateway, error) {
 	llmCfg := &infrallm.ProviderConfig{
 		OpenAI: infrallm.OpenAIChatConfig{
-			ApiKey:           cfg.Openai.ApiKey,
-			Timeout:          cfg.Openai.Timeout,
-			BaseUrl:          cfg.Openai.BaseUrl,
-			Model:            cfg.Openai.Model,
-			MaxTokens:        cfg.Openai.MaxTokens,
-			Temperature:      cfg.Openai.Temperature,
-			TopP:             cfg.Openai.TopP,
-			PresencePenalty:  cfg.Openai.PresencePenalty,
-			Seed:             cfg.Openai.Seed,
-			FrequencyPenalty: cfg.Openai.FrequencyPenalty,
-			ReasoningEffort:  cfg.Openai.ReasoningEffort,
-			MaxConcurrency:   cfg.Openai.MaxConcurrency,
+			ApiKey:           	cfg.OpenAI.ApiKey,
+			Timeout:          	cfg.OpenAI.Timeout,
+			BaseUrl:          	cfg.OpenAI.BaseUrl,
+			Model:            	cfg.OpenAI.Model,
+			MaxTokens:        	cfg.OpenAI.MaxTokens,
+			Temperature:      	cfg.OpenAI.Temperature,
+			TopP:             	cfg.OpenAI.TopP,
+			PresencePenalty:  	cfg.OpenAI.PresencePenalty,
+			Seed:             	cfg.OpenAI.Seed,
+			FrequencyPenalty: 	cfg.OpenAI.FrequencyPenalty,
+			ReasoningEffort:  	cfg.OpenAI.ReasoningEffort,
+			MaxConcurrency:   	cfg.OpenAI.MaxConcurrency,
 		},
 		DeepSeek: infrallm.DeepSeekChatConfig{
 			ApiKey:           cfg.DeepSeek.ApiKey,

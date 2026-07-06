@@ -15,9 +15,9 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/text2image"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
+	llm "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/openai"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/eino-ext/chunker/recursive"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -41,8 +41,8 @@ type Logic struct {
 	prompt *bizprompt.Prompt
 
 	objectStorage     storage.Storage
-	llmGateway        *gateway.Gateway
-	text2imageGateway *text2image.Gateway
+	llmGateway        *openai.Gateway
+	text2imageGateway *llm.Text2ImageGateway
 	splitter          document.Transformer
 
 	loop *taskLoop
@@ -55,8 +55,8 @@ func MustNewLogic(
 	sourceBizForAgent *bizsource.AgentBiz,
 	notebookBiz *biznotebook.Biz,
 	artifactBiz *bizartifact.Biz,
-	llmGateway *gateway.Gateway,
-	text2imageGateway *text2image.Gateway,
+	llmGateway *openai.Gateway,
+	text2imageGateway *llm.Text2ImageGateway,
 	prompt *bizprompt.Prompt,
 ) *Logic {
 	splitter, err := recursive.NewSplitter(context.TODO(), &recursive.Config{

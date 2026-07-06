@@ -15,9 +15,9 @@ import (
 	// "github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/mq"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/openai"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 
@@ -59,7 +59,7 @@ type Logic struct {
 	prepProducer mq.Producer
 	prepConsumer mq.Consumer
 
-	llmGateway *gateway.Gateway
+	llmGateway *openai.Gateway
 	summarizer summarizer.Summarizer
 	prompt     *bizprompt.Prompt
 
@@ -88,7 +88,7 @@ func MustNewLogic(
 	objectStorage storage.Storage,
 	notebookBiz *biznotebook.Biz,
 	sourceBiz *bizsource.Biz,
-	llmGateway *gateway.Gateway,
+	llmGateway *openai.Gateway,
 	prompt *bizprompt.Prompt,
 ) *Logic {
 	sl := &Logic{

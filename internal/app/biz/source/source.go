@@ -12,9 +12,9 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal/schema"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/embedding"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
+	llm "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/openai"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
 	vecschema "github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -36,7 +36,7 @@ type Biz struct {
 	sourceStore    dal.SourceStore
 	sourceDocStore vectordb.SourceDocStore
 
-	llmGateway    *gateway.Gateway
+	llmGateway    *openai.Gateway
 	embedder      einoembed.Embedder
 	sourceIndexer *SourceIndexer
 }
@@ -45,8 +45,8 @@ func New(
 	objectStorage storage.Storage,
 	sourceStore dal.SourceStore,
 	sourceDocStore vectordb.SourceDocStore,
-	llmGateway *gateway.Gateway,
-	embeddingGateway *embedding.Gateway,
+	llmGateway *openai.Gateway,
+	embeddingGateway *llm.EmbeddingGateway,
 	prompt *bizprompt.Prompt,
 ) (*Biz, error) {
 	providerType := conf.Global().Embedding.Type

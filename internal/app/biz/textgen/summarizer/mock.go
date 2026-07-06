@@ -3,7 +3,7 @@ package summarizer
 import (
 	"context"
 
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
+	llm "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
 )
 
 type mockSummarizer struct{}
@@ -18,7 +18,7 @@ func (m *mockSummarizer) Summarize(ctx context.Context, text string) (string, er
 
 func (m *mockSummarizer) SummarizeWith(
 	ctx context.Context,
-	provider chat.Provider,
+	provider llm.Provider,
 	model string,
 	text string,
 ) (string, error) {

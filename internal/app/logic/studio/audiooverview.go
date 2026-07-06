@@ -8,7 +8,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	bizprompt "github.com/gonotelm-lab/gonotelm/internal/app/biz/prompt"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	llmchat "github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
+	llmchat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"

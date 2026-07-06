@@ -9,7 +9,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/app/agent/tool"
 	bizsource "github.com/gonotelm-lab/gonotelm/internal/app/biz/source"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
+	llm "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 
@@ -104,7 +104,7 @@ func sourceIDsToStrings(sourceIDs []uuid.UUID) []string {
 }
 
 func (l *Logic) buildSourceExploreAgent(
-	provider chat.Provider,
+	provider llm.Provider,
 	modelName string,
 	maxRound int,
 	options []einomodel.Option,

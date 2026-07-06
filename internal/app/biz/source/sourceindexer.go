@@ -13,8 +13,8 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/openai"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
 	vecschema "github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/batch"
@@ -45,7 +45,7 @@ func NewSourceIndexer(
 	embedder einoembed.Embedder,
 	sourceDocStore vectordb.SourceDocStore,
 	objectStorage storage.Storage,
-	llmGateway *gateway.Gateway,
+	llmGateway *openai.Gateway,
 	prompt *bizprompt.Prompt,
 ) *SourceIndexer {
 	hc := convertdoc.HandlerConfig{

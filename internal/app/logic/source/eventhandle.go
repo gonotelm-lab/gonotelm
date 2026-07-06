@@ -8,7 +8,7 @@ import (
 	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	llmchat "github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
+	llmchat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"

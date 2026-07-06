@@ -13,7 +13,7 @@ import (
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/openai"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 	"github.com/gonotelm-lab/gonotelm/pkg/http/middleware"
@@ -30,7 +30,7 @@ type ServerDeps struct {
 	StreamTaskRepo    chatrepo.StreamTaskRepository
 	EventBus          eventbus.EventBus
 	WaitGroup         *sync.WaitGroup
-	Gateway           *gateway.Gateway
+	Gateway           *openai.Gateway
 }
 
 type Server struct {

@@ -5,7 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/cache"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache"
 	cacheimpl "github.com/gonotelm-lab/gonotelm/internal/infra/cache/impl"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal"
 	dalimpl "github.com/gonotelm-lab/gonotelm/internal/infra/dal/impl"

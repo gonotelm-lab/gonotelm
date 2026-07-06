@@ -5,28 +5,28 @@ import (
 	"strings"
 
 	bizprompt "github.com/gonotelm-lab/gonotelm/internal/app/biz/prompt"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
+	llm "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/openai"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type titlemakerImpl struct {
-	gateway *gateway.Gateway
+	gateway *openai.Gateway
 	option  GenerateOption
 	prompt  *bizprompt.Prompt
 }
 
 type GenerateOption struct {
-	Provider chat.Provider
+	Provider llm.Provider
 	Model    string
 }
 
-func New(gateway *gateway.Gateway, prompt *bizprompt.Prompt) Maker {
+func New(gateway *openai.Gateway, prompt *bizprompt.Prompt) Maker {
 	return NewWithOption(gateway, GenerateOption{}, prompt)
 }
 
-func NewWithOption(gateway *gateway.Gateway, option GenerateOption, prompt *bizprompt.Prompt) Maker {
+func NewWithOption(gateway *openai.Gateway, option GenerateOption, prompt *bizprompt.Prompt) Maker {
 	return &titlemakerImpl{
 		gateway: gateway,
 		option:  option,
@@ -38,7 +38,7 @@ func (t *titlemakerImpl) Generate(ctx context.Context, text string) (string, err
 	return t.GenerateWith(ctx, t.option.Provider, t.option.Model, text)
 }
 
-func (t *titlemakerImpl) GenerateWith(ctx context.Context, provider chat.Provider, model string, text string) (string, error) {
+func (t *titlemakerImpl) GenerateWith(ctx context.Context, provider llm.Provider, model string, text string) (string, error) {
 	lang := pkgcontext.GetLang(ctx)
 	msgs, err := t.prompt.RenderTitleMakerMessage(ctx, text, lang)
 	if err != nil {
@@ -50,7 +50,7 @@ func (t *titlemakerImpl) GenerateWith(ctx context.Context, provider chat.Provide
 		return "", errors.Wrapf(errors.ErrParams, "get provider failed, err=%v", err)
 	}
 
-	opt := chat.WithModel(model)
+	opt := llm.WithModel(model)
 	result, err := p.Generate(ctx, msgs, opt)
 	if err != nil {
 		return "", errors.Wrapf(errors.ErrLLM, "generate title failed, err=%v", err)

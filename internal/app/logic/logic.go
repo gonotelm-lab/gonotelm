@@ -11,12 +11,11 @@ import (
 	sourcelogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/source"
 	studiologic "github.com/gonotelm-lab/gonotelm/internal/app/logic/studio"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/embedding"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/text2image"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/mq"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/dal"
+	llm "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/openai"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
 	"github.com/redis/go-redis/v9"
 )
@@ -29,13 +28,13 @@ type Logic struct {
 func MustNewLogic(
 	ctx context.Context,
 	objectStorage storage.Storage,
-	notebookStore database.NotebookStore,
-	artifactTaskStore database.ArtifactTaskStore,
-	sourceStore database.SourceStore,
+	notebookStore dal.NotebookStore,
+	artifactTaskStore dal.ArtifactTaskStore,
+	sourceStore dal.SourceStore,
 	sourceDocStore vectordb.SourceDocStore,
-	llmGateway *gateway.Gateway,
-	embeddingGateway *embedding.Gateway,
-	text2imageGateway *text2image.Gateway,
+	llmGateway *openai.Gateway,
+	embeddingGateway *llm.EmbeddingGateway,
+	text2imageGateway *llm.Text2ImageGateway,
 	mqFactory *mq.MQ,
 	redisClient redis.UniversalClient,
 ) *Logic {

@@ -1,8 +1,10 @@
 package chat
 
+import "github.com/gonotelm-lab/gonotelm/pkg/llm"
+
 const (
-	FinishReasonStop          = "stop"
-	FinishReasonLength        = "length"
-	FinishReasonToolCalls     = "tool_calls"
-	FinishReasonContentFilter = "content_filter"
+	FinishReasonStop          = llm.FinishReasonStop
+	FinishReasonLength        = llm.FinishReasonLength
+	FinishReasonToolCalls     = llm.FinishReasonToolCalls
+	FinishReasonContentFilter = llm.FinishReasonContentFilter
 )

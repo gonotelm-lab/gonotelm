@@ -1,7 +1,5 @@
 package openai
 
-var streamOptionsIncludeUsage = map[string]any{
-	"stream_options": map[string]bool{
-		"include_usage": true,
-	},
-}
+import openaiext "github.com/gonotelm-lab/gonotelm/pkg/eino-ext/openai"
+
+var streamOptionsIncludeUsage = openaiext.StreamOptionsIncludeUsage

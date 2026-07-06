@@ -8,13 +8,8 @@ import (
 	"github.com/cloudwego/eino-ext/components/model/qwen"
 	einomodel "github.com/cloudwego/eino/components/model"
 	"github.com/gonotelm-lab/gonotelm/pkg/eino-ext/model/agnes"
+	openaiext "github.com/gonotelm-lab/gonotelm/pkg/eino-ext/openai"
 )
-
-var responseFormatJsonObject = map[string]any{
-	"response_format": map[string]string{
-		"type": "json_object",
-	},
-}
 
 func WithThinking(
 	providerType Provider,
@@ -60,7 +55,7 @@ func WithModel(model string) einomodel.Option {
 func WithResponseJsonObject(providerType Provider) einomodel.Option {
 	switch providerType {
 	case ProviderQwen, ProviderDeepSeek, ProviderOpenAI:
-		return qwen.WithExtraFields(responseFormatJsonObject)
+		return qwen.WithExtraFields(openaiext.ResponseFormatJSONObject)
 	default:
 		return einomodel.Option{}
 	}

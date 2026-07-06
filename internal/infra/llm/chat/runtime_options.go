@@ -4,18 +4,13 @@ import (
 	"strings"
 
 	"github.com/gonotelm-lab/gonotelm/pkg/eino-ext/model/agnes"
+	openaiext "github.com/gonotelm-lab/gonotelm/pkg/eino-ext/openai"
 
 	"github.com/cloudwego/eino-ext/components/model/deepseek"
 	"github.com/cloudwego/eino-ext/components/model/openai"
 	"github.com/cloudwego/eino-ext/components/model/qwen"
 	einomodel "github.com/cloudwego/eino/components/model"
 )
-
-var responseFormatJsonObject = map[string]any{
-	"response_format": map[string]string{
-		"type": "json_object",
-	},
-}
 
 // WithThinking builds per-request model options for thinking behavior.
 func WithThinking(
@@ -65,7 +60,7 @@ func WithModel(model string) einomodel.Option {
 func WithResponseJsonObject(providerType Provider) einomodel.Option {
 	switch providerType {
 	case Qwen, DeepSeek, Openai:
-		return qwen.WithExtraFields(responseFormatJsonObject)
+		return qwen.WithExtraFields(openaiext.ResponseFormatJSONObject)
 	default:
 		return einomodel.Option{}
 	}

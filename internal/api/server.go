@@ -1,6 +1,8 @@
 package api
 
 import (
+	"sync"
+
 	"github.com/cloudwego/hertz/pkg/app/server"
 	"github.com/gonotelm-lab/gonotelm/internal/app/logic"
 	studiologic "github.com/gonotelm-lab/gonotelm/internal/app/logic/studio"
@@ -8,11 +10,28 @@ import (
 	notebookapp "github.com/gonotelm-lab/gonotelm/internal/application/notebook"
 	sourceapp "github.com/gonotelm-lab/gonotelm/internal/application/source"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	"github.com/gonotelm-lab/gonotelm/internal/infra"
-	wire "github.com/gonotelm-lab/gonotelm/internal/wire"
+	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
+	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
+	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 	"github.com/gonotelm-lab/gonotelm/pkg/http/middleware"
 )
+
+type ServerDeps struct {
+	NotebookRepo      notebookrepo.Repository
+	SourceRepo        sourcerepo.Repository
+	SourceStorageRepo sourcerepo.StorageRepository
+	SourceDocRepo     sourcerepo.SourceDocRepository
+	ChatRepo          chatrepo.Repository
+	MessageRepo       chatrepo.MessageRepository
+	ContextMessageRepo chatrepo.ContextMessageRepository
+	StreamTaskRepo    chatrepo.StreamTaskRepository
+	EventBus          eventbus.EventBus
+	WaitGroup         *sync.WaitGroup
+	Gateway           *gateway.Gateway
+}
 
 type Server struct {
 	h *server.Hertz
@@ -47,14 +66,11 @@ type Server struct {
 	getStreamHandler         *chatapp.GetStreamHandler
 	abortStreamHandler       *chatapp.AbortStreamHandler
 	deleteChatContextHandler *chatapp.DeleteChatContextHandler
-
-	wire *wire.Wire
 }
 
 func NewServer(
 	logic *logic.Logic,
-	infras *infra.Instances,
-	wire *wire.Wire,
+	deps ServerDeps,
 ) *Server {
 	hz := server.Default(
 		server.WithCustomBinder(http.NewCanonicalBinder()),
@@ -70,51 +86,49 @@ func NewServer(
 		h:           hz,
 		studioLogic: logic.StudioLogic,
 
-		wire: wire,
+		checkNotebookAccessHandler: notebookapp.NewCheckNotebookAccessHandler(deps.NotebookRepo),
+		getNotebookHandler:         notebookapp.NewGetNotebookHandler(deps.NotebookRepo),
+		createNotebookHandler:      notebookapp.NewCreateNotebookHandler(deps.NotebookRepo, deps.EventBus),
+		listNotebooksHandler:       notebookapp.NewListNotebooksHandler(deps.NotebookRepo),
+		deleteNotebookHandler:      notebookapp.NewDeleteNotebookHandler(deps.NotebookRepo, deps.EventBus),
+		updateNotebookNameHandler:  notebookapp.NewUpdateNotebookNameHandler(deps.NotebookRepo),
 
-		checkNotebookAccessHandler: notebookapp.NewCheckNotebookAccessHandler(wire.NotebookRepo),
-		getNotebookHandler:         notebookapp.NewGetNotebookHandler(wire.NotebookRepo),
-		createNotebookHandler:      notebookapp.NewCreateNotebookHandler(wire.NotebookRepo, wire.EventBus),
-		listNotebooksHandler:       notebookapp.NewListNotebooksHandler(wire.NotebookRepo),
-		deleteNotebookHandler:      notebookapp.NewDeleteNotebookHandler(wire.NotebookRepo, wire.EventBus),
-		updateNotebookNameHandler:  notebookapp.NewUpdateNotebookNameHandler(wire.NotebookRepo),
+		checkSourceAccessHandler:      sourceapp.NewCheckSourceAccessHandler(deps.SourceRepo),
+		getSourceHandler:              sourceapp.NewGetSourceHandler(deps.SourceRepo, deps.SourceStorageRepo),
+		createSourceHandler:           sourceapp.NewCreateSourceHandler(deps.SourceRepo, deps.NotebookRepo, deps.EventBus),
+		deleteSourceHandler:           sourceapp.NewDeleteSourceHandler(deps.SourceRepo, deps.EventBus),
+		presignUploadFileHandler:      sourceapp.NewPresignUploadFileHandler(deps.SourceRepo, deps.SourceStorageRepo),
+		pollSourceStatusHandler:       sourceapp.NewPollSourceStatusHandler(deps.SourceRepo, deps.SourceStorageRepo, deps.EventBus),
+		retrySourcePreparationHandler: sourceapp.NewRetrySourcePreparationHandler(deps.SourceRepo, deps.EventBus),
+		updateSourceTitleHandler:      sourceapp.NewUpdateSourceTitleHandler(deps.SourceRepo),
 
-		checkSourceAccessHandler:      sourceapp.NewCheckSourceAccessHandler(wire.SourceRepo),
-		getSourceHandler:              sourceapp.NewGetSourceHandler(wire.SourceRepo, wire.SourceStorageRepo),
-		createSourceHandler:           sourceapp.NewCreateSourceHandler(wire.SourceRepo, wire.NotebookRepo, wire.EventBus),
-		deleteSourceHandler:           sourceapp.NewDeleteSourceHandler(wire.SourceRepo, wire.EventBus),
-		presignUploadFileHandler:      sourceapp.NewPresignUploadFileHandler(wire.SourceRepo, wire.SourceStorageRepo),
-		pollSourceStatusHandler:       sourceapp.NewPollSourceStatusHandler(wire.SourceRepo, wire.SourceStorageRepo, wire.EventBus),
-		retrySourcePreparationHandler: sourceapp.NewRetrySourcePreparationHandler(wire.SourceRepo, wire.EventBus),
-		updateSourceTitleHandler:      sourceapp.NewUpdateSourceTitleHandler(wire.SourceRepo),
+		getSourceDocHandler:      sourceapp.NewGetSourceDocHandler(deps.SourceRepo, deps.SourceDocRepo),
+		batchGetSourceDocHandler: sourceapp.NewBatchGetSourceDocsHandler(deps.SourceRepo, deps.SourceDocRepo),
 
-		getSourceDocHandler:      sourceapp.NewGetSourceDocHandler(wire.SourceRepo, wire.SourceDocRepo),
-		batchGetSourceDocHandler: sourceapp.NewBatchGetSourceDocsHandler(wire.SourceRepo, wire.SourceDocRepo),
-
-		createChatHandler:  chatapp.NewCreateChatHandler(wire.NotebookRepo, wire.ChatRepo),
-		listSourcesHandler: sourceapp.NewListSourcesHandler(wire.NotebookRepo, wire.SourceRepo, wire.SourceStorageRepo),
+		createChatHandler:  chatapp.NewCreateChatHandler(deps.NotebookRepo, deps.ChatRepo),
+		listSourcesHandler: sourceapp.NewListSourcesHandler(deps.NotebookRepo, deps.SourceRepo, deps.SourceStorageRepo),
 
 		chatCreateMessageHandler: chatapp.NewCreateMessageHandler(
-			wire.WaitGroup,
-			wire.NotebookRepo,
-			wire.ChatRepo,
-			wire.MessageRepo,
-			wire.ContextMessageRepo,
-			wire.StreamTaskRepo,
-			wire.SourceRepo,
-			wire.SourceStorageRepo,
-			wire.SourceDocRepo,
-			wire.Gateway(),
+			deps.WaitGroup,
+			deps.NotebookRepo,
+			deps.ChatRepo,
+			deps.MessageRepo,
+			deps.ContextMessageRepo,
+			deps.StreamTaskRepo,
+			deps.SourceRepo,
+			deps.SourceStorageRepo,
+			deps.SourceDocRepo,
+			deps.Gateway,
 		),
 		listMessagesHandler: chatapp.NewListMessagesHandler(
-			wire.ChatRepo,
-			wire.MessageRepo,
+			deps.ChatRepo,
+			deps.MessageRepo,
 		),
-		getStreamHandler:   chatapp.NewGetStreamHandler(wire.StreamTaskRepo),
-		abortStreamHandler: chatapp.NewAbortStreamHandler(wire.StreamTaskRepo),
+		getStreamHandler:   chatapp.NewGetStreamHandler(deps.StreamTaskRepo),
+		abortStreamHandler: chatapp.NewAbortStreamHandler(deps.StreamTaskRepo),
 		deleteChatContextHandler: chatapp.NewDeleteChatContextHandler(
-			wire.ChatRepo,
-			wire.ContextMessageRepo,
+			deps.ChatRepo,
+			deps.ContextMessageRepo,
 		),
 	}
 

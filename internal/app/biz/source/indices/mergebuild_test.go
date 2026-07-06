@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	vschema "github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/schema"
+	vschema "github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/schema"
 	. "github.com/smartystreets/goconvey/convey"
 )
 

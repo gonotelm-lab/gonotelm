@@ -8,7 +8,7 @@ import (
 	"unsafe"
 
 	sourceutil "github.com/gonotelm-lab/gonotelm/internal/app/biz/source/util"
-	vschema "github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/schema"
+	vschema "github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/batch"
 	"github.com/gonotelm-lab/gonotelm/pkg/eino-ext/chunker/recursive"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"

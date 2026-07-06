@@ -11,9 +11,9 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/slices"
 
-	vdal "github.com/gonotelm-lab/gonotelm/internal/infra/vectordal"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/schema"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/schema/mapper"
+	vdal "github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/schema"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/schema/mapper"
 )
 
 type SourceDocRepositoryImpl struct {

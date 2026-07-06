@@ -13,8 +13,8 @@ import (
 	mqimpl "github.com/gonotelm-lab/gonotelm/internal/infra/mq/impl"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
 	storageimpl "github.com/gonotelm-lab/gonotelm/internal/infra/storage/impl"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/vectordal"
-	vectordalimpl "github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/impl"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/milvus"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -23,7 +23,7 @@ var gInstances *Instances
 
 type Instances struct {
 	Dal           *dal.DAL
-	VectorDal     *vectordal.DAL
+	VectorDal     *vectordb.DAL
 	MQ            *mq.MQ
 	Cache         *cacheimpl.Cache
 	Redis         redis.UniversalClient
@@ -38,7 +38,7 @@ func MustInit(c *conf.Config) *Instances {
 
 	slog.Info("initialized dal", "type", c.Database.Type)
 
-	vd, err := vectordalimpl.New(&c.VectorDB)
+	vd, err := milvus.Open(&c.VectorDB)
 	if err != nil {
 		panic(err)
 	}

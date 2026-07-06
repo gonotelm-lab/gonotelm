@@ -15,8 +15,8 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/embedding"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/vectordal"
-	vecschema "github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/schema"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
+	vecschema "github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/safe"
 	"github.com/gonotelm-lab/gonotelm/pkg/slices"
@@ -34,7 +34,7 @@ var (
 type Biz struct {
 	objectStorage  storage.Storage
 	sourceStore    dal.SourceStore
-	sourceDocStore vectordal.SourceDocStore
+	sourceDocStore vectordb.SourceDocStore
 
 	llmGateway    *gateway.Gateway
 	embedder      einoembed.Embedder
@@ -44,7 +44,7 @@ type Biz struct {
 func New(
 	objectStorage storage.Storage,
 	sourceStore dal.SourceStore,
-	sourceDocStore vectordal.SourceDocStore,
+	sourceDocStore vectordb.SourceDocStore,
 	llmGateway *gateway.Gateway,
 	embeddingGateway *embedding.Gateway,
 	prompt *bizprompt.Prompt,

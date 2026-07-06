@@ -13,7 +13,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/text2image"
 	mqimpl "github.com/gonotelm-lab/gonotelm/internal/infra/mq/impl"
 	storageimpl "github.com/gonotelm-lab/gonotelm/internal/infra/storage/impl"
-	vecimpl "github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/impl"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
 	"github.com/gonotelm-lab/gonotelm/pkg/sql"
 
 	"github.com/BurntSushi/toml"
@@ -33,7 +33,7 @@ type Config struct {
 	Api        ApiConfig              `toml:"api"`
 	Database   DatabaseConfig         `toml:"database"`
 	Redis      cache.RedisCacheConfig `toml:"redis"`
-	VectorDB   vecimpl.Config         `toml:"vectorDb"`
+	VectorDB   vectordb.Config        `toml:"vectorDb"`
 	Storage    storageimpl.Config     `toml:"storage"`
 	MsgQueue   mqimpl.Config          `toml:"msgQueue"`
 	Embedding  embedding.Config       `toml:"embedding"`

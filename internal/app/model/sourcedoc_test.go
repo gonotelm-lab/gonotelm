@@ -3,7 +3,7 @@ package model
 import (
 	"testing"
 
-	vecschema "github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/schema"
+	vecschema "github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/schema"
 )
 
 func TestNewSourceDocTreeMeta(t *testing.T) {

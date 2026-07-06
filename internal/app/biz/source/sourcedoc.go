@@ -7,7 +7,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/app/biz/source/indices"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
-	vecschema "github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/schema"
+	vecschema "github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/bitmap"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/slices"

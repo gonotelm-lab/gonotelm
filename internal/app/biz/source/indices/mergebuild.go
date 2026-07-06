@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	vschema "github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/schema"
+	vschema "github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/algo/manifold"
 	"github.com/gonotelm-lab/gonotelm/pkg/algo/mixture"
 	"github.com/gonotelm-lab/gonotelm/pkg/algo/normalize"

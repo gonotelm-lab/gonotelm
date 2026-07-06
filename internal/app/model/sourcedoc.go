@@ -1,7 +1,7 @@
 package model
 
 import (
-	vecschema "github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/schema"
+	vecschema "github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 

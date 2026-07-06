@@ -15,8 +15,8 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/vectordal"
-	vecschema "github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/schema"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
+	vecschema "github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/batch"
 	"github.com/gonotelm-lab/gonotelm/pkg/bitmap"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -35,7 +35,7 @@ type SourceIndexer struct {
 	embedder            einoembed.Embedder
 	embedBatchSize      int
 	embedMaxConcurrency int
-	sourceDocStore      vectordal.SourceDocStore
+	sourceDocStore      vectordb.SourceDocStore
 
 	sourceConverters map[model.SourceKind]convertdoc.Handler
 	docTreeBuilder   *indices.DocTreeBuilder
@@ -43,7 +43,7 @@ type SourceIndexer struct {
 
 func NewSourceIndexer(
 	embedder einoembed.Embedder,
-	sourceDocStore vectordal.SourceDocStore,
+	sourceDocStore vectordb.SourceDocStore,
 	objectStorage storage.Storage,
 	llmGateway *gateway.Gateway,
 	prompt *bizprompt.Prompt,

@@ -6,8 +6,8 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/app/biz/source/indices"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/schema"
-	vschema "github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/schema"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/schema"
+	vschema "github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/bitmap"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 	. "github.com/smartystreets/goconvey/convey"

@@ -2,7 +2,7 @@ package indices
 
 import (
 	"github.com/gonotelm-lab/gonotelm/internal/app/biz/textgen/summarizer"
-	vschema "github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/schema"
+	vschema "github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/schema"
 
 	einoembed "github.com/cloudwego/eino/components/embedding"
 )

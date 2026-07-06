@@ -2,11 +2,8 @@ package database
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 
-	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/postgres"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/misc"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
@@ -201,11 +198,3 @@ func (d *DAL) Close(ctx context.Context) error {
 	return d.Closer.Close(ctx)
 }
 
-func Open(cfg conf.DatabaseConfig) (*DAL, error) {
-	switch cfg.Type {
-	case "postgres":
-		return postgres.Open(cfg)
-	default:
-		return nil, fmt.Errorf("unsupported database driver: %s", cfg.Type)
-	}
-}

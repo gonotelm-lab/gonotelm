@@ -13,7 +13,7 @@ import (
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/cache"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/cache/schema"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/cache/schema/mapper"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository/mapper"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 

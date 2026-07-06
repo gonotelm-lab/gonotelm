@@ -13,7 +13,7 @@ import (
 
 	vdal "github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/schema"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/schema/mapper"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository/mapper"
 )
 
 type SourceDocRepositoryImpl struct {

@@ -8,7 +8,7 @@ import (
 	chaterrors "github.com/gonotelm-lab/gonotelm/internal/domain/chat/errors"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/dal"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/dal/schema/mapper"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository/mapper"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 

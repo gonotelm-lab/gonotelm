@@ -5,7 +5,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourcevo "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity/vo"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/dal/schema"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/schema"
 )
 
 func SourceToSchema(source *sourceentity.Source) *schema.Source {

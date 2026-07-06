@@ -6,7 +6,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/chat/entity"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/cache"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository/mapper"
 )
 

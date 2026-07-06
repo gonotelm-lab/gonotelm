@@ -6,19 +6,19 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	notebookdomain "github.com/gonotelm-lab/gonotelm/internal/domain/notebook"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/dal"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository/mapper"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type NotebookRepositoryImpl struct {
-	notebookStore dal.NotebookStore
-	sourceStore   dal.SourceStore
+	notebookStore database.NotebookStore
+	sourceStore   database.SourceStore
 }
 
 func NewNotebookRepository(
-	notebookStore dal.NotebookStore,
-	sourceStore dal.SourceStore,
+	notebookStore database.NotebookStore,
+	sourceStore database.SourceStore,
 ) notebookrepo.Repository {
 	return &NotebookRepositoryImpl{
 		notebookStore: notebookStore,

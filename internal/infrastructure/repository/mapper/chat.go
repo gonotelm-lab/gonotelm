@@ -4,7 +4,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	chatdomain "github.com/gonotelm-lab/gonotelm/internal/domain/chat/entity"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/dal/schema"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/schema"
 )
 
 func ChatToSchema(chat *chatdomain.Chat) *schema.Chat {

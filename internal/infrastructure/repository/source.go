@@ -7,16 +7,16 @@ import (
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	domainerr "github.com/gonotelm-lab/gonotelm/internal/domain/source/errors"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/dal"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository/mapper"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type SourceRepositoryImpl struct {
-	sourceStore dal.SourceStore
+	sourceStore database.SourceStore
 }
 
-func NewSourceRepository(sourceStore dal.SourceStore) sourcerepo.Repository {
+func NewSourceRepository(sourceStore database.SourceStore) sourcerepo.Repository {
 	return &SourceRepositoryImpl{
 		sourceStore: sourceStore,
 	}

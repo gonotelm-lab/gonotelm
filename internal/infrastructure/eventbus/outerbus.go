@@ -6,7 +6,7 @@ import (
 
 	"github.com/bytedance/sonic"
 	"github.com/gonotelm-lab/gonotelm/internal/core/event"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/mq"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 

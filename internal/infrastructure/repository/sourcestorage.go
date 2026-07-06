@@ -5,7 +5,7 @@ import (
 
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 

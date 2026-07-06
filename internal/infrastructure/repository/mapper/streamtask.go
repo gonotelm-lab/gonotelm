@@ -3,7 +3,7 @@ package mapper
 import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/chat/entity"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/cache/schema"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 
 	"github.com/vmihailenco/msgpack/v5"

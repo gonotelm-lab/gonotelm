@@ -4,14 +4,14 @@ import (
 	"context"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/dal"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
 )
 
 type ArtifactTaskRepository struct {
-	taskStore dal.ArtifactTaskStore
+	taskStore database.ArtifactTaskStore
 }
 
-func NewArtifactTaskRepository(taskStore dal.ArtifactTaskStore) *ArtifactTaskRepository {
+func NewArtifactTaskRepository(taskStore database.ArtifactTaskStore) *ArtifactTaskRepository {
 	return &ArtifactTaskRepository{
 		taskStore: taskStore,
 	}

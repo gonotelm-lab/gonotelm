@@ -4,7 +4,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	notebookdomain "github.com/gonotelm-lab/gonotelm/internal/domain/notebook"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/dal/schema"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/schema"
 )
 
 func NotebookToSchema(notebook *notebookdomain.Notebook) *schema.Notebook {

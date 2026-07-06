@@ -7,16 +7,16 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/domain/chat/entity"
 	chaterrors "github.com/gonotelm-lab/gonotelm/internal/domain/chat/errors"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/dal"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository/mapper"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type ChatRepositoryImpl struct {
-	chatStore dal.ChatStore
+	chatStore database.ChatStore
 }
 
-func NewChatRepository(chatStore dal.ChatStore) repository.Repository {
+func NewChatRepository(chatStore database.ChatStore) repository.Repository {
 	return &ChatRepositoryImpl{chatStore: chatStore}
 }
 

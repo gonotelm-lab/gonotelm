@@ -9,8 +9,8 @@ import (
 
 	einoschema "github.com/cloudwego/eino/schema"
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/openai"
 )
 
 const summarizePromptTemplate = `
@@ -38,11 +38,11 @@ const (
 )
 
 type SummarizerImpl struct {
-	provider chat.Provider
-	llm      *gateway.Gateway
+	provider llm.Provider
+	llm      *openai.Gateway
 }
 
-func NewSummarizer(llm *gateway.Gateway) adapter.Summarizer {
+func NewSummarizer(llm *openai.Gateway) adapter.Summarizer {
 	return &SummarizerImpl{
 		llm: llm,
 	}
@@ -63,7 +63,7 @@ func (s *SummarizerImpl) Summarize(
 
 	provider := s.provider
 	if opt.Prompt != "" {
-		provider = chat.Provider(opt.Provider)
+		provider = llm.Provider(opt.Provider)
 	}
 
 	var prompt string
@@ -83,7 +83,7 @@ func (s *SummarizerImpl) Summarize(
 			Role:    einoschema.User,
 			Content: prompt,
 		},
-	}, chat.WithModel(opt.Model))
+	}, llm.WithModel(opt.Model))
 	if err != nil {
 		return "", errors.WithMessagef(err, "generate summary failed, err=%v", err)
 	}

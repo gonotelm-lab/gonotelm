@@ -6,15 +6,15 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/chat/entity"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/dal"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository/mapper"
 )
 
 type MessageRepositoryImpl struct {
-	messageStore dal.ChatMessageStore
+	messageStore database.ChatMessageStore
 }
 
-func NewMessageRepository(messageStore dal.ChatMessageStore) chatrepo.MessageRepository {
+func NewMessageRepository(messageStore database.ChatMessageStore) chatrepo.MessageRepository {
 	return &MessageRepositoryImpl{
 		messageStore: messageStore,
 	}

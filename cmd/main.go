@@ -3,13 +3,10 @@ package main
 import (
 	"context"
 	"flag"
+	"log/slog"
 
-	"github.com/gonotelm-lab/gonotelm/internal/api"
-	"github.com/gonotelm-lab/gonotelm/internal/app/logic"
+	"github.com/gonotelm-lab/gonotelm/internal/bootstrap"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	"github.com/gonotelm-lab/gonotelm/internal/infra"
-	"github.com/gonotelm-lab/gonotelm/internal/interfaces/event"
-	wire "github.com/gonotelm-lab/gonotelm/internal/wire"
 	pkglog "github.com/gonotelm-lab/gonotelm/pkg/log"
 )
 
@@ -20,7 +17,9 @@ func main() {
 	initConfig(*configPath)
 	initLogger()
 
-	run()
+	if err := run(); err != nil {
+		slog.Error("fatal", "err", err)
+	}
 }
 
 func initConfig(configPath string) {
@@ -45,27 +44,20 @@ func initLogger() {
 	}
 }
 
-func run() {
+// run wires the application using bootstrap.NewApp.
+// NOTE: bootstrap.NewApp is partially wired — Tasks 11-12 will complete the logic,
+// event handler registration, and HTTP server wiring. The build may not fully
+// compile until those tasks are done.
+func run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	infras := infra.MustInit(conf.Global())
-	wire.Init(infras)
-	app := logic.MustNewLogic(
-		ctx,
-		infras,
-		infras.ObjectStorage,
-	)
+	app, err := bootstrap.NewApp(ctx, conf.Global())
+	if err != nil {
+		return err
+	}
+	defer app.Close()
 
-	wireIns := wire.GetWire()
-
-	defer func() {
-		// Close MQ consumers/producers before databases to avoid shutdown writes on closed DB.
-		app.Close(ctx)
-		wireIns.Close()
-		infra.Close(ctx)
-	}()
-
-	event.Init(ctx, wireIns)
-	api.NewServer(app, infras, wireIns).Run()
+	app.Server.Run()
+	return nil
 }

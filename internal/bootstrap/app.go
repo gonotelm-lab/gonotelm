@@ -13,6 +13,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/adapter"
 	cacheredis "github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache/redis"
+	"github.com/gonotelm-lab/gonotelm/internal/interfaces/event"
 	dbpostgres "github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/postgres"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	infrallm "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
@@ -161,23 +162,25 @@ func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
 	*/
 
 	// ── 7. Event handler registration ──
-	// TODO: Update event.Init to accept explicit params instead of *wire.Wire. See Tasks 9-12.
+
+	event.Init(ctx, &event.EventDeps{
+		NotebookRepo:        notebookRepo,
+		SourceRepo:          sourceRepo,
+		SourceStorageRepo:   sourceStorageRepo,
+		SourceDocRepo:       sourceDocRepo,
+		ChatRepo:            chatRepo,
+		MessageRepo:         messageRepo,
+		ContextMessageRepo:  contextMsgRepo,
+		ArtifactTaskRepo:    artifactTaskRepo,
+		EventBus:            bus,
+		Summarizer:          summarizer,
+	})
 
 	// ── 8. HTTP Server ──
 	// TODO: Update api.NewServer to accept explicit params instead of *infra.Instances + *wire.Wire.
 	// See Tasks 9-12.
 
-	_ = summarizer
-	_ = notebookRepo
-	_ = sourceRepo
-	_ = sourceStorageRepo
-	_ = sourceDocRepo
-	_ = chatRepo
-	_ = messageRepo
-	_ = contextMsgRepo
 	_ = streamTaskRepo
-	_ = artifactTaskRepo
-	_ = bus
 
 	return &App{closers: closers, Server: &dummyServer{}}, nil
 }

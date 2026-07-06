@@ -1,0 +1,297 @@
+package postgres
+
+import (
+	"context"
+
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/schema"
+	"github.com/gonotelm-lab/gonotelm/pkg/batch"
+	xerror "github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/sql"
+
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+)
+
+type SourceStoreImpl struct {
+	db *gorm.DB
+}
+
+var sourceIDsQueryBatchSize = 500
+
+var _ database.SourceStore = &SourceStoreImpl{}
+
+func NewSourceStoreImpl(db *gorm.DB) *SourceStoreImpl {
+	return &SourceStoreImpl{db: db}
+}
+
+func (s *SourceStoreImpl) Create(ctx context.Context, source *schema.Source) error {
+	if err := s.db.WithContext(ctx).Create(source).Error; err != nil {
+		return sql.WrapErr(err)
+	}
+
+	return nil
+}
+
+func (s *SourceStoreImpl) Upsert(ctx context.Context, source *schema.Source) error {
+	cl := clause.OnConflict{
+		Columns: []clause.Column{{Name: "id"}},
+		DoUpdates: clause.Assignments(map[string]any{
+			"status":             source.Status,
+			"title":              source.Title,
+			"abstract":           source.Abstract,
+			"parsed_content_key": source.ParsedContentKey,
+			"updated_at":         source.UpdatedAt,
+			"content":            source.Content,
+		}),
+	}
+
+	if err := s.db.WithContext(ctx).
+		Model(&schema.Source{}).
+		Clauses(cl).
+		Create(source).Error; err != nil {
+		return sql.WrapErr(err)
+	}
+
+	return nil
+}
+
+func (s *SourceStoreImpl) GetById(ctx context.Context, id database.Id) (*schema.Source, error) {
+	var source schema.Source
+	err := s.db.WithContext(ctx).
+		Where("id = ?", id).
+		Take(&source).Error
+	if err != nil {
+		return nil, sql.WrapErr(err)
+	}
+
+	return &source, nil
+}
+
+func (s *SourceStoreImpl) CountByNotebookId(
+	ctx context.Context,
+	notebookId database.Id,
+) (int64, error) {
+	var count int64
+	err := s.db.WithContext(ctx).
+		Model(&schema.Source{}).
+		Where("notebook_id = ? AND status <> ?", notebookId, schema.SourceStatusInited).
+		Count(&count).Error
+	if err != nil {
+		return 0, sql.WrapErr(err)
+	}
+
+	return count, nil
+}
+
+func (s *SourceStoreImpl) BatchCountByNotebookIds(ctx context.Context, notebookIds []database.Id) (map[database.Id]int64, error) {
+	var rows []struct {
+		NotebookId database.Id `gorm:"column:notebook_id"`
+		Count      int64  `gorm:"column:count"`
+	}
+
+	err := s.db.WithContext(ctx).
+		Model(&schema.Source{}).
+		Where("notebook_id IN ? AND status <> ?", notebookIds, schema.SourceStatusInited).
+		Group("notebook_id").
+		Select("notebook_id, COUNT(*) as count").
+		Find(&rows).Error
+	if err != nil {
+		return nil, sql.WrapErr(err)
+	}
+
+	countsByNotebookId := make(map[database.Id]int64, len(notebookIds))
+	for _, row := range rows {
+		countsByNotebookId[row.NotebookId] = row.Count
+	}
+
+	return countsByNotebookId, nil
+}
+
+func (s *SourceStoreImpl) ListByNotebookId(
+	ctx context.Context,
+	notebookId database.Id,
+	limit, offset int,
+) ([]*schema.Source, error) {
+	if limit <= 0 || offset < 0 {
+		return nil, xerror.ErrParams.Msgf("invalid pagination params: limit=%d offset=%d", limit, offset)
+	}
+
+	var rows []*schema.Source
+	err := s.db.WithContext(ctx).
+		Where("notebook_id = ? AND status <> ?", notebookId, schema.SourceStatusInited).
+		Order("id DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&rows).Error
+	if err != nil {
+		return nil, sql.WrapErr(err)
+	}
+
+	return rows, nil
+}
+
+func (s *SourceStoreImpl) DeleteById(ctx context.Context, id database.Id) error {
+	return s.BatchDelete(ctx, []database.Id{id})
+}
+
+func (s *SourceStoreImpl) BatchDelete(ctx context.Context, ids []database.Id) error {
+	if len(ids) == 0 {
+		return nil
+	}
+
+	_, err := batch.BatchMap(
+		ctx,
+		ids,
+		sourceIDsQueryBatchSize,
+		func(ctx context.Context, batchIDs []database.Id) ([]struct{}, error) {
+			if err := s.db.WithContext(ctx).
+				Where("id IN ?", batchIDs).
+				Delete(&schema.Source{}).Error; err != nil {
+				return nil, sql.WrapErr(err)
+			}
+			return nil, nil
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *SourceStoreImpl) DeleteByNotebookId(ctx context.Context, notebookId database.Id) error {
+	if err := s.db.WithContext(ctx).
+		Where("notebook_id = ?", notebookId).
+		Delete(&schema.Source{}).Error; err != nil {
+		return sql.WrapErr(err)
+	}
+
+	return nil
+}
+
+func (s *SourceStoreImpl) UpdateStatus(
+	ctx context.Context,
+	params *schema.SourceUpdateStatusParams,
+) error {
+	if err := s.db.WithContext(ctx).
+		Model(&schema.Source{}).
+		Where("id = ?", params.Id).
+		Updates(map[string]any{
+			"status":     params.Status,
+			"updated_at": params.UpdatedAt,
+		}).Error; err != nil {
+		return sql.WrapErr(err)
+	}
+
+	return nil
+}
+
+func (s *SourceStoreImpl) Update(ctx context.Context, params *schema.SourceUpdateParams) error {
+	err := s.db.WithContext(ctx).
+		Model(&schema.Source{}).
+		Where("id = ?", params.Id).
+		Updates(map[string]any{
+			"status":     params.Status,
+			"title":      params.Title,
+			"content":    params.Content,
+			"updated_at": params.UpdatedAt,
+		}).Error
+	if err != nil {
+		return sql.WrapErr(err)
+	}
+
+	return nil
+}
+
+func (s *SourceStoreImpl) UpdateTitle(
+	ctx context.Context,
+	params *schema.SourceUpdateTitleParams,
+) error {
+	if err := s.db.WithContext(ctx).
+		Model(&schema.Source{}).
+		Where("id = ?", params.Id).
+		Updates(map[string]any{
+			"title":      params.Title,
+			"updated_at": params.UpdatedAt,
+		}).Error; err != nil {
+		return sql.WrapErr(err)
+	}
+
+	return nil
+}
+
+func (s *SourceStoreImpl) UpdateParsedContent(
+	ctx context.Context,
+	params *schema.SourceUpdateParsedContentParams,
+) error {
+	if err := s.db.WithContext(ctx).
+		Model(&schema.Source{}).
+		Where("id = ?", params.Id).
+		Updates(map[string]any{
+			"parsed_content_key": params.ParsedContentKey,
+			"updated_at":         params.UpdatedAt,
+		}).Error; err != nil {
+		return sql.WrapErr(err)
+	}
+
+	return nil
+}
+
+func (s *SourceStoreImpl) UpdateAbstract(
+	ctx context.Context,
+	params *schema.SourceUpdateAbstractParams,
+) error {
+	if err := s.db.WithContext(ctx).
+		Model(&schema.Source{}).
+		Where("id = ?", params.Id).
+		Updates(map[string]any{
+			"abstract":   params.Abstract,
+			"updated_at": params.UpdatedAt,
+		}).Error; err != nil {
+		return sql.WrapErr(err)
+	}
+
+	return nil
+}
+
+func (s *SourceStoreImpl) ListByIds(ctx context.Context, ids []database.Id) ([]*schema.Source, error) {
+	return batch.BatchMap(
+		ctx,
+		ids,
+		sourceIDsQueryBatchSize,
+		func(ctx context.Context, batch []database.Id) ([]*schema.Source, error) {
+			var rows []*schema.Source
+			err := s.db.WithContext(ctx).
+				Where("id IN ?", batch).
+				Find(&rows).Error
+			if err != nil {
+				return nil, sql.WrapErr(err)
+			}
+
+			return rows, nil
+		})
+}
+
+func (s *SourceStoreImpl) ListByNotebookIdAndIds(
+	ctx context.Context,
+	notebookId database.Id,
+	ids []database.Id,
+) ([]*schema.Source, error) {
+	return batch.BatchMap(
+		ctx,
+		ids,
+		sourceIDsQueryBatchSize,
+		func(ctx context.Context, batch []database.Id) ([]*schema.Source, error) {
+			var rows []*schema.Source
+			err := s.db.WithContext(ctx).
+				Where("notebook_id = ? AND id IN ?", notebookId, batch).
+				Find(&rows).Error
+			if err != nil {
+				return nil, sql.WrapErr(err)
+			}
+
+			return rows, nil
+		},
+	)
+}

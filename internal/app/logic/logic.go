@@ -11,12 +11,14 @@ import (
 	sourcelogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/source"
 	studiologic "github.com/gonotelm-lab/gonotelm/internal/app/logic/studio"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	"github.com/gonotelm-lab/gonotelm/internal/infra"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/cache"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/embedding"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/text2image"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/mq"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
+	"github.com/redis/go-redis/v9"
 )
 
 type Logic struct {
@@ -26,38 +28,26 @@ type Logic struct {
 
 func MustNewLogic(
 	ctx context.Context,
-	infrastructures *infra.Instances,
 	objectStorage storage.Storage,
+	notebookStore database.NotebookStore,
+	artifactTaskStore database.ArtifactTaskStore,
+	sourceStore database.SourceStore,
+	sourceDocStore vectordb.SourceDocStore,
+	llmGateway *gateway.Gateway,
+	embeddingGateway *embedding.Gateway,
+	text2imageGateway *text2image.Gateway,
+	mqFactory *mq.MQ,
+	redisClient redis.UniversalClient,
 ) *Logic {
-	llmGateway, err := gateway.New(&conf.Global().Provider)
-	if err != nil {
-		panic(err)
-	}
-
-	embeddingGateway, err := embedding.NewGateway(
-		&conf.Global().Embedding,
-		embedding.NewRedisCacher(cache.GetRedis()),
-	)
-	if err != nil {
-		panic(err)
-	}
-
-	text2imageGateway, err := text2image.NewGateway(
-		&conf.Global().Text2Image,
-	)
-	if err != nil {
-		panic(err)
-	}
-
-	notebookBiz := biznotebook.New(infrastructures.Dal.NotebookStore)
-	artifactBiz := bizartifact.New(infrastructures.Dal.ArtifactTaskStore)
+	notebookBiz := biznotebook.New(notebookStore)
+	artifactBiz := bizartifact.New(artifactTaskStore)
 
 	prompt := bizprompt.New("zh")
 
 	sourceBiz, err := bizsource.New(
 		objectStorage,
-		infrastructures.Dal.SourceStore,
-		infrastructures.VectorDal.SourceDocStore,
+		sourceStore,
+		sourceDocStore,
 		llmGateway,
 		embeddingGateway,
 		prompt,
@@ -78,7 +68,8 @@ func MustNewLogic(
 
 	sourceLogic := sourcelogic.MustNewLogic(
 		ctx,
-		infrastructures,
+		mqFactory,
+		redisClient,
 		objectStorage,
 		notebookBiz,
 		sourceBiz,

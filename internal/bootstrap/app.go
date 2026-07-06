@@ -6,10 +6,12 @@ import (
 	"io"
 	"log/slog"
 
+	"github.com/gonotelm-lab/gonotelm/internal/app/logic"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	oldcache "github.com/gonotelm-lab/gonotelm/internal/infra/cache"
 	oldchat "github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/embedding"
+	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/text2image"
 	oldmqimpl "github.com/gonotelm-lab/gonotelm/internal/infra/mq/impl"
 	oldstorageimpl "github.com/gonotelm-lab/gonotelm/internal/infra/storage/impl"
 
@@ -103,6 +105,11 @@ func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
 		return nil, fmt.Errorf("embedder: %w", err)
 	}
 
+	text2imageGateway, err := text2image.NewGateway(&cfg.Text2Image)
+	if err != nil {
+		return nil, fmt.Errorf("text2image gateway: %w", err)
+	}
+
 	// ── 2. Repositories ──
 
 	notebookRepo := repository.NewNotebookRepository(db.NotebookStore, db.SourceStore)
@@ -136,8 +143,19 @@ func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
 	// TODO: Migrate biz constructors to accept database.* (NEW) types instead of dal.* (OLD) types.
 
 	// ── 6. Logic ──
-	// TODO: Update sourcelogic.MustNewLogic and studiologic.MustNewLogic to accept explicit
-	// params instead of *infra.Instances. See Tasks 9-12.
+	appLogic := logic.MustNewLogic(
+		ctx,
+		oss,
+		db.NotebookStore,
+		db.ArtifactTaskStore,
+		db.SourceStore,
+		vdb.SourceDocStore,
+		llmGateway,
+		embeddingGateway,
+		text2imageGateway,
+		mqInst,
+		redisClient,
+	)
 
 	// ── 7. Event handler registration ──
 	// TODO: Update event.Init to accept explicit params instead of *wire.Wire. See Tasks 9-12.
@@ -146,7 +164,6 @@ func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
 	// TODO: Update api.NewServer to accept explicit params instead of *infra.Instances + *wire.Wire.
 	// See Tasks 9-12.
 
-	// Suppress unused variable warnings for now; these will be consumed in Tasks 9-12.
 	_ = summarizer
 	_ = notebookRepo
 	_ = sourceRepo
@@ -158,6 +175,7 @@ func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
 	_ = streamTaskRepo
 	_ = artifactTaskRepo
 	_ = bus
+	_ = appLogic
 
 	return &App{closers: closers}, nil
 }

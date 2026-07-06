@@ -15,7 +15,6 @@ import (
 	// "github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	"github.com/gonotelm-lab/gonotelm/internal/infra"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/gateway"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/mq"
 	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
@@ -84,7 +83,8 @@ func (l *Logic) Close(ctx context.Context) {
 
 func MustNewLogic(
 	rootCtx context.Context,
-	infras *infra.Instances,
+	mqFactory *mq.MQ,
+	redisClient redis.UniversalClient,
 	objectStorage storage.Storage,
 	notebookBiz *biznotebook.Biz,
 	sourceBiz *bizsource.Biz,
@@ -96,9 +96,9 @@ func MustNewLogic(
 		objectStorage: objectStorage,
 		notebookBiz:   notebookBiz,
 		sourceBiz:     sourceBiz,
-		mqFactory:     infras.MQ,
+		mqFactory:     mqFactory,
 		llmGateway:    llmGateway,
-		redis:         infras.Redis,
+		redis:         redisClient,
 		prompt:        prompt,
 	}
 

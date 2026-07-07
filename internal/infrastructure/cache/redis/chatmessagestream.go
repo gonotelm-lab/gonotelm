@@ -167,6 +167,10 @@ func (c *ChatMessageStreamCacheImpl) PullEventStream(
 			return nil, cache.ErrStreamNoData
 		}
 
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, ctxErr
+		}
+
 		return nil, errors.Wrap(errors.ErrCache, err.Error())
 	}
 

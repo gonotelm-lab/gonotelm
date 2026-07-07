@@ -187,6 +187,7 @@ func TestChatMessageStreamCache_PullEventStream_WithExplicitCustomId(t *testing.
 		events, err := testChatMessageStreamCache.PullEventStream(
 			t.Context(), testKey, schema.PullEventStreamArgs{
 				LastId: lastRecvId,
+				Count:  1,
 			},
 		)
 		if err != nil {
@@ -217,20 +218,17 @@ func TestChatMessageStreamCache_PullEventStream_WithExplicitCustomId(t *testing.
 
 func TestChatMessageStreamCache_CancelByContext(t *testing.T) {
 	testKey := "test-stream-key"
-	ctx, cancel := context.WithCancel(t.Context())
-	go func() {
-		time.Sleep(100 * time.Millisecond)
-		cancel()
-	}()
+	ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(50*time.Millisecond))
+	defer cancel()
 
 	events, err := testChatMessageStreamCache.PullEventStream(
-		ctx, testKey, schema.PullEventStreamArgs{},
+		ctx, testKey, schema.PullEventStreamArgs{Block: 2 * time.Second},
 	)
-	if err != nil {
-		t.Fatal(err)
+	if err == nil {
+		t.Fatal("expected error, got nil")
 	}
 	if !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("expected deadline exceeded, got %v", err)
+		t.Fatalf("expected context.DeadlineExceeded, got %v", err)
 	}
 
 	if len(events) != 0 {

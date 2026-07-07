@@ -42,7 +42,6 @@ func (s *SourceStoreImpl) Upsert(ctx context.Context, source *schema.Source) err
 			"abstract":           source.Abstract,
 			"parsed_content_key": source.ParsedContentKey,
 			"updated_at":         source.UpdatedAt,
-			"content":            source.Content,
 		}),
 	}
 

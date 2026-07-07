@@ -12,8 +12,9 @@ import (
 	studiologic "github.com/gonotelm-lab/gonotelm/internal/app/logic/studio"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	dal "github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
-	llm "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/openai"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
+	embedding "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/embedding"
+	text2image "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
@@ -32,9 +33,9 @@ func MustNewLogic(
 	artifactTaskStore dal.ArtifactTaskStore,
 	sourceStore dal.SourceStore,
 	sourceDocStore vectordb.SourceDocStore,
-	llmGateway *openai.Gateway,
-	embeddingGateway *llm.EmbeddingGateway,
-	text2imageGateway *llm.Text2ImageGateway,
+	llmGateway *chat.Gateway,
+	embeddingGateway *embedding.EmbeddingGateway,
+	text2imageGateway *text2image.Text2ImageGateway,
 	mqFactory *mq.MQ,
 	redisClient redis.UniversalClient,
 ) *Logic {

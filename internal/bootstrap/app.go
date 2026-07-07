@@ -17,7 +17,9 @@ import (
 	dbpostgres "github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/postgres"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	infrallm "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/openai"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
+	embedding "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/embedding"
+	text2image "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
 	mqkafka "github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq/kafka"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository"
@@ -90,9 +92,9 @@ func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
 		return nil, fmt.Errorf("llm gateway: %w", err)
 	}
 
-	embeddingGateway, err := infrallm.NewEmbeddingGateway(
+	embeddingGateway, err := embedding.NewEmbeddingGateway(
 		&cfg.Embedding,
-		infrallm.NewRedisCacher(redisClient),
+		embedding.NewRedisCacher(redisClient),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("embedding gateway: %w", err)
@@ -103,7 +105,7 @@ func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
 		return nil, fmt.Errorf("embedder: %w", err)
 	}
 
-	text2imageGateway, err := infrallm.NewText2ImageGateway(&cfg.Text2Image)
+	text2imageGateway, err := text2image.NewText2ImageGateway(&cfg.Text2Image)
 	if err != nil {
 		return nil, fmt.Errorf("text2image gateway: %w", err)
 	}
@@ -191,7 +193,7 @@ func (d *dummyServer) Run() {}
 
 // ── internal helpers ──
 
-func newLLMGateway(cfg *infrallm.ProviderConfig) (*openai.Gateway, error) {
+func newLLMGateway(cfg *infrallm.ProviderConfig) (*chat.Gateway, error) {
 	llmCfg := &infrallm.ProviderConfig{
 		OpenAI: infrallm.OpenAIChatConfig{
 			ApiKey:           	cfg.OpenAI.ApiKey,
@@ -251,7 +253,7 @@ func newLLMGateway(cfg *infrallm.ProviderConfig) (*openai.Gateway, error) {
 			MaxConcurrency:   cfg.Agnes.MaxConcurrency,
 		},
 	}
-	return openai.New(llmCfg)
+	return chat.New(llmCfg)
 }
 
 func newMQ(cfg *oldmqimpl.Config) (*mq.MQ, error) {

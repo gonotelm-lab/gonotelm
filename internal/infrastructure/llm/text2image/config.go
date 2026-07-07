@@ -1,4 +1,4 @@
-package llm
+package text2image
 
 import (
 	"github.com/gonotelm-lab/multimodal/image/dashscope"

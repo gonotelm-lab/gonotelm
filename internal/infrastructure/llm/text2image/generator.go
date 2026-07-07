@@ -1,4 +1,4 @@
-package llm
+package text2image
 
 import (
 	"fmt"

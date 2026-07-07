@@ -1,4 +1,4 @@
-package llm
+package embedding
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 	"github.com/cloudwego/eino-ext/components/embedding/openai"
 	"github.com/cloudwego/eino-ext/components/embedding/qianfan"
 	"github.com/cloudwego/eino-ext/components/embedding/tencentcloud"
-	"github.com/cloudwego/eino/components/embedding"
+	einoembed "github.com/cloudwego/eino/components/embedding"
 	"github.com/redis/go-redis/v9"
 	"google.golang.org/genai"
 )
@@ -23,13 +23,13 @@ func newEmbedder(
 	ctx context.Context,
 	cfg *EmbeddingConfig,
 	cacher cache.Cacher,
-) (embedding.Embedder, error) {
+) (einoembed.Embedder, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("embedding config must not be nil")
 	}
 
 	var (
-		embedder embedding.Embedder
+		embedder einoembed.Embedder
 		err      error
 	)
 
@@ -130,7 +130,7 @@ func parseArkAPIType(raw string) (ark.APIType, error) {
 	}
 }
 
-func newGeminiEmbedder(ctx context.Context, cfg GeminiConfig) (embedding.Embedder, error) {
+func newGeminiEmbedder(ctx context.Context, cfg GeminiConfig) (einoembed.Embedder, error) {
 	backend, err := parseGeminiBackend(cfg.Backend)
 	if err != nil {
 		return nil, err
@@ -214,7 +214,7 @@ func parseOpenAIEncodingFormat(raw string) (openai.EmbeddingEncodingFormat, erro
 	}
 }
 
-func newQianfanEmbedder(ctx context.Context, cfg QianfanConfig) (embedding.Embedder, error) {
+func newQianfanEmbedder(ctx context.Context, cfg QianfanConfig) (einoembed.Embedder, error) {
 	qcfg := qianfan.GetQianfanSingletonConfig()
 
 	if cfg.AK != "" {

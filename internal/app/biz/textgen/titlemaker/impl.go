@@ -6,13 +6,13 @@ import (
 
 	bizprompt "github.com/gonotelm-lab/gonotelm/internal/app/biz/prompt"
 	llm "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/openai"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type titlemakerImpl struct {
-	gateway *openai.Gateway
+	gateway *chat.Gateway
 	option  GenerateOption
 	prompt  *bizprompt.Prompt
 }
@@ -22,11 +22,11 @@ type GenerateOption struct {
 	Model    string
 }
 
-func New(gateway *openai.Gateway, prompt *bizprompt.Prompt) Maker {
+func New(gateway *chat.Gateway, prompt *bizprompt.Prompt) Maker {
 	return NewWithOption(gateway, GenerateOption{}, prompt)
 }
 
-func NewWithOption(gateway *openai.Gateway, option GenerateOption, prompt *bizprompt.Prompt) Maker {
+func NewWithOption(gateway *chat.Gateway, option GenerateOption, prompt *bizprompt.Prompt) Maker {
 	return &titlemakerImpl{
 		gateway: gateway,
 		option:  option,

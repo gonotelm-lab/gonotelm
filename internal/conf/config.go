@@ -8,9 +8,9 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache"
 	chat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
-	embedding "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
-	rerank "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
-	text2image "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
+	embedding "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/embedding"
+	rerank "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/rerank"
+	text2image "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image"
 	mqimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
 	storageimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"

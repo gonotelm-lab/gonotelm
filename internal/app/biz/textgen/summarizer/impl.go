@@ -6,13 +6,13 @@ import (
 
 	bizprompt "github.com/gonotelm-lab/gonotelm/internal/app/biz/prompt"
 	llm "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/openai"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type summazierImpl struct {
-	gateway *openai.Gateway
+	gateway *chat.Gateway
 	option  SummarizeOption
 	prompt  *bizprompt.Prompt
 }
@@ -22,11 +22,11 @@ type SummarizeOption struct {
 	Model    string
 }
 
-func New(gateway *openai.Gateway, prompt *bizprompt.Prompt) Summarizer {
+func New(gateway *chat.Gateway, prompt *bizprompt.Prompt) Summarizer {
 	return NewWithOption(gateway, SummarizeOption{}, prompt)
 }
 
-func NewWithOption(gateway *openai.Gateway, option SummarizeOption, prompt *bizprompt.Prompt) Summarizer {
+func NewWithOption(gateway *chat.Gateway, option SummarizeOption, prompt *bizprompt.Prompt) Summarizer {
 	return &summazierImpl{
 		gateway: gateway,
 		option:  option,

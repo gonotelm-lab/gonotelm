@@ -12,8 +12,8 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	dal "github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/schema"
-	llm "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/openai"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
+	embedding "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/embedding"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
 	vecschema "github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/schema"
@@ -36,7 +36,7 @@ type Biz struct {
 	sourceStore    dal.SourceStore
 	sourceDocStore vectordb.SourceDocStore
 
-	llmGateway    *openai.Gateway
+	llmGateway    *chat.Gateway
 	embedder      einoembed.Embedder
 	sourceIndexer *SourceIndexer
 }
@@ -45,8 +45,8 @@ func New(
 	objectStorage storage.Storage,
 	sourceStore dal.SourceStore,
 	sourceDocStore vectordb.SourceDocStore,
-	llmGateway *openai.Gateway,
-	embeddingGateway *llm.EmbeddingGateway,
+	llmGateway *chat.Gateway,
+	embeddingGateway *embedding.EmbeddingGateway,
 	prompt *bizprompt.Prompt,
 ) (*Biz, error) {
 	providerType := conf.Global().Embedding.Type

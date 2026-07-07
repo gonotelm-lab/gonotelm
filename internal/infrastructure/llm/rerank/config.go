@@ -1,4 +1,4 @@
-package llm
+package rerank
 
 import "github.com/gonotelm-lab/gonotelm/pkg/rerank/dashscope"
 

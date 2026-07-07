@@ -1,4 +1,4 @@
-package openai
+package chat
 
 import openaiext "github.com/gonotelm-lab/gonotelm/pkg/eino-ext/openai"
 

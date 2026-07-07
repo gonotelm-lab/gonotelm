@@ -17,7 +17,7 @@ import (
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/service/agentize"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/openai"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/idgen"
@@ -37,7 +37,7 @@ type CreateMessageHandler struct {
 	sourceStorageRepo      sourcerepo.StorageRepository
 	sourceDocRepo          sourcerepo.SourceDocRepository
 	sourceAgentizeService  *agentize.Service
-	gateway                *openai.Gateway
+	gateway                *chat.Gateway
 
 	agentService *agentize.Service
 }
@@ -52,7 +52,7 @@ func NewCreateMessageHandler(
 	sourceRepo sourcerepo.Repository,
 	sourceStorageRepo sourcerepo.StorageRepository,
 	sourceDocRepo sourcerepo.SourceDocRepository,
-	gateway *openai.Gateway,
+	gateway *chat.Gateway,
 ) *CreateMessageHandler {
 	sourceAgentizeService := agentize.NewService(
 		agentize.Config{},

@@ -10,7 +10,7 @@ import (
 	einoschema "github.com/cloudwego/eino/schema"
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/openai"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 )
 
 const summarizePromptTemplate = `
@@ -39,10 +39,10 @@ const (
 
 type SummarizerImpl struct {
 	provider llm.Provider
-	llm      *openai.Gateway
+	llm      *chat.Gateway
 }
 
-func NewSummarizer(llm *openai.Gateway) adapter.Summarizer {
+func NewSummarizer(llm *chat.Gateway) adapter.Summarizer {
 	return &SummarizerImpl{
 		llm: llm,
 	}

@@ -16,7 +16,7 @@ import (
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/service/agentize"
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/openai"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 
 	"github.com/bytedance/sonic"
 	einotool "github.com/cloudwego/eino/components/tool"
@@ -62,14 +62,14 @@ func (l ChatMessageAnswerLength) IsValid() bool {
 // 实现类似Agentic RAG回答问题
 type Agent struct {
 	service      *agentize.Service
-	gateway      *openai.Gateway
+	gateway      *chat.Gateway
 	sourceRepo   sourcerepo.Repository
 	notebookRepo notebookrepo.Repository
 }
 
 func New(
 	s *agentize.Service,
-	g *openai.Gateway,
+	g *chat.Gateway,
 	sourceRepo sourcerepo.Repository,
 	notebookRepo notebookrepo.Repository,
 ) *Agent {

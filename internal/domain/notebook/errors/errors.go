@@ -1,4 +1,4 @@
-package notebook
+package errors
 
 import (
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"

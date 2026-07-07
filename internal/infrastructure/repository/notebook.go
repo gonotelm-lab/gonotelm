@@ -4,7 +4,8 @@ import (
 	"context"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	notebookdomain "github.com/gonotelm-lab/gonotelm/internal/domain/notebook"
+	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
+	notebookerrors "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/errors"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository/mapper"
@@ -28,7 +29,7 @@ func NewNotebookRepository(
 
 var _ notebookrepo.Repository = &NotebookRepositoryImpl{}
 
-func (s *NotebookRepositoryImpl) Save(ctx context.Context, notebook *notebookdomain.Notebook) error {
+func (s *NotebookRepositoryImpl) Save(ctx context.Context, notebook *notebookentity.Notebook) error {
 	if notebook.IsDeleted() {
 		return s.notebookStore.DeleteById(ctx, notebook.Id)
 	}
@@ -37,11 +38,11 @@ func (s *NotebookRepositoryImpl) Save(ctx context.Context, notebook *notebookdom
 	return s.notebookStore.Upsert(ctx, sch)
 }
 
-func (s *NotebookRepositoryImpl) FindById(ctx context.Context, id valobj.Id) (*notebookdomain.Notebook, error) {
+func (s *NotebookRepositoryImpl) FindById(ctx context.Context, id valobj.Id) (*notebookentity.Notebook, error) {
 	notebook, err := s.notebookStore.GetById(ctx, id)
 	if err != nil {
 		if errors.Is(err, errors.ErrNoRecord) {
-			return nil, notebookdomain.ErrNotebookNotFound
+			return nil, notebookerrors.ErrNotebookNotFound
 		}
 
 		return nil, err
@@ -62,7 +63,7 @@ func (s *NotebookRepositoryImpl) ListByOwner(
 	ctx context.Context,
 	ownerId string,
 	spec *notebookrepo.ListSpec,
-) ([]*notebookdomain.Notebook, error) {
+) ([]*notebookentity.Notebook, error) {
 	if err := spec.Validate(); err != nil {
 		return nil, err
 	}
@@ -89,7 +90,7 @@ func (s *NotebookRepositoryImpl) ListByOwner(
 		return nil, err
 	}
 
-	notebooks := make([]*notebookdomain.Notebook, 0, len(rows))
+	notebooks := make([]*notebookentity.Notebook, 0, len(rows))
 	for _, row := range rows {
 		notebook := mapper.NotebookFromSchema(row)
 		notebook.SourceCount = counts[row.Id]

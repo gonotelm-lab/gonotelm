@@ -10,7 +10,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	domainagent "github.com/gonotelm-lab/gonotelm/pkg/agent"
 	chatentity "github.com/gonotelm-lab/gonotelm/internal/domain/chat/entity"
-	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook"
+	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"

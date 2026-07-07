@@ -5,7 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	notebookdomain "github.com/gonotelm-lab/gonotelm/internal/domain/notebook"
+	notebookevent "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/event"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -34,9 +34,9 @@ func NewDeleteNotebookSourcesHandler(
 
 func (h *DeleteNotebookSourcesHandler) Handle(
 	ctx context.Context,
-	evt *notebookdomain.Event,
+	evt *notebookevent.Event,
 ) error {
-	if evt.Action() != notebookdomain.EventActionDelete {
+	if evt.Action() != notebookevent.EventActionDelete {
 		return nil
 	}
 

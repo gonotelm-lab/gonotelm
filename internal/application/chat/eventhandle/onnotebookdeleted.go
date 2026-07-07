@@ -6,7 +6,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
-	notebookdomain "github.com/gonotelm-lab/gonotelm/internal/domain/notebook"
+	notebookevent "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/event"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
@@ -31,9 +31,9 @@ func NewDeleteNotebookChatsHandler(
 
 func (h *DeleteNotebookChatsHandler) Handle(
 	ctx context.Context,
-	evt *notebookdomain.Event,
+	evt *notebookevent.Event,
 ) error {
-	if evt.Action() != notebookdomain.EventActionDelete {
+	if evt.Action() != notebookevent.EventActionDelete {
 		return nil
 	}
 

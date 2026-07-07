@@ -1,4 +1,4 @@
-package notebook
+package event
 
 import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/event"

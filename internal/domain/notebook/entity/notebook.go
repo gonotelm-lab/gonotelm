@@ -1,10 +1,12 @@
-package notebook
+package entity
 
 import (
 	"unicode/utf8"
 
-	"github.com/gonotelm-lab/gonotelm/internal/core/entity"
+	coreentity "github.com/gonotelm-lab/gonotelm/internal/core/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	notebookerrors "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/errors"
+	notebookevent "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/event"
 )
 
 const (
@@ -18,7 +20,7 @@ const (
 )
 
 type Notebook struct {
-	entity.Base
+	coreentity.Base
 
 	Name        string
 	Description string
@@ -33,7 +35,7 @@ func NewNotebook(
 	ownerId string,
 ) (*Notebook, error) {
 	n := Notebook{
-		Base:        entity.NewBase(),
+		Base:        coreentity.NewBase(),
 		Name:        name,
 		Description: description,
 		OwnerId:     ownerId,
@@ -43,22 +45,22 @@ func NewNotebook(
 		return nil, err
 	}
 
-	n.AddEvent(NewEvent(n.Id, EventActionCreate))
+	n.AddEvent(notebookevent.NewEvent(n.Id, notebookevent.EventActionCreate))
 
 	return &n, nil
 }
 
 func (n *Notebook) validate() error {
 	if len := utf8.RuneCountInString(n.Name); len > MaxNameLength {
-		return ErrInvalidName
+		return notebookerrors.ErrInvalidName
 	}
 
 	if len := utf8.RuneCountInString(n.Description); len > MaxDescriptionLength {
-		return ErrInvalidDescription
+		return notebookerrors.ErrInvalidDescription
 	}
 
 	if len := utf8.RuneCountInString(n.OwnerId); len > MaxOwnerIdLength {
-		return ErrInvalidOwnerId
+		return notebookerrors.ErrInvalidOwnerId
 	}
 
 	return nil
@@ -67,7 +69,7 @@ func (n *Notebook) validate() error {
 
 func (n *Notebook) Delete() {
 	n.Base.Delete()
-	n.Base.AddEvent(NewEvent(n.Id, EventActionDelete))
+	n.Base.AddEvent(notebookevent.NewEvent(n.Id, notebookevent.EventActionDelete))
 }
 
 func (n *Notebook) UpdateName(name string) error {
@@ -83,7 +85,7 @@ func (n *Notebook) UpdateName(name string) error {
 
 func (n *Notebook) AllowedToCreateSource() error {
 	if n.SourceCount >= MaxSourceCountAllowed {
-		return ErrSourceCountExceeded
+		return notebookerrors.ErrSourceCountExceeded
 	}
 
 	return nil

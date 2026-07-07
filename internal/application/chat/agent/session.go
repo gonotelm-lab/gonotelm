@@ -5,7 +5,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	chatentity "github.com/gonotelm-lab/gonotelm/internal/domain/chat/entity"
-	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook"
+	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 )
 

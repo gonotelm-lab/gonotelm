@@ -3,7 +3,7 @@ package notebook
 import (
 	"context"
 
-	"github.com/gonotelm-lab/gonotelm/internal/domain/notebook"
+	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
@@ -45,7 +45,7 @@ func (q *ListNotebooksHandleQuery) ToSpec() *notebookrepo.ListSpec {
 }
 
 type ListNotebooksHandleResult struct {
-	Notebooks []*notebook.Notebook
+	Notebooks []*notebookentity.Notebook
 	Limit     int
 	Offset    int
 	HasMore   bool

@@ -5,7 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	"github.com/gonotelm-lab/gonotelm/internal/domain/notebook"
+	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
@@ -33,7 +33,7 @@ func (h *CreateNotebookHandler) Handle(
 	ctx context.Context,
 	cmd *CreateNotebookHandleCommand,
 ) (valobj.Id, error) {
-	notebook, err := notebook.NewNotebook(cmd.Name, cmd.Desc, cmd.OwnerId)
+	notebook, err := notebookentity.NewNotebook(cmd.Name, cmd.Desc, cmd.OwnerId)
 	if err != nil {
 		return valobj.Id{}, errors.WithMessage(err, "create notebook failed")
 	}

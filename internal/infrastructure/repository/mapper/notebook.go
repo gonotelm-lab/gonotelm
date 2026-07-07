@@ -3,11 +3,11 @@ package mapper
 import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	notebookdomain "github.com/gonotelm-lab/gonotelm/internal/domain/notebook"
+	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/schema"
 )
 
-func NotebookToSchema(notebook *notebookdomain.Notebook) *schema.Notebook {
+func NotebookToSchema(notebook *notebookentity.Notebook) *schema.Notebook {
 	return &schema.Notebook{
 		Id:          notebook.Id,
 		Name:        notebook.Name,
@@ -17,8 +17,8 @@ func NotebookToSchema(notebook *notebookdomain.Notebook) *schema.Notebook {
 	}
 }
 
-func NotebookFromSchema(notebook *schema.Notebook) *notebookdomain.Notebook {
-	return &notebookdomain.Notebook{
+func NotebookFromSchema(notebook *schema.Notebook) *notebookentity.Notebook {
+	return &notebookentity.Notebook{
 		Base: entity.Base{
 			Id:         notebook.Id,
 			CreateTime: valobj.NewTimeFromId(notebook.Id),
@@ -30,8 +30,8 @@ func NotebookFromSchema(notebook *schema.Notebook) *notebookdomain.Notebook {
 	}
 }
 
-func NotebooksFromSchemas(notebooks []*schema.Notebook) []*notebookdomain.Notebook {
-	results := make([]*notebookdomain.Notebook, 0, len(notebooks))
+func NotebooksFromSchemas(notebooks []*schema.Notebook) []*notebookentity.Notebook {
+	results := make([]*notebookentity.Notebook, 0, len(notebooks))
 	for i := range notebooks {
 		results = append(results, NotebookFromSchema(notebooks[i]))
 	}

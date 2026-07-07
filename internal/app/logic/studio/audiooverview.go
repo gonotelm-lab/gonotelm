@@ -8,7 +8,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	bizprompt "github.com/gonotelm-lab/gonotelm/internal/app/biz/prompt"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	llmchat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -119,7 +119,7 @@ func (ag *audioOverviewGenerator) generateTitleAndOutline(
 	params *generateAudioOverviewTaskParams,
 ) (*titleAndOutlineExpectation, error) {
 	cfg := conf.Global().Logic.Studio.AudioOverview
-	modelOption := llmchat.WithModel(cfg.Model)
+	modelOption := llm.WithModel(cfg.Model)
 
 	agent, err := ag.l.buildSourceExploreAgent(
 		cfg.ModelProvider,

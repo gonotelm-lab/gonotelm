@@ -10,7 +10,7 @@ import (
 	bizprompt "github.com/gonotelm-lab/gonotelm/internal/app/biz/prompt"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	dal "github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/schema"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	embedding "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/embedding"
@@ -33,7 +33,7 @@ var (
 
 type Biz struct {
 	objectStorage  storage.Storage
-	sourceStore    dal.SourceStore
+	sourceStore    database.SourceStore
 	sourceDocStore vectordb.SourceDocStore
 
 	llmGateway    *chat.Gateway
@@ -43,7 +43,7 @@ type Biz struct {
 
 func New(
 	objectStorage storage.Storage,
-	sourceStore dal.SourceStore,
+	sourceStore database.SourceStore,
 	sourceDocStore vectordb.SourceDocStore,
 	llmGateway *chat.Gateway,
 	embeddingGateway *embedding.EmbeddingGateway,

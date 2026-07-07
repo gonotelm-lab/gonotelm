@@ -11,7 +11,7 @@ import (
 	sourcelogic "github.com/gonotelm-lab/gonotelm/internal/app/logic/source"
 	studiologic "github.com/gonotelm-lab/gonotelm/internal/app/logic/studio"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	dal "github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	embedding "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/embedding"
 	text2image "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image"
@@ -29,9 +29,9 @@ type Logic struct {
 func MustNewLogic(
 	ctx context.Context,
 	objectStorage storage.Storage,
-	notebookStore dal.NotebookStore,
-	artifactTaskStore dal.ArtifactTaskStore,
-	sourceStore dal.SourceStore,
+	notebookStore database.NotebookStore,
+	artifactTaskStore database.ArtifactTaskStore,
+	sourceStore database.SourceStore,
 	sourceDocStore vectordb.SourceDocStore,
 	llmGateway *chat.Gateway,
 	embeddingGateway *embedding.EmbeddingGateway,

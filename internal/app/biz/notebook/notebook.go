@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
-	dal "github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
@@ -14,10 +14,10 @@ import (
 var ErrNotebookNotFound = errors.ErrParams.Msg("notebook not found")
 
 type Biz struct {
-	notebookStore dal.NotebookStore
+	notebookStore database.NotebookStore
 }
 
-func New(notebookStore dal.NotebookStore) *Biz {
+func New(notebookStore database.NotebookStore) *Biz {
 	return &Biz{notebookStore: notebookStore}
 }
 

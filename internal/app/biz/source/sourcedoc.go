@@ -7,7 +7,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/app/biz/source/indices"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
-	vecschema "github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/schema"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/bitmap"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/slices"
@@ -50,7 +50,7 @@ func (b *Biz) ClearSourceIndices(
 	notebookId uuid.UUID,
 	sourceId uuid.UUID,
 ) error {
-	err := b.sourceDocStore.BatchDelete(ctx, &vecschema.SourceDocBatchDeleteParams{
+	err := b.sourceDocStore.BatchDelete(ctx, &schema.SourceDocBatchDeleteParams{
 		NotebookId: notebookId.String(),
 		SourceId:   []string{sourceId.String()},
 	})
@@ -84,7 +84,7 @@ func (b *Biz) GetSourceDoc(
 	query *GetSourceDocQuery,
 ) (*model.SourceDoc, error) {
 	doc, err := b.sourceDocStore.Get(ctx,
-		&vecschema.SourceDocGetParams{
+		&schema.SourceDocGetParams{
 			NotebookId: query.NotebookId.String(),
 			SourceId:   query.SourceId.String(),
 			DocId:      query.DocId,
@@ -127,7 +127,7 @@ func (b *Biz) BatchGetSourceDocs(
 	query *BatchGetSourceDocsQuery,
 ) ([]*model.SourceDoc, error) {
 	docs, err := b.sourceDocStore.BatchGet(ctx,
-		&vecschema.SourceDocBatchGetParams{
+		&schema.SourceDocBatchGetParams{
 			NotebookId: query.NotebookId.String(),
 			SourceId:   query.SourceId.String(),
 			DocIds:     query.DocIds,
@@ -171,7 +171,7 @@ func (b *Biz) ListSourceDocs(
 	query *ListSourceDocsQuery,
 ) ([]*model.SourceDoc, error) {
 	docs, err := b.sourceDocStore.List(ctx,
-		&vecschema.SourceDocListParams{
+		&schema.SourceDocListParams{
 			NotebookId: query.NotebookId.String(),
 			SourceId:   query.SourceId.String(),
 		})
@@ -235,7 +235,7 @@ func (b *Biz) SimilaritySearchSourceDocs(
 
 	queryEmbedding := slices.CastFloat[float64, float32](queryEmbeddings[0])
 	docs, err := b.sourceDocStore.Query(ctx,
-		&vecschema.SourceDocQueryParams{
+		&schema.SourceDocQueryParams{
 			NotebookId: notebookId,
 			SourceIds:  sourceIds,
 			Embedding:  queryEmbedding,
@@ -284,7 +284,7 @@ func (b *Biz) GetSourceDocTree(
 
 	docs, err := b.sourceDocStore.List(
 		ctx,
-		&vecschema.SourceDocListParams{
+		&schema.SourceDocListParams{
 			NotebookId: notebookIdStr,
 			SourceId:   sourceIdStr,
 			BatchSize:  500,
@@ -456,8 +456,8 @@ func (h *sourceDocPopulateHelper) buildTreeMetaResolve(
 func (h *sourceDocPopulateHelper) loadDocsBySourcePos(
 	ctx context.Context,
 	posesBySource map[string][]int32,
-) (map[string]map[int32]*vecschema.SourceDoc, error) {
-	docsBySourcePos := make(map[string]map[int32]*vecschema.SourceDoc, len(posesBySource))
+) (map[string]map[int32]*schema.SourceDoc, error) {
+	docsBySourcePos := make(map[string]map[int32]*schema.SourceDoc, len(posesBySource))
 	var (
 		mu sync.Mutex
 		eg errgroup.Group
@@ -467,7 +467,7 @@ func (h *sourceDocPopulateHelper) loadDocsBySourcePos(
 		posList := append([]int32(nil), slices.Unique(chunkPoses)...)
 		eg.Go(func() error {
 			sourceDocs, err := h.biz.sourceDocStore.ListByChunkPos(ctx,
-				&vecschema.SourceDocListByChunkPosParams{
+				&schema.SourceDocListByChunkPosParams{
 					NotebookId: h.notebookID,
 					SourceId:   sourceID,
 					ChunkPoses: posList,
@@ -479,7 +479,7 @@ func (h *sourceDocPopulateHelper) loadDocsBySourcePos(
 					sourceID,
 				)
 			}
-			docsByPos := make(map[int32]*vecschema.SourceDoc, len(sourceDocs))
+			docsByPos := make(map[int32]*schema.SourceDoc, len(sourceDocs))
 			for _, sourceDoc := range sourceDocs {
 				docsByPos[sourceDoc.ChunkPos] = sourceDoc
 			}
@@ -498,7 +498,7 @@ func (h *sourceDocPopulateHelper) loadDocsBySourcePos(
 func (h *sourceDocPopulateHelper) populateDerivationIDs(
 	ctx context.Context,
 	deriveMetas []*deriveMeta,
-	docsBySourcePos map[string]map[int32]*vecschema.SourceDoc,
+	docsBySourcePos map[string]map[int32]*schema.SourceDoc,
 ) {
 	for _, meta := range deriveMetas {
 		docsByPos := docsBySourcePos[meta.sourceId]
@@ -537,7 +537,7 @@ func (h *sourceDocPopulateHelper) populateDerivationIDs(
 func (h *sourceDocPopulateHelper) populateTreeMetaIDs(
 	ctx context.Context,
 	treeMetas []*treeMetaResolve,
-	docsBySourcePos map[string]map[int32]*vecschema.SourceDoc,
+	docsBySourcePos map[string]map[int32]*schema.SourceDoc,
 ) {
 	for _, meta := range treeMetas {
 		docsByPos := docsBySourcePos[meta.sourceId]
@@ -552,7 +552,7 @@ func (h *sourceDocPopulateHelper) populateTreeMetaIDs(
 func (h *sourceDocPopulateHelper) populateParentID(
 	ctx context.Context,
 	meta *treeMetaResolve,
-	docsByPos map[int32]*vecschema.SourceDoc,
+	docsByPos map[int32]*schema.SourceDoc,
 ) {
 	if meta == nil || meta.parentPos == nil {
 		return
@@ -578,7 +578,7 @@ func (h *sourceDocPopulateHelper) populateParentID(
 func (h *sourceDocPopulateHelper) collectChildIDs(
 	ctx context.Context,
 	meta *treeMetaResolve,
-	docsByPos map[int32]*vecschema.SourceDoc,
+	docsByPos map[int32]*schema.SourceDoc,
 ) []uuid.UUID {
 	if meta == nil {
 		return nil

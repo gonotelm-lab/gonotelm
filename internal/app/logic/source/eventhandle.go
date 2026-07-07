@@ -8,7 +8,7 @@ import (
 	biznotebook "github.com/gonotelm-lab/gonotelm/internal/app/biz/notebook"
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	llmchat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
@@ -94,8 +94,8 @@ func (l *Logic) generateNotebookSummary(
 	result, err := chatModel.Generate(
 		ctx,
 		msgs,
-		llmchat.WithModel(model),
-		llmchat.WithResponseJsonObject(provider),
+		llm.WithModel(model),
+		llm.WithResponseJsonObject(provider),
 	)
 	if err != nil {
 		slog.ErrorContext(ctx, "generate notebook summary failed",

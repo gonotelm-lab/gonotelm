@@ -16,7 +16,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
-	vecschema "github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/schema"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/batch"
 	"github.com/gonotelm-lab/gonotelm/pkg/bitmap"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -106,7 +106,7 @@ func (b *SourceIndexer) Prepare(
 
 	var (
 		textChunks []string
-		vsDocs     []*vecschema.SourceDoc
+		vsDocs     []*schema.SourceDoc
 		log        string
 	)
 	// 对于有明显层级结构的markdown文档尝试使用语法树解析
@@ -171,7 +171,7 @@ func (b *SourceIndexer) parseEmbedChunks(
 	ctx context.Context,
 	source *model.Source,
 	result *convertdoc.HandleResult,
-) ([]string, []*vecschema.SourceDoc, error) {
+) ([]string, []*schema.SourceDoc, error) {
 	tree, err := b.docTreeBuilder.ParseBuild(
 		ctx,
 		result.ParsedContent,
@@ -183,7 +183,7 @@ func (b *SourceIndexer) parseEmbedChunks(
 
 	nodes := tree.Nodes()
 	chunkTexts := make([]string, 0, len(tree.Nodes()))
-	sourceDocs := make([]*vecschema.SourceDoc, 0, len(tree.Nodes()))
+	sourceDocs := make([]*schema.SourceDoc, 0, len(tree.Nodes()))
 	for _, node := range nodes {
 		chunkTexts = append(chunkTexts, node.Core().Content)
 		sourceDocs = append(sourceDocs, node.Core())
@@ -236,7 +236,7 @@ func (b *SourceIndexer) mergeEmbedChunks(
 	ctx context.Context,
 	source *model.Source,
 	result *convertdoc.HandleResult,
-) ([]string, []*vecschema.SourceDoc, error) {
+) ([]string, []*schema.SourceDoc, error) {
 	texts := make([]string, 0, len(result.Docs))
 	for _, doc := range result.Docs {
 		texts = append(texts, doc.Content)
@@ -272,11 +272,11 @@ func (b *SourceIndexer) mergeEmbedChunks(
 	notebookIdStr := source.NotebookId.String()
 	sourceIdStr := source.Id.String()
 	docsLen := len(result.Docs)
-	vsDocs := make([]*vecschema.SourceDoc, 0, docsLen)
-	fallbackVsDocs := make([]*vecschema.SourceDoc, 0, docsLen)
+	vsDocs := make([]*schema.SourceDoc, 0, docsLen)
+	fallbackVsDocs := make([]*schema.SourceDoc, 0, docsLen)
 	leafNodes := make([]*indices.DocTreeNode, 0, docsLen)
 	for pos, doc := range result.Docs {
-		vdoc := &vecschema.SourceDoc{
+		vdoc := &schema.SourceDoc{
 			Id:         doc.ID,
 			NotebookId: notebookIdStr,
 			SourceId:   sourceIdStr,
@@ -365,7 +365,7 @@ func (b *SourceIndexer) mergeEmbedChunks(
 // 插入向量库
 func (b *SourceIndexer) insertSourceDocs(
 	ctx context.Context,
-	vsDocs []*vecschema.SourceDoc,
+	vsDocs []*schema.SourceDoc,
 ) error {
 	err := b.sourceDocStore.BatchInsert(ctx, vsDocs)
 	if err != nil {
@@ -428,7 +428,7 @@ func isNonDerivedNode(node *indices.DocTreeNode) bool {
 	return node.Pos() >= 0
 }
 
-func isLeafNodeByChildrenMeta(doc *vecschema.SourceDoc) (bool, []int, error) {
+func isLeafNodeByChildrenMeta(doc *schema.SourceDoc) (bool, []int, error) {
 	if doc == nil {
 		return true, nil, nil
 	}
@@ -442,20 +442,20 @@ func isLeafNodeByChildrenMeta(doc *vecschema.SourceDoc) (bool, []int, error) {
 	return false, childrenPos, nil
 }
 
-func recoverDocTree(ctx context.Context, docs []*vecschema.SourceDoc) (*indices.DocTree, error) {
+func recoverDocTree(ctx context.Context, docs []*schema.SourceDoc) (*indices.DocTree, error) {
 	_ = ctx
 	if len(docs) == 0 {
 		return nil, errors.ErrParams.Msg("no source docs found")
 	}
 
 	// root 是最小 chunk_pos，先排序保证重建入口稳定。
-	sortedDocs := append(make([]*vecschema.SourceDoc, 0, len(docs)), docs...)
-	stdslices.SortFunc(sortedDocs, func(a, b *vecschema.SourceDoc) int {
+	sortedDocs := append(make([]*schema.SourceDoc, 0, len(docs)), docs...)
+	stdslices.SortFunc(sortedDocs, func(a, b *schema.SourceDoc) int {
 		return int(a.ChunkPos - b.ChunkPos)
 	})
 	rootDoc := sortedDocs[0]
 
-	docPosMapping := make(map[int]*vecschema.SourceDoc, len(sortedDocs))
+	docPosMapping := make(map[int]*schema.SourceDoc, len(sortedDocs))
 	for _, doc := range sortedDocs {
 		docPosMapping[int(doc.ChunkPos)] = doc
 	}
@@ -493,7 +493,7 @@ func recoverDocTree(ctx context.Context, docs []*vecschema.SourceDoc) (*indices.
 }
 
 type docTreeRecoverBuilder struct {
-	docPosMapping map[int]*vecschema.SourceDoc
+	docPosMapping map[int]*schema.SourceDoc
 	nodeByPos     map[int]*indices.DocTreeNode
 	building      map[int]bool
 }
@@ -554,8 +554,8 @@ func (b *docTreeRecoverBuilder) buildNode(pos int) (*indices.DocTreeNode, error)
 }
 
 func readSourceDocDerivation(
-	doc *vecschema.SourceDoc,
-	docPosMapping map[int]*vecschema.SourceDoc,
+	doc *schema.SourceDoc,
+	docPosMapping map[int]*schema.SourceDoc,
 ) ([]string, error) {
 	if doc == nil {
 		return nil, errors.ErrParams.Msg("source doc is nil")

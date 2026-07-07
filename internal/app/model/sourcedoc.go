@@ -1,7 +1,7 @@
 package model
 
 import (
-	vecschema "github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/schema"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 
@@ -94,7 +94,7 @@ func (s *SourceDoc) DerivationPos() string {
 	return s.derivationPos
 }
 
-func NewSourceDoc(doc *vecschema.SourceDoc) (*SourceDoc, error) {
+func NewSourceDoc(doc *schema.SourceDoc) (*SourceDoc, error) {
 	notebookId, err := uuid.ParseString(doc.NotebookId)
 	if err != nil {
 		return nil, err

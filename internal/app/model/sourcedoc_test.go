@@ -3,11 +3,11 @@ package model
 import (
 	"testing"
 
-	vecschema "github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/schema"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/schema"
 )
 
 func TestNewSourceDocTreeMeta(t *testing.T) {
-	doc := &vecschema.SourceDoc{
+	doc := &schema.SourceDoc{
 		Id:         "doc-1",
 		NotebookId: "11111111-1111-1111-1111-111111111111",
 		SourceId:   "22222222-2222-2222-2222-222222222222",
@@ -45,7 +45,7 @@ func TestNewSourceDocTreeMeta(t *testing.T) {
 }
 
 func TestNewSourceDocTreeMetaNoParent(t *testing.T) {
-	doc := &vecschema.SourceDoc{
+	doc := &schema.SourceDoc{
 		Id:         "doc-2",
 		NotebookId: "11111111-1111-1111-1111-111111111111",
 		SourceId:   "22222222-2222-2222-2222-222222222222",

@@ -16,7 +16,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	bizprompt "github.com/gonotelm-lab/gonotelm/internal/app/biz/prompt"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	llmchat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
@@ -156,7 +156,7 @@ func (ig *infoGraphicGenerator) generateImagePrompt(
 	params *generateInfoGraphicTaskParams,
 ) (*infographicExpectation, error) {
 	cfg := conf.Global().Logic.Studio.InfoGraphic
-	modelOption := llmchat.WithModel(cfg.Model)
+	modelOption := llm.WithModel(cfg.Model)
 
 	bindAllTools := params.DetailLevel != model.ArtifactInfoGraphicDetailLevelConcise
 

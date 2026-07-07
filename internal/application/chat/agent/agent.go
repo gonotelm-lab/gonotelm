@@ -15,7 +15,7 @@ import (
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/service/agentize"
-	llmchat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 
 	"github.com/bytedance/sonic"
@@ -137,14 +137,14 @@ type (
 )
 
 func (a *Agent) Run(ctx context.Context, req *RunRequest) (*RunResponse, error) {
-	toolCallingChatModel, err := a.gateway.GetProvider(llmchat.Provider(req.ModelProvider))
+	toolCallingChatModel, err := a.gateway.GetProvider(llm.Provider(req.ModelProvider))
 	if err != nil {
 		return nil, err
 	}
 
-	options := llmchat.BuildLLMOptions(
-		llmchat.WithThinking(llmchat.Provider(req.ModelProvider), req.EnableThinking),
-		llmchat.WithModel(req.Model),
+	options := llm.BuildLLMOptions(
+		llm.WithThinking(llm.Provider(req.ModelProvider), req.EnableThinking),
+		llm.WithModel(req.Model),
 	)
 	session := &SessionState{
 		chat:     req.Chat,

@@ -7,7 +7,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
-	dal "github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/safe"
@@ -25,10 +25,10 @@ var (
 )
 
 type Biz struct {
-	taskStore dal.ArtifactTaskStore
+	taskStore database.ArtifactTaskStore
 }
 
-func New(taskStore dal.ArtifactTaskStore) *Biz {
+func New(taskStore database.ArtifactTaskStore) *Biz {
 	return &Biz{taskStore: taskStore}
 }
 
@@ -302,7 +302,7 @@ func (b *Biz) lazySetTaskExpiredStatus(
 	// reset task status to expired in backgound
 	newCtx := context.WithoutCancel(ctx)
 	safe.Go(newCtx, func() {
-		ids := make([]dal.Id, 0, len(expiredTasks))
+		ids := make([]database.Id, 0, len(expiredTasks))
 		for _, task := range expiredTasks {
 			ids = append(ids, task.Id)
 		}

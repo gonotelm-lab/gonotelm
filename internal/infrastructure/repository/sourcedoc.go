@@ -11,14 +11,14 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/slices"
 
-	vdal "github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/schema"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository/mapper"
 )
 
 type SourceDocRepositoryImpl struct {
 	embedder embedding.Embedder
-	vStore   vdal.SourceDocStore
+	vStore   vectordb.SourceDocStore
 	cfg      SourceDocRepositoryConfig
 }
 
@@ -29,7 +29,7 @@ type SourceDocRepositoryConfig struct {
 
 func NewSourceDocRepository(
 	embedder embedding.Embedder,
-	vstore vdal.SourceDocStore,
+	vstore vectordb.SourceDocStore,
 	c SourceDocRepositoryConfig,
 ) repository.SourceDocRepository {
 	return &SourceDocRepositoryImpl{embedder: embedder, vStore: vstore, cfg: c}

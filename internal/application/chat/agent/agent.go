@@ -8,7 +8,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/application/chat/agent/tools"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	domainagent "github.com/gonotelm-lab/gonotelm/internal/domain/agent"
+	domainagent "github.com/gonotelm-lab/gonotelm/pkg/agent"
 	chatentity "github.com/gonotelm-lab/gonotelm/internal/domain/chat/entity"
 	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"

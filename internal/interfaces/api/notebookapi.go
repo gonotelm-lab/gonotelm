@@ -5,7 +5,7 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/route"
-	"github.com/gonotelm-lab/gonotelm/internal/api/schema"
+	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/schema"
 	chatapp "github.com/gonotelm-lab/gonotelm/internal/application/chat"
 	notebookapp "github.com/gonotelm-lab/gonotelm/internal/application/notebook"
 	sourceapp "github.com/gonotelm-lab/gonotelm/internal/application/source"

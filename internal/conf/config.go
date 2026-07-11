@@ -30,21 +30,21 @@ type Config struct {
 
 	Logic LogicConfig `toml:"logic"`
 
-	Api        ApiConfig              `toml:"api"`
-	Database   DatabaseConfig         `toml:"database"`
-	Redis      cache.RedisCacheConfig `toml:"redis"`
-	VectorDB   vectordb.Config        `toml:"vectorDb"`
-	Storage    storageimpl.StorageTypeConfig     `toml:"storage"`
-	MsgQueue   mqimpl.Config          `toml:"msgQueue"`
-	Embedding  embedding.EmbeddingConfig  `toml:"embedding"`
-	Rerank     rerank.RerankConfig        `toml:"rerank"`
-	Text2Image text2image.Text2ImageConfig `toml:"text2image"`
-	Logging    LoggingConfig          `toml:"logging"`
-	Chunking   ChunkingConfig         `toml:"chunking"`
-	Provider   chat.ProviderConfig    `toml:"provider"`
-	Flow       FlowConfig             `toml:"flow"`
-	Worker     WorkerConfig           `toml:"worker"`
-	Syncer     SyncerConfig           `toml:"syncer"`
+	Api        ApiConfig                     `toml:"api"`
+	Database   DatabaseConfig                `toml:"database"`
+	Redis      cache.RedisCacheConfig        `toml:"redis"`
+	VectorDB   vectordb.Config               `toml:"vectorDb"`
+	Storage    storageimpl.StorageTypeConfig `toml:"storage"`
+	MsgQueue   mqimpl.Config                 `toml:"msgQueue"`
+	Embedding  embedding.EmbeddingConfig     `toml:"embedding"`
+	Rerank     rerank.RerankConfig           `toml:"rerank"`
+	Text2Image text2image.Text2ImageConfig   `toml:"text2image"`
+	Logging    LoggingConfig                 `toml:"logging"`
+	Chunking   ChunkingConfig                `toml:"chunking"`
+	Provider   chat.ProviderConfig           `toml:"provider"`
+	Flow       FlowConfig                    `toml:"flow"`
+	Worker     WorkerConfig                  `toml:"worker"`
+	Syncer     SyncerConfig                  `toml:"syncer"`
 }
 
 func (c *Config) IsDev() bool {

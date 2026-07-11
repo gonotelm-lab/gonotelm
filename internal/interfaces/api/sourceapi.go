@@ -8,7 +8,7 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/route"
-	"github.com/gonotelm-lab/gonotelm/internal/api/schema"
+	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/schema"
 	sourceapp "github.com/gonotelm-lab/gonotelm/internal/application/source"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"

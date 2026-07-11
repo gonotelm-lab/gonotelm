@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/gonotelm-lab/gonotelm/internal/api"
+	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api"
 	"github.com/gonotelm-lab/gonotelm/internal/application/artifact"
 	syncerpkg "github.com/gonotelm-lab/gonotelm/internal/application/artifact/syncer"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"

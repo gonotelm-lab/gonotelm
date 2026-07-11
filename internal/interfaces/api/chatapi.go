@@ -11,7 +11,7 @@ import (
 	"github.com/bytedance/sonic"
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/route"
-	"github.com/gonotelm-lab/gonotelm/internal/api/schema"
+	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/schema"
 	chatapp "github.com/gonotelm-lab/gonotelm/internal/application/chat"
 	chatagent "github.com/gonotelm-lab/gonotelm/internal/application/chat/agent"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"

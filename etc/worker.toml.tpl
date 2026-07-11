@@ -37,14 +37,6 @@ level = "${GONOTELM_LOG_LEVEL:-debug}"
 
 [logic]
 
-[logic.source]
-modelProvider = "${GONOTELM_LOGIC_SOURCE_PROVIDER:-qwen}"
-model = "${GONOTELM_LOGIC_SOURCE_MODEL:-qwen3.5-27b}"
-
-[logic.source.bizCache]
-eviction = "${GONOTELM_LOGIC_SOURCE_BIZCACHE_EVICTION:-15m}"
-maxMB = ${GONOTELM_LOGIC_SOURCE_BIZCACHE_MAX_MB:-1024}
-
 [logic.studio.mindmap]
 maxRound = ${GONOTELM_LOGIC_STUDIO_MINDMAP_MAX_ROUND:-50}
 modelProvider = "${GONOTELM_LOGIC_STUDIO_MINDMAP_PROVIDER:-deepseek}"
@@ -62,14 +54,10 @@ model = "${GONOTELM_LOGIC_STUDIO_INFOGRAPHIC_MODEL:-deepseek-v4-flash}"
 imageModelProvider = "${GONOTELM_LOGIC_STUDIO_INFOGRAPHIC_IMAGE_MODEL_PROVIDER:-dashscope}"
 imageModel = "${GONOTELM_LOGIC_STUDIO_INFOGRAPHIC_IMAGE_MODEL:-qwen-image-2.0-pro}"
 
-[logic.studio.audioOverview]
-maxRound = ${GONOTELM_LOGIC_STUDIO_AUDIOOVERVIEW_MAX_ROUND:-50}
-modelProvider = "${GONOTELM_LOGIC_STUDIO_AUDIOOVERVIEW_PROVIDER:-deepseek}"
-model = "${GONOTELM_LOGIC_STUDIO_AUDIOOVERVIEW_MODEL:-deepseek-v4-flash}"
 
-[chunking]
-size = ${GONOTELM_CHUNKING_SIZE:-500}
-overlapSize = ${GONOTELM_CHUNKING_OVERLAP_SIZE:-75}
+
+
+
 
 [embedding]
 type = "${GONOTELM_EMBEDDING_TYPE:-dashscope}"

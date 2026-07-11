@@ -13,7 +13,7 @@ func TestNewGenerator_SupportedKinds(t *testing.T) {
 		ok   bool
 	}{
 		{artifactentity.KindMindmap, true},
-		{artifactentity.KindReport, false},
+		{artifactentity.KindReport, true},
 		{artifactentity.KindInfoGraphic, false},
 		{artifactentity.KindAudioOverview, false},
 	}
@@ -31,7 +31,7 @@ func TestNewGenerator_SupportedKinds(t *testing.T) {
 
 func TestRun_UnsupportedKind(t *testing.T) {
 	req := &Request{
-		Kind: artifactentity.KindReport,
+		Kind: artifactentity.KindInfoGraphic,
 	}
 
 	_, err := Run(context.Background(), nil, req)

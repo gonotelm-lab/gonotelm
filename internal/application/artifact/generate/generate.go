@@ -52,6 +52,8 @@ func newGenerator(kind artifactentity.Kind, deps *ServiceDeps) (Generator, error
 	switch kind {
 	case artifactentity.KindMindmap:
 		return &MindmapGenerator{deps: deps}, nil
+	case artifactentity.KindReport:
+		return &ReportGenerator{deps: deps}, nil
 	}
 	return nil, errors.ErrParams.Msgf("unsupported kind: %s", kind)
 }

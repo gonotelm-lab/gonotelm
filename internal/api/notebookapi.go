@@ -6,7 +6,6 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/route"
 	"github.com/gonotelm-lab/gonotelm/internal/api/schema"
-	"github.com/gonotelm-lab/gonotelm/internal/app/logic/studio"
 	chatapp "github.com/gonotelm-lab/gonotelm/internal/application/chat"
 	notebookapp "github.com/gonotelm-lab/gonotelm/internal/application/notebook"
 	sourceapp "github.com/gonotelm-lab/gonotelm/internal/application/source"
@@ -28,7 +27,6 @@ func (s *Server) registerNotebooksRoutes(g *route.RouterGroup) {
 		notebookIdGroup.PUT("/name", s.UpdateNotebookName)
 		notebookIdGroup.POST("/chat", s.GetOrCreateNotebookChat)
 		notebookIdGroup.GET("/source/list", s.ListNotebookSources)
-		notebookIdGroup.GET("/studio/artifact/list", s.ListNotebookStudioArtifacts)
 	}
 }
 
@@ -349,53 +347,4 @@ func (s *Server) DeleteNotebook(ctx context.Context, c *app.RequestContext) {
 	http.OkResp(c, nil)
 }
 
-type ListNotebookStudioArtifactsRequest struct {
-	Id     uuid.UUID `path:"id,required"`
-	Limit  int       `query:"limit"      validate:"omitempty,min=1,max=50"`
-	Offset int       `query:"offset"     validate:"min=0"`
-}
 
-const (
-	defaultNotebookStudioArtifactsLimit = 50
-)
-
-func (r *ListNotebookStudioArtifactsRequest) Validate() error {
-	if r.Limit == 0 {
-		r.Limit = defaultNotebookStudioArtifactsLimit
-	}
-	return nil
-}
-
-type NotebookStudioArtifactResponse struct {
-	Artifacts []*schema.ArtifactResult `json:"artifacts"`
-	Limit     int                      `json:"limit"`
-	Offset    int                      `json:"offset"`
-	HasMore   bool                     `json:"has_more"`
-}
-
-func (s *Server) ListNotebookStudioArtifacts(ctx context.Context, c *app.RequestContext) {
-	var req ListNotebookStudioArtifactsRequest
-	err := c.BindAndValidate(&req)
-	if err != nil {
-		http.ErrResp(c, err)
-		return
-	}
-
-	result, err := s.studioLogic.ListNotebookArtifacts(ctx,
-		&studio.ListNotebookArtifactsParams{
-			NotebookId: req.Id,
-			Limit:      req.Limit,
-			Offset:     req.Offset,
-		})
-	if err != nil {
-		http.ErrResp(c, err)
-		return
-	}
-
-	http.OkResp(c, NotebookStudioArtifactResponse{
-		Artifacts: schema.ToArtifactResults(result.Artifacts),
-		Limit:     req.Limit,
-		Offset:    req.Offset,
-		HasMore:   result.HasMore,
-	})
-}

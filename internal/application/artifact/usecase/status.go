@@ -58,6 +58,22 @@ func (u *StatusUseCase) Execute(ctx context.Context, req *StatusRequest) (*Statu
 	return &StatusResponse{Status: mapped, FlowError: string(info.Error)}, nil
 }
 
+func (u *StatusUseCase) CheckOwnership(ctx context.Context, artifactId valobj.Id) error {
+	a, err := u.repo.FindById(ctx, artifactId)
+	if err != nil {
+		return err
+	}
+	userId := pkgcontext.GetUserId(ctx)
+	if !a.IsOwner(userId) {
+		return artifacterrors.ErrArtifactNotOwnedByUser
+	}
+	return nil
+}
+
+func (u *StatusUseCase) FindById(ctx context.Context, artifactId valobj.Id) (*artifactentity.Artifact, error) {
+	return u.repo.FindById(ctx, artifactId)
+}
+
 func mapFlowState(state flowschema.TaskState) artifactentity.Status {
 	switch state {
 	case flowschema.TaskState_INITED:

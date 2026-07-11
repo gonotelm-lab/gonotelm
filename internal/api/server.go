@@ -5,7 +5,6 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app/server"
 	"github.com/gonotelm-lab/gonotelm/internal/app/logic"
-	studiologic "github.com/gonotelm-lab/gonotelm/internal/app/logic/studio"
 	chatapp "github.com/gonotelm-lab/gonotelm/internal/application/chat"
 	notebookapp "github.com/gonotelm-lab/gonotelm/internal/application/notebook"
 	sourceapp "github.com/gonotelm-lab/gonotelm/internal/application/source"
@@ -35,8 +34,6 @@ type ServerDeps struct {
 
 type Server struct {
 	h *server.Hertz
-
-	studioLogic *studiologic.Logic
 
 	checkNotebookAccessHandler *notebookapp.CheckNotebookAccessHandler
 	getNotebookHandler         *notebookapp.GetNotebookHandler
@@ -84,8 +81,6 @@ func NewServer(
 
 	s := &Server{
 		h:           hz,
-		studioLogic: logic.StudioLogic,
-
 		checkNotebookAccessHandler: notebookapp.NewCheckNotebookAccessHandler(deps.NotebookRepo),
 		getNotebookHandler:         notebookapp.NewGetNotebookHandler(deps.NotebookRepo),
 		createNotebookHandler:      notebookapp.NewCreateNotebookHandler(deps.NotebookRepo, deps.EventBus),
@@ -143,7 +138,6 @@ func (s *Server) registerRoutes() {
 	s.registerNotebooksRoutes(v1Group)
 	s.registerSourcesRoutes(v1Group)
 	s.registerChatRoutes(v1Group)
-	s.registerStudioRoutes(v1Group)
 }
 
 func (s *Server) Run() {

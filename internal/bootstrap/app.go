@@ -2,30 +2,14 @@ package bootstrap
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log/slog"
 
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	oldcache "github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache"
-	oldmqimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
-	oldstorageimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
-
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/adapter"
-	cacheredis "github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache/redis"
 	"github.com/gonotelm-lab/gonotelm/internal/interfaces/event"
-	dbpostgres "github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/postgres"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
-	infrallm "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
-	embedding "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/embedding"
-	text2image "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
-	mqkafka "github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq/kafka"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
-	storageminio "github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage/minio"
-	vdbmilvus "github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/milvus"
 )
 
 type App struct {
@@ -45,7 +29,6 @@ func (a *App) Close() error {
 func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
 	var closers []io.Closer
 	addCloser := func(c io.Closer) { closers = append(closers, c) }
-	// close all previously added closers on error
 	defer func() {
 		if outErr != nil {
 			for i := len(closers) - 1; i >= 0; i-- {
@@ -56,93 +39,47 @@ func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
 		}
 	}()
 
-	// ── 1. Infrastructure ──
-
-	db, err := dbpostgres.Open(cfg.Database)
+	infra, err := NewSharedInfra(ctx, cfg)
 	if err != nil {
-		return nil, fmt.Errorf("database: %w", err)
+		return nil, err
 	}
-	addCloser(contextCloser(func(ctx context.Context) error { return db.Close(ctx) }))
-
-	vdb, err := vdbmilvus.Open(&cfg.VectorDB)
-	if err != nil {
-		return nil, fmt.Errorf("vectordb: %w", err)
-	}
-	addCloser(contextCloser(func(ctx context.Context) error { return vdb.Close(ctx) }))
-
-	if err := oldcache.Init(&cfg.Redis); err != nil {
-		return nil, fmt.Errorf("cache init: %w", err)
-	}
-	redisClient := oldcache.GetRedis()
-	addCloser(contextCloser(func(ctx context.Context) error { return redisClient.Close() }))
-	cacheInst := cacheredis.NewCache(redisClient)
-
-	mqInst, err := newMQ(&cfg.MsgQueue)
-	if err != nil {
-		return nil, fmt.Errorf("mq: %w", err)
-	}
-
-	oss, err := newStorage(&cfg.Storage)
-	if err != nil {
-		return nil, fmt.Errorf("storage: %w", err)
-	}
-
-	llmGateway, err := newLLMGateway(&cfg.Provider)
-	if err != nil {
-		return nil, fmt.Errorf("llm gateway: %w", err)
-	}
-
-	embeddingGateway, err := embedding.NewEmbeddingGateway(
-		&cfg.Embedding,
-		embedding.NewRedisCacher(redisClient),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("embedding gateway: %w", err)
-	}
-
-	embedder, err := embeddingGateway.GetProvider(cfg.Embedding.Type)
-	if err != nil {
-		return nil, fmt.Errorf("embedder: %w", err)
-	}
-
-	text2imageGateway, err := text2image.NewText2ImageGateway(&cfg.Text2Image)
-	if err != nil {
-		return nil, fmt.Errorf("text2image gateway: %w", err)
+	for _, c := range infra.Closers() {
+		addCloser(c)
 	}
 
 	// ── 2. Repositories ──
 
-	notebookRepo := repository.NewNotebookRepository(db.NotebookStore, db.SourceStore)
-	sourceRepo := repository.NewSourceRepository(db.SourceStore)
-	sourceStorageRepo := repository.NewSourceStorageRepository(oss)
+	notebookRepo := repository.NewNotebookRepository(infra.DB.NotebookStore, infra.DB.SourceStore)
+	sourceRepo := repository.NewSourceRepository(infra.DB.SourceStore)
+	sourceStorageRepo := repository.NewSourceStorageRepository(infra.Storage)
 	sourceDocRepo := repository.NewSourceDocRepository(
-		embedder,
-		vdb.SourceDocStore,
+		infra.Embedder,
+		infra.VDB.SourceDocStore,
 		repository.SourceDocRepositoryConfig{
 			EmbedBatchSize:      cfg.Embedding.BatchSize,
 			EmbedMaxConcurrency: cfg.Embedding.MaxConcurrency,
 		},
 	)
-	chatRepo := repository.NewChatRepository(db.ChatStore)
-	messageRepo := repository.NewMessageRepository(db.ChatMessageStore)
-	contextMsgRepo := repository.NewContextMessageRepository(cacheInst.ChatMessageContextCache)
-	streamTaskRepo := repository.NewStreamTaskRepository(cacheInst.ChatMessageStreamCache)
-	artifactTaskRepo := repository.NewArtifactTaskRepository(db.ArtifactTaskStore)
+	chatRepo := repository.NewChatRepository(infra.DB.ChatStore)
+	messageRepo := repository.NewMessageRepository(infra.DB.ChatMessageStore)
+	contextMsgRepo := repository.NewContextMessageRepository(infra.Cache.ChatMessageContextCache)
+	streamTaskRepo := repository.NewStreamTaskRepository(infra.Cache.ChatMessageStreamCache)
+	artifactTaskRepo := repository.NewArtifactTaskRepository(infra.DB.ArtifactTaskStore)
 
 	// ── 3. Event Bus ──
 
 	innerBus := eventbus.NewInnerEventBus()
-	outerBus := eventbus.NewOuterEventBus(mqInst)
+	outerBus := eventbus.NewOuterEventBus(infra.MQ)
 	bus := eventbus.NewCompositeEventBus(innerBus, outerBus)
 
 	// ── 4. Adapters ──
 
-	summarizer := adapter.NewSummarizer(llmGateway)
+	summarizer := adapter.NewSummarizer(infra.LLMGateway)
 
 	// ── 5. Biz objects ──
 	// TODO: Migrate biz constructors to accept database.* (NEW) types instead of dal.* (OLD) types.
 
-	_ = text2imageGateway
+	_ = infra.Text2Image
 
 	// ── 6. Logic ──
 	// TODO: Migrate biz constructors to accept database.* (NEW) types instead of dal.* (OLD) types.
@@ -190,121 +127,3 @@ func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
 type dummyServer struct{}
 
 func (d *dummyServer) Run() {}
-
-// ── internal helpers ──
-
-func newLLMGateway(cfg *infrallm.ProviderConfig) (*chat.Gateway, error) {
-	llmCfg := &infrallm.ProviderConfig{
-		OpenAI: infrallm.OpenAIChatConfig{
-			ApiKey:           	cfg.OpenAI.ApiKey,
-			Timeout:          	cfg.OpenAI.Timeout,
-			BaseUrl:          	cfg.OpenAI.BaseUrl,
-			Model:            	cfg.OpenAI.Model,
-			MaxTokens:        	cfg.OpenAI.MaxTokens,
-			Temperature:      	cfg.OpenAI.Temperature,
-			TopP:             	cfg.OpenAI.TopP,
-			PresencePenalty:  	cfg.OpenAI.PresencePenalty,
-			Seed:             	cfg.OpenAI.Seed,
-			FrequencyPenalty: 	cfg.OpenAI.FrequencyPenalty,
-			ReasoningEffort:  	cfg.OpenAI.ReasoningEffort,
-			MaxConcurrency:   	cfg.OpenAI.MaxConcurrency,
-		},
-		DeepSeek: infrallm.DeepSeekChatConfig{
-			ApiKey:           cfg.DeepSeek.ApiKey,
-			Timeout:          cfg.DeepSeek.Timeout,
-			BaseURL:          cfg.DeepSeek.BaseURL,
-			Path:             cfg.DeepSeek.Path,
-			Model:            cfg.DeepSeek.Model,
-			MaxTokens:        cfg.DeepSeek.MaxTokens,
-			Temperature:      cfg.DeepSeek.Temperature,
-			TopP:             cfg.DeepSeek.TopP,
-			PresencePenalty:  cfg.DeepSeek.PresencePenalty,
-			FrequencyPenalty: cfg.DeepSeek.FrequencyPenalty,
-			LogProbs:         cfg.DeepSeek.LogProbs,
-			TopLogProbs:      cfg.DeepSeek.TopLogProbs,
-			ThinkingEnabled:  cfg.DeepSeek.ThinkingEnabled,
-			MaxConcurrency:   cfg.DeepSeek.MaxConcurrency,
-		},
-		Qwen: infrallm.QwenChatConfig{
-			ApiKey:           cfg.Qwen.ApiKey,
-			Timeout:          cfg.Qwen.Timeout,
-			BaseUrl:          cfg.Qwen.BaseUrl,
-			Model:            cfg.Qwen.Model,
-			MaxTokens:        cfg.Qwen.MaxTokens,
-			Temperature:      cfg.Qwen.Temperature,
-			TopP:             cfg.Qwen.TopP,
-			PresencePenalty:  cfg.Qwen.PresencePenalty,
-			Seed:             cfg.Qwen.Seed,
-			FrequencyPenalty: cfg.Qwen.FrequencyPenalty,
-			EnableThinking:   cfg.Qwen.EnableThinking,
-			MaxConcurrency:   cfg.Qwen.MaxConcurrency,
-		},
-		Agnes: infrallm.AgnesChatConfig{
-			ApiKey:           cfg.Agnes.ApiKey,
-			Timeout:          cfg.Agnes.Timeout,
-			BaseUrl:          cfg.Agnes.BaseUrl,
-			Model:            cfg.Agnes.Model,
-			MaxTokens:        cfg.Agnes.MaxTokens,
-			Temperature:      cfg.Agnes.Temperature,
-			TopP:             cfg.Agnes.TopP,
-			PresencePenalty:  cfg.Agnes.PresencePenalty,
-			Seed:             cfg.Agnes.Seed,
-			FrequencyPenalty: cfg.Agnes.FrequencyPenalty,
-			MaxConcurrency:   cfg.Agnes.MaxConcurrency,
-		},
-	}
-	return chat.New(llmCfg)
-}
-
-func newMQ(cfg *oldmqimpl.Config) (*mq.MQ, error) {
-	switch cfg.Type {
-	case oldmqimpl.Kafka:
-		kc := cfg.Kafka
-		return &mq.MQ{
-			NewProducer: func() mq.Producer {
-				return mqkafka.NewProducer(mqkafka.ProducerConfig{
-					Brokers:  kc.Brokers,
-					Username: kc.Username,
-					Password: kc.Password,
-				})
-			},
-			NewConsumer: func(topic, groupID string) mq.Consumer {
-				return mqkafka.NewConsumer(mqkafka.ConsumerConfig{
-					Brokers:        kc.Brokers,
-					GroupID:        groupID,
-					Topic:          topic,
-					QueueCapacity:  kc.ConsumerQueueCapacity,
-					CommitInterval: kc.ConsumerCommitInterval,
-					Username:       kc.Username,
-					Password:       kc.Password,
-				})
-			},
-		}, nil
-	default:
-		return nil, fmt.Errorf("unknown mq type: %s", cfg.Type)
-	}
-}
-
-func newStorage(cfg *oldstorageimpl.StorageTypeConfig) (storage.Storage, error) {
-	switch cfg.Type {
-	case oldstorageimpl.Minio:
-		mc := cfg.Minio
-		return storageminio.New(&storage.Config{
-			Endpoint:      mc.Endpoint,
-			Region:        mc.Region,
-			Bucket:        mc.Bucket,
-			AccessKey:     mc.AccessKey,
-			SecretKey:     mc.SecretKey,
-			Secure:        mc.Secure,
-			PresignExpiry: mc.PresignExpiry,
-		})
-	default:
-		return nil, fmt.Errorf("unknown storage type: %s", cfg.Type)
-	}
-}
-
-type contextCloser func(ctx context.Context) error
-
-func (c contextCloser) Close() error {
-	return c(context.Background())
-}

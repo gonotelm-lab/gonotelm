@@ -16,7 +16,8 @@ func TestArtifactRoundTrip(t *testing.T) {
 	notebookId := uuid.NewV7()
 	sourceId := uuid.NewV7()
 	payload := &artifactentity.MindmapPayload{NotebookId: notebookId, SourceIds: []valobj.Id{sourceId}}
-	a := artifactentity.NewArtifact(notebookId, "u1", artifactentity.KindMindmap, payload)
+	a, err := artifactentity.NewArtifact(notebookId, "u1", artifactentity.KindMindmap, payload)
+	require.NoError(t, err)
 	a.BindFlowTaskId("ft-1")
 
 	sch := ArtifactToSchema(a)
@@ -47,7 +48,8 @@ func TestArtifactRoundTrip_Kinds(t *testing.T) {
 		{artifactentity.KindAudioOverview, &artifactentity.AudioOverviewPayload{NotebookId: notebookId}},
 	}
 	for _, c := range cases {
-		a := artifactentity.NewArtifact(notebookId, "u1", c.kind, c.payload)
+		a, err := artifactentity.NewArtifact(notebookId, "u1", c.kind, c.payload)
+		require.NoError(t, err)
 		sch := ArtifactToSchema(a)
 		back := ArtifactFromSchema(sch)
 		assert.Equal(t, a.Kind, back.Kind, "kind=%s", c.kind)

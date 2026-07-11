@@ -3,6 +3,7 @@ package entity
 import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	artifacterrors "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 
@@ -68,7 +69,7 @@ type Artifact struct {
 	Payload    Payload
 }
 
-func NewArtifact(notebookId valobj.Id, userId string, kind Kind, payload Payload) *Artifact {
+func NewArtifact(notebookId valobj.Id, userId string, kind Kind, payload Payload) (*Artifact, error) {
 	a := &Artifact{
 		NotebookId: notebookId,
 		UserId:     userId,
@@ -77,23 +78,59 @@ func NewArtifact(notebookId valobj.Id, userId string, kind Kind, payload Payload
 		Payload:    payload,
 	}
 	a.Base = entity.NewBase()
-	return a
+
+	if err := a.validate(); err != nil {
+		return nil, err
+	}
+
+	return a, nil
+}
+
+func (a *Artifact) validate() error {
+	if a.NotebookId.IsZero() {
+		return artifacterrors.ErrInvalidNotebookId
+	}
+	if a.UserId == "" {
+		return artifacterrors.ErrInvalidUserId
+	}
+	if !a.Kind.Supported() {
+		return artifacterrors.ErrInvalidKind
+	}
+	if a.Payload == nil {
+		return artifacterrors.ErrInvalidPayload
+	}
+	if a.Payload.Kind() != a.Kind {
+		return artifacterrors.ErrPayloadKindMismatch
+	}
+	return nil
 }
 
 func (a *Artifact) IsOwner(userId string) bool { return a.UserId == userId }
 
 func (a *Artifact) BindFlowTaskId(flowTaskId string) { a.FlowTaskId = flowTaskId }
 
-func (a *Artifact) MarkRunning() { a.Status = StatusRunning }
+func (a *Artifact) MarkRunning() {
+	a.Status = StatusRunning
+	a.UpdateTime = valobj.NewTime()
+}
+
 func (a *Artifact) MarkCompleted(result []byte, kind ResultKind, title string) {
 	a.Status = StatusCompleted
 	a.Result = result
 	a.ResultKind = kind
 	a.Title = title
+	a.UpdateTime = valobj.NewTime()
 }
-func (a *Artifact) MarkFailed() { a.Status = StatusFailed }
 
-func (a *Artifact) MarkCancelled() { a.Status = StatusCancelled }
+func (a *Artifact) MarkFailed() {
+	a.Status = StatusFailed
+	a.UpdateTime = valobj.NewTime()
+}
+
+func (a *Artifact) MarkCancelled() {
+	a.Status = StatusCancelled
+	a.UpdateTime = valobj.NewTime()
+}
 
 func (a *Artifact) MarkRetrying(newFlowTaskId string) {
 	a.Status = StatusPending
@@ -101,11 +138,30 @@ func (a *Artifact) MarkRetrying(newFlowTaskId string) {
 	a.Title = ""
 	a.Result = nil
 	a.ResultKind = ""
+	a.UpdateTime = valobj.NewTime()
+}
+
+func (a *Artifact) Cancel() error {
+	if a.IsTerminal() {
+		return artifacterrors.ErrCannotCancelInState
+	}
+	if a.FlowTaskId == "" {
+		return artifacterrors.ErrInvalidFlowTaskId
+	}
+	a.MarkCancelled()
+	return nil
+}
+
+func (a *Artifact) Retry(newFlowTaskId string) error {
+	if a.Status != StatusFailed && a.Status != StatusCancelled {
+		return artifacterrors.ErrCannotRetryInState
+	}
+	a.MarkRetrying(newFlowTaskId)
+	return nil
 }
 
 func (a *Artifact) IsTerminal() bool {
-	return a.Status.Completed() || a.Status.Failed() || a.Status.Cancelled()
+	return a.Status.IsTerminal()
 }
 
-func NewArtifactId() valobj.Id                     { return valobj.Id(uuid.NewV7()) }
-func NewArtifactIdFromUUID(id valobj.Id) valobj.Id { return id }
+func NewArtifactId() valobj.Id { return valobj.Id(uuid.NewV7()) }

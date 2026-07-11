@@ -68,7 +68,10 @@ func (s *stubStorage) PresignGet(ctx context.Context, key string) (string, error
 var _ StorageGateway = &stubStorage{}
 
 func makeArtifact(status artifactentity.Status, flowTaskId string, userId string) *artifactentity.Artifact {
-	a := artifactentity.NewArtifact(uuid.NewV7(), userId, artifactentity.KindMindmap, &artifactentity.MindmapPayload{NotebookId: uuid.NewV7()})
+	a, err := artifactentity.NewArtifact(uuid.NewV7(), userId, artifactentity.KindMindmap, &artifactentity.MindmapPayload{NotebookId: uuid.NewV7()})
+	if err != nil {
+		panic(err)
+	}
 	a.Status = status
 	a.FlowTaskId = flowTaskId
 	if status == artifactentity.StatusCompleted {

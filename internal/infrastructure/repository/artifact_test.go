@@ -49,7 +49,8 @@ func TestMain(m *testing.M) {
 
 func TestArtifactRepository_SaveAndFindById(t *testing.T) {
 	payload := &artifactentity.MindmapPayload{NotebookId: uuid.NewV7(), SourceIds: nil}
-	a := artifactentity.NewArtifact(uuid.NewV7(), "u-repo-1", artifactentity.KindMindmap, payload)
+	a, err := artifactentity.NewArtifact(uuid.NewV7(), "u-repo-1", artifactentity.KindMindmap, payload)
+	require.NoError(t, err)
 	a.BindFlowTaskId(uuid.NewV7().String())
 	require.NoError(t, artifactRepo.Save(artifactTestCtx, a))
 
@@ -69,7 +70,8 @@ func TestArtifactRepository_FindById_NotFound(t *testing.T) {
 
 func TestArtifactRepository_ListByNotebookId(t *testing.T) {
 	notebookId := uuid.NewV7()
-	a := artifactentity.NewArtifact(notebookId, "u-repo-list", artifactentity.KindReport, &artifactentity.ReportPayload{NotebookId: notebookId})
+	a, err := artifactentity.NewArtifact(notebookId, "u-repo-list", artifactentity.KindReport, &artifactentity.ReportPayload{NotebookId: notebookId})
+	require.NoError(t, err)
 	a.BindFlowTaskId(uuid.NewV7().String())
 	require.NoError(t, artifactRepo.Save(artifactTestCtx, a))
 
@@ -87,7 +89,8 @@ func TestArtifactRepository_ListByNotebookId(t *testing.T) {
 }
 
 func TestArtifactRepository_ListByStatus_And_UpdateStatus(t *testing.T) {
-	a := artifactentity.NewArtifact(uuid.NewV7(), "u-repo-2", artifactentity.KindReport, &artifactentity.ReportPayload{})
+	a, err := artifactentity.NewArtifact(uuid.NewV7(), "u-repo-2", artifactentity.KindReport, &artifactentity.ReportPayload{})
+	require.NoError(t, err)
 	a.BindFlowTaskId(uuid.NewV7().String())
 	require.NoError(t, artifactRepo.Save(artifactTestCtx, a))
 
@@ -102,7 +105,8 @@ func TestArtifactRepository_ListByStatus_And_UpdateStatus(t *testing.T) {
 }
 
 func TestArtifactRepository_UpdateStatus_PopulatesResult(t *testing.T) {
-	a := artifactentity.NewArtifact(uuid.NewV7(), "u-repo-3", artifactentity.KindMindmap, &artifactentity.MindmapPayload{})
+	a, err := artifactentity.NewArtifact(uuid.NewV7(), "u-repo-3", artifactentity.KindMindmap, &artifactentity.MindmapPayload{})
+	require.NoError(t, err)
 	a.BindFlowTaskId(uuid.NewV7().String())
 	require.NoError(t, artifactRepo.Save(artifactTestCtx, a))
 
@@ -118,11 +122,12 @@ func TestArtifactRepository_UpdateStatus_PopulatesResult(t *testing.T) {
 }
 
 func TestArtifactRepository_DeleteById(t *testing.T) {
-	a := artifactentity.NewArtifact(uuid.NewV7(), "u-repo-del", artifactentity.KindReport, &artifactentity.ReportPayload{})
+	a, err := artifactentity.NewArtifact(uuid.NewV7(), "u-repo-del", artifactentity.KindReport, &artifactentity.ReportPayload{})
+	require.NoError(t, err)
 	a.BindFlowTaskId(uuid.NewV7().String())
 	require.NoError(t, artifactRepo.Save(artifactTestCtx, a))
 
 	require.NoError(t, artifactRepo.DeleteById(artifactTestCtx, a.Id))
-	_, err := artifactRepo.FindById(artifactTestCtx, a.Id)
+	_, err = artifactRepo.FindById(artifactTestCtx, a.Id)
 	assert.ErrorIs(t, err, artifacterrors.ErrArtifactNotFound)
 }

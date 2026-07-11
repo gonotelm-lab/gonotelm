@@ -57,7 +57,10 @@ func (h *GenerateArtifactHandler) Handle(ctx context.Context, cmd *GenerateReque
 		return nil, err
 	}
 
-	artifact := artifactentity.NewArtifact(cmd.NotebookId, userId, cmd.Kind, payload)
+	artifact, err := artifactentity.NewArtifact(cmd.NotebookId, userId, cmd.Kind, payload)
+	if err != nil {
+		return nil, err
+	}
 
 	payloadBytes, err := sonic.Marshal(payload)
 	if err != nil {

@@ -144,7 +144,10 @@ func (f *syncTestFlow) Close() error                                        { re
 var _ flow.TaskClient = &syncTestFlow{}
 
 func makeSyncArtifact(status artifactentity.Status, flowTaskId string) *artifactentity.Artifact {
-	a := artifactentity.NewArtifact(uuid.NewV7(), "u1", artifactentity.KindMindmap, &artifactentity.MindmapPayload{NotebookId: uuid.NewV7()})
+	a, err := artifactentity.NewArtifact(uuid.NewV7(), "u1", artifactentity.KindMindmap, &artifactentity.MindmapPayload{NotebookId: uuid.NewV7()})
+	if err != nil {
+		panic(err)
+	}
 	a.Status = status
 	a.FlowTaskId = flowTaskId
 	return a

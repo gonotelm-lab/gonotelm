@@ -13,7 +13,6 @@ import (
 
 	"github.com/gabriel-vasile/mimetype"
 
-	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
@@ -207,7 +206,7 @@ func (ig *InfoGraphicGenerator) parseAgentOutput(
 
 	expect.Title = strings.TrimSpace(expect.Title)
 	expect.ImagePrompt = strings.TrimSpace(expect.ImagePrompt)
-	expect.Title = pkgstring.TruncateRune(expect.Title, constants.MaxArtifactTitleLength)
+	expect.Title = pkgstring.TruncateRune(expect.Title, MaxArtifactTitleLength)
 	if expect.ImagePrompt == "" {
 		return nil, fmt.Errorf("image_prompt is empty")
 	}

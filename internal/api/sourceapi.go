@@ -9,7 +9,6 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/route"
 	"github.com/gonotelm-lab/gonotelm/internal/api/schema"
-	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	sourceapp "github.com/gonotelm-lab/gonotelm/internal/application/source"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
@@ -82,7 +81,7 @@ func (r *CreateSourceRequest) Validate() error {
 		if r.Text == "" {
 			return errors.Errorf("text content is required")
 		}
-		if tLen := utf8.RuneCountInString(r.Text); tLen > constants.MaxSourceTextContentLength {
+		if tLen := utf8.RuneCountInString(r.Text); tLen > 50_000 {
 			return errors.Errorf("text content is too long")
 		}
 	case sourcevo.SourceKindUrl:
@@ -140,7 +139,7 @@ type UploadFileSourceRequest struct {
 	Md5      string `json:"md5,required"       validate:"md5"`
 }
 
-const maxUploadFileSizeBytes int64 = constants.MaxSourceFileSizeBytes
+const maxUploadFileSizeBytes int64 = 100 * 1024 * 1024 // 100MB
 
 type UploadFileSourceResponse struct {
 	Url     string            `json:"url"`

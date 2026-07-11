@@ -1,8 +1,8 @@
 package schema
 
 import (
-	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
+	sourcevo "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity/vo"
 )
 
 type TextSourceContent struct {
@@ -21,8 +21,8 @@ type FileSourceContent struct {
 
 type Source struct {
 	Id     string             `json:"id"`
-	Kind   model.SourceKind   `json:"kind"`
-	Status model.SourceStatus `json:"status"`
+	Kind   sourcevo.SourceKind   `json:"kind"`
+	Status sourcevo.SourceStatus `json:"status"`
 	Title  string             `json:"title"`
 
 	Text *TextSourceContent `json:"text,omitempty"`
@@ -36,38 +36,6 @@ type SourceParsedContent struct {
 	Url string `json:"url,omitempty"`
 }
 
-func ToSource(source *model.FullSource) *Source {
-	s := &Source{
-		Id:     source.Source.Id.String(),
-		Kind:   source.Source.Kind,
-		Status: source.Source.Status,
-		Title:  source.Source.Title,
-		ParsedContent: &SourceParsedContent{
-			Url: source.ParsedContentUrl,
-		},
-	}
-
-	if source.Source.Kind.IsText() {
-		s.Text = &TextSourceContent{
-			Text: source.DecodedSource.ContentText.Text,
-		}
-	}
-	if source.Source.Kind.IsUrl() {
-		s.Url = &UrlSourceContent{
-			Url: source.DecodedSource.ContentUrl.Url,
-		}
-	}
-	if source.Source.Kind.IsFile() {
-		s.File = &FileSourceContent{
-			Filename: source.DecodedSource.ContentFile.Filename,
-			Format:   source.DecodedSource.ContentFile.Format,
-			Url:      source.DecodedSource.ContentFile.Url,
-		}
-	}
-
-	return s
-}
-
 func ToSourceFromDomain(
 	source *sourceentity.Source,
 	fileContentUrl, parsedContentUrl string,
@@ -78,8 +46,8 @@ func ToSourceFromDomain(
 
 	s := &Source{
 		Id:     source.Id.String(),
-		Kind:   model.SourceKind(source.Kind),
-		Status: model.SourceStatus(source.Status),
+		Kind:   source.Kind,
+		Status: source.Status,
 		Title:  source.Title,
 		ParsedContent: &SourceParsedContent{
 			Url: parsedContentUrl,
@@ -128,11 +96,3 @@ func ToSourcesFromDomainDetails(
 	return resp
 }
 
-func ToSources(sources []*model.FullSource) []*Source {
-	resp := make([]*Source, 0, len(sources))
-	for _, source := range sources {
-		resp = append(resp, ToSource(source))
-	}
-
-	return resp
-}

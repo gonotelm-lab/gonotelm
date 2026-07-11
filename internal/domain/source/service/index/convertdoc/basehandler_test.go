@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/cloudwego/eino/schema"
-	convertdoctransformer "github.com/gonotelm-lab/gonotelm/internal/app/biz/source/convertdoc/transformer"
+	convertdoctransformer "github.com/gonotelm-lab/gonotelm/internal/domain/source/service/index/convertdoc/transformer"
 	. "github.com/smartystreets/goconvey/convey"
 )
 

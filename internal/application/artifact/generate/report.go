@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
@@ -107,7 +106,7 @@ func (r *ReportGenerator) generateTitle(ctx context.Context, report string, req 
 		}
 	}
 
-	title = pkgstring.TruncateRune(title, constants.MaxNotebookNameLength)
+	title = pkgstring.TruncateRune(title, MaxNotebookNameLength)
 	title = strings.TrimSpace(title)
 
 	return title

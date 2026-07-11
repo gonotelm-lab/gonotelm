@@ -139,7 +139,7 @@ func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
 
 	// ── 10. HTTP Server ──
 
-	svr := api.NewServer(nil, api.ServerDeps{
+	svr := api.NewServer(api.ServerDeps{
 		NotebookRepo:       notebookRepo,
 		SourceRepo:         sourceRepo,
 		SourceStorageRepo:  sourceStorageRepo,

@@ -4,7 +4,6 @@ import (
 	"sync"
 
 	"github.com/cloudwego/hertz/pkg/app/server"
-	"github.com/gonotelm-lab/gonotelm/internal/app/logic"
 	chatapp "github.com/gonotelm-lab/gonotelm/internal/application/chat"
 	notebookapp "github.com/gonotelm-lab/gonotelm/internal/application/notebook"
 	sourceapp "github.com/gonotelm-lab/gonotelm/internal/application/source"
@@ -66,7 +65,6 @@ type Server struct {
 }
 
 func NewServer(
-	logic *logic.Logic,
 	deps ServerDeps,
 ) *Server {
 	hz := server.Default(

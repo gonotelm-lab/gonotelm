@@ -83,7 +83,7 @@ func (s *SummarizerImpl) Summarize(
 			Role:    einoschema.User,
 			Content: prompt,
 		},
-	}, llm.WithModel(opt.Model))
+	}, chat.WithModel(opt.Model))
 	if err != nil {
 		return "", errors.WithMessagef(err, "generate summary failed, err=%v", err)
 	}

@@ -13,7 +13,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	bizprompt "github.com/gonotelm-lab/gonotelm/internal/app/biz/prompt"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -141,9 +141,9 @@ func (m *mindmapGenerator) llmOptions() []einomodel.Option {
 		model    = conf.Global().Logic.Studio.Mindmap.Model
 	)
 	return []einomodel.Option{
-		llm.WithModel(model),
-		llm.WithResponseJsonObject(provider),
-		llm.WithThinking(provider, false),
+		chat.WithModel(model),
+		chat.WithResponseJsonObject(provider),
+		chat.WithThinking(provider, false),
 	}
 }
 

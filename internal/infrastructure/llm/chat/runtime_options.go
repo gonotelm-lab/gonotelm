@@ -1,4 +1,4 @@
-package llm
+package chat
 
 import (
 	"strings"
@@ -7,23 +7,24 @@ import (
 	"github.com/cloudwego/eino-ext/components/model/openai"
 	"github.com/cloudwego/eino-ext/components/model/qwen"
 	einomodel "github.com/cloudwego/eino/components/model"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
 	"github.com/gonotelm-lab/gonotelm/pkg/eino-ext/model/agnes"
 	openaiext "github.com/gonotelm-lab/gonotelm/pkg/eino-ext/openai"
 )
 
 func WithThinking(
-	providerType Provider,
+	providerType llm.Provider,
 	enableThinking bool,
 ) einomodel.Option {
 	switch providerType {
-	case ProviderOpenAI:
+	case llm.ProviderOpenAI:
 		if !enableThinking {
 			return einomodel.Option{}
 		}
 		return openai.WithReasoningEffort(openai.ReasoningEffortLevelHigh)
-	case ProviderQwen:
+	case llm.ProviderQwen:
 		return qwen.WithEnableThinking(enableThinking)
-	case ProviderDeepSeek:
+	case llm.ProviderDeepSeek:
 		thinkingType := "disabled"
 		if enableThinking {
 			thinkingType = "enabled"
@@ -33,7 +34,7 @@ func WithThinking(
 				"type": thinkingType,
 			},
 		})
-	case ProviderAgnes:
+	case llm.ProviderAgnes:
 		return agnes.WithExtraFields(map[string]any{
 			"chat_template_kwargs": map[string]any{
 				"enable_thinking": enableThinking,
@@ -52,9 +53,9 @@ func WithModel(model string) einomodel.Option {
 	return einomodel.Option{}
 }
 
-func WithResponseJsonObject(providerType Provider) einomodel.Option {
+func WithResponseJsonObject(providerType llm.Provider) einomodel.Option {
 	switch providerType {
-	case ProviderQwen, ProviderDeepSeek, ProviderOpenAI:
+	case llm.ProviderQwen, llm.ProviderDeepSeek, llm.ProviderOpenAI:
 		return qwen.WithExtraFields(openaiext.ResponseFormatJSONObject)
 	default:
 		return einomodel.Option{}

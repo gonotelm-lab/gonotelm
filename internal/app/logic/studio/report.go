@@ -9,7 +9,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/app/constants"
 	"github.com/gonotelm-lab/gonotelm/internal/app/model"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
@@ -68,7 +68,7 @@ func (m *reportGenerator) generate(
 	var (
 		reportModel         = conf.Global().Logic.Studio.Report.Model
 		reportModelProvider = conf.Global().Logic.Studio.Report.ModelProvider
-		modelOption         = llm.WithModel(reportModel)
+		modelOption         = chat.WithModel(reportModel)
 		maxRound            = conf.Global().Logic.Studio.Report.MaxRound
 		lang                = pkgcontext.GetLang(ctx)
 	)

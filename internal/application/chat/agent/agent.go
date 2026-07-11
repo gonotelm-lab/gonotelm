@@ -142,9 +142,9 @@ func (a *Agent) Run(ctx context.Context, req *RunRequest) (*RunResponse, error) 
 		return nil, err
 	}
 
-	options := llm.BuildLLMOptions(
-		llm.WithThinking(llm.Provider(req.ModelProvider), req.EnableThinking),
-		llm.WithModel(req.Model),
+	options := chat.BuildLLMOptions(
+		chat.WithThinking(llm.Provider(req.ModelProvider), req.EnableThinking),
+		chat.WithModel(req.Model),
 	)
 	session := &SessionState{
 		chat:     req.Chat,

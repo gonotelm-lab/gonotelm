@@ -42,7 +42,10 @@ func (h *ListArtifactsHandler) Handle(ctx context.Context, cmd *ListRequest) (*L
 	}
 
 	fetchLimit := cmd.Limit + 1
-	rows, err := h.repo.ListByNotebookId(ctx, cmd.NotebookId, fetchLimit, cmd.Offset)
+	rows, err := h.repo.ListByNotebookId(ctx, cmd.NotebookId, &artifactrepo.ListSpec{
+		Limit:  fetchLimit,
+		Offset: cmd.Offset,
+	})
 	if err != nil {
 		return nil, err
 	}

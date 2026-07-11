@@ -7,9 +7,11 @@ import (
 	"time"
 
 	flowschema "github.com/gonotelm-lab/flow/api/schema/v1"
+	"github.com/gonotelm-lab/gonotelm/internal/core/event"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 	"github.com/stretchr/testify/assert"
@@ -17,13 +19,8 @@ import (
 )
 
 type syncTestRepo struct {
-	mu      sync.Mutex
-	byId    map[valobj.Id]*artifactentity.Artifact
-	updated []struct {
-		id     valobj.Id
-		status artifactentity.Status
-		result []byte
-	}
+	mu   sync.Mutex
+	byId map[valobj.Id]*artifactentity.Artifact
 }
 
 func newSyncTestRepo(artifacts ...*artifactentity.Artifact) *syncTestRepo {
@@ -52,15 +49,15 @@ func (s *syncTestRepo) FindById(ctx context.Context, id valobj.Id) (*artifactent
 	return &copy, nil
 }
 
-func (s *syncTestRepo) ListByNotebookId(ctx context.Context, notebookId valobj.Id, limit, offset int) ([]*artifactentity.Artifact, error) {
+func (s *syncTestRepo) ListByNotebookId(ctx context.Context, notebookId valobj.Id, spec *artifactrepo.ListSpec) ([]*artifactentity.Artifact, error) {
 	return nil, nil
 }
 
-func (s *syncTestRepo) ListByStatus(ctx context.Context, statuses []artifactentity.Status, limit int) ([]*artifactentity.Artifact, error) {
+func (s *syncTestRepo) ListByStatus(ctx context.Context, spec *artifactrepo.ListByStatusSpec) ([]*artifactentity.Artifact, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	statusSet := make(map[artifactentity.Status]bool)
-	for _, st := range statuses {
+	for _, st := range spec.Statuses {
 		statusSet[st] = true
 	}
 	var result []*artifactentity.Artifact
@@ -68,41 +65,12 @@ func (s *syncTestRepo) ListByStatus(ctx context.Context, statuses []artifactenti
 		if statusSet[a.Status] {
 			copy := *a
 			result = append(result, &copy)
-			if len(result) >= limit {
+			if len(result) >= spec.Limit {
 				break
 			}
 		}
 	}
 	return result, nil
-}
-
-func (s *syncTestRepo) UpdateStatus(ctx context.Context, id valobj.Id, status artifactentity.Status, result []byte, resultKind artifactentity.ResultKind, title string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	a, ok := s.byId[id]
-	if !ok {
-		return nil
-	}
-	a.Status = status
-	if len(result) > 0 {
-		a.Result = result
-	}
-	if resultKind != "" {
-		a.ResultKind = resultKind
-	}
-	if title != "" {
-		a.Title = title
-	}
-	s.updated = append(s.updated, struct {
-		id     valobj.Id
-		status artifactentity.Status
-		result []byte
-	}{id: id, status: status, result: result})
-	return nil
-}
-
-func (s *syncTestRepo) UpdateFlowTaskId(ctx context.Context, id valobj.Id, flowTaskId string, oldStatuses []artifactentity.Status) error {
-	return nil
 }
 
 func (s *syncTestRepo) DeleteById(ctx context.Context, id valobj.Id) error { return nil }
@@ -111,6 +79,16 @@ func (s *syncTestRepo) DeleteByNotebookId(ctx context.Context, notebookId valobj
 }
 
 var _ artifactrepo.Repository = &syncTestRepo{}
+
+type stubEventBus struct{}
+
+func (s *stubEventBus) Publish(ctx context.Context, evt event.Event) error { return nil }
+func (s *stubEventBus) Subscribe(ctx context.Context, topic, groupID string, handler eventbus.EventBusMessageHandler) error {
+	return nil
+}
+func (s *stubEventBus) Close(ctx context.Context) error { return nil }
+
+var _ eventbus.EventBus = &stubEventBus{}
 
 type syncTestFlow struct {
 	mu     sync.Mutex
@@ -162,7 +140,7 @@ func TestSyncer_PollOne_ReachesTerminalAndStops(t *testing.T) {
 		PerTaskInterval: 10 * time.Millisecond,
 		GlobalInterval:  10 * time.Millisecond,
 		GlobalBatchSize: 100,
-	})
+	}, &stubEventBus{})
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -189,7 +167,7 @@ func TestSyncer_GlobalScan_CatchesPendingArtifacts(t *testing.T) {
 		PerTaskInterval: 10 * time.Millisecond,
 		GlobalInterval:  10 * time.Millisecond,
 		GlobalBatchSize: 100,
-	})
+	}, &stubEventBus{})
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -211,7 +189,7 @@ func TestSyncer_Shutdown_StopsLoops(t *testing.T) {
 		PerTaskInterval: 10 * time.Millisecond,
 		GlobalInterval:  10 * time.Millisecond,
 		GlobalBatchSize: 100,
-	})
+	}, &stubEventBus{})
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

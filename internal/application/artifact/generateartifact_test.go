@@ -32,17 +32,11 @@ func (s *stubArtifactRepo) Save(ctx context.Context, a *artifactentity.Artifact)
 func (s *stubArtifactRepo) FindById(ctx context.Context, id valobj.Id) (*artifactentity.Artifact, error) {
 	return nil, artifacterrors.ErrArtifactNotFound
 }
-func (s *stubArtifactRepo) ListByNotebookId(ctx context.Context, n valobj.Id, l, o int) ([]*artifactentity.Artifact, error) {
+func (s *stubArtifactRepo) ListByNotebookId(ctx context.Context, n valobj.Id, spec *artifactrepo.ListSpec) ([]*artifactentity.Artifact, error) {
 	return nil, nil
 }
-func (s *stubArtifactRepo) ListByStatus(ctx context.Context, sts []artifactentity.Status, l int) ([]*artifactentity.Artifact, error) {
+func (s *stubArtifactRepo) ListByStatus(ctx context.Context, spec *artifactrepo.ListByStatusSpec) ([]*artifactentity.Artifact, error) {
 	return nil, nil
-}
-func (s *stubArtifactRepo) UpdateStatus(ctx context.Context, id valobj.Id, st artifactentity.Status, r []byte, rk artifactentity.ResultKind, t string) error {
-	return nil
-}
-func (s *stubArtifactRepo) UpdateFlowTaskId(ctx context.Context, id valobj.Id, flowTaskId string, oldStatuses []artifactentity.Status) error {
-	return nil
 }
 func (s *stubArtifactRepo) DeleteById(ctx context.Context, id valobj.Id) error { return nil }
 func (s *stubArtifactRepo) DeleteByNotebookId(ctx context.Context, n valobj.Id) error {
@@ -98,7 +92,7 @@ func TestGenerate_Execute_HappyPath(t *testing.T) {
 	repo := &stubArtifactRepo{}
 	flowc := &stubFlowClient{submitID: "flow-1"}
 	notebookRepo := &stubNotebookRepo{ownerId: "u1"}
-	h := NewGenerateArtifactHandler(repo, flowc, notebookRepo, nil)
+	h := NewGenerateArtifactHandler(repo, flowc, notebookRepo, nil, &stubEventBus{})
 
 	ctx := pkgcontext.WithUserId(context.Background(), "u1")
 	resp, err := h.Handle(ctx, &GenerateRequest{
@@ -116,7 +110,7 @@ func TestGenerate_Execute_NotebookOwnedByOther(t *testing.T) {
 	repo := &stubArtifactRepo{}
 	flowc := &stubFlowClient{}
 	notebookRepo := &stubNotebookRepo{ownerId: "other-user"}
-	h := NewGenerateArtifactHandler(repo, flowc, notebookRepo, nil)
+	h := NewGenerateArtifactHandler(repo, flowc, notebookRepo, nil, &stubEventBus{})
 
 	ctx := pkgcontext.WithUserId(context.Background(), "u1")
 	_, err := h.Handle(ctx, &GenerateRequest{

@@ -5,10 +5,12 @@ import (
 	"testing"
 
 	flowschema "github.com/gonotelm-lab/flow/api/schema/v1"
+	"github.com/gonotelm-lab/gonotelm/internal/core/event"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	artifacterrors "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/errors"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
@@ -17,35 +19,27 @@ import (
 )
 
 type multiStubRepo struct {
-	findByIdResult *artifactentity.Artifact
-	findByIdErr    error
-	updatedStatus  *artifactentity.Status
-	updatedFTID    string
-	updatedFTOld   []artifactentity.Status
-	listResult     []*artifactentity.Artifact
-	listErr        error
-	deletedId      valobj.Id
-	deleteErr      error
+	findByIdResult  *artifactentity.Artifact
+	findByIdErr     error
+	savedArtifacts  []*artifactentity.Artifact
+	listResult      []*artifactentity.Artifact
+	listErr         error
+	deletedId       valobj.Id
+	deleteErr       error
 }
 
-func (s *multiStubRepo) Save(ctx context.Context, a *artifactentity.Artifact) error { return nil }
+func (s *multiStubRepo) Save(ctx context.Context, a *artifactentity.Artifact) error {
+	s.savedArtifacts = append(s.savedArtifacts, a)
+	return nil
+}
 func (s *multiStubRepo) FindById(ctx context.Context, id valobj.Id) (*artifactentity.Artifact, error) {
 	return s.findByIdResult, s.findByIdErr
 }
-func (s *multiStubRepo) ListByNotebookId(ctx context.Context, n valobj.Id, l, o int) ([]*artifactentity.Artifact, error) {
+func (s *multiStubRepo) ListByNotebookId(ctx context.Context, n valobj.Id, spec *artifactrepo.ListSpec) ([]*artifactentity.Artifact, error) {
 	return s.listResult, s.listErr
 }
-func (s *multiStubRepo) ListByStatus(ctx context.Context, sts []artifactentity.Status, l int) ([]*artifactentity.Artifact, error) {
+func (s *multiStubRepo) ListByStatus(ctx context.Context, spec *artifactrepo.ListByStatusSpec) ([]*artifactentity.Artifact, error) {
 	return nil, nil
-}
-func (s *multiStubRepo) UpdateStatus(ctx context.Context, id valobj.Id, st artifactentity.Status, r []byte, rk artifactentity.ResultKind, t string) error {
-	s.updatedStatus = &st
-	return nil
-}
-func (s *multiStubRepo) UpdateFlowTaskId(ctx context.Context, id valobj.Id, flowTaskId string, oldStatuses []artifactentity.Status) error {
-	s.updatedFTID = flowTaskId
-	s.updatedFTOld = oldStatuses
-	return nil
 }
 func (s *multiStubRepo) DeleteById(ctx context.Context, id valobj.Id) error {
 	s.deletedId = id
@@ -54,6 +48,21 @@ func (s *multiStubRepo) DeleteById(ctx context.Context, id valobj.Id) error {
 func (s *multiStubRepo) DeleteByNotebookId(ctx context.Context, n valobj.Id) error { return nil }
 
 var _ artifactrepo.Repository = &multiStubRepo{}
+
+type stubEventBus struct {
+	published []event.Event
+}
+
+func (s *stubEventBus) Publish(ctx context.Context, evt event.Event) error {
+	s.published = append(s.published, evt)
+	return nil
+}
+func (s *stubEventBus) Subscribe(ctx context.Context, topic, groupID string, handler eventbus.EventBusMessageHandler) error {
+	return nil
+}
+func (s *stubEventBus) Close(ctx context.Context) error { return nil }
+
+var _ eventbus.EventBus = &stubEventBus{}
 
 type stubStorage struct {
 	deletedKey string
@@ -162,7 +171,7 @@ func TestCancel_HappyPath(t *testing.T) {
 	artifact := makeArtifact(artifactentity.StatusRunning, "ft-3", "u1")
 	repo := &multiStubRepo{findByIdResult: artifact}
 	flowc := &stubFlowClient{}
-	h := NewCancelArtifactHandler(repo, flowc)
+	h := NewCancelArtifactHandler(repo, flowc, &stubEventBus{})
 
 	ctx := pkgcontext.WithUserId(context.Background(), "u1")
 	err := h.Handle(ctx, artifact.Id)
@@ -170,14 +179,14 @@ func TestCancel_HappyPath(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, flowc.canceled, 1)
 	assert.Equal(t, "ft-3", flowc.canceled[0])
-	assert.NotNil(t, repo.updatedStatus)
-	assert.Equal(t, artifactentity.StatusCancelled, *repo.updatedStatus)
+	require.Len(t, repo.savedArtifacts, 1)
+	assert.Equal(t, artifactentity.StatusCancelled, repo.savedArtifacts[0].Status)
 }
 
 func TestCancel_TerminalRejected(t *testing.T) {
 	artifact := makeArtifact(artifactentity.StatusCompleted, "ft-4", "u1")
 	repo := &multiStubRepo{findByIdResult: artifact}
-	h := NewCancelArtifactHandler(repo, &stubFlowClient{})
+	h := NewCancelArtifactHandler(repo, &stubFlowClient{}, &stubEventBus{})
 
 	ctx := pkgcontext.WithUserId(context.Background(), "u1")
 	err := h.Handle(ctx, artifact.Id)
@@ -220,22 +229,21 @@ func TestRetry_HappyPath(t *testing.T) {
 	artifact.Payload = &artifactentity.MindmapPayload{NotebookId: artifact.NotebookId}
 	repo := &multiStubRepo{findByIdResult: artifact}
 	flowc := &stubFlowClient{submitID: "ft-new"}
-	h := NewRetryArtifactHandler(repo, flowc, nil)
+	h := NewRetryArtifactHandler(repo, flowc, nil, &stubEventBus{})
 
 	ctx := pkgcontext.WithUserId(context.Background(), "u1")
 	err := h.Handle(ctx, artifact.Id)
 
 	require.NoError(t, err)
-	assert.Equal(t, "ft-new", repo.updatedFTID)
-	assert.Equal(t, []artifactentity.Status{artifactentity.StatusFailed, artifactentity.StatusCancelled}, repo.updatedFTOld)
-	assert.NotNil(t, repo.updatedStatus)
-	assert.Equal(t, artifactentity.StatusPending, *repo.updatedStatus)
+	require.Len(t, repo.savedArtifacts, 1)
+	assert.Equal(t, "ft-new", repo.savedArtifacts[0].FlowTaskId)
+	assert.Equal(t, artifactentity.StatusPending, repo.savedArtifacts[0].Status)
 }
 
 func TestRetry_CannotRetryTerminalButNotFailedOrCancelled(t *testing.T) {
 	artifact := makeArtifact(artifactentity.StatusCompleted, "ft-c", "u1")
 	repo := &multiStubRepo{findByIdResult: artifact}
-	h := NewRetryArtifactHandler(repo, &stubFlowClient{}, nil)
+	h := NewRetryArtifactHandler(repo, &stubFlowClient{}, nil, &stubEventBus{})
 
 	ctx := pkgcontext.WithUserId(context.Background(), "u1")
 	err := h.Handle(ctx, artifact.Id)
@@ -247,7 +255,7 @@ func TestRetry_CannotRetryTerminalButNotFailedOrCancelled(t *testing.T) {
 func TestRetry_CannotRetryPending(t *testing.T) {
 	artifact := makeArtifact(artifactentity.StatusPending, "ft-p", "u1")
 	repo := &multiStubRepo{findByIdResult: artifact}
-	h := NewRetryArtifactHandler(repo, &stubFlowClient{}, nil)
+	h := NewRetryArtifactHandler(repo, &stubFlowClient{}, nil, &stubEventBus{})
 
 	ctx := pkgcontext.WithUserId(context.Background(), "u1")
 	err := h.Handle(ctx, artifact.Id)

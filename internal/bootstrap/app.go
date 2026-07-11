@@ -108,18 +108,18 @@ func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
 		GlobalInterval:  cfg.Syncer.GlobalInterval,
 		GlobalBatchSize: cfg.Syncer.GlobalBatchSize,
 	}
-	syncerInst := syncerpkg.NewSyncer(artifactRepo, flowClient, syncerCfg)
+	syncerInst := syncerpkg.NewSyncer(artifactRepo, flowClient, syncerCfg, bus)
 	syncerInst.Start(ctx)
 	addCloser(&syncerCloser{syncerInst})
 
 	// ── 8. Use cases ──
 
-	generateUC := artifact.NewGenerateArtifactHandler(artifactRepo, flowClient, notebookRepo, syncerInst)
+	generateUC := artifact.NewGenerateArtifactHandler(artifactRepo, flowClient, notebookRepo, syncerInst, bus)
 	statusUC := artifact.NewGetArtifactStatusHandler(artifactRepo, flowClient)
 	listUC := artifact.NewListArtifactsHandler(artifactRepo, notebookRepo)
-	cancelUC := artifact.NewCancelArtifactHandler(artifactRepo, flowClient)
+	cancelUC := artifact.NewCancelArtifactHandler(artifactRepo, flowClient, bus)
 	deleteUC := artifact.NewDeleteArtifactHandler(artifactRepo, flowClient, storageGateway)
-	retryUC := artifact.NewRetryArtifactHandler(artifactRepo, flowClient, syncerInst)
+	retryUC := artifact.NewRetryArtifactHandler(artifactRepo, flowClient, syncerInst, bus)
 
 	// ── 9. Event handler registration ──
 

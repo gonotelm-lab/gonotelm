@@ -47,10 +47,15 @@ func TestMain(m *testing.M) {
 	}
 }
 
-func TestArtifactRepository_SaveAndFindById(t *testing.T) {
-	payload := &artifactentity.MindmapPayload{NotebookId: uuid.NewV7(), SourceIds: nil}
-	a, err := artifactentity.NewArtifact(uuid.NewV7(), "u-repo-1", artifactentity.KindMindmap, payload)
+func mustNewArtifact(t *testing.T, notebookId uuid.UUID, userId string, kind artifactentity.Kind, payload artifactentity.Payload) *artifactentity.Artifact {
+	t.Helper()
+	a, err := artifactentity.NewArtifact(notebookId, userId, kind, payload)
 	require.NoError(t, err)
+	return a
+}
+
+func TestArtifactRepository_SaveAndFindById(t *testing.T) {
+	a := mustNewArtifact(t, uuid.NewV7(), "u-repo-1", artifactentity.KindMindmap, &artifactentity.MindmapPayload{NotebookId: uuid.NewV7(), SourceIds: nil})
 	a.BindFlowTaskId(uuid.NewV7().String())
 	require.NoError(t, artifactRepo.Save(artifactTestCtx, a))
 
@@ -70,12 +75,11 @@ func TestArtifactRepository_FindById_NotFound(t *testing.T) {
 
 func TestArtifactRepository_ListByNotebookId(t *testing.T) {
 	notebookId := uuid.NewV7()
-	a, err := artifactentity.NewArtifact(notebookId, "u-repo-list", artifactentity.KindReport, &artifactentity.ReportPayload{NotebookId: notebookId})
-	require.NoError(t, err)
+	a := mustNewArtifact(t, notebookId, "u-repo-list", artifactentity.KindReport, &artifactentity.ReportPayload{NotebookId: notebookId})
 	a.BindFlowTaskId(uuid.NewV7().String())
 	require.NoError(t, artifactRepo.Save(artifactTestCtx, a))
 
-	got, err := artifactRepo.ListByNotebookId(artifactTestCtx, notebookId, 50, 0)
+	got, err := artifactRepo.ListByNotebookId(artifactTestCtx, notebookId, &artifactrepo.ListSpec{Limit: 50, Offset: 0})
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, len(got), 1)
 	found := false
@@ -88,46 +92,41 @@ func TestArtifactRepository_ListByNotebookId(t *testing.T) {
 	assert.True(t, found, "saved artifact not present in ListByNotebookId result")
 }
 
-func TestArtifactRepository_ListByStatus_And_UpdateStatus(t *testing.T) {
-	a, err := artifactentity.NewArtifact(uuid.NewV7(), "u-repo-2", artifactentity.KindReport, &artifactentity.ReportPayload{})
-	require.NoError(t, err)
+func TestArtifactRepository_ListByStatus(t *testing.T) {
+	a := mustNewArtifact(t, uuid.NewV7(), "u-repo-2", artifactentity.KindReport, &artifactentity.ReportPayload{NotebookId: uuid.NewV7()})
 	a.BindFlowTaskId(uuid.NewV7().String())
 	require.NoError(t, artifactRepo.Save(artifactTestCtx, a))
 
-	got, err := artifactRepo.ListByStatus(artifactTestCtx, []artifactentity.Status{artifactentity.StatusPending}, 50)
+	got, err := artifactRepo.ListByStatus(artifactTestCtx, &artifactrepo.ListByStatusSpec{
+		Statuses: []artifactentity.Status{artifactentity.StatusPending},
+		Limit:    50,
+	})
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, len(got), 1)
-
-	require.NoError(t, artifactRepo.UpdateStatus(artifactTestCtx, a.Id, artifactentity.StatusRunning, nil, "", ""))
-	got2, err := artifactRepo.FindById(artifactTestCtx, a.Id)
-	require.NoError(t, err)
-	assert.Equal(t, artifactentity.StatusRunning, got2.Status)
 }
 
-func TestArtifactRepository_UpdateStatus_PopulatesResult(t *testing.T) {
-	a, err := artifactentity.NewArtifact(uuid.NewV7(), "u-repo-3", artifactentity.KindMindmap, &artifactentity.MindmapPayload{})
-	require.NoError(t, err)
+func TestArtifactRepository_Save_UpsertUpdatesFields(t *testing.T) {
+	a := mustNewArtifact(t, uuid.NewV7(), "u-repo-3", artifactentity.KindMindmap, &artifactentity.MindmapPayload{NotebookId: uuid.NewV7()})
 	a.BindFlowTaskId(uuid.NewV7().String())
 	require.NoError(t, artifactRepo.Save(artifactTestCtx, a))
 
-	result := []byte(`{"hello":"world"}`)
-	require.NoError(t, artifactRepo.UpdateStatus(artifactTestCtx, a.Id, artifactentity.StatusCompleted, result, artifactentity.ResultKindInline, "title-1"))
+	a.MarkCompleted([]byte(`{"hello":"world"}`), artifactentity.ResultKindInline, "title-1")
+	require.NoError(t, artifactRepo.Save(artifactTestCtx, a))
 
 	got, err := artifactRepo.FindById(artifactTestCtx, a.Id)
 	require.NoError(t, err)
 	assert.Equal(t, artifactentity.StatusCompleted, got.Status)
 	assert.Equal(t, "title-1", got.Title)
-	assert.Equal(t, result, got.Result)
+	assert.Equal(t, []byte(`{"hello":"world"}`), got.Result)
 	assert.Equal(t, artifactentity.ResultKindInline, got.ResultKind)
 }
 
 func TestArtifactRepository_DeleteById(t *testing.T) {
-	a, err := artifactentity.NewArtifact(uuid.NewV7(), "u-repo-del", artifactentity.KindReport, &artifactentity.ReportPayload{})
-	require.NoError(t, err)
+	a := mustNewArtifact(t, uuid.NewV7(), "u-repo-del", artifactentity.KindReport, &artifactentity.ReportPayload{NotebookId: uuid.NewV7()})
 	a.BindFlowTaskId(uuid.NewV7().String())
 	require.NoError(t, artifactRepo.Save(artifactTestCtx, a))
 
 	require.NoError(t, artifactRepo.DeleteById(artifactTestCtx, a.Id))
-	_, err = artifactRepo.FindById(artifactTestCtx, a.Id)
+	_, err := artifactRepo.FindById(artifactTestCtx, a.Id)
 	assert.ErrorIs(t, err, artifacterrors.ErrArtifactNotFound)
 }

@@ -2,12 +2,14 @@ package artifact
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/bytedance/sonic"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -30,6 +32,7 @@ type GenerateArtifactHandler struct {
 	flow     flow.TaskClient
 	notebook notebookrepo.Repository
 	poller   Poller
+	eventBus eventbus.EventBus
 }
 
 func NewGenerateArtifactHandler(
@@ -37,8 +40,9 @@ func NewGenerateArtifactHandler(
 	flowc flow.TaskClient,
 	notebook notebookrepo.Repository,
 	poller Poller,
+	eventBus eventbus.EventBus,
 ) *GenerateArtifactHandler {
-	return &GenerateArtifactHandler{repo: repo, flow: flowc, notebook: notebook, poller: poller}
+	return &GenerateArtifactHandler{repo: repo, flow: flowc, notebook: notebook, poller: poller, eventBus: eventBus}
 }
 
 func (h *GenerateArtifactHandler) Handle(ctx context.Context, cmd *GenerateRequest) (*GenerateResponse, error) {
@@ -76,6 +80,12 @@ func (h *GenerateArtifactHandler) Handle(ctx context.Context, cmd *GenerateReque
 
 	if err := h.repo.Save(ctx, artifact); err != nil {
 		return nil, errors.WithMessage(err, "save artifact failed")
+	}
+
+	for _, evt := range artifact.PullEvents() {
+		if err := h.eventBus.Publish(ctx, evt); err != nil {
+			slog.ErrorContext(ctx, "publish artifact event failed", "artifact_id", artifact.Id, "err", err)
+		}
 	}
 
 	if h.poller != nil {

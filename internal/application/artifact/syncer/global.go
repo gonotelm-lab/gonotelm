@@ -6,6 +6,7 @@ import (
 	"time"
 
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
+	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 )
 
 func (s *Syncer) globalLoop(ctx context.Context) {
@@ -28,10 +29,10 @@ func (s *Syncer) globalLoop(ctx context.Context) {
 }
 
 func (s *Syncer) scanOnce(ctx context.Context) error {
-	rows, err := s.repo.ListByStatus(ctx,
-		[]artifactentity.Status{artifactentity.StatusPending, artifactentity.StatusRunning},
-		s.cfg.GlobalBatchSize,
-	)
+	rows, err := s.repo.ListByStatus(ctx, &artifactrepo.ListByStatusSpec{
+		Statuses: []artifactentity.Status{artifactentity.StatusPending, artifactentity.StatusRunning},
+		Limit:    s.cfg.GlobalBatchSize,
+	})
 	if err != nil {
 		return err
 	}

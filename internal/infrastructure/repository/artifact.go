@@ -2,14 +2,12 @@ package repository
 
 import (
 	"context"
-	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	artifacterrors "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/errors"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/schema"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository/mapper"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
@@ -23,7 +21,10 @@ func NewArtifactRepository(store database.ArtifactStore) artifactrepo.Repository
 var _ artifactrepo.Repository = &ArtifactRepositoryImpl{}
 
 func (r *ArtifactRepositoryImpl) Save(ctx context.Context, a *artifactentity.Artifact) error {
-	return r.store.Create(ctx, mapper.ArtifactToSchema(a))
+	if a.IsDeleted() {
+		return r.store.DeleteById(ctx, a.Id)
+	}
+	return r.store.Upsert(ctx, mapper.ArtifactToSchema(a))
 }
 
 func (r *ArtifactRepositoryImpl) FindById(ctx context.Context, id valobj.Id) (*artifactentity.Artifact, error) {
@@ -37,8 +38,13 @@ func (r *ArtifactRepositoryImpl) FindById(ctx context.Context, id valobj.Id) (*a
 	return mapper.ArtifactFromSchema(sch), nil
 }
 
-func (r *ArtifactRepositoryImpl) ListByNotebookId(ctx context.Context, notebookId valobj.Id, limit, offset int) ([]*artifactentity.Artifact, error) {
-	rows, err := r.store.ListByNotebookId(ctx, notebookId, limit, offset)
+func (r *ArtifactRepositoryImpl) ListByNotebookId(
+	ctx context.Context, notebookId valobj.Id, spec *artifactrepo.ListSpec,
+) ([]*artifactentity.Artifact, error) {
+	if err := spec.Validate(); err != nil {
+		return nil, err
+	}
+	rows, err := r.store.ListByNotebookId(ctx, notebookId, spec.Limit, spec.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -49,12 +55,17 @@ func (r *ArtifactRepositoryImpl) ListByNotebookId(ctx context.Context, notebookI
 	return out, nil
 }
 
-func (r *ArtifactRepositoryImpl) ListByStatus(ctx context.Context, statuses []artifactentity.Status, limit int) ([]*artifactentity.Artifact, error) {
-	strs := make([]string, 0, len(statuses))
-	for _, s := range statuses {
+func (r *ArtifactRepositoryImpl) ListByStatus(
+	ctx context.Context, spec *artifactrepo.ListByStatusSpec,
+) ([]*artifactentity.Artifact, error) {
+	if err := spec.Validate(); err != nil {
+		return nil, err
+	}
+	strs := make([]string, 0, len(spec.Statuses))
+	for _, s := range spec.Statuses {
 		strs = append(strs, s.String())
 	}
-	rows, err := r.store.ListByStatus(ctx, strs, limit)
+	rows, err := r.store.ListByStatus(ctx, strs, spec.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -63,28 +74,6 @@ func (r *ArtifactRepositoryImpl) ListByStatus(ctx context.Context, statuses []ar
 		out = append(out, mapper.ArtifactFromSchema(row))
 	}
 	return out, nil
-}
-
-func (r *ArtifactRepositoryImpl) UpdateStatus(
-	ctx context.Context,
-	id valobj.Id,
-	status artifactentity.Status,
-	result []byte,
-	resultKind artifactentity.ResultKind,
-	title string,
-) error {
-	_, err := r.store.UpdateStatus(ctx, id, status.String(), "", &schema.ArtifactUpdateStatusParams{
-		NewStatus: status.String(), Title: title, Result: result, ResultKind: resultKind.String(), UpdatedAt: time.Now(),
-	})
-	return err
-}
-
-func (r *ArtifactRepositoryImpl) UpdateFlowTaskId(ctx context.Context, id valobj.Id, flowTaskId string, oldStatuses []artifactentity.Status) error {
-	strs := make([]string, 0, len(oldStatuses))
-	for _, s := range oldStatuses {
-		strs = append(strs, s.String())
-	}
-	return r.store.UpdateFlowTaskId(ctx, id, flowTaskId, strs)
 }
 
 func (r *ArtifactRepositoryImpl) DeleteById(ctx context.Context, id valobj.Id) error {

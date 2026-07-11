@@ -50,19 +50,23 @@ func (s *Syncer) pollOnce(ctx context.Context, artifactId valobj.Id) (done bool,
 	}
 	switch newStatus {
 	case artifactentity.StatusCompleted:
-		if err := s.repo.UpdateStatus(ctx, a.Id, newStatus, info.Result, artifactentity.ResultKindInline, a.Title); err != nil {
-			return false, err
-		}
-	case artifactentity.StatusFailed, artifactentity.StatusCancelled:
-		if err := s.repo.UpdateStatus(ctx, a.Id, newStatus, nil, "", ""); err != nil {
-			return false, err
-		}
+		a.MarkCompleted(info.Result, artifactentity.ResultKindInline, a.Title)
+	case artifactentity.StatusFailed:
+		a.MarkFailed()
+	case artifactentity.StatusCancelled:
+		a.MarkCancelled()
 	case artifactentity.StatusRunning:
-		if err := s.repo.UpdateStatus(ctx, a.Id, newStatus, nil, "", ""); err != nil {
-			return false, err
-		}
+		a.MarkRunning()
 	case artifactentity.StatusPending:
 		return false, nil
+	}
+	if err := s.repo.Save(ctx, a); err != nil {
+		return false, err
+	}
+	for _, evt := range a.PullEvents() {
+		if err := s.eventBus.Publish(ctx, evt); err != nil {
+			slog.WarnContext(ctx, "publish artifact event failed", "artifact_id", a.Id, "err", err)
+		}
 	}
 	return newStatus.IsTerminal(), nil
 }

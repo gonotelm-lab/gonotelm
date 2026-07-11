@@ -6,6 +6,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
 )
 
@@ -23,4 +24,5 @@ type Deps struct {
 	FlowClient   flow.TaskClient
 	NotebookRepo notebookrepo.Repository
 	Poller       Poller
+	EventBus     eventbus.EventBus
 }

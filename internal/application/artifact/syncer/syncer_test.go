@@ -6,7 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bytedance/sonic"
 	flowschema "github.com/gonotelm-lab/flow/api/schema/v1"
+	"github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate"
 	"github.com/gonotelm-lab/gonotelm/internal/core/event"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
@@ -134,7 +136,17 @@ func makeSyncArtifact(status artifactentity.Status, flowTaskId string) *artifact
 func TestSyncer_PollOne_ReachesTerminalAndStops(t *testing.T) {
 	a := makeSyncArtifact(artifactentity.StatusPending, "ft-1")
 	repo := newSyncTestRepo(a)
-	flowc := newSyncTestFlow([]flowschema.TaskState{flowschema.TaskState_RUNNING, flowschema.TaskState_DONE}, []byte(`{"key":"val"}`))
+
+	// The flow task result is a marshaled generate.WorkerOutput.
+	innerResult := []byte("mindmap content")
+	out := generate.WorkerOutput{
+		Title:      "test title",
+		Result:     innerResult,
+		ResultKind: "inline",
+	}
+	workerOutputBytes, err := sonic.Marshal(out)
+	require.NoError(t, err)
+	flowc := newSyncTestFlow([]flowschema.TaskState{flowschema.TaskState_RUNNING, flowschema.TaskState_DONE}, workerOutputBytes)
 
 	s := NewSyncer(repo, flowc, Config{
 		PerTaskInterval: 10 * time.Millisecond,
@@ -154,14 +166,25 @@ func TestSyncer_PollOne_ReachesTerminalAndStops(t *testing.T) {
 
 	got, _ := repo.FindById(ctx, a.Id)
 	assert.True(t, got.Status.Completed())
-	assert.Equal(t, []byte(`{"key":"val"}`), got.Result)
+	// Result should be the inner content, not the whole WorkerOutput JSON.
+	assert.Equal(t, innerResult, got.Result)
+	assert.Equal(t, "test title", got.Title)
+	assert.Equal(t, artifactentity.ResultKindInline, got.ResultKind)
 }
 
 func TestSyncer_GlobalScan_CatchesPendingArtifacts(t *testing.T) {
+	out := generate.WorkerOutput{
+		Title:      "scanned title",
+		Result:     []byte("scanned result"),
+		ResultKind: "inline",
+	}
+	outBytes, err := sonic.Marshal(out)
+	require.NoError(t, err)
+
 	a1 := makeSyncArtifact(artifactentity.StatusPending, "ft-a")
 	a2 := makeSyncArtifact(artifactentity.StatusPending, "ft-b")
 	repo := newSyncTestRepo(a1, a2)
-	flowc := newSyncTestFlow([]flowschema.TaskState{flowschema.TaskState_DONE}, []byte(`result`))
+	flowc := newSyncTestFlow([]flowschema.TaskState{flowschema.TaskState_DONE}, outBytes)
 
 	s := NewSyncer(repo, flowc, Config{
 		PerTaskInterval: 10 * time.Millisecond,

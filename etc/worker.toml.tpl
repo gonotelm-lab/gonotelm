@@ -8,7 +8,6 @@ user = "${GONOTELM_DB_USER:-postgres}"
 password = "${GONOTELM_DB_PASSWORD:-postgres}"
 dbName = "${GONOTELM_DB_NAME:-gonotelm}"
 
-
 [vectorDb]
 type = "milvus"
 
@@ -53,11 +52,6 @@ modelProvider = "${GONOTELM_LOGIC_STUDIO_INFOGRAPHIC_PROVIDER:-deepseek}"
 model = "${GONOTELM_LOGIC_STUDIO_INFOGRAPHIC_MODEL:-deepseek-v4-flash}"
 imageModelProvider = "${GONOTELM_LOGIC_STUDIO_INFOGRAPHIC_IMAGE_MODEL_PROVIDER:-dashscope}"
 imageModel = "${GONOTELM_LOGIC_STUDIO_INFOGRAPHIC_IMAGE_MODEL:-qwen-image-2.0-pro}"
-
-
-
-
-
 
 [embedding]
 type = "${GONOTELM_EMBEDDING_TYPE:-dashscope}"
@@ -110,8 +104,14 @@ baseUrl = "${GONOTELM_TEXT2IMAGE_DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.
 model = "${GONOTELM_TEXT2IMAGE_DASHSCOPE_MODEL:-qwen-image-2.0-pro}"
 timeout = "${GONOTELM_TEXT2IMAGE_DASHSCOPE_TIMEOUT:-1h}"
 
+[text2image.agnes]
+apiKey = "${GONOTELM_AGNES_API_KEY:-}"
+baseUrl = "${GONOTELM_TEXT2IMAGE_AGNES_BASE_URL:-https://apihub.agnes-ai.com/v1/images/generations}"
+model = "${GONOTELM_TEXT2IMAGE_AGNES_MODEL:-agnes-image-2.1-flash}"
+timeout = "${GONOTELM_TEXT2IMAGE_AGNES_TIMEOUT:-1h}"
+
 [flow]
-addr        = "${GONOTELM_FLOW_ADDR:-flow.example:9443}"
+addr        = "${GONOTELM_FLOW_ADDR:-localhost:7091}"
 namespace   = "${GONOTELM_FLOW_NAMESPACE:-gonotelm}"
 maxRetry    = ${GONOTELM_FLOW_MAX_RETRY:-3}
 dialTimeout = "${GONOTELM_FLOW_DIAL_TIMEOUT:-5s}"

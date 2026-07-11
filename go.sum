@@ -26,8 +26,6 @@ github.com/Masterminds/semver/v3 v3.4.0/go.mod h1:4V+yj/TJE1HU9XfppCwVMZq3I84lpr
 github.com/Shopify/goreferrer v0.0.0-20181106222321-ec9c9a553398/go.mod h1:a1uqRtAwp2Xwc6WNPJEufxJ7fx3npB4UV/JOLmbu5I0=
 github.com/a8m/envsubst v1.4.2 h1:4yWIHXOLEJHQEFd4UjrWDrYeYlV7ncFWJOCBRLOZHQg=
 github.com/a8m/envsubst v1.4.2/go.mod h1:MVUTQNGQ3tsjOOtKCNd+fl8RzhsXcDvvAEzkhGtlsbY=
-github.com/agiledragon/gomonkey/v2 v2.14.0 h1:FASzes6sjtD0hRo5lu0g796qKL03bOHCgcIA/4am9QM=
-github.com/agiledragon/gomonkey/v2 v2.14.0/go.mod h1:ap1AmDzcVOAz1YpeJ3TCzIgstoaWLA6jbbgxfB4w2iY=
 github.com/airbrake/gobrake v3.6.1+incompatible/go.mod h1:wM4gu3Cn0W0K7GUuVWnlXZU11AGBXMILnrdOU8Kn00o=
 github.com/ajg/form v1.5.1/go.mod h1:uL1WgH+h2mgNtvBq0339dVnzXdBETtL2LeUXaIv25UY=
 github.com/alecthomas/assert/v2 v2.10.0 h1:jjRCHsj6hBJhkmhznrCzoNpbA3zqy0fYiUcYZP/GkPY=
@@ -102,8 +100,6 @@ github.com/cloudwego/eino-ext/components/document/parser/docx v0.0.0-20260424065
 github.com/cloudwego/eino-ext/components/document/parser/docx v0.0.0-20260424065505-3b3b8b5db0d0/go.mod h1:7Nfu+tf9OkdI8Fy5VRi9Xap13OGVV8SXlpj+GHbaWQ8=
 github.com/cloudwego/eino-ext/components/document/transformer/splitter/html v0.0.0-20260424065505-3b3b8b5db0d0 h1:9Itm/VmvZiWOdqC56t0mX0DPYp6l8VV26o7ePXkGK0Q=
 github.com/cloudwego/eino-ext/components/document/transformer/splitter/html v0.0.0-20260424065505-3b3b8b5db0d0/go.mod h1:8NURh77KvO7D5hmYM1A0Rrkh8aSmQnsYRnrZ9HdfeVU=
-github.com/cloudwego/eino-ext/components/document/transformer/splitter/markdown v0.0.0-20260424065505-3b3b8b5db0d0 h1:MDyCuBEit2ongiMBixLyxIWO/UgIrrwoxeaLvHes2fI=
-github.com/cloudwego/eino-ext/components/document/transformer/splitter/markdown v0.0.0-20260424065505-3b3b8b5db0d0/go.mod h1:KVOVct4e2BQ7epDONW2QE1qU5+ccoh91FzJTs9vIJj0=
 github.com/cloudwego/eino-ext/components/document/transformer/splitter/recursive v0.0.0-20260424065505-3b3b8b5db0d0 h1:XYl1BycUrSVTcJjlsz7tmKNfSoFy9uIxcujrapUQ42k=
 github.com/cloudwego/eino-ext/components/document/transformer/splitter/recursive v0.0.0-20260424065505-3b3b8b5db0d0/go.mod h1:9R0RQrQSpg1JaNnRtw7+RfRAAv0HgdE348YnrlZ6coo=
 github.com/cloudwego/eino-ext/components/embedding/ark v0.1.1 h1:PM/+XAvJtrBqFlBY15ws0pb0+92XKHQv0ei3M7PIJcQ=
@@ -293,10 +289,10 @@ github.com/gomlx/gomlx v0.27.3/go.mod h1:gqqTny0q1kcxml72T313SZy5U9pfX9c54NmzcYt
 github.com/gomodule/redigo v1.7.1-0.20190724094224-574c33c3df38/go.mod h1:B4C85qUVwatsJoIUNIfCRsp7qO0iAmpGFZ4EELWSbC4=
 github.com/gomodule/redigo v1.9.3 h1:dNPSXeXv6HCq2jdyWfjgmhBdqnR6PRO3m/G05nvpPC8=
 github.com/gomodule/redigo v1.9.3/go.mod h1:KsU3hiK/Ay8U42qpaJk+kuNa3C+spxapWpM+ywhcgtw=
-github.com/gonotelm-lab/flow/api v0.0.0-20260626153544-6e1f453554e7 h1:vH1hOe/2a9Lgw3XuBTQ2DMx+Q40+dlnxNjR7ck6nm94=
-github.com/gonotelm-lab/flow/api v0.0.0-20260626153544-6e1f453554e7/go.mod h1:/R9SgAneBkWC7XDsRa54mcbLl7gk+UE9zsVrMZpiDpY=
-github.com/gonotelm-lab/flow/client v0.0.0-20260626153544-6e1f453554e7 h1:qOzdXkd5P6LzfzAtLrpmUkZpRfZSMjSXEe7CdnNQQ34=
-github.com/gonotelm-lab/flow/client v0.0.0-20260626153544-6e1f453554e7/go.mod h1:K9d/5RlBiGNG0rOd5j+CUElT4cPgzrJmfrv6B4Gv97g=
+github.com/gonotelm-lab/flow/api v0.0.0-20260711110918-b961c8b79b0f h1:Lh+GRgGLxCeQ3kiI5QEBNvF7CInm7fdawuVMqvcpTh4=
+github.com/gonotelm-lab/flow/api v0.0.0-20260711110918-b961c8b79b0f/go.mod h1:/R9SgAneBkWC7XDsRa54mcbLl7gk+UE9zsVrMZpiDpY=
+github.com/gonotelm-lab/flow/client v0.0.0-20260711110918-b961c8b79b0f h1:KddKRrz0E6O+jSmDo7n4Ol5XVUnjPFlX8PWE2QuT4C4=
+github.com/gonotelm-lab/flow/client v0.0.0-20260711110918-b961c8b79b0f/go.mod h1:K9d/5RlBiGNG0rOd5j+CUElT4cPgzrJmfrv6B4Gv97g=
 github.com/gonotelm-lab/multimodal v0.1.0 h1:gUeefSVvcV0qJxvUu6h6tY3NXyo4z/mSxC5kGA4hmLo=
 github.com/gonotelm-lab/multimodal v0.1.0/go.mod h1:VyQmUs50KDwFzm8sRoaarP6krTNoEWg1OUfVi4P5NRs=
 github.com/google/btree v1.1.2 h1:xf4v41cLI2Z6FxbKm+8Bu+m8ifhj15JuZ9sa0jZCMUU=

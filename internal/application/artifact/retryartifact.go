@@ -39,7 +39,14 @@ func (h *RetryArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error 
 	if err != nil {
 		return errors.Wrapf(errors.ErrSerde, "marshal payload on retry err=%v", err)
 	}
-	newFlowTaskId, err := h.flowc.Submit(ctx, taskTypeFor(a.Kind), payloadBytes)
+
+	workerInput := buildWorkerInput(a, payloadBytes)
+	workerInputBytes, err := sonic.Marshal(workerInput)
+	if err != nil {
+		return errors.Wrapf(errors.ErrSerde, "marshal worker input on retry err=%v", err)
+	}
+
+	newFlowTaskId, err := h.flowc.Submit(ctx, taskTypeFor(a.Kind), workerInputBytes)
 	if err != nil {
 		return errors.WithMessage(err, "submit retry task to flow failed")
 	}

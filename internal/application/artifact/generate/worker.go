@@ -28,7 +28,7 @@ type WorkerOutput struct {
 }
 
 func RegisterTypedWorker(client *flowworker.Client, deps *ServiceDeps) {
-	flowworker.RegisterTyped[WorkerInput, WorkerOutput](client, func(ctx context.Context, in WorkerInput) (WorkerOutput, error) {
+	flowworker.RegisterTyped(client, func(ctx context.Context, in WorkerInput) (WorkerOutput, error) {
 		kind := artifactentity.Kind(in.Kind)
 		if !kind.Supported() {
 			return WorkerOutput{}, fmt.Errorf("unsupported artifact kind: %s", kind)

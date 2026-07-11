@@ -6,13 +6,11 @@ require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.0
 	github.com/a8m/envsubst v1.4.2
-	github.com/agiledragon/gomonkey/v2 v2.14.0
 	github.com/allegro/bigcache/v3 v3.1.0
 	github.com/bytedance/sonic v1.15.0
 	github.com/cloudwego/eino v0.8.11
 	github.com/cloudwego/eino-ext/components/document/parser/docx v0.0.0-20260424065505-3b3b8b5db0d0
 	github.com/cloudwego/eino-ext/components/document/transformer/splitter/html v0.0.0-20260424065505-3b3b8b5db0d0
-	github.com/cloudwego/eino-ext/components/document/transformer/splitter/markdown v0.0.0-20260424065505-3b3b8b5db0d0
 	github.com/cloudwego/eino-ext/components/document/transformer/splitter/recursive v0.0.0-20260424065505-3b3b8b5db0d0
 	github.com/cloudwego/eino-ext/components/embedding/ark v0.1.1
 	github.com/cloudwego/eino-ext/components/embedding/cache v0.0.0-20260427010451-749e3706378b
@@ -34,8 +32,8 @@ require (
 	github.com/go-redsync/redsync/v4 v4.16.0
 	github.com/golang/snappy v1.0.0
 	github.com/gomlx/gomlx v0.27.3
-	github.com/gonotelm-lab/flow/api v0.0.0-20260626153544-6e1f453554e7
-	github.com/gonotelm-lab/flow/client v0.0.0-20260626153544-6e1f453554e7
+	github.com/gonotelm-lab/flow/api v0.0.0-20260711110918-b961c8b79b0f
+	github.com/gonotelm-lab/flow/client v0.0.0-20260711110918-b961c8b79b0f
 	github.com/gonotelm-lab/multimodal v0.1.0
 	github.com/google/uuid v1.6.0
 	github.com/hertz-contrib/logger/slog v1.0.0

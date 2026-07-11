@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/bytedance/sonic"
+	"github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 )
@@ -50,7 +52,11 @@ func (s *Syncer) pollOnce(ctx context.Context, artifactId valobj.Id) (done bool,
 	}
 	switch newStatus {
 	case artifactentity.StatusCompleted:
-		a.MarkCompleted(info.Result, artifactentity.ResultKindInline, a.Title)
+		var out generate.WorkerOutput
+		if err := sonic.Unmarshal(info.Result, &out); err != nil {
+			return false, err
+		}
+		a.MarkCompleted(out.Result, artifactentity.ResultKind(out.ResultKind), out.Title)
 	case artifactentity.StatusFailed:
 		a.MarkFailed()
 	case artifactentity.StatusCancelled:

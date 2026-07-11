@@ -1266,7 +1266,7 @@ func TestLoad_FlowWorkerSyncer(t *testing.T) {
 	cfg := LoadOrDefaultForTest(t, "./etc/gonotelm.toml.tpl")
 	require.NotNil(t, cfg)
 
-	assert.Equal(t, "flow.example:9443", cfg.Flow.Addr)
+	assert.Equal(t, "localhost:7091", cfg.Flow.Addr)
 	assert.Equal(t, "gonotelm", cfg.Flow.Namespace)
 	assert.Equal(t, 3, cfg.Flow.MaxRetry)
 	assert.Equal(t, 5*time.Second, cfg.Flow.DialTimeout)
@@ -1341,7 +1341,7 @@ Append (after `[text2image.agnes]` block):
 ```toml
 
 [flow]
-addr        = "${GONOTELM_FLOW_ADDR:-flow.example:9443}"
+addr        = "${GONOTELM_FLOW_ADDR:-localhost:7091}"
 namespace   = "${GONOTELM_FLOW_NAMESPACE:-gonotelm}"
 maxRetry    = ${GONOTELM_FLOW_MAX_RETRY:-3}
 dialTimeout = "${GONOTELM_FLOW_DIAL_TIMEOUT:-5s}"

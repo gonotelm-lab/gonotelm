@@ -71,7 +71,13 @@ func (h *GenerateArtifactHandler) Handle(ctx context.Context, cmd *GenerateReque
 		return nil, errors.Wrapf(errors.ErrSerde, "marshal generate payload err=%v", err)
 	}
 
-	flowTaskId, err := h.flow.Submit(ctx, taskTypeFor(cmd.Kind), payloadBytes)
+	workerInput := buildWorkerInput(artifact, payloadBytes)
+	workerInputBytes, err := sonic.Marshal(workerInput)
+	if err != nil {
+		return nil, errors.Wrapf(errors.ErrSerde, "marshal worker input err=%v", err)
+	}
+
+	flowTaskId, err := h.flow.Submit(ctx, taskTypeFor(cmd.Kind), workerInputBytes)
 	if err != nil {
 		return nil, errors.WithMessage(err, "submit artifact task to flow failed")
 	}

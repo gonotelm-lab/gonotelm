@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/bytedance/sonic"
+	"github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	artifacterrors "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/errors"
@@ -70,6 +72,24 @@ func (s *stubFlowClient) Close() error { return nil }
 
 var _ flow.TaskClient = &stubFlowClient{}
 
+type capturingFlowClient struct {
+	submitID        string
+	submitErr       error
+	submittedType   string
+	submittedPayload []byte
+}
+
+func (s *capturingFlowClient) Submit(ctx context.Context, t string, p []byte) (string, error) {
+	s.submittedType = t
+	s.submittedPayload = p
+	return s.submitID, s.submitErr
+}
+func (s *capturingFlowClient) Get(ctx context.Context, id string) (*flow.TaskInfo, error) { return nil, nil }
+func (s *capturingFlowClient) Cancel(ctx context.Context, id string) error { return nil }
+func (s *capturingFlowClient) Close() error { return nil }
+
+var _ flow.TaskClient = &capturingFlowClient{}
+
 type stubNotebookRepo struct {
 	ownerId string
 	err     error
@@ -120,4 +140,34 @@ func TestGenerate_Execute_NotebookOwnedByOther(t *testing.T) {
 	})
 
 	require.Error(t, err)
+}
+
+func TestGenerate_Execute_SubmitsWorkerInput(t *testing.T) {
+	repo := &stubArtifactRepo{}
+	flowc := &capturingFlowClient{submitID: "flow-1"}
+	notebookRepo := &stubNotebookRepo{ownerId: "u1"}
+	h := NewGenerateArtifactHandler(repo, flowc, notebookRepo, nil, &stubEventBus{})
+
+	ctx := pkgcontext.WithUserId(context.Background(), "u1")
+	notebookId := uuid.NewV7()
+	sourceIds := []valobj.Id{uuid.NewV7()}
+	resp, err := h.Handle(ctx, &GenerateRequest{
+		NotebookId: notebookId,
+		Kind:       artifactentity.KindMindmap,
+		SourceIds:  sourceIds,
+	})
+
+	require.NoError(t, err)
+	assert.NotEqual(t, valobj.Id(uuid.EmptyUUID()), resp.ArtifactId)
+	assert.Equal(t, "artifact.mindmap", flowc.submittedType)
+
+	var workerInput generate.WorkerInput
+	err = sonic.Unmarshal(flowc.submittedPayload, &workerInput)
+	require.NoError(t, err)
+	assert.Equal(t, resp.ArtifactId.String(), workerInput.ArtifactId)
+	assert.Equal(t, notebookId.String(), workerInput.NotebookId)
+	assert.Equal(t, "u1", workerInput.UserId)
+	assert.Equal(t, []string{sourceIds[0].String()}, workerInput.SourceIds)
+	assert.Equal(t, string(artifactentity.KindMindmap), workerInput.Kind)
+	assert.NotNil(t, workerInput.Payload)
 }

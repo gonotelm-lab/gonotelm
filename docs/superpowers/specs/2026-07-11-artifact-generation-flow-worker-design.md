@@ -326,7 +326,7 @@ cmd/
 
 ```toml
 [flow]
-addr        = "flow.example:9443"          # flow gRPC 地址
+addr        = "localhost:7091"             # flow gRPC 地址
 namespace   = "gonotelm"
 max-retry   = 3                             # 默认 Submit max_retry
 dial-timeout = "5s"

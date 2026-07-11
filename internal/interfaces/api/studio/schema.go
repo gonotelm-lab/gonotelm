@@ -9,12 +9,49 @@ type Kind = artifactentity.Kind
 type Status = artifactentity.Status
 type ResultKind = artifactentity.ResultKind
 
-type GenerateRequest struct {
+type GenerateArtifactRequest struct {
 	NotebookId    uuid.UUID                        `json:"notebook_id,required"`
 	Kind          Kind                             `json:"kind,required"`
 	SourceIds     []uuid.UUID                      `json:"source_ids,required"`
 	InfoGraphic   *GenerateInfoGraphicParameters   `json:"info_graphic,omitempty"`
 	AudioOverview *GenerateAudioOverviewParameters `json:"audio_overview,omitempty"`
+}
+
+type GenerateArtifactResponse struct {
+	TaskId string `json:"task_id"`
+}
+
+type ArtifactTaskIdRequest struct {
+	TaskId uuid.UUID `path:"task_id,required"`
+}
+
+type GetArtifactStatusResponse struct {
+	TaskId string              `json:"task_id"`
+	Status artifactentity.Status `json:"status"`
+}
+
+type GetArtifactResultResponse struct {
+	TaskId      string                   `json:"task_id"`
+	Status      artifactentity.Status    `json:"status"`
+	Title       string                   `json:"title"`
+	Content     string                   `json:"content,omitempty"`
+	ContentUrl  string                   `json:"content_url,omitempty"`
+	ContentKind artifactentity.ResultKind `json:"content_kind"`
+	MimeType    string                   `json:"mime_type,omitempty"`
+	ImageInfo   *ArtifactResultImageInfo `json:"image_info,omitempty"`
+}
+
+type ListNotebookArtifactsRequest struct {
+	Id     uuid.UUID `path:"id,required"`
+	Limit  int       `query:"limit"`
+	Offset int       `query:"offset"`
+}
+
+type ListNotebookArtifactsResponse struct {
+	Artifacts []*ArtifactResult `json:"artifacts"`
+	Limit     int               `json:"limit"`
+	Offset    int               `json:"offset"`
+	HasMore   bool              `json:"has_more"`
 }
 
 type GenerateInfoGraphicParameters struct {
@@ -28,33 +65,6 @@ type GenerateAudioOverviewParameters struct {
 	Tip      string                                    `json:"tip,omitempty"`
 	Language string                                    `json:"language,omitempty"`
 	Style    artifactentity.ArtifactAudioOverviewStyle `json:"style,omitempty"`
-}
-
-type GenerateResponse struct {
-	TaskId string `json:"task_id"`
-}
-
-type StatusResponse struct {
-	TaskId      string     `json:"task_id"`
-	Status      Status     `json:"status"`
-	Title       string     `json:"title,omitempty"`
-	Content     string     `json:"content,omitempty"`
-	ContentUrl  string     `json:"content_url,omitempty"`
-	ContentKind ResultKind `json:"content_kind"`
-	FlowError   string     `json:"flow_error,omitempty"`
-}
-
-type ListNotebookArtifactsRequest struct {
-	Id     uuid.UUID `path:"id,required"`
-	Limit  int       `query:"limit"  validate:"omitempty,min=1,max=50"`
-	Offset int       `query:"offset" validate:"min=0"`
-}
-
-type ListNotebookArtifactsResponse struct {
-	Artifacts []*ArtifactResult `json:"artifacts"`
-	Limit     int               `json:"limit"`
-	Offset    int               `json:"offset"`
-	HasMore   bool              `json:"has_more"`
 }
 
 type ArtifactResult struct {
@@ -120,7 +130,7 @@ func ToArtifactResult(a *artifactentity.Artifact) *ArtifactResult {
 	return r
 }
 
-func (r *GenerateInfoGraphicParameters) toPayload() *artifactentity.InfoGraphicPayload {
+func (r *GenerateInfoGraphicParameters) ToPayload() *artifactentity.InfoGraphicPayload {
 	if r == nil {
 		return nil
 	}
@@ -132,7 +142,7 @@ func (r *GenerateInfoGraphicParameters) toPayload() *artifactentity.InfoGraphicP
 	}
 }
 
-func (r *GenerateAudioOverviewParameters) toPayload() *artifactentity.AudioOverviewPayload {
+func (r *GenerateAudioOverviewParameters) ToPayload() *artifactentity.AudioOverviewPayload {
 	if r == nil {
 		return nil
 	}

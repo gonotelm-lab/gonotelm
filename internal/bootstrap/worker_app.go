@@ -52,7 +52,7 @@ func NewWorkerApp(ctx context.Context, cfg *conf.Config) (*WorkerApp, error) {
 		wcfg := flowworker.ConfigWithDefaults(flowworker.Config{
 			Namespace:         cfg.Flow.Namespace,
 			TaskType:          taskType,
-			Name:              "gonotelm-worker",
+			Name:              "gonotelm-worker-" + strings.TrimPrefix(taskType, taskTypePrefix),
 			MaxConcurrency:    cfg.Worker.MaxConcurrency,
 			HeartbeatInterval: cfg.Worker.Heartbeat,
 		})

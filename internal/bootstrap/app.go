@@ -15,7 +15,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api"
-	studioroutes "github.com/gonotelm-lab/gonotelm/internal/interfaces/api/studio"
 	"github.com/gonotelm-lab/gonotelm/internal/interfaces/event"
 )
 
@@ -151,17 +150,14 @@ func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
 		EventBus:           bus,
 		WaitGroup:          &sync.WaitGroup{},
 		Gateway:            infra.LLMGateway,
-	})
 
-	// ── 11. Studio routes ──
-
-	studioroutes.RegisterRoutes(svr.Hertz(), &studioroutes.Deps{
-		GenerateHandler: generateUC,
-		StatusHandler:   statusUC,
-		ListHandler:     listUC,
-		RetryHandler:    retryUC,
-		CancelHandler:   cancelUC,
-		DeleteHandler:   deleteUC,
+		GenerateArtifactHandler:      generateUC,
+		GetArtifactStatusHandler:     statusUC,
+		ListNotebookArtifactsHandler: listUC,
+		CancelArtifactHandler:        cancelUC,
+		DeleteArtifactHandler:        deleteUC,
+		RetryArtifactHandler:         retryUC,
+		ArtifactStorage:              storageGateway,
 	})
 
 	return &App{closers: closers, Server: svr}, nil

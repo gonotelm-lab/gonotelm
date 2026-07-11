@@ -27,6 +27,7 @@ func (s *Server) registerNotebooksRoutes(g *route.RouterGroup) {
 		notebookIdGroup.PUT("/name", s.UpdateNotebookName)
 		notebookIdGroup.POST("/chat", s.GetOrCreateNotebookChat)
 		notebookIdGroup.GET("/source/list", s.ListNotebookSources)
+		notebookIdGroup.GET("/studio/artifact/list", s.ListNotebookStudioArtifacts)
 	}
 }
 

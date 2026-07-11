@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/cloudwego/hertz/pkg/app/server"
+	artifactapp "github.com/gonotelm-lab/gonotelm/internal/application/artifact"
 	chatapp "github.com/gonotelm-lab/gonotelm/internal/application/chat"
 	notebookapp "github.com/gonotelm-lab/gonotelm/internal/application/notebook"
 	sourceapp "github.com/gonotelm-lab/gonotelm/internal/application/source"
@@ -29,6 +30,14 @@ type ServerDeps struct {
 	EventBus           eventbus.EventBus
 	WaitGroup          *sync.WaitGroup
 	Gateway            *chat.Gateway
+
+	GenerateArtifactHandler      *artifactapp.GenerateArtifactHandler
+	GetArtifactStatusHandler     *artifactapp.GetArtifactStatusHandler
+	ListNotebookArtifactsHandler *artifactapp.ListArtifactsHandler
+	CancelArtifactHandler        *artifactapp.CancelArtifactHandler
+	DeleteArtifactHandler        *artifactapp.DeleteArtifactHandler
+	RetryArtifactHandler         *artifactapp.RetryArtifactHandler
+	ArtifactStorage              artifactapp.StorageGateway
 }
 
 type Server struct {
@@ -41,7 +50,6 @@ type Server struct {
 	deleteNotebookHandler      *notebookapp.DeleteNotebookHandler
 	updateNotebookNameHandler  *notebookapp.UpdateNotebookNameHandler
 
-	// source handler
 	checkSourceAccessHandler      *sourceapp.CheckSourceAccessHandler
 	getSourceHandler              *sourceapp.GetSourceHandler
 	createSourceHandler           *sourceapp.CreateSourceHandler
@@ -62,6 +70,14 @@ type Server struct {
 	getStreamHandler         *chatapp.GetStreamHandler
 	abortStreamHandler       *chatapp.AbortStreamHandler
 	deleteChatContextHandler *chatapp.DeleteChatContextHandler
+
+	generateArtifactHandler      *artifactapp.GenerateArtifactHandler
+	getArtifactStatusHandler     *artifactapp.GetArtifactStatusHandler
+	listNotebookArtifactsHandler *artifactapp.ListArtifactsHandler
+	cancelArtifactHandler        *artifactapp.CancelArtifactHandler
+	deleteArtifactHandler        *artifactapp.DeleteArtifactHandler
+	retryArtifactHandler         *artifactapp.RetryArtifactHandler
+	artifactStorage              artifactapp.StorageGateway
 }
 
 func NewServer(
@@ -123,6 +139,14 @@ func NewServer(
 			deps.ChatRepo,
 			deps.ContextMessageRepo,
 		),
+
+		generateArtifactHandler:      deps.GenerateArtifactHandler,
+		getArtifactStatusHandler:     deps.GetArtifactStatusHandler,
+		listNotebookArtifactsHandler: deps.ListNotebookArtifactsHandler,
+		cancelArtifactHandler:        deps.CancelArtifactHandler,
+		deleteArtifactHandler:        deps.DeleteArtifactHandler,
+		retryArtifactHandler:         deps.RetryArtifactHandler,
+		artifactStorage:              deps.ArtifactStorage,
 	}
 
 	s.registerRoutes()
@@ -131,11 +155,12 @@ func NewServer(
 }
 
 func (s *Server) registerRoutes() {
-	v1Group := s.h.Group("/api/v1", s.authMiddleware()) // TODO add auth group middleware
+	v1Group := s.h.Group("/api/v1", s.authMiddleware())
 
 	s.registerNotebooksRoutes(v1Group)
 	s.registerSourcesRoutes(v1Group)
 	s.registerChatRoutes(v1Group)
+	s.registerStudioRoutes(v1Group)
 }
 
 func (s *Server) Hertz() *server.Hertz { return s.h }

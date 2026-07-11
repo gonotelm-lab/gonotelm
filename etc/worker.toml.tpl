@@ -8,10 +8,6 @@ user = "${GONOTELM_DB_USER:-postgres}"
 password = "${GONOTELM_DB_PASSWORD:-postgres}"
 dbName = "${GONOTELM_DB_NAME:-gonotelm}"
 
-[redis]
-addrs = ${GONOTELM_REDIS_ADDRS:-['127.0.0.1:7542']}
-username = "${GONOTELM_REDIS_USERNAME:-}"
-password = "${GONOTELM_REDIS_PASSWORD:-}"
 
 [vectorDb]
 type = "milvus"
@@ -35,15 +31,6 @@ region = "${GONOTELM_MINIO_REGION:-us-east-1}"
 secure = ${GONOTELM_MINIO_SECURE:-false}
 presignExpiry = "${GONOTELM_MINIO_PRESIGN_EXPIRY:-15m}"
 
-[msgQueue]
-type = "kafka"
-
-[msgQueue.kafka]
-brokers = ["${GONOTELM_KAFKA_BROKER:-127.0.0.1:9094}"]
-username = "${GONOTELM_KAFKA_USERNAME:-kafka}"
-password = "${GONOTELM_KAFKA_PASSWORD:-kafka}"
-consumerQueueCapacity = ${GONOTELM_KAFKA_CONSUMER_QUEUE_CAPACITY:-100}
-consumerCommitInterval = "${GONOTELM_KAFKA_CONSUMER_COMMIT_INTERVAL:-0s}"
 
 [logging]
 level = "${GONOTELM_LOG_LEVEL:-debug}"

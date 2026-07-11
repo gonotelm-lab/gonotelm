@@ -9,6 +9,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	einoembed "github.com/cloudwego/eino/components/embedding"
+	embedcache "github.com/cloudwego/eino-ext/components/embedding/cache"
 
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/service/agentize"
@@ -76,19 +77,24 @@ func NewSharedInfra(ctx context.Context, cfg *conf.Config) (_ *SharedInfra, outE
 	addCloser(contextCloser(func(ctx context.Context) error { return vdb.Close(ctx) }))
 	infra.VDB = vdb
 
-	if err := oldcache.Init(&cfg.Redis); err != nil {
-		return nil, fmt.Errorf("cache init: %w", err)
+	var redisClient redis.UniversalClient
+	if len(cfg.Redis.Addrs) > 0 {
+		if err := oldcache.Init(&cfg.Redis); err != nil {
+			return nil, fmt.Errorf("cache init: %w", err)
+		}
+		redisClient = oldcache.GetRedis()
+		addCloser(contextCloser(func(ctx context.Context) error { return redisClient.Close() }))
+		infra.Redis = redisClient
+		infra.Cache = cacheredis.NewCache(redisClient)
 	}
-	redisClient := oldcache.GetRedis()
-	addCloser(contextCloser(func(ctx context.Context) error { return redisClient.Close() }))
-	infra.Redis = redisClient
-	infra.Cache = cacheredis.NewCache(redisClient)
 
-	mqInst, err := newMQ(&cfg.MsgQueue)
-	if err != nil {
-		return nil, fmt.Errorf("mq: %w", err)
+	if cfg.MsgQueue.Type != "" {
+		mqInst, err := newMQ(&cfg.MsgQueue)
+		if err != nil {
+			return nil, fmt.Errorf("mq: %w", err)
+		}
+		infra.MQ = mqInst
 	}
-	infra.MQ = mqInst
 
 	oss, err := newStorage(&cfg.Storage)
 	if err != nil {
@@ -102,9 +108,13 @@ func NewSharedInfra(ctx context.Context, cfg *conf.Config) (_ *SharedInfra, outE
 	}
 	infra.LLMGateway = llmGateway
 
+	var embedCacher embedcache.Cacher
+	if redisClient != nil {
+		embedCacher = embedding.NewRedisCacher(redisClient)
+	}
 	embeddingGateway, err := embedding.NewEmbeddingGateway(
 		&cfg.Embedding,
-		embedding.NewRedisCacher(redisClient),
+		embedCacher,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("embedding gateway: %w", err)

@@ -14,6 +14,7 @@ func TestListSpec_Validate(t *testing.T) {
 
 func TestListSpec_Validate_Errors(t *testing.T) {
 	assert.Error(t, (&ListSpec{Limit: 0, Offset: 0}).Validate())
+	assert.Error(t, (&ListSpec{Limit: -1, Offset: 0}).Validate())
 	assert.Error(t, (&ListSpec{Limit: 10, Offset: -1}).Validate())
 }
 

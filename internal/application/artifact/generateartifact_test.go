@@ -1,4 +1,4 @@
-package usecase
+package artifact
 
 import (
 	"context"
@@ -98,10 +98,10 @@ func TestGenerate_Execute_HappyPath(t *testing.T) {
 	repo := &stubArtifactRepo{}
 	flowc := &stubFlowClient{submitID: "flow-1"}
 	notebookRepo := &stubNotebookRepo{ownerId: "u1"}
-	uc := NewGenerate(repo, flowc, notebookRepo, nil)
+	h := NewGenerateArtifactHandler(repo, flowc, notebookRepo, nil)
 
 	ctx := pkgcontext.WithUserId(context.Background(), "u1")
-	resp, err := uc.Execute(ctx, &GenerateRequest{
+	resp, err := h.Handle(ctx, &GenerateRequest{
 		NotebookId: uuid.NewV7(),
 		Kind:       artifactentity.KindMindmap,
 		SourceIds:  []valobj.Id{uuid.NewV7()},
@@ -116,10 +116,10 @@ func TestGenerate_Execute_NotebookOwnedByOther(t *testing.T) {
 	repo := &stubArtifactRepo{}
 	flowc := &stubFlowClient{}
 	notebookRepo := &stubNotebookRepo{ownerId: "other-user"}
-	uc := NewGenerate(repo, flowc, notebookRepo, nil)
+	h := NewGenerateArtifactHandler(repo, flowc, notebookRepo, nil)
 
 	ctx := pkgcontext.WithUserId(context.Background(), "u1")
-	_, err := uc.Execute(ctx, &GenerateRequest{
+	_, err := h.Handle(ctx, &GenerateRequest{
 		NotebookId: uuid.NewV7(),
 		Kind:       artifactentity.KindMindmap,
 		SourceIds:  nil,

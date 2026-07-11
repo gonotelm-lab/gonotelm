@@ -1,4 +1,4 @@
-package usecase
+package artifact
 
 import (
 	"context"
@@ -83,10 +83,10 @@ func TestStatus_TerminalArtifact(t *testing.T) {
 	artifact := makeArtifact(artifactentity.StatusCompleted, "ft-1", "u1")
 	repo := &multiStubRepo{findByIdResult: artifact}
 	flowc := &stubFlowClient{}
-	uc := NewStatus(repo, flowc)
+	h := NewGetArtifactStatusHandler(repo, flowc)
 
 	ctx := pkgcontext.WithUserId(context.Background(), "u1")
-	resp, err := uc.Execute(ctx, &StatusRequest{ArtifactId: artifact.Id})
+	resp, err := h.Handle(ctx, &StatusRequest{ArtifactId: artifact.Id})
 
 	require.NoError(t, err)
 	assert.Equal(t, artifactentity.StatusCompleted, resp.Status)
@@ -99,10 +99,10 @@ func TestStatus_ActiveArtifact_FlowGet(t *testing.T) {
 	artifact := makeArtifact(artifactentity.StatusRunning, "ft-2", "u1")
 	repo := &multiStubRepo{findByIdResult: artifact}
 	flowc := &stubFlowClient{getInfo: &flow.TaskInfo{State: flowschema.TaskState_RUNNING}}
-	uc := NewStatus(repo, flowc)
+	h := NewGetArtifactStatusHandler(repo, flowc)
 
 	ctx := pkgcontext.WithUserId(context.Background(), "u1")
-	resp, err := uc.Execute(ctx, &StatusRequest{ArtifactId: artifact.Id})
+	resp, err := h.Handle(ctx, &StatusRequest{ArtifactId: artifact.Id})
 
 	require.NoError(t, err)
 	assert.Equal(t, artifactentity.StatusRunning, resp.Status)
@@ -111,10 +111,10 @@ func TestStatus_ActiveArtifact_FlowGet(t *testing.T) {
 func TestStatus_PermissionDenied(t *testing.T) {
 	artifact := makeArtifact(artifactentity.StatusPending, "", "u2")
 	repo := &multiStubRepo{findByIdResult: artifact}
-	uc := NewStatus(repo, &stubFlowClient{})
+	h := NewGetArtifactStatusHandler(repo, &stubFlowClient{})
 
 	ctx := pkgcontext.WithUserId(context.Background(), "u1")
-	_, err := uc.Execute(ctx, &StatusRequest{ArtifactId: artifact.Id})
+	_, err := h.Handle(ctx, &StatusRequest{ArtifactId: artifact.Id})
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, artifacterrors.ErrArtifactNotOwnedByUser)
@@ -128,10 +128,10 @@ func TestList_HappyPath(t *testing.T) {
 		},
 	}
 	nbRepo := &stubNotebookRepo{ownerId: "u1"}
-	uc := NewList(repo, nbRepo)
+	h := NewListArtifactsHandler(repo, nbRepo)
 
 	ctx := pkgcontext.WithUserId(context.Background(), "u1")
-	resp, err := uc.Execute(ctx, &ListRequest{NotebookId: uuid.NewV7(), Limit: 5, Offset: 0})
+	resp, err := h.Handle(ctx, &ListRequest{NotebookId: uuid.NewV7(), Limit: 5, Offset: 0})
 
 	require.NoError(t, err)
 	assert.Len(t, resp.Artifacts, 2)
@@ -145,10 +145,10 @@ func TestList_HasMore(t *testing.T) {
 	}
 	repo := &multiStubRepo{listResult: artifacts}
 	nbRepo := &stubNotebookRepo{ownerId: "u1"}
-	uc := NewList(repo, nbRepo)
+	h := NewListArtifactsHandler(repo, nbRepo)
 
 	ctx := pkgcontext.WithUserId(context.Background(), "u1")
-	resp, err := uc.Execute(ctx, &ListRequest{NotebookId: uuid.NewV7(), Limit: 3, Offset: 0})
+	resp, err := h.Handle(ctx, &ListRequest{NotebookId: uuid.NewV7(), Limit: 3, Offset: 0})
 
 	require.NoError(t, err)
 	assert.Len(t, resp.Artifacts, 3)
@@ -159,10 +159,10 @@ func TestCancel_HappyPath(t *testing.T) {
 	artifact := makeArtifact(artifactentity.StatusRunning, "ft-3", "u1")
 	repo := &multiStubRepo{findByIdResult: artifact}
 	flowc := &stubFlowClient{}
-	uc := NewCancel(repo, flowc)
+	h := NewCancelArtifactHandler(repo, flowc)
 
 	ctx := pkgcontext.WithUserId(context.Background(), "u1")
-	err := uc.Execute(ctx, artifact.Id)
+	err := h.Handle(ctx, artifact.Id)
 
 	require.NoError(t, err)
 	assert.Len(t, flowc.canceled, 1)
@@ -174,10 +174,10 @@ func TestCancel_HappyPath(t *testing.T) {
 func TestCancel_TerminalRejected(t *testing.T) {
 	artifact := makeArtifact(artifactentity.StatusCompleted, "ft-4", "u1")
 	repo := &multiStubRepo{findByIdResult: artifact}
-	uc := NewCancel(repo, &stubFlowClient{})
+	h := NewCancelArtifactHandler(repo, &stubFlowClient{})
 
 	ctx := pkgcontext.WithUserId(context.Background(), "u1")
-	err := uc.Execute(ctx, artifact.Id)
+	err := h.Handle(ctx, artifact.Id)
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, artifacterrors.ErrCannotCancelInState)
@@ -187,10 +187,10 @@ func TestDelete_HappyPath(t *testing.T) {
 	artifact := makeArtifact(artifactentity.StatusCompleted, "ft-5", "u1")
 	repo := &multiStubRepo{findByIdResult: artifact}
 	storage := &stubStorage{}
-	uc := NewDelete(repo, &stubFlowClient{}, storage)
+	h := NewDeleteArtifactHandler(repo, &stubFlowClient{}, storage)
 
 	ctx := pkgcontext.WithUserId(context.Background(), "u1")
-	err := uc.Execute(ctx, artifact.Id)
+	err := h.Handle(ctx, artifact.Id)
 
 	require.NoError(t, err)
 	assert.Equal(t, artifact.Id, repo.deletedId)
@@ -201,10 +201,10 @@ func TestDelete_NonTerminalCancelsFlow(t *testing.T) {
 	artifact := makeArtifact(artifactentity.StatusRunning, "ft-6", "u1")
 	repo := &multiStubRepo{findByIdResult: artifact}
 	flowc := &stubFlowClient{}
-	uc := NewDelete(repo, flowc, &stubStorage{})
+	h := NewDeleteArtifactHandler(repo, flowc, &stubStorage{})
 
 	ctx := pkgcontext.WithUserId(context.Background(), "u1")
-	err := uc.Execute(ctx, artifact.Id)
+	err := h.Handle(ctx, artifact.Id)
 
 	require.NoError(t, err)
 	assert.Len(t, flowc.canceled, 1)
@@ -217,10 +217,10 @@ func TestRetry_HappyPath(t *testing.T) {
 	artifact.Payload = &artifactentity.MindmapPayload{NotebookId: artifact.NotebookId}
 	repo := &multiStubRepo{findByIdResult: artifact}
 	flowc := &stubFlowClient{submitID: "ft-new"}
-	uc := NewRetry(repo, flowc, nil)
+	h := NewRetryArtifactHandler(repo, flowc, nil)
 
 	ctx := pkgcontext.WithUserId(context.Background(), "u1")
-	err := uc.Execute(ctx, artifact.Id)
+	err := h.Handle(ctx, artifact.Id)
 
 	require.NoError(t, err)
 	assert.Equal(t, "ft-new", repo.updatedFTID)
@@ -232,10 +232,10 @@ func TestRetry_HappyPath(t *testing.T) {
 func TestRetry_CannotRetryTerminalButNotFailedOrCancelled(t *testing.T) {
 	artifact := makeArtifact(artifactentity.StatusCompleted, "ft-c", "u1")
 	repo := &multiStubRepo{findByIdResult: artifact}
-	uc := NewRetry(repo, &stubFlowClient{}, nil)
+	h := NewRetryArtifactHandler(repo, &stubFlowClient{}, nil)
 
 	ctx := pkgcontext.WithUserId(context.Background(), "u1")
-	err := uc.Execute(ctx, artifact.Id)
+	err := h.Handle(ctx, artifact.Id)
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, artifacterrors.ErrCannotRetryInState)
@@ -244,10 +244,10 @@ func TestRetry_CannotRetryTerminalButNotFailedOrCancelled(t *testing.T) {
 func TestRetry_CannotRetryPending(t *testing.T) {
 	artifact := makeArtifact(artifactentity.StatusPending, "ft-p", "u1")
 	repo := &multiStubRepo{findByIdResult: artifact}
-	uc := NewRetry(repo, &stubFlowClient{}, nil)
+	h := NewRetryArtifactHandler(repo, &stubFlowClient{}, nil)
 
 	ctx := pkgcontext.WithUserId(context.Background(), "u1")
-	err := uc.Execute(ctx, artifact.Id)
+	err := h.Handle(ctx, artifact.Id)
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, artifacterrors.ErrCannotRetryInState)

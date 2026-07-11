@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/cloudwego/hertz/pkg/app"
-	usecase "github.com/gonotelm-lab/gonotelm/internal/application/artifact/usecase"
+	"github.com/gonotelm-lab/gonotelm/internal/application/artifact"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 )
 
@@ -26,7 +26,7 @@ func (d *Deps) ListNotebookArtifacts(ctx context.Context, c *app.RequestContext)
 		return
 	}
 
-	resp, err := d.ListUC.Execute(ctx, &usecase.ListRequest{
+	resp, err := d.ListHandler.Handle(ctx, &artifact.ListRequest{
 		NotebookId: req.Id,
 		Limit:      req.Limit,
 		Offset:     req.Offset,

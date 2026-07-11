@@ -1,4 +1,4 @@
-package usecase
+package artifact
 
 import (
 	"context"
@@ -11,17 +11,17 @@ import (
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 )
 
-type CancelUseCase struct {
+type CancelArtifactHandler struct {
 	repo  artifactrepo.Repository
 	flowc flow.TaskClient
 }
 
-func NewCancel(repo artifactrepo.Repository, flowc flow.TaskClient) *CancelUseCase {
-	return &CancelUseCase{repo: repo, flowc: flowc}
+func NewCancelArtifactHandler(repo artifactrepo.Repository, flowc flow.TaskClient) *CancelArtifactHandler {
+	return &CancelArtifactHandler{repo: repo, flowc: flowc}
 }
 
-func (u *CancelUseCase) Execute(ctx context.Context, artifactId valobj.Id) error {
-	a, err := u.repo.FindById(ctx, artifactId)
+func (h *CancelArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error {
+	a, err := h.repo.FindById(ctx, cmd)
 	if err != nil {
 		return err
 	}
@@ -34,8 +34,8 @@ func (u *CancelUseCase) Execute(ctx context.Context, artifactId valobj.Id) error
 	if a.FlowTaskId == "" {
 		return artifacterrors.ErrInvalidFlowTaskId
 	}
-	if err := u.flowc.Cancel(ctx, a.FlowTaskId); err != nil {
+	if err := h.flowc.Cancel(ctx, a.FlowTaskId); err != nil {
 		return err
 	}
-	return u.repo.UpdateStatus(ctx, a.Id, artifactentity.StatusCancelled, nil, "", "")
+	return h.repo.UpdateStatus(ctx, a.Id, artifactentity.StatusCancelled, nil, "", "")
 }

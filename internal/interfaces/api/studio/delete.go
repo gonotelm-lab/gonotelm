@@ -17,7 +17,7 @@ func (d *Deps) Delete(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	if err := d.DeleteUC.Execute(ctx, tid); err != nil {
+	if err := d.DeleteHandler.Handle(ctx, tid); err != nil {
 		http.ErrResp(c, err)
 		return
 	}

@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/cloudwego/hertz/pkg/app"
-	usecase "github.com/gonotelm-lab/gonotelm/internal/application/artifact/usecase"
+	"github.com/gonotelm-lab/gonotelm/internal/application/artifact"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
@@ -12,12 +12,12 @@ import (
 )
 
 type Deps struct {
-	GenerateUC *usecase.GenerateUseCase
-	StatusUC   *usecase.StatusUseCase
-	ListUC     *usecase.ListUseCase
-	RetryUC    *usecase.RetryUseCase
-	CancelUC   *usecase.CancelUseCase
-	DeleteUC   *usecase.DeleteUseCase
+	GenerateHandler *artifact.GenerateArtifactHandler
+	StatusHandler   *artifact.GetArtifactStatusHandler
+	ListHandler     *artifact.ListArtifactsHandler
+	RetryHandler    *artifact.RetryArtifactHandler
+	CancelHandler   *artifact.CancelArtifactHandler
+	DeleteHandler   *artifact.DeleteArtifactHandler
 }
 
 func (d *Deps) CheckArtifactAccess(ctx context.Context, c *app.RequestContext) {
@@ -29,7 +29,7 @@ func (d *Deps) CheckArtifactAccess(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	err = d.StatusUC.CheckOwnership(ctx, artifactentity.NewArtifactIdFromUUID(tid))
+	err = d.StatusHandler.CheckOwnership(ctx, artifactentity.NewArtifactIdFromUUID(tid))
 	if err != nil {
 		http.ErrResp(c, err)
 		c.Abort()

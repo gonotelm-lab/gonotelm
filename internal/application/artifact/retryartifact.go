@@ -1,4 +1,4 @@
-package usecase
+package artifact
 
 import (
 	"context"
@@ -13,18 +13,18 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
-type RetryUseCase struct {
+type RetryArtifactHandler struct {
 	repo   artifactrepo.Repository
 	flowc  flow.TaskClient
 	poller Poller
 }
 
-func NewRetry(repo artifactrepo.Repository, flowc flow.TaskClient, poller Poller) *RetryUseCase {
-	return &RetryUseCase{repo: repo, flowc: flowc, poller: poller}
+func NewRetryArtifactHandler(repo artifactrepo.Repository, flowc flow.TaskClient, poller Poller) *RetryArtifactHandler {
+	return &RetryArtifactHandler{repo: repo, flowc: flowc, poller: poller}
 }
 
-func (u *RetryUseCase) Execute(ctx context.Context, artifactId valobj.Id) error {
-	a, err := u.repo.FindById(ctx, artifactId)
+func (h *RetryArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error {
+	a, err := h.repo.FindById(ctx, cmd)
 	if err != nil {
 		return err
 	}
@@ -40,23 +40,23 @@ func (u *RetryUseCase) Execute(ctx context.Context, artifactId valobj.Id) error 
 	if err != nil {
 		return errors.Wrapf(errors.ErrSerde, "marshal payload on retry err=%v", err)
 	}
-	newFlowTaskId, err := u.flowc.Submit(ctx, taskTypeFor(a.Kind), payloadBytes)
+	newFlowTaskId, err := h.flowc.Submit(ctx, taskTypeFor(a.Kind), payloadBytes)
 	if err != nil {
 		return errors.WithMessage(err, "submit retry task to flow failed")
 	}
 
-	if err := u.repo.UpdateFlowTaskId(ctx, a.Id, newFlowTaskId, []artifactentity.Status{artifactentity.StatusFailed, artifactentity.StatusCancelled}); err != nil {
+	if err := h.repo.UpdateFlowTaskId(ctx, a.Id, newFlowTaskId, []artifactentity.Status{artifactentity.StatusFailed, artifactentity.StatusCancelled}); err != nil {
 		return errors.WithMessage(err, "update flow task id failed")
 	}
-	if err := u.repo.UpdateStatus(ctx, a.Id, artifactentity.StatusPending, nil, "", ""); err != nil {
+	if err := h.repo.UpdateStatus(ctx, a.Id, artifactentity.StatusPending, nil, "", ""); err != nil {
 		return errors.WithMessage(err, "save retried artifact failed")
 	}
 
 	if oldFlowTaskId != "" && oldFlowTaskId != newFlowTaskId {
-		go func() { _ = u.flowc.Cancel(context.WithoutCancel(ctx), oldFlowTaskId) }()
+		go func() { _ = h.flowc.Cancel(context.WithoutCancel(ctx), oldFlowTaskId) }()
 	}
-	if u.poller != nil {
-		go u.poller.PollOne(context.WithoutCancel(ctx), a.Id)
+	if h.poller != nil {
+		go h.poller.PollOne(context.WithoutCancel(ctx), a.Id)
 	}
 	return nil
 }

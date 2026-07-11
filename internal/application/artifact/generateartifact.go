@@ -1,4 +1,4 @@
-package usecase
+package artifact
 
 import (
 	"context"
@@ -25,58 +25,58 @@ type GenerateResponse struct {
 	ArtifactId valobj.Id
 }
 
-type GenerateUseCase struct {
+type GenerateArtifactHandler struct {
 	repo     artifactrepo.Repository
 	flow     flow.TaskClient
 	notebook notebookrepo.Repository
 	poller   Poller
 }
 
-func NewGenerate(
+func NewGenerateArtifactHandler(
 	repo artifactrepo.Repository,
 	flowc flow.TaskClient,
 	notebook notebookrepo.Repository,
 	poller Poller,
-) *GenerateUseCase {
-	return &GenerateUseCase{repo: repo, flow: flowc, notebook: notebook, poller: poller}
+) *GenerateArtifactHandler {
+	return &GenerateArtifactHandler{repo: repo, flow: flowc, notebook: notebook, poller: poller}
 }
 
-func (u *GenerateUseCase) Execute(ctx context.Context, req *GenerateRequest) (*GenerateResponse, error) {
+func (h *GenerateArtifactHandler) Handle(ctx context.Context, cmd *GenerateRequest) (*GenerateResponse, error) {
 	userId := pkgcontext.GetUserId(ctx)
 
-	nb, err := u.notebook.FindById(ctx, req.NotebookId)
+	nb, err := h.notebook.FindById(ctx, cmd.NotebookId)
 	if err != nil {
 		return nil, err
 	}
 	if nb.OwnerId != userId {
-		return nil, errors.ErrPermission.Msgf("notebook access denied, notebook_id=%s", req.NotebookId)
+		return nil, errors.ErrPermission.Msgf("notebook access denied, notebook_id=%s", cmd.NotebookId)
 	}
 
-	payload, err := buildPayload(req)
+	payload, err := buildPayload(cmd)
 	if err != nil {
 		return nil, err
 	}
 
-	artifact := artifactentity.NewArtifact(req.NotebookId, userId, req.Kind, payload)
+	artifact := artifactentity.NewArtifact(cmd.NotebookId, userId, cmd.Kind, payload)
 
 	payloadBytes, err := sonic.Marshal(payload)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrSerde, "marshal generate payload err=%v", err)
 	}
 
-	flowTaskId, err := u.flow.Submit(ctx, taskTypeFor(req.Kind), payloadBytes)
+	flowTaskId, err := h.flow.Submit(ctx, taskTypeFor(cmd.Kind), payloadBytes)
 	if err != nil {
 		return nil, errors.WithMessage(err, "submit artifact task to flow failed")
 	}
 
 	artifact.BindFlowTaskId(flowTaskId)
 
-	if err := u.repo.Save(ctx, artifact); err != nil {
+	if err := h.repo.Save(ctx, artifact); err != nil {
 		return nil, errors.WithMessage(err, "save artifact failed")
 	}
 
-	if u.poller != nil {
-		go u.poller.PollOne(context.WithoutCancel(ctx), artifact.Id)
+	if h.poller != nil {
+		go h.poller.PollOne(context.WithoutCancel(ctx), artifact.Id)
 	}
 
 	return &GenerateResponse{ArtifactId: artifact.Id}, nil

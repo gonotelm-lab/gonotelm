@@ -1,4 +1,4 @@
-package usecase
+package artifact
 
 import (
 	"context"
@@ -23,17 +23,17 @@ type StatusResponse struct {
 	FlowError  string
 }
 
-type StatusUseCase struct {
+type GetArtifactStatusHandler struct {
 	repo  artifactrepo.Repository
 	flowc flow.TaskClient
 }
 
-func NewStatus(repo artifactrepo.Repository, flowc flow.TaskClient) *StatusUseCase {
-	return &StatusUseCase{repo: repo, flowc: flowc}
+func NewGetArtifactStatusHandler(repo artifactrepo.Repository, flowc flow.TaskClient) *GetArtifactStatusHandler {
+	return &GetArtifactStatusHandler{repo: repo, flowc: flowc}
 }
 
-func (u *StatusUseCase) Execute(ctx context.Context, req *StatusRequest) (*StatusResponse, error) {
-	a, err := u.repo.FindById(ctx, req.ArtifactId)
+func (h *GetArtifactStatusHandler) Handle(ctx context.Context, cmd *StatusRequest) (*StatusResponse, error) {
+	a, err := h.repo.FindById(ctx, cmd.ArtifactId)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func (u *StatusUseCase) Execute(ctx context.Context, req *StatusRequest) (*Statu
 		return nil, artifacterrors.ErrInvalidFlowTaskId
 	}
 
-	info, err := u.flowc.Get(ctx, a.FlowTaskId)
+	info, err := h.flowc.Get(ctx, a.FlowTaskId)
 	if err != nil {
 		return nil, errors.WithMessage(err, "query flow task failed")
 	}
@@ -58,8 +58,8 @@ func (u *StatusUseCase) Execute(ctx context.Context, req *StatusRequest) (*Statu
 	return &StatusResponse{Status: mapped, FlowError: string(info.Error)}, nil
 }
 
-func (u *StatusUseCase) CheckOwnership(ctx context.Context, artifactId valobj.Id) error {
-	a, err := u.repo.FindById(ctx, artifactId)
+func (h *GetArtifactStatusHandler) CheckOwnership(ctx context.Context, artifactId valobj.Id) error {
+	a, err := h.repo.FindById(ctx, artifactId)
 	if err != nil {
 		return err
 	}
@@ -70,8 +70,8 @@ func (u *StatusUseCase) CheckOwnership(ctx context.Context, artifactId valobj.Id
 	return nil
 }
 
-func (u *StatusUseCase) FindById(ctx context.Context, artifactId valobj.Id) (*artifactentity.Artifact, error) {
-	return u.repo.FindById(ctx, artifactId)
+func (h *GetArtifactStatusHandler) FindById(ctx context.Context, artifactId valobj.Id) (*artifactentity.Artifact, error) {
+	return h.repo.FindById(ctx, artifactId)
 }
 
 func mapFlowState(state flowschema.TaskState) artifactentity.Status {

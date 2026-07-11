@@ -1,4 +1,4 @@
-package usecase
+package artifact
 
 import (
 	"context"
@@ -22,33 +22,33 @@ type ListResponse struct {
 	HasMore   bool
 }
 
-type ListUseCase struct {
+type ListArtifactsHandler struct {
 	repo     artifactrepo.Repository
 	notebook notebookrepo.Repository
 }
 
-func NewList(repo artifactrepo.Repository, notebook notebookrepo.Repository) *ListUseCase {
-	return &ListUseCase{repo: repo, notebook: notebook}
+func NewListArtifactsHandler(repo artifactrepo.Repository, notebook notebookrepo.Repository) *ListArtifactsHandler {
+	return &ListArtifactsHandler{repo: repo, notebook: notebook}
 }
 
-func (u *ListUseCase) Execute(ctx context.Context, req *ListRequest) (*ListResponse, error) {
+func (h *ListArtifactsHandler) Handle(ctx context.Context, cmd *ListRequest) (*ListResponse, error) {
 	userId := pkgcontext.GetUserId(ctx)
-	nb, err := u.notebook.FindById(ctx, req.NotebookId)
+	nb, err := h.notebook.FindById(ctx, cmd.NotebookId)
 	if err != nil {
 		return nil, err
 	}
 	if nb.OwnerId != userId {
-		return nil, errors.ErrPermission.Msgf("notebook access denied, notebook_id=%s", req.NotebookId)
+		return nil, errors.ErrPermission.Msgf("notebook access denied, notebook_id=%s", cmd.NotebookId)
 	}
 
-	fetchLimit := req.Limit + 1
-	rows, err := u.repo.ListByNotebookId(ctx, req.NotebookId, fetchLimit, req.Offset)
+	fetchLimit := cmd.Limit + 1
+	rows, err := h.repo.ListByNotebookId(ctx, cmd.NotebookId, fetchLimit, cmd.Offset)
 	if err != nil {
 		return nil, err
 	}
-	hasMore := len(rows) > req.Limit
+	hasMore := len(rows) > cmd.Limit
 	if hasMore {
-		rows = rows[:req.Limit]
+		rows = rows[:cmd.Limit]
 	}
 	return &ListResponse{Artifacts: rows, HasMore: hasMore}, nil
 }

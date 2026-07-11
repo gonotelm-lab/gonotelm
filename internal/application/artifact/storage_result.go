@@ -1,4 +1,4 @@
-package usecase
+package artifact
 
 import "github.com/bytedance/sonic"
 

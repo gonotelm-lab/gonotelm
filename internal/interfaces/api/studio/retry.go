@@ -17,7 +17,7 @@ func (d *Deps) Retry(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	if err := d.RetryUC.Execute(ctx, tid); err != nil {
+	if err := d.RetryHandler.Handle(ctx, tid); err != nil {
 		http.ErrResp(c, err)
 		return
 	}

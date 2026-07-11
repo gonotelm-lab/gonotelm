@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/cloudwego/hertz/pkg/app"
-	usecase "github.com/gonotelm-lab/gonotelm/internal/application/artifact/usecase"
+	"github.com/gonotelm-lab/gonotelm/internal/application/artifact"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
@@ -18,7 +18,7 @@ func (d *Deps) GetStatus(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp, err := d.StatusUC.Execute(ctx, &usecase.StatusRequest{ArtifactId: tid})
+	resp, err := d.StatusHandler.Handle(ctx, &artifact.StatusRequest{ArtifactId: tid})
 	if err != nil {
 		http.ErrResp(c, err)
 		return

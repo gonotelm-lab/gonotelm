@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/cloudwego/hertz/pkg/app"
-	usecase "github.com/gonotelm-lab/gonotelm/internal/application/artifact/usecase"
+	"github.com/gonotelm-lab/gonotelm/internal/application/artifact"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 )
 
@@ -15,7 +15,7 @@ func (d *Deps) Generate(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp, err := d.GenerateUC.Execute(ctx, &usecase.GenerateRequest{
+	resp, err := d.GenerateHandler.Handle(ctx, &artifact.GenerateRequest{
 		NotebookId:  req.NotebookId,
 		Kind:        req.Kind,
 		SourceIds:   req.SourceIds,

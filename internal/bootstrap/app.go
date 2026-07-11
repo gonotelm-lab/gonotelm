@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	"github.com/gonotelm-lab/gonotelm/internal/api"
-	usecase "github.com/gonotelm-lab/gonotelm/internal/application/artifact/usecase"
+	"github.com/gonotelm-lab/gonotelm/internal/application/artifact"
 	syncerpkg "github.com/gonotelm-lab/gonotelm/internal/application/artifact/syncer"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	flowcli "github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
@@ -115,12 +115,12 @@ func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
 
 	// ── 8. Use cases ──
 
-	generateUC := usecase.NewGenerate(artifactRepo, flowClient, notebookRepo, syncerInst)
-	statusUC := usecase.NewStatus(artifactRepo, flowClient)
-	listUC := usecase.NewList(artifactRepo, notebookRepo)
-	cancelUC := usecase.NewCancel(artifactRepo, flowClient)
-	deleteUC := usecase.NewDelete(artifactRepo, flowClient, storageGateway)
-	retryUC := usecase.NewRetry(artifactRepo, flowClient, syncerInst)
+	generateUC := artifact.NewGenerateArtifactHandler(artifactRepo, flowClient, notebookRepo, syncerInst)
+	statusUC := artifact.NewGetArtifactStatusHandler(artifactRepo, flowClient)
+	listUC := artifact.NewListArtifactsHandler(artifactRepo, notebookRepo)
+	cancelUC := artifact.NewCancelArtifactHandler(artifactRepo, flowClient)
+	deleteUC := artifact.NewDeleteArtifactHandler(artifactRepo, flowClient, storageGateway)
+	retryUC := artifact.NewRetryArtifactHandler(artifactRepo, flowClient, syncerInst)
 
 	// ── 9. Event handler registration ──
 
@@ -156,12 +156,12 @@ func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
 	// ── 11. Studio routes ──
 
 	studioroutes.RegisterRoutes(svr.Hertz(), &studioroutes.Deps{
-		GenerateUC: generateUC,
-		StatusUC:   statusUC,
-		ListUC:     listUC,
-		RetryUC:    retryUC,
-		CancelUC:   cancelUC,
-		DeleteUC:   deleteUC,
+		GenerateHandler: generateUC,
+		StatusHandler:   statusUC,
+		ListHandler:     listUC,
+		RetryHandler:    retryUC,
+		CancelHandler:   cancelUC,
+		DeleteHandler:   deleteUC,
 	})
 
 	return &App{closers: closers, Server: svr}, nil

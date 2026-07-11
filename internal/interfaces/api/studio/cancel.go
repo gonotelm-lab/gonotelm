@@ -17,7 +17,7 @@ func (d *Deps) Cancel(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	if err := d.CancelUC.Execute(ctx, tid); err != nil {
+	if err := d.CancelHandler.Handle(ctx, tid); err != nil {
 		http.ErrResp(c, err)
 		return
 	}

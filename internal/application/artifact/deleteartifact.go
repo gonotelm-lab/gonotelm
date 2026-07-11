@@ -1,4 +1,4 @@
-package usecase
+package artifact
 
 import (
 	"context"
@@ -11,18 +11,18 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
-type DeleteUseCase struct {
+type DeleteArtifactHandler struct {
 	repo    artifactrepo.Repository
 	flowc   flow.TaskClient
 	storage StorageGateway
 }
 
-func NewDelete(repo artifactrepo.Repository, flowc flow.TaskClient, storage StorageGateway) *DeleteUseCase {
-	return &DeleteUseCase{repo: repo, flowc: flowc, storage: storage}
+func NewDeleteArtifactHandler(repo artifactrepo.Repository, flowc flow.TaskClient, storage StorageGateway) *DeleteArtifactHandler {
+	return &DeleteArtifactHandler{repo: repo, flowc: flowc, storage: storage}
 }
 
-func (u *DeleteUseCase) Execute(ctx context.Context, artifactId valobj.Id) error {
-	a, err := u.repo.FindById(ctx, artifactId)
+func (h *DeleteArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error {
+	a, err := h.repo.FindById(ctx, cmd)
 	if err != nil {
 		return err
 	}
@@ -30,15 +30,15 @@ func (u *DeleteUseCase) Execute(ctx context.Context, artifactId valobj.Id) error
 		return artifacterrors.ErrArtifactNotOwnedByUser
 	}
 	if !a.IsTerminal() && a.FlowTaskId != "" {
-		if err := u.flowc.Cancel(ctx, a.FlowTaskId); err != nil {
+		if err := h.flowc.Cancel(ctx, a.FlowTaskId); err != nil {
 			return errors.WithMessage(err, "cancel flow task failed")
 		}
 	}
 	if a.ResultKind.Storage() && a.Result != nil {
 		storeKey := extractStoreKey(a.Result)
 		if storeKey != "" {
-			_ = u.storage.DeleteObject(ctx, storeKey)
+			_ = h.storage.DeleteObject(ctx, storeKey)
 		}
 	}
-	return u.repo.DeleteById(ctx, a.Id)
+	return h.repo.DeleteById(ctx, a.Id)
 }

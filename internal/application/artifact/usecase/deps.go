@@ -1,0 +1,21 @@
+package usecase
+
+import (
+	"context"
+
+	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
+	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
+)
+
+type Poller interface {
+	PollOne(ctx context.Context, artifactId valobj.Id)
+}
+
+type Deps struct {
+	ArtifactRepo artifactrepo.Repository
+	FlowClient   flow.TaskClient
+	NotebookRepo notebookrepo.Repository
+	Poller       Poller
+}

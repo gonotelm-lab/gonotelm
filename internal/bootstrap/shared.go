@@ -22,11 +22,13 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
 	oldmqimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
 	mqkafka "github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq/kafka"
+	infrarepo "github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository"
 	oldstorageimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	storageminio "github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage/minio"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
 	vdbmilvus "github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/milvus"
+	"github.com/gonotelm-lab/gonotelm/internal/domain/source/service/agentize"
 )
 
 type SharedInfra struct {
@@ -40,6 +42,7 @@ type SharedInfra struct {
 	EmbeddingGateway *embedding.EmbeddingGateway
 	Embedder         einoembed.Embedder
 	Text2Image       *text2image.Text2ImageGateway
+	AgentizeService  *agentize.Service
 
 	closers []io.Closer
 }
@@ -120,7 +123,28 @@ func NewSharedInfra(ctx context.Context, cfg *conf.Config) (_ *SharedInfra, outE
 	}
 	infra.Text2Image = text2imageGateway
 
+	sourceRepo := infrarepo.NewSourceRepository(db.SourceStore)
+	storageRepo := infrarepo.NewSourceStorageRepository(oss)
+	sourceDocRepo := infrarepo.NewSourceDocRepository(
+		embedder,
+		vdb.SourceDocStore,
+		infrarepo.SourceDocRepositoryConfig{
+			EmbedBatchSize:      cfg.Embedding.BatchSize,
+			EmbedMaxConcurrency: cfg.Embedding.MaxConcurrency,
+		},
+	)
+	infra.AgentizeService = agentize.NewService(agentize.Config{}, sourceRepo, storageRepo, sourceDocRepo)
+
 	return infra, nil
+}
+
+func (s *SharedInfra) Close(ctx context.Context) error {
+	for i := len(s.closers) - 1; i >= 0; i-- {
+		if err := s.closers[i].Close(); err != nil {
+			slog.Error("close error", "err", err)
+		}
+	}
+	return nil
 }
 
 func newLLMGateway(cfg *infrallm.ProviderConfig) (*chat.Gateway, error) {

@@ -15,7 +15,7 @@ func TestNewGenerator_SupportedKinds(t *testing.T) {
 		{artifactentity.KindMindmap, true},
 		{artifactentity.KindReport, true},
 		{artifactentity.KindInfoGraphic, true},
-		{artifactentity.KindAudioOverview, false},
+		{artifactentity.KindAudioOverview, true},
 	}
 
 	for _, tt := range tests {
@@ -29,9 +29,9 @@ func TestNewGenerator_SupportedKinds(t *testing.T) {
 	}
 }
 
-func TestRun_UnsupportedKind(t *testing.T) {
+func TestRun_UnknownKind(t *testing.T) {
 	req := &Request{
-		Kind: artifactentity.KindAudioOverview,
+		Kind: artifactentity.Kind("unknown_kind"),
 	}
 
 	_, err := Run(context.Background(), nil, req)

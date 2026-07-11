@@ -56,6 +56,8 @@ func newGenerator(kind artifactentity.Kind, deps *ServiceDeps) (Generator, error
 		return &ReportGenerator{deps: deps}, nil
 	case artifactentity.KindInfoGraphic:
 		return &InfoGraphicGenerator{deps: deps}, nil
+	case artifactentity.KindAudioOverview:
+		return &AudioOverviewGenerator{deps: deps}, nil
 	}
 	return nil, errors.ErrParams.Msgf("unsupported kind: %s", kind)
 }

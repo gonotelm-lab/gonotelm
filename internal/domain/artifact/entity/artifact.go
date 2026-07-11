@@ -3,6 +3,7 @@ package entity
 import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	artifactevent "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/event"
 	artifacterrors "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
@@ -120,16 +121,19 @@ func (a *Artifact) MarkCompleted(result []byte, kind ResultKind, title string) {
 	a.ResultKind = kind
 	a.Title = title
 	a.UpdateTime = valobj.NewTime()
+	a.AddEvent(artifactevent.NewCompletedEvent(a.Id, a.NotebookId))
 }
 
 func (a *Artifact) MarkFailed() {
 	a.Status = StatusFailed
 	a.UpdateTime = valobj.NewTime()
+	a.AddEvent(artifactevent.NewFailedEvent(a.Id, a.NotebookId))
 }
 
 func (a *Artifact) MarkCancelled() {
 	a.Status = StatusCancelled
 	a.UpdateTime = valobj.NewTime()
+	a.AddEvent(artifactevent.NewCancelledEvent(a.Id, a.NotebookId))
 }
 
 func (a *Artifact) MarkRetrying(newFlowTaskId string) {
@@ -139,6 +143,7 @@ func (a *Artifact) MarkRetrying(newFlowTaskId string) {
 	a.Result = nil
 	a.ResultKind = ""
 	a.UpdateTime = valobj.NewTime()
+	a.AddEvent(artifactevent.NewRetryingEvent(a.Id, a.NotebookId, newFlowTaskId))
 }
 
 func (a *Artifact) Cancel() error {

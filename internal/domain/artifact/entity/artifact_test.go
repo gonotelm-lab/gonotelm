@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	artifactevent "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/event"
 	artifacterrors "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 	"github.com/stretchr/testify/assert"
@@ -144,6 +145,45 @@ func TestArtifactIsOwner(t *testing.T) {
 	a := newTestArtifact(t)
 	assert.True(t, a.IsOwner("user-1"))
 	assert.False(t, a.IsOwner("user-2"))
+}
+
+func TestArtifactMarkCompleted_EmitsEvent(t *testing.T) {
+	a := newTestArtifact(t)
+	a.MarkCompleted([]byte("r"), ResultKindInline, "title")
+	events := a.PullEvents()
+	require.Len(t, events, 1)
+	assert.Equal(t, artifactevent.TopicArtifactEvent, events[0].Topic())
+}
+
+func TestArtifactMarkFailed_EmitsEvent(t *testing.T) {
+	a := newTestArtifact(t)
+	a.MarkFailed()
+	events := a.PullEvents()
+	require.Len(t, events, 1)
+}
+
+func TestArtifactMarkCancelled_EmitsEvent(t *testing.T) {
+	a := newTestArtifact(t)
+	a.MarkCancelled()
+	events := a.PullEvents()
+	require.Len(t, events, 1)
+}
+
+func TestArtifactCancel_EmitsEvent(t *testing.T) {
+	a := newTestArtifact(t)
+	a.BindFlowTaskId("ft-1")
+	require.NoError(t, a.Cancel())
+	events := a.PullEvents()
+	require.Len(t, events, 1)
+}
+
+func TestArtifactRetry_EmitsEvent(t *testing.T) {
+	a := newTestArtifact(t)
+	a.MarkFailed()
+	a.PullEvents()
+	require.NoError(t, a.Retry("ft-2"))
+	events := a.PullEvents()
+	require.Len(t, events, 1)
 }
 
 func newTestArtifact(t *testing.T) *Artifact {

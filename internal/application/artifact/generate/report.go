@@ -13,6 +13,7 @@ import (
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 
 	einomodel "github.com/cloudwego/eino/components/model"
+	artifactprompt "github.com/gonotelm-lab/gonotelm/internal/application/artifact/prompt"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 )
 
@@ -46,7 +47,6 @@ func (r *ReportGenerator) agentCreateReport(
 		reportModelProvider = conf.Global().Logic.Studio.Report.ModelProvider
 		modelOption         = chat.WithModel(reportModel)
 		maxRound            = conf.Global().Logic.Studio.Report.MaxRound
-		lang                = pkgcontext.GetLang(ctx)
 	)
 
 	ag, err := buildSourceExploreAgent(
@@ -64,7 +64,7 @@ func (r *ReportGenerator) agentCreateReport(
 	}
 
 	sourceIds := sourceIDsToStrings(req.SourceIds)
-	msgs, err := r.deps.Prompt.RenderStudioReportMessage(ctx, sourceIds, lang)
+	msgs, err := artifactprompt.RenderReport(ctx, sourceIds)
 	if err != nil {
 		return "", errors.Wrapf(errors.ErrInner, "generate report message failed, err=%v", err)
 	}
@@ -81,8 +81,7 @@ func (r *ReportGenerator) agentCreateReport(
 
 func (r *ReportGenerator) generateTitle(ctx context.Context, report string, req *Request) string {
 	title := ""
-	lang := pkgcontext.GetLang(ctx)
-	titleMakerMsgs, err := r.deps.Prompt.RenderTitleMakerMessage(ctx, report, lang)
+	titleMakerMsgs, err := artifactprompt.RenderTitleMaker(ctx, report)
 	if err != nil {
 		slog.ErrorContext(ctx, "generate title maker message failed", slog.Any("err", err))
 	} else {

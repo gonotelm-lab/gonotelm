@@ -8,31 +8,27 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestPrompt_RenderStudioMindmapV2(t *testing.T) {
-	p := New("zh")
-	msgs, err := p.RenderStudioMindmapV2Message(context.Background(), []string{"src-1"}, "")
+func TestRenderMindmap(t *testing.T) {
+	msgs, err := RenderMindmap(context.Background(), []string{"src-1"})
 	require.NoError(t, err)
 	assert.NotEmpty(t, msgs)
 	assert.Contains(t, msgs[len(msgs)-1].Content, "src-1")
 }
 
-func TestPrompt_RenderStudioReport(t *testing.T) {
-	p := New("zh")
-	_, err := p.RenderStudioReportMessage(context.Background(), []string{"s1", "s2"}, "zh")
+func TestRenderReport(t *testing.T) {
+	_, err := RenderReport(context.Background(), []string{"s1", "s2"})
 	require.NoError(t, err)
 }
 
-func TestPrompt_RenderStudioInfoGraphic(t *testing.T) {
-	p := New("zh")
-	_, err := p.RenderStudioInfoGraphicMessage(context.Background(), StudioInfoGraphicTemplateVars{
+func TestRenderInfographic(t *testing.T) {
+	_, err := RenderInfographic(context.Background(), StudioInfoGraphicTemplateVars{
 		SourceIds: []string{"s1"}, TextLanguage: "zh-cn", ExtraPrompt: "p", Orientation: "landscape", DetailLevel: "standard",
-	}, "")
+	})
 	require.NoError(t, err)
 }
 
-func TestPrompt_RenderTitleMaker(t *testing.T) {
-	p := New("zh")
-	_, err := p.RenderTitleMakerMessage(context.Background(), "report content", "")
+func TestRenderTitleMaker(t *testing.T) {
+	_, err := RenderTitleMaker(context.Background(), "report content")
 	require.NoError(t, err)
 }
 

@@ -6,7 +6,6 @@ import (
 
 	flowworker "github.com/gonotelm-lab/flow/client/worker"
 	artifactgeneration "github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate"
-	artifactprompt "github.com/gonotelm-lab/gonotelm/internal/application/artifact/prompt"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	"google.golang.org/grpc"
@@ -38,7 +37,6 @@ func NewWorkerApp(ctx context.Context, cfg *conf.Config) (*WorkerApp, error) {
 		LLMGateway:    shared.LLMGateway,
 		Text2Image:    shared.Text2Image,
 		ObjectStorage: shared.Storage,
-		Prompt:        artifactprompt.New("zh"),
 	}
 
 	taskTypes := []string{

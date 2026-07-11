@@ -9,7 +9,6 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
-	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
@@ -82,7 +81,7 @@ func (m *MindmapGenerator) agentCreateMindmap(
 	}
 
 	sourceIds := sourceIDsToStrings(req.SourceIds)
-	msgs, err := m.deps.Prompt.RenderStudioMindmapV2Message(ctx, sourceIds, pkgcontext.GetLang(ctx))
+	msgs, err := artifactprompt.RenderMindmap(ctx, sourceIds)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "generate mindmap message failed, err=%v", err)
 	}

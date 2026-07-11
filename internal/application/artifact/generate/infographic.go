@@ -121,7 +121,7 @@ func (ig *InfoGraphicGenerator) generateImagePrompt(
 		Orientation:  payload.Orientation.String(),
 		DetailLevel:  payload.DetailLevel.String(),
 	}
-	msgs, err := ig.deps.Prompt.RenderStudioInfoGraphicMessage(ctx, vars, pkgcontext.GetLang(ctx))
+	msgs, err := artifactprompt.RenderInfographic(ctx, vars)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "render infographic prompt failed, err=%v", err)
 	}

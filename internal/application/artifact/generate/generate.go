@@ -3,7 +3,6 @@ package generate
 import (
 	"context"
 
-	artifactprompt "github.com/gonotelm-lab/gonotelm/internal/application/artifact/prompt"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/service/agentize"
@@ -33,7 +32,6 @@ type ServiceDeps struct {
 	LLMGateway    *chat.Gateway
 	Text2Image    *text2image.Text2ImageGateway
 	ObjectStorage storage.Storage
-	Prompt        *artifactprompt.Prompt
 }
 
 type Generator interface {

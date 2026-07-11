@@ -167,12 +167,10 @@ type ArtifactTaskStore interface {
 
 type ArtifactStore interface {
 	Create(ctx context.Context, artifact *schema.Artifact) error
+	Upsert(ctx context.Context, artifact *schema.Artifact) error
 	GetById(ctx context.Context, id Id) (*schema.Artifact, error)
-	GetStatusById(ctx context.Context, id Id) (string, error)
 	ListByNotebookId(ctx context.Context, notebookId Id, limit, offset int) ([]*schema.Artifact, error)
 	ListByStatus(ctx context.Context, statuses []string, limit int) ([]*schema.Artifact, error)
-	UpdateStatus(ctx context.Context, id Id, newStatus string, oldStatus string, params *schema.ArtifactUpdateStatusParams) (bool, error)
-	UpdateFlowTaskId(ctx context.Context, id Id, flowTaskId string, oldStatuses []string) error
 	DeleteById(ctx context.Context, id Id) error
 	DeleteByNotebookId(ctx context.Context, notebookId Id) error
 }

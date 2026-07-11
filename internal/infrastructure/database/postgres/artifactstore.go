@@ -8,6 +8,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/sql"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type ArtifactStoreImpl struct{ db *gorm.DB }
@@ -25,20 +26,34 @@ func (s *ArtifactStoreImpl) Create(ctx context.Context, a *schema.Artifact) erro
 	return nil
 }
 
+func (s *ArtifactStoreImpl) Upsert(ctx context.Context, a *schema.Artifact) error {
+	cl := clause.OnConflict{
+		Columns: []clause.Column{{Name: "id"}},
+		DoUpdates: clause.Assignments(map[string]any{
+			"status":       a.Status,
+			"flow_task_id":  a.FlowTaskId,
+			"title":         a.Title,
+			"result":        a.Result,
+			"result_kind":   a.ResultKind,
+			"payload":       a.Payload,
+			"updated_at":     a.UpdatedAt,
+		}),
+	}
+	if err := s.db.WithContext(ctx).
+		Model(&schema.Artifact{}).
+		Clauses(cl).
+		Create(a).Error; err != nil {
+		return sql.WrapErr(err)
+	}
+	return nil
+}
+
 func (s *ArtifactStoreImpl) GetById(ctx context.Context, id database.Id) (*schema.Artifact, error) {
 	var a schema.Artifact
 	if err := s.db.WithContext(ctx).Where("id = ?", id).Take(&a).Error; err != nil {
 		return nil, sql.WrapErr(err)
 	}
 	return &a, nil
-}
-
-func (s *ArtifactStoreImpl) GetStatusById(ctx context.Context, id database.Id) (string, error) {
-	var a schema.Artifact
-	if err := s.db.WithContext(ctx).Model(&schema.Artifact{}).Where("id = ?", id).Select("status").Take(&a).Error; err != nil {
-		return "", sql.WrapErr(err)
-	}
-	return a.Status, nil
 }
 
 func (s *ArtifactStoreImpl) ListByNotebookId(ctx context.Context, notebookId database.Id, limit, offset int) ([]*schema.Artifact, error) {
@@ -63,50 +78,6 @@ func (s *ArtifactStoreImpl) ListByStatus(ctx context.Context, statuses []string,
 		return nil, sql.WrapErr(err)
 	}
 	return rows, nil
-}
-
-func (s *ArtifactStoreImpl) UpdateStatus(
-	ctx context.Context, id database.Id, newStatus string, oldStatus string, params *schema.ArtifactUpdateStatusParams,
-) (bool, error) {
-	updates := map[string]any{"status": newStatus, "updated_at": params.UpdatedAt}
-	if params.Title != "" {
-		updates["title"] = params.Title
-	}
-	if params.Result != nil {
-		updates["result"] = params.Result
-	}
-	if params.ResultKind != "" {
-		updates["result_kind"] = params.ResultKind
-	}
-	q := s.db.WithContext(ctx).
-		Model(&schema.Artifact{}).
-		Where("id = ?", id)
-	if oldStatus != "" {
-		q = q.Where("status = ?", oldStatus)
-	}
-	res := q.Updates(updates)
-	if res.Error != nil {
-		return false, sql.WrapErr(res.Error)
-	}
-	return res.RowsAffected > 0, nil
-}
-
-func (s *ArtifactStoreImpl) UpdateFlowTaskId(ctx context.Context, id database.Id, flowTaskId string, oldStatuses []string) error {
-	q := s.db.WithContext(ctx).Model(&schema.Artifact{}).Where("id = ?", id)
-	if len(oldStatuses) > 0 {
-		q = q.Where("status IN ?", oldStatuses)
-	}
-	if err := q.Updates(map[string]any{
-		"flow_task_id": flowTaskId,
-		"status":       "pending",
-		"title":        "",
-		"result":       nil,
-		"result_kind":  "",
-		"updated_at":   gorm.Expr("now()"),
-	}).Error; err != nil {
-		return sql.WrapErr(err)
-	}
-	return nil
 }
 
 func (s *ArtifactStoreImpl) DeleteById(ctx context.Context, id database.Id) error {

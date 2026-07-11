@@ -1,8 +1,6 @@
 package schema
 
 import (
-	"time"
-
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 
@@ -17,8 +15,8 @@ type Artifact struct {
 	Result     []byte    `gorm:"column:result"`
 	ResultKind string    `gorm:"column:result_kind"`
 	Payload    []byte    `gorm:"column:payload"`
-	CreatedAt  time.Time `gorm:"column:created_at;autoCreateTime"`
-	UpdatedAt  time.Time `gorm:"column:updated_at;autoUpdateTime"`
+	CreatedAt  int64     `gorm:"column:created_at"`
+	UpdatedAt  int64     `gorm:"column:updated_at"`
 }
 
 func (Artifact) TableName() string { return "artifacts" }
@@ -28,5 +26,5 @@ type ArtifactUpdateStatusParams struct {
 	Title      string
 	Result     []byte
 	ResultKind string
-	UpdatedAt  time.Time
+	UpdatedAt  int64
 }

@@ -17,7 +17,7 @@ func TestArtifactStore_CreateAndGetById(t *testing.T) {
 	store := testArtifactStore
 
 	id := uuid.NewV7()
-	now := time.Now()
+	now := time.Now().UnixMilli()
 	in := &schema.Artifact{
 		Id: id, NotebookId: uuid.NewV7(), UserId: "u1",
 		Kind: "mindmap", Status: "pending", FlowTaskId: "ft-1",
@@ -31,28 +31,29 @@ func TestArtifactStore_CreateAndGetById(t *testing.T) {
 	assert.Equal(t, "pending", got.Status)
 }
 
-func TestArtifactStore_UpdateStatus(t *testing.T) {
+func TestArtifactStore_Upsert(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	store := testArtifactStore
 	id := uuid.NewV7()
+	nbId := uuid.NewV7()
+	now := time.Now().UnixMilli()
+
 	require.NoError(t, store.Create(ctx, &schema.Artifact{
-		Id: id, NotebookId: uuid.NewV7(), UserId: "u2",
+		Id: id, NotebookId: nbId, UserId: "u1",
 		Kind: "report", Status: "pending", FlowTaskId: "ft-2",
-		Payload: []byte(`{}`), CreatedAt: time.Now(), UpdatedAt: time.Now(),
+		Payload: []byte(`{}`), CreatedAt: now, UpdatedAt: now,
 	}))
 
-	ok, err := store.UpdateStatus(ctx, id, "running", "pending", &schema.ArtifactUpdateStatusParams{
-		NewStatus: "running", Title: "", Result: nil, ResultKind: "", UpdatedAt: time.Now(),
-	})
-	require.NoError(t, err)
-	assert.True(t, ok)
+	require.NoError(t, store.Upsert(ctx, &schema.Artifact{
+		Id: id, NotebookId: nbId, UserId: "u1",
+		Kind: "report", Status: "running", FlowTaskId: "ft-2",
+		Payload: []byte(`{}`), CreatedAt: now, UpdatedAt: now + 1000,
+	}))
 
-	ok, err = store.UpdateStatus(ctx, id, "running", "pending", &schema.ArtifactUpdateStatusParams{
-		NewStatus: "running", UpdatedAt: time.Now(),
-	})
+	got, err := store.GetById(ctx, id)
 	require.NoError(t, err)
-	assert.False(t, ok)
+	assert.Equal(t, "running", got.Status)
 }
 
 func TestArtifactStore_ListByStatus(t *testing.T) {
@@ -64,7 +65,7 @@ func TestArtifactStore_ListByStatus(t *testing.T) {
 		require.NoError(t, store.Create(ctx, &schema.Artifact{
 			Id: id, NotebookId: uuid.NewV7(), UserId: "u3",
 			Kind: "mindmap", Status: "pending", FlowTaskId: uuid.NewV7().String(),
-			Payload: []byte(`{}`), CreatedAt: time.Now(), UpdatedAt: time.Now(),
+			Payload: []byte(`{}`), CreatedAt: time.Now().UnixMilli(), UpdatedAt: time.Now().UnixMilli(),
 		}))
 	}
 	got, err := store.ListByStatus(ctx, []string{"pending"}, 100)

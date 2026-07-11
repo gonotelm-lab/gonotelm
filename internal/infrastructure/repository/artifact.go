@@ -79,6 +79,14 @@ func (r *ArtifactRepositoryImpl) UpdateStatus(
 	return err
 }
 
+func (r *ArtifactRepositoryImpl) UpdateFlowTaskId(ctx context.Context, id valobj.Id, flowTaskId string, oldStatuses []artifactentity.Status) error {
+	strs := make([]string, 0, len(oldStatuses))
+	for _, s := range oldStatuses {
+		strs = append(strs, s.String())
+	}
+	return r.store.UpdateFlowTaskId(ctx, id, flowTaskId, strs)
+}
+
 func (r *ArtifactRepositoryImpl) DeleteById(ctx context.Context, id valobj.Id) error {
 	return r.store.DeleteById(ctx, id)
 }

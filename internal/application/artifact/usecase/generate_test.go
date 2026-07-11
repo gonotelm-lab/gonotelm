@@ -41,6 +41,9 @@ func (s *stubArtifactRepo) ListByStatus(ctx context.Context, sts []artifactentit
 func (s *stubArtifactRepo) UpdateStatus(ctx context.Context, id valobj.Id, st artifactentity.Status, r []byte, rk artifactentity.ResultKind, t string) error {
 	return nil
 }
+func (s *stubArtifactRepo) UpdateFlowTaskId(ctx context.Context, id valobj.Id, flowTaskId string, oldStatuses []artifactentity.Status) error {
+	return nil
+}
 func (s *stubArtifactRepo) DeleteById(ctx context.Context, id valobj.Id) error { return nil }
 func (s *stubArtifactRepo) DeleteByNotebookId(ctx context.Context, n valobj.Id) error {
 	return nil
@@ -52,12 +55,19 @@ type stubFlowClient struct {
 	submitID  string
 	submitErr error
 	canceled  []string
+	getInfo   *flow.TaskInfo
+	getErr    error
 }
 
 func (s *stubFlowClient) Submit(ctx context.Context, t string, p []byte) (string, error) {
 	return s.submitID, s.submitErr
 }
-func (s *stubFlowClient) Get(ctx context.Context, id string) (*flow.TaskInfo, error) { return nil, nil }
+func (s *stubFlowClient) Get(ctx context.Context, id string) (*flow.TaskInfo, error) {
+	if s.getInfo != nil {
+		return s.getInfo, s.getErr
+	}
+	return nil, nil
+}
 func (s *stubFlowClient) Cancel(ctx context.Context, id string) error {
 	s.canceled = append(s.canceled, id)
 	return nil

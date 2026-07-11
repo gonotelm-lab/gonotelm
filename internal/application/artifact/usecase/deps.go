@@ -13,6 +13,11 @@ type Poller interface {
 	PollOne(ctx context.Context, artifactId valobj.Id)
 }
 
+type StorageGateway interface {
+	DeleteObject(ctx context.Context, key string) error
+	PresignGet(ctx context.Context, key string) (string, error)
+}
+
 type Deps struct {
 	ArtifactRepo artifactrepo.Repository
 	FlowClient   flow.TaskClient

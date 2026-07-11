@@ -59,6 +59,21 @@ func TestArtifactRoundTrip_Kinds(t *testing.T) {
 	}
 }
 
+func TestArtifactRoundTrip_Time(t *testing.T) {
+	notebookId := uuid.NewV7()
+	a, err := artifactentity.NewArtifact(notebookId, "u1", artifactentity.KindMindmap, &artifactentity.MindmapPayload{NotebookId: notebookId})
+	require.NoError(t, err)
+	a.MarkCompleted([]byte("r"), artifactentity.ResultKindInline, "title")
+
+	sch := ArtifactToSchema(a)
+	assert.NotZero(t, sch.UpdatedAt)
+	assert.NotZero(t, sch.CreatedAt)
+
+	back := ArtifactFromSchema(sch)
+	assert.Equal(t, a.UpdateTime.Value(), back.UpdateTime.Value())
+	assert.Equal(t, a.CreateTime.Value(), back.CreateTime.Value())
+}
+
 func TestArtifactFromSchema_EmptyPayload(t *testing.T) {
 	sch := &schema.Artifact{Id: uuid.NewV7(), Kind: "unknown"}
 	back := ArtifactFromSchema(sch)

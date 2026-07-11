@@ -2,6 +2,7 @@ package mapper
 
 import (
 	"github.com/bytedance/sonic"
+	"github.com/gonotelm-lab/gonotelm/internal/core/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/schema"
@@ -28,11 +29,18 @@ func ArtifactToSchema(a *artifactentity.Artifact) *schema.Artifact {
 		Result:     a.Result,
 		ResultKind: a.ResultKind.String(),
 		Payload:    payloadBytes,
+		CreatedAt:  a.CreateTime.Value(),
+		UpdatedAt:  a.UpdateTime.Value(),
 	}
 }
 
 func ArtifactFromSchema(sch *schema.Artifact) *artifactentity.Artifact {
 	a := &artifactentity.Artifact{
+		Base: entity.Base{
+			Id:         valobj.Id(sch.Id),
+			CreateTime: valobj.NewTimeFromId(valobj.Id(sch.Id)),
+			UpdateTime: valobj.NewTimeFrom(sch.UpdatedAt),
+		},
 		NotebookId: valobj.Id(sch.NotebookId),
 		UserId:     sch.UserId,
 		Kind:       artifactentity.Kind(sch.Kind),
@@ -42,7 +50,6 @@ func ArtifactFromSchema(sch *schema.Artifact) *artifactentity.Artifact {
 		Result:     sch.Result,
 		ResultKind: artifactentity.ResultKind(sch.ResultKind),
 	}
-	a.Base.Id = valobj.Id(sch.Id)
 	a.Payload = decodePayload(a.Kind, sch.Payload)
 	return a
 }

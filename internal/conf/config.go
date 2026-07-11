@@ -6,15 +6,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gonotelm-lab/gonotelm/internal/infra/cache"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/embedding"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/rerank"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/text2image"
-	mqimpl "github.com/gonotelm-lab/gonotelm/internal/infra/mq/impl"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/storage"
-	storageimpl "github.com/gonotelm-lab/gonotelm/internal/infra/storage/impl"
-	vecimpl "github.com/gonotelm-lab/gonotelm/internal/infra/vectordal/impl"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache"
+	chat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
+	embedding "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/embedding"
+	rerank "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/rerank"
+	text2image "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image"
+	mqimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
+	storageimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
 	"github.com/gonotelm-lab/gonotelm/pkg/sql"
 
 	"github.com/BurntSushi/toml"
@@ -29,20 +28,25 @@ var (
 type Config struct {
 	DeployEnv string `toml:"deployEnv"`
 
-	Logic LogicConfig `toml:"logic"`
+	Chat   ChatConfig   `toml:"chat"`
+	Source SourceConfig `toml:"source"`
+	Studio StudioConfig `toml:"studio"`
 
-	Api        ApiConfig              `toml:"api"`
-	Database   DatabaseConfig         `toml:"database"`
-	Redis      cache.RedisCacheConfig `toml:"redis"`
-	VectorDB   vecimpl.Config         `toml:"vectorDb"`
-	Storage    StorageConfig          `toml:"storage"`
-	MsgQueue   mqimpl.Config          `toml:"msgQueue"`
-	Embedding  embedding.Config       `toml:"embedding"`
-	Rerank     rerank.Config          `toml:"rerank"`
-	Text2Image text2image.Config      `toml:"text2image"`
-	Logging    LoggingConfig          `toml:"logging"`
-	Chunking   ChunkingConfig         `toml:"chunking"`
-	Provider   chat.ProviderConfig    `toml:"provider"`
+	Api        ApiConfig                     `toml:"api"`
+	Database   DatabaseConfig                `toml:"database"`
+	Redis      cache.RedisCacheConfig        `toml:"redis"`
+	VectorDB   vectordb.Config               `toml:"vectorDb"`
+	Storage    storageimpl.StorageTypeConfig `toml:"storage"`
+	MsgQueue   mqimpl.Config                 `toml:"msgQueue"`
+	Embedding  embedding.EmbeddingConfig     `toml:"embedding"`
+	Rerank     rerank.RerankConfig           `toml:"rerank"`
+	Text2Image text2image.Text2ImageConfig   `toml:"text2image"`
+	Logging    LoggingConfig                 `toml:"logging"`
+	Chunking   ChunkingConfig                `toml:"chunking"`
+	Provider   chat.ProviderConfig           `toml:"provider"`
+	Flow       FlowConfig                    `toml:"flow"`
+	Worker     WorkerConfig                  `toml:"worker"`
+	Syncer     SyncerConfig                  `toml:"syncer"`
 }
 
 func (c *Config) IsDev() bool {
@@ -65,21 +69,6 @@ type DatabaseConfig struct {
 	User     string `toml:"user"`
 	Password string `toml:"password"`
 	DBName   string `toml:"dbName"`
-}
-
-type StorageConfig struct {
-	Type  storageimpl.Type `toml:"type"`
-	Minio MinioConfig      `toml:"minio"`
-}
-
-type MinioConfig struct {
-	Endpoint      string        `toml:"endpoint"`
-	AccessKey     string        `toml:"accessKey"`
-	SecretKey     string        `toml:"secretKey"`
-	Bucket        string        `toml:"bucket"`
-	Region        string        `toml:"region"`
-	Secure        bool          `toml:"secure"`
-	PresignExpiry time.Duration `toml:"presignExpiry"`
 }
 
 type LoggingConfig struct {
@@ -109,13 +98,13 @@ func Load(path string) (*Config, error) {
 		cfg.MsgQueue.Type = mqimpl.Kafka
 	}
 	if cfg.Embedding.Type == "" {
-		cfg.Embedding.Type = embedding.DashScope
+		cfg.Embedding.Type = embedding.EmbeddingDashScope
 	}
 	if cfg.Rerank.Type == "" {
-		cfg.Rerank.Type = rerank.DashScope
+		cfg.Rerank.Type = rerank.RerankDashScope
 	}
 	if cfg.Text2Image.Type == "" {
-		cfg.Text2Image.Type = text2image.DashScope
+		cfg.Text2Image.Type = text2image.Text2ImageDashScope
 	}
 	if cfg.Embedding.BatchSize <= 0 {
 		cfg.Embedding.BatchSize = 10
@@ -125,6 +114,27 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Logging.Level == "" {
 		cfg.Logging.Level = "debug"
+	}
+	if cfg.Flow.MaxRetry <= 0 {
+		cfg.Flow.MaxRetry = 3
+	}
+	if cfg.Flow.DialTimeout == 0 {
+		cfg.Flow.DialTimeout = 5 * time.Second
+	}
+	if cfg.Syncer.PerTaskInterval == 0 {
+		cfg.Syncer.PerTaskInterval = 2 * time.Second
+	}
+	if cfg.Syncer.GlobalInterval == 0 {
+		cfg.Syncer.GlobalInterval = 5 * time.Second
+	}
+	if cfg.Syncer.GlobalBatchSize <= 0 {
+		cfg.Syncer.GlobalBatchSize = 100
+	}
+	if cfg.Worker.MaxConcurrency <= 0 {
+		cfg.Worker.MaxConcurrency = 4
+	}
+	if cfg.Worker.Heartbeat == 0 {
+		cfg.Worker.Heartbeat = 5 * time.Second
 	}
 
 	global = cfg
@@ -153,37 +163,6 @@ func (d *DatabaseConfig) ToSQLConfig() *sql.Config {
 		User:     d.User,
 		Password: d.Password,
 		DbName:   d.DBName,
-	}
-}
-
-func (c *Config) StorageBucket() string {
-	switch c.Storage.Type {
-	case storageimpl.Minio:
-		return c.Storage.Minio.Bucket
-	default:
-		return ""
-	}
-}
-
-func (c *Config) ObjectStorageConfig() (*storage.Config, error) {
-	switch c.Storage.Type {
-	case storageimpl.Minio:
-		presignExpiry := 15 * time.Minute
-		if c.Storage.Minio.PresignExpiry != 0 {
-			presignExpiry = c.Storage.Minio.PresignExpiry
-		}
-
-		return &storage.Config{
-			Endpoint:      c.Storage.Minio.Endpoint,
-			Region:        c.Storage.Minio.Region,
-			Bucket:        c.Storage.Minio.Bucket,
-			AccessKey:     c.Storage.Minio.AccessKey,
-			SecretKey:     c.Storage.Minio.SecretKey,
-			Secure:        c.Storage.Minio.Secure,
-			PresignExpiry: presignExpiry,
-		}, nil
-	default:
-		return nil, fmt.Errorf("storage type %q is not supported", c.Storage.Type)
 	}
 }
 

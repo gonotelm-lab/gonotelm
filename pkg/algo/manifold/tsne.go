@@ -236,6 +236,7 @@ type TSNE struct {
 // perplexity=30, early_exaggeration=12, auto learning-rate, max_iter=1000.
 //
 // Example:
+//
 //	model, err := NewTSNE(
 //		2,
 //		WithPerplexity(30),

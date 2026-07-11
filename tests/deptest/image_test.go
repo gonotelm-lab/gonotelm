@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"image"
-	_ "image/png"
 	_ "image/jpeg"
+	_ "image/png"
 )
 
 func TestImageDecode(t *testing.T) {

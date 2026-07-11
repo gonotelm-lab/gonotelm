@@ -12,8 +12,8 @@ func TestUniqueCount(t *testing.T) {
 }
 
 func TestUniqueyFn(t *testing.T) {
-	data := []struct{
-		ID int
+	data := []struct {
+		ID   int
 		Name string
 	}{
 		{ID: 1, Name: "alice"},
@@ -24,7 +24,10 @@ func TestUniqueyFn(t *testing.T) {
 
 	t.Log(data)
 
-	got := UniqueyFn(data, func(item struct{ID int; Name string}) int {
+	got := UniqueyFn(data, func(item struct {
+		ID   int
+		Name string
+	}) int {
 		return item.ID
 	})
 	t.Log(got)

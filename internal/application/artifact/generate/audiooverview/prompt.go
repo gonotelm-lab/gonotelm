@@ -1,0 +1,63 @@
+package audiooverview
+
+import (
+	"context"
+	_ "embed"
+	"fmt"
+
+	"github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/types"
+
+	"github.com/cloudwego/eino/components/prompt"
+	einoschema "github.com/cloudwego/eino/schema"
+)
+
+//go:embed studio-podcast-outline.jinja
+var podcastOutlinePromptContent string
+
+var podcastOutlineTpl = prompt.FromMessages(einoschema.Jinja2, einoschema.SystemMessage(podcastOutlinePromptContent))
+
+func RenderPodcastOutline(ctx context.Context, sourceIds []string, lang string, tips string, style PodcastStyle) ([]*einoschema.Message, error) {
+	vars := StudioPodcastOutlineTemplateVars{
+		SourceIds: sourceIds,
+		Language:  lang,
+		Tips:      tips,
+	}
+	info, ok := builtinPodcastInfos[style]
+	if !ok {
+		info = builtinPodcastInfos[PodcastStyleAbstract]
+	}
+	vars.Style = info.Style
+	vars.StyleDesc = info.Description
+	vars.Speakers = info.Speakers
+	vars.NumOfSegments = info.NumOfSegments
+
+	msgs, err := podcastOutlineTpl.Format(ctx, vars.PromptVars())
+	if err != nil {
+		return nil, fmt.Errorf("render podcast outline prompt: %w", err)
+	}
+	return msgs, nil
+}
+
+type StudioPodcastOutlineTemplateVars struct {
+	SourceIds     []string
+	Speakers      []StudioPodcastSpeaker
+	Tips          string
+	NumOfSegments int
+	Language      string
+	Style         PodcastStyle
+	StyleDesc     string
+}
+
+func (v StudioPodcastOutlineTemplateVars) PromptVars() map[string]any {
+	return map[string]any{
+		"SourceIds":     types.NormalizeStrings(v.SourceIds),
+		"Speakers":      v.Speakers,
+		"Tips":          v.Tips,
+		"NumOfSegments": v.NumOfSegments,
+		"Language":      v.Language,
+		"StyleInfo": map[string]any{
+			"Style":       v.Style,
+			"Description": v.StyleDesc,
+		},
+	}
+}

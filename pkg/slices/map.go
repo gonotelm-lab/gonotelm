@@ -48,6 +48,6 @@ func MapSet[T comparable](s []T) map[T]struct{} {
 	for _, v := range s {
 		out[v] = struct{}{}
 	}
-	
+
 	return out
 }

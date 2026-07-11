@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"testing"
 
-	cacheschema "github.com/gonotelm-lab/gonotelm/internal/infra/cache/schema"
+	"github.com/golang/snappy"
+	cacheschema "github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 	"github.com/vmihailenco/msgpack/v5"
-	"github.com/golang/snappy"
 )
 
 // TestMsgpackSnappyCompression 测试不同大小的 ChatContextMessage 的 msgpack 序列化和 snappy 压缩效果

@@ -3,38 +3,32 @@ package conf
 import (
 	"time"
 
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/chat"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/rerank"
-	"github.com/gonotelm-lab/gonotelm/internal/infra/llm/text2image"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
+	rerank "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/rerank"
+	text2image "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image"
 )
 
 const (
-	DefaultMaxRound              = 10
+	DefaultMaxRound              = 30
 	DefaultSourceDocsRecallCount = 50
 	DefaultTaskTimeout           = 5 * time.Minute
 	DefaultGMMAutoMaxClusters    = 50
 	RerankDefaultTopN            = 20
 )
 
-type LogicConfig struct {
-	Chat   ChatLogicConfig   `toml:"chat"`
-	Source SourceLogicConfig `toml:"source"`
-	Studio StudioLogicConfig `toml:"studio"`
+type ChatConfig struct {
+	MaxRound              int                   `toml:"maxRound"`
+	ModelProvider         llm.Provider          `toml:"modelProvider"`
+	Model                 string                `toml:"model"` // 对话使用的模型
+	SourceDocsRecallCount int                   `toml:"sourceDocsRecallCount"`
+	TaskTimeout           time.Duration         `toml:"taskTimeout"`    // 流式任务超时时间
+	RerankProvider        rerank.RerankProvider `toml:"rerankProvider"` // 重排序提供商
+	RerankEnabled         bool                  `toml:"rerankEnabled"`
+	RerankTopN            int                   `toml:"rerankTopN"`
+	RerankModel           string                `toml:"rerankModel"`
 }
 
-type ChatLogicConfig struct {
-	MaxRound              int             `toml:"maxRound"`
-	ModelProvider         chat.Provider   `toml:"modelProvider"`
-	Model                 string          `toml:"model"` // 对话使用的模型
-	SourceDocsRecallCount int             `toml:"sourceDocsRecallCount"`
-	TaskTimeout           time.Duration   `toml:"taskTimeout"`    // 流式任务超时时间
-	RerankProvider        rerank.Provider `toml:"rerankProvider"` // 重排序提供商
-	RerankEnabled         bool            `toml:"rerankEnabled"`
-	RerankTopN            int             `toml:"rerankTopN"`
-	RerankModel           string          `toml:"rerankModel"`
-}
-
-func (c *ChatLogicConfig) GetSourceDocsRecallCount() int {
+func (c *ChatConfig) GetSourceDocsRecallCount() int {
 	if c.SourceDocsRecallCount == 0 {
 		return DefaultSourceDocsRecallCount
 	}
@@ -42,7 +36,7 @@ func (c *ChatLogicConfig) GetSourceDocsRecallCount() int {
 	return c.SourceDocsRecallCount
 }
 
-func (c *ChatLogicConfig) GetTaskTimeout() time.Duration {
+func (c *ChatConfig) GetTaskTimeout() time.Duration {
 	if c.TaskTimeout == 0 {
 		return DefaultTaskTimeout
 	}
@@ -50,7 +44,7 @@ func (c *ChatLogicConfig) GetTaskTimeout() time.Duration {
 	return c.TaskTimeout
 }
 
-func (c *ChatLogicConfig) GetMaxRound() int {
+func (c *ChatConfig) GetMaxRound() int {
 	if c.MaxRound == 0 {
 		return DefaultMaxRound
 	}
@@ -58,7 +52,7 @@ func (c *ChatLogicConfig) GetMaxRound() int {
 	return c.MaxRound
 }
 
-func (c *ChatLogicConfig) GetRerankTopN() int {
+func (c *ChatConfig) GetRerankTopN() int {
 	if c.RerankTopN == 0 {
 		return RerankDefaultTopN
 	}
@@ -66,9 +60,9 @@ func (c *ChatLogicConfig) GetRerankTopN() int {
 	return c.RerankTopN
 }
 
-type SourceLogicConfig struct {
-	ModelProvider chat.Provider `toml:"modelProvider"`
-	Model         string        `toml:"model"`
+type SourceConfig struct {
+	ModelProvider llm.Provider `toml:"modelProvider"`
+	Model         string       `toml:"model"`
 
 	BizCache struct {
 		Eviction time.Duration `toml:"eviction"`
@@ -76,31 +70,31 @@ type SourceLogicConfig struct {
 	} `toml:"bizCache"`
 }
 
-type StudioLogicConfig struct {
+type StudioConfig struct {
 	Mindmap struct {
-		MaxRound      int           `toml:"maxRound"`
-		ModelProvider chat.Provider `toml:"modelProvider"`
-		Model         string        `toml:"model"`
+		MaxRound      int          `toml:"maxRound"`
+		ModelProvider llm.Provider `toml:"modelProvider"`
+		Model         string       `toml:"model"`
 	} `toml:"mindmap"`
 
 	Report struct {
-		MaxRound      int           `toml:"maxRound"`
-		ModelProvider chat.Provider `toml:"modelProvider"`
-		Model         string        `toml:"model"`
+		MaxRound      int          `toml:"maxRound"`
+		ModelProvider llm.Provider `toml:"modelProvider"`
+		Model         string       `toml:"model"`
 	} `toml:"report"`
 
 	InfoGraphic struct {
-		MaxRound           int                 `toml:"maxRound"`
-		ModelProvider      chat.Provider       `toml:"modelProvider"`
-		Model              string              `toml:"model"`
-		ImageModelProvider text2image.Provider `toml:"imageModelProvider"`
-		ImageModel         string              `toml:"imageModel"`
+		MaxRound           int                           `toml:"maxRound"`
+		ModelProvider      llm.Provider                  `toml:"modelProvider"`
+		Model              string                        `toml:"model"`
+		ImageModelProvider text2image.Text2ImageProvider `toml:"imageModelProvider"`
+		ImageModel         string                        `toml:"imageModel"`
 	} `toml:"infoGraphic"`
 
 	AudioOverview struct {
-		MaxRound      int           `toml:"maxRound"`
-		ModelProvider chat.Provider `toml:"modelProvider"`
-		Model         string        `toml:"model"`
+		MaxRound      int          `toml:"maxRound"`
+		ModelProvider llm.Provider `toml:"modelProvider"`
+		Model         string       `toml:"model"`
 	} `toml:"audioOverview"`
 
 	TaskConfig struct {

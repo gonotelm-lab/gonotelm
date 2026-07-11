@@ -14,8 +14,8 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/pkg/algo/decomposition"
 	"github.com/gonotelm-lab/gonotelm/pkg/algo/manifold"
-	algonormalize "github.com/gonotelm-lab/gonotelm/pkg/algo/normalize"
 	"github.com/gonotelm-lab/gonotelm/pkg/algo/mixture"
+	algonormalize "github.com/gonotelm-lab/gonotelm/pkg/algo/normalize"
 	"github.com/gonotelm-lab/gonotelm/pkg/algo/numutil"
 )
 

@@ -54,7 +54,7 @@ func ParallelMap[In any, Out any](
 
 	for i := range batchCount {
 		start := i * batchSize
-		end := min(start + batchSize, len(items))
+		end := min(start+batchSize, len(items))
 
 		wg.Add(1)
 		go func(batchIdx, from, to int) {

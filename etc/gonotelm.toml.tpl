@@ -52,46 +52,44 @@ consumerCommitInterval = "${GONOTELM_KAFKA_CONSUMER_COMMIT_INTERVAL:-0s}"
 [logging]
 level = "${GONOTELM_LOG_LEVEL:-debug}"
 
-[logic]
+[chat]
+modelProvider = "${GONOTELM_CHAT_PROVIDER:-qwen}"
+model = "${GONOTELM_CHAT_MODEL:-glm-5.1}"
+maxRound = ${GONOTELM_CHAT_MAX_ROUND:-30}
+rerankEnabled = ${GONOTELM_CHAT_RERANK_ENABLED:-false}
+rerankProvider = "${GONOTELM_RERANK_PROVIDER:-dashscope}"
+rerankTopN = ${GONOTELM_CHAT_RERANK_TOP_N:-30}
+rerankModel = "${GONOTELM_CHAT_RERANK_MODEL:-qwen3-rerank}"
 
-[logic.chat]
-modelProvider = "${GONOTELM_LOGIC_CHAT_PROVIDER:-qwen}"
-model = "${GONOTELM_LOGIC_CHAT_MODEL:-glm-5.1}"
-maxRound = ${GONOTELM_LOGIC_CHAT_MAX_ROUND:-10}
-rerankEnabled = ${GONOTELM_LOGIC_CHAT_RERANK_ENABLED:-false}
-rerankProvider = "${GONOTELM_LOGIC_RERANK_PROVIDER:-dashscope}"
-rerankTopN = ${GONOTELM_LOGIC_CHAT_RERANK_TOP_N:-30}
-rerankModel = "${GONOTELM_LOGIC_CHAT_RERANK_MODEL:-qwen3-rerank}"
+[source]
+modelProvider = "${GONOTELM_SOURCE_PROVIDER:-qwen}"
+model = "${GONOTELM_SOURCE_MODEL:-qwen3.5-27b}"
 
-[logic.source]
-modelProvider = "${GONOTELM_LOGIC_SOURCE_PROVIDER:-qwen}"
-model = "${GONOTELM_LOGIC_SOURCE_MODEL:-qwen3.5-27b}"
+[source.bizCache]
+eviction = "${GONOTELM_SOURCE_BIZCACHE_EVICTION:-15m}"
+maxMB = ${GONOTELM_SOURCE_BIZCACHE_MAX_MB:-1024}
 
-[logic.source.bizCache]
-eviction = "${GONOTELM_LOGIC_SOURCE_BIZCACHE_EVICTION:-15m}"
-maxMB = ${GONOTELM_LOGIC_SOURCE_BIZCACHE_MAX_MB:-1024}
+[studio.mindmap]
+maxRound = ${GONOTELM_STUDIO_MINDMAP_MAX_ROUND:-50}
+modelProvider = "${GONOTELM_STUDIO_MINDMAP_PROVIDER:-deepseek}"
+model = "${GONOTELM_STUDIO_MINDMAP_MODEL:-deepseek-v4-flash}"
 
-[logic.studio.mindmap]
-maxRound = ${GONOTELM_LOGIC_STUDIO_MINDMAP_MAX_ROUND:-50}
-modelProvider = "${GONOTELM_LOGIC_STUDIO_MINDMAP_PROVIDER:-deepseek}"
-model = "${GONOTELM_LOGIC_STUDIO_MINDMAP_MODEL:-deepseek-v4-flash}"
+[studio.report]
+maxRound = ${GONOTELM_STUDIO_REPORT_MAX_ROUND:-50}
+modelProvider = "${GONOTELM_STUDIO_REPORT_PROVIDER:-deepseek}"
+model = "${GONOTELM_STUDIO_REPORT_MODEL:-deepseek-v4-flash}"
 
-[logic.studio.report]
-maxRound = ${GONOTELM_LOGIC_STUDIO_REPORT_MAX_ROUND:-50}
-modelProvider = "${GONOTELM_LOGIC_STUDIO_REPORT_PROVIDER:-deepseek}"
-model = "${GONOTELM_LOGIC_STUDIO_REPORT_MODEL:-deepseek-v4-flash}"
+[studio.infoGraphic]
+maxRound = ${GONOTELM_STUDIO_INFOGRAPHIC_MAX_ROUND:-50}
+modelProvider = "${GONOTELM_STUDIO_INFOGRAPHIC_PROVIDER:-deepseek}"
+model = "${GONOTELM_STUDIO_INFOGRAPHIC_MODEL:-deepseek-v4-flash}"
+imageModelProvider = "${GONOTELM_STUDIO_INFOGRAPHIC_IMAGE_MODEL_PROVIDER:-dashscope}"
+imageModel = "${GONOTELM_STUDIO_INFOGRAPHIC_IMAGE_MODEL:-qwen-image-2.0-pro}"
 
-[logic.studio.infoGraphic]
-maxRound = ${GONOTELM_LOGIC_STUDIO_INFOGRAPHIC_MAX_ROUND:-50}
-modelProvider = "${GONOTELM_LOGIC_STUDIO_INFOGRAPHIC_PROVIDER:-deepseek}"
-model = "${GONOTELM_LOGIC_STUDIO_INFOGRAPHIC_MODEL:-deepseek-v4-flash}"
-imageModelProvider = "${GONOTELM_LOGIC_STUDIO_INFOGRAPHIC_IMAGE_MODEL_PROVIDER:-dashscope}"
-imageModel = "${GONOTELM_LOGIC_STUDIO_INFOGRAPHIC_IMAGE_MODEL:-qwen-image-2.0-pro}"
-
-[logic.studio.audioOverview]
-maxRound = ${GONOTELM_LOGIC_STUDIO_AUDIOOVERVIEW_MAX_ROUND:-50}
-modelProvider = "${GONOTELM_LOGIC_STUDIO_AUDIOOVERVIEW_PROVIDER:-deepseek}"
-model = "${GONOTELM_LOGIC_STUDIO_AUDIOOVERVIEW_MODEL:-deepseek-v4-flash}"
+[studio.audioOverview]
+maxRound = ${GONOTELM_STUDIO_AUDIOOVERVIEW_MAX_ROUND:-50}
+modelProvider = "${GONOTELM_STUDIO_AUDIOOVERVIEW_PROVIDER:-deepseek}"
+model = "${GONOTELM_STUDIO_AUDIOOVERVIEW_MODEL:-deepseek-v4-flash}"
 
 [chunking]
 size = ${GONOTELM_CHUNKING_SIZE:-500}
@@ -225,3 +223,16 @@ apiKey = "${GONOTELM_AGNES_API_KEY:-}"
 baseUrl = "${GONOTELM_TEXT2IMAGE_AGNES_BASE_URL:-https://apihub.agnes-ai.com/v1/images/generations}"
 model = "${GONOTELM_TEXT2IMAGE_AGNES_MODEL:-agnes-image-2.1-flash}"
 timeout = "${GONOTELM_TEXT2IMAGE_AGNES_TIMEOUT:-1h}"
+
+[flow]
+addr        = "${GONOTELM_FLOW_ADDR:-localhost:7091}"
+namespace   = "${GONOTELM_FLOW_NAMESPACE:-gonotelm}"
+maxRetry    = ${GONOTELM_FLOW_MAX_RETRY:-3}
+dialTimeout = "${GONOTELM_FLOW_DIAL_TIMEOUT:-5s}"
+
+[syncer]
+perTaskInterval = "${GONOTELM_SYNCER_PER_TASK_INTERVAL:-2s}"
+globalInterval   = "${GONOTELM_SYNCER_GLOBAL_INTERVAL:-5s}"
+globalBatchSize  = ${GONOTELM_SYNCER_GLOBAL_BATCH_SIZE:-100}
+
+

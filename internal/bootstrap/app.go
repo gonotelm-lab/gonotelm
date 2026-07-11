@@ -63,8 +63,7 @@ func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
 	chatRepo := repository.NewChatRepository(infra.DB.ChatStore)
 	messageRepo := repository.NewMessageRepository(infra.DB.ChatMessageStore)
 	contextMsgRepo := repository.NewContextMessageRepository(infra.Cache.ChatMessageContextCache)
-	streamTaskRepo := repository.NewStreamTaskRepository(infra.Cache.ChatMessageStreamCache)
-	artifactTaskRepo := repository.NewArtifactTaskRepository(infra.DB.ArtifactTaskStore)
+artifactRepo := repository.NewArtifactRepository(infra.DB.ArtifactStore)
 
 	// ── 3. Event Bus ──
 
@@ -110,7 +109,7 @@ func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
 		ChatRepo:            chatRepo,
 		MessageRepo:         messageRepo,
 		ContextMessageRepo:  contextMsgRepo,
-		ArtifactTaskRepo:    artifactTaskRepo,
+		ArtifactTaskRepo:    artifactRepo,
 		EventBus:            bus,
 		Summarizer:          summarizer,
 	})
@@ -118,8 +117,6 @@ func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
 	// ── 8. HTTP Server ──
 	// TODO: Update api.NewServer to accept explicit params instead of *infra.Instances + *wire.Wire.
 	// See Tasks 9-12.
-
-	_ = streamTaskRepo
 
 	return &App{closers: closers, Server: &dummyServer{}}, nil
 }

@@ -4,21 +4,21 @@ import (
 	"context"
 	"log/slog"
 
+	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	notebookevent "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/event"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type DeleteNotebookArtifactTasksHandler struct {
-	artifactTaskRepo *repository.ArtifactTaskRepository
+	artifactRepo artifactrepo.Repository
 }
 
 func NewDeleteNotebookArtifactTasksHandler(
-	artifactTaskRepo *repository.ArtifactTaskRepository,
+	artifactRepo artifactrepo.Repository,
 ) *DeleteNotebookArtifactTasksHandler {
 	return &DeleteNotebookArtifactTasksHandler{
-		artifactTaskRepo: artifactTaskRepo,
+		artifactRepo: artifactRepo,
 	}
 }
 
@@ -31,7 +31,7 @@ func (h *DeleteNotebookArtifactTasksHandler) Handle(
 	}
 
 	notebookId := evt.NotebookId()
-	if err := h.artifactTaskRepo.DeleteByNotebookId(ctx, notebookId); err != nil {
+	if err := h.artifactRepo.DeleteByNotebookId(ctx, notebookId); err != nil {
 		return errors.WithMessagef(err, "delete artifact tasks failed, notebook_id=%s", notebookId)
 	}
 

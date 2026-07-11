@@ -7,11 +7,11 @@ import (
 	sourceeventhandle "github.com/gonotelm-lab/gonotelm/internal/application/source/eventhandle"
 	studioeventhandle "github.com/gonotelm-lab/gonotelm/internal/application/studio/eventhandle"
 	adapterdefine "github.com/gonotelm-lab/gonotelm/internal/core/adapter"
+	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository"
 )
 
 type EventDeps struct {
@@ -23,7 +23,7 @@ type EventDeps struct {
 	ChatRepo           chatrepo.Repository
 	MessageRepo        chatrepo.MessageRepository
 	ContextMessageRepo chatrepo.ContextMessageRepository
-	ArtifactTaskRepo   *repository.ArtifactTaskRepository
+	ArtifactTaskRepo   artifactrepo.Repository
 
 	EventBus eventbus.EventBus
 

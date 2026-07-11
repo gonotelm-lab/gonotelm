@@ -27,6 +27,8 @@ func TestUniqueyFn(t *testing.T) {
 	got := UniqueyFn(data, func(item struct {
 		ID   int
 		Name string
-	}) int { return item.ID })
+	}) int {
+		return item.ID
+	})
 	t.Log(got)
 }

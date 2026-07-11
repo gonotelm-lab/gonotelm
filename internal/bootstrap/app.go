@@ -80,7 +80,11 @@ func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
 
 	// ── 4. Adapters ──
 
-	summarizer := adapter.NewSummarizer(infra.LLMGateway)
+	summarizer := adapter.NewSummarizer(
+		infra.LLMGateway,
+		cfg.Source.ModelProvider,
+		cfg.Source.Model,
+	)
 
 	_ = infra.Text2Image
 
@@ -115,7 +119,7 @@ func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
 	// ── 8. Use cases ──
 
 	generateUC := artifact.NewGenerateArtifactHandler(artifactRepo, flowClient, notebookRepo, syncerInst, bus)
-	statusUC := artifact.NewGetArtifactStatusHandler(artifactRepo, flowClient)
+	statusUC := artifact.NewGetArtifactStatusHandler(artifactRepo, flowClient, storageGateway)
 	listUC := artifact.NewListArtifactsHandler(artifactRepo, notebookRepo)
 	cancelUC := artifact.NewCancelArtifactHandler(artifactRepo, flowClient, bus)
 	deleteUC := artifact.NewDeleteArtifactHandler(artifactRepo, flowClient, storageGateway)
@@ -157,7 +161,6 @@ func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
 		CancelArtifactHandler:        cancelUC,
 		DeleteArtifactHandler:        deleteUC,
 		RetryArtifactHandler:         retryUC,
-		ArtifactStorage:              storageGateway,
 	})
 
 	return &App{closers: closers, Server: svr}, nil

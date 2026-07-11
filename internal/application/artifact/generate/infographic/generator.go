@@ -1,4 +1,4 @@
-package generate
+package infographic
 
 import (
 	"bytes"
@@ -13,6 +13,7 @@ import (
 
 	"github.com/gabriel-vasile/mimetype"
 
+	generatetypes "github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/types"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
@@ -24,25 +25,30 @@ import (
 	"github.com/bytedance/sonic"
 	einomodel "github.com/cloudwego/eino/components/model"
 	einoschema "github.com/cloudwego/eino/schema"
-	artifactprompt "github.com/gonotelm-lab/gonotelm/internal/application/artifact/prompt"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	t2ischema "github.com/gonotelm-lab/multimodal/image/schema"
 	t2iutil "github.com/gonotelm-lab/multimodal/image/util"
 )
 
-type InfoGraphicGenerator struct {
-	deps *ServiceDeps
+const MaxArtifactTitleLength = 128
+
+type Generator struct {
+	deps *generatetypes.ServiceDeps
 }
 
-var _ Generator = &InfoGraphicGenerator{}
+var _ generatetypes.Generator = &Generator{}
+
+func New(deps *generatetypes.ServiceDeps) *Generator {
+	return &Generator{deps: deps}
+}
 
 type infographicExpectation struct {
 	Title       string `json:"title"`
 	ImagePrompt string `json:"image_prompt"`
 }
 
-func (ig *InfoGraphicGenerator) Generate(ctx context.Context, req *Request) (*Response, error) {
+func (ig *Generator) Generate(ctx context.Context, req *generatetypes.Request) (*generatetypes.Response, error) {
 	payload, ok := req.Payload.(*artifactentity.InfoGraphicPayload)
 	if !ok {
 		return nil, errors.ErrParams.Msgf("infographic generator expects InfoGraphicPayload")
@@ -58,14 +64,14 @@ func (ig *InfoGraphicGenerator) Generate(ctx context.Context, req *Request) (*Re
 		return nil, errors.Wrapf(errors.ErrSerde, "marshal infographic storage result err=%v", err)
 	}
 
-	return &Response{
+	return &generatetypes.Response{
 		Title:      expect.Title,
 		Result:     result,
 		ResultKind: artifactentity.ResultKindStorage,
 	}, nil
 }
 
-func (ig *InfoGraphicGenerator) generate(
+func (ig *Generator) generate(
 	ctx context.Context,
 	taskId valobj.Id,
 	payload *artifactentity.InfoGraphicPayload,
@@ -90,16 +96,16 @@ func (ig *InfoGraphicGenerator) generate(
 	return expect, storageResult, nil
 }
 
-func (ig *InfoGraphicGenerator) generateImagePrompt(
+func (ig *Generator) generateImagePrompt(
 	ctx context.Context,
 	payload *artifactentity.InfoGraphicPayload,
 ) (*infographicExpectation, error) {
-	cfg := conf.Global().Logic.Studio.InfoGraphic
+	cfg := conf.Global().Studio.InfoGraphic
 	modelOption := chat.WithModel(cfg.Model)
 
 	bindAllTools := payload.DetailLevel != artifactentity.ArtifactInfoGraphicDetailLevelConcise
 
-	ag, err := buildSourceExploreAgent(
+	ag, err := generatetypes.BuildSourceExploreAgent(
 		ig.deps,
 		cfg.ModelProvider,
 		cfg.Model,
@@ -113,15 +119,15 @@ func (ig *InfoGraphicGenerator) generateImagePrompt(
 		return nil, errors.WithMessagef(err, "failed to build source explore agent for infographic")
 	}
 
-	sourceIds := sourceIDsToStrings(payload.SourceIds)
-	vars := artifactprompt.StudioInfoGraphicTemplateVars{
+	sourceIds := generatetypes.SourceIDsToStrings(payload.SourceIds)
+	vars := TemplateVars{
 		SourceIds:    sourceIds,
 		TextLanguage: payload.TextLanguage,
 		ExtraPrompt:  payload.ExtraPrompt,
 		Orientation:  payload.Orientation.String(),
 		DetailLevel:  payload.DetailLevel.String(),
 	}
-	msgs, err := artifactprompt.RenderInfographic(ctx, vars)
+	msgs, err := RenderInfographic(ctx, vars)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "render infographic prompt failed, err=%v", err)
 	}
@@ -181,7 +187,7 @@ func (ig *InfoGraphicGenerator) generateImagePrompt(
 	)
 }
 
-func (ig *InfoGraphicGenerator) parseAgentOutput(
+func (ig *Generator) parseAgentOutput(
 	ctx context.Context,
 	content string,
 ) (*infographicExpectation, error) {
@@ -214,13 +220,13 @@ func (ig *InfoGraphicGenerator) parseAgentOutput(
 	return &expect, nil
 }
 
-func (ig *InfoGraphicGenerator) generateAndStoreImage(
+func (ig *Generator) generateAndStoreImage(
 	ctx context.Context,
 	taskId valobj.Id,
 	payload *artifactentity.InfoGraphicPayload,
 	imagePrompt string,
 ) (*StorageResult, error) {
-	cfg := conf.Global().Logic.Studio.InfoGraphic
+	cfg := conf.Global().Studio.InfoGraphic
 
 	generator, err := ig.deps.Text2Image.GetProvider(cfg.ImageModelProvider)
 	if err != nil {

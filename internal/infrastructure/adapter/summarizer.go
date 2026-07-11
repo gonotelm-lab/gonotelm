@@ -39,12 +39,15 @@ const (
 
 type SummarizerImpl struct {
 	provider llm.Provider
+	model    string
 	llm      *chat.Gateway
 }
 
-func NewSummarizer(llm *chat.Gateway) adapter.Summarizer {
+func NewSummarizer(gw *chat.Gateway, provider llm.Provider, model string) adapter.Summarizer {
 	return &SummarizerImpl{
-		llm: llm,
+		provider: provider,
+		model:    model,
+		llm:      gw,
 	}
 }
 
@@ -62,8 +65,13 @@ func (s *SummarizerImpl) Summarize(
 	}
 
 	provider := s.provider
-	if opt.Prompt != "" {
+	if opt.Provider != "" {
 		provider = llm.Provider(opt.Provider)
+	}
+
+	model := s.model
+	if opt.Model != "" {
+		model = opt.Model
 	}
 
 	var prompt string
@@ -73,17 +81,17 @@ func (s *SummarizerImpl) Summarize(
 		prompt = fmt.Sprintf(summarizePromptTemplate, opt.MinWord, opt.MaxWord, text)
 	}
 
-	model, err := s.llm.GetProvider(provider)
+	llmModel, err := s.llm.GetProvider(provider)
 	if err != nil {
 		return "", errors.Wrapf(errors.ErrParams, "get provider failed, err=%v", err)
 	}
 
-	result, err := model.Generate(ctx, []*einoschema.Message{
+	result, err := llmModel.Generate(ctx, []*einoschema.Message{
 		{
 			Role:    einoschema.User,
 			Content: prompt,
 		},
-	}, chat.WithModel(opt.Model))
+	}, chat.WithModel(model))
 	if err != nil {
 		return "", errors.WithMessagef(err, "generate summary failed, err=%v", err)
 	}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	flowworker "github.com/gonotelm-lab/flow/client/worker"
+	generatetypes "github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/types"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 
@@ -27,7 +28,7 @@ type WorkerOutput struct {
 	ResultKind string `json:"result_kind"`
 }
 
-func RegisterTypedWorker(client *flowworker.Client, deps *ServiceDeps) {
+func RegisterTypedWorker(client *flowworker.Client, deps *generatetypes.ServiceDeps) {
 	flowworker.RegisterTyped(client, func(ctx context.Context, in WorkerInput) (WorkerOutput, error) {
 		kind := artifactentity.Kind(in.Kind)
 		if !kind.Supported() {
@@ -51,7 +52,7 @@ func RegisterTypedWorker(client *flowworker.Client, deps *ServiceDeps) {
 			return WorkerOutput{}, fmt.Errorf("payload: %w", err)
 		}
 
-		req := &Request{
+		req := &generatetypes.Request{
 			ArtifactId: artifactId,
 			NotebookId: notebookId,
 			UserId:     in.UserId,

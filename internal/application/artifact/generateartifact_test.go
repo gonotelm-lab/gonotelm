@@ -73,9 +73,9 @@ func (s *stubFlowClient) Close() error { return nil }
 var _ flow.TaskClient = &stubFlowClient{}
 
 type capturingFlowClient struct {
-	submitID        string
-	submitErr       error
-	submittedType   string
+	submitID         string
+	submitErr        error
+	submittedType    string
 	submittedPayload []byte
 }
 
@@ -84,9 +84,11 @@ func (s *capturingFlowClient) Submit(ctx context.Context, t string, p []byte) (s
 	s.submittedPayload = p
 	return s.submitID, s.submitErr
 }
-func (s *capturingFlowClient) Get(ctx context.Context, id string) (*flow.TaskInfo, error) { return nil, nil }
+func (s *capturingFlowClient) Get(ctx context.Context, id string) (*flow.TaskInfo, error) {
+	return nil, nil
+}
 func (s *capturingFlowClient) Cancel(ctx context.Context, id string) error { return nil }
-func (s *capturingFlowClient) Close() error { return nil }
+func (s *capturingFlowClient) Close() error                                { return nil }
 
 var _ flow.TaskClient = &capturingFlowClient{}
 

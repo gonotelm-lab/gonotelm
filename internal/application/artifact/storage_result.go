@@ -1,16 +1,31 @@
 package artifact
 
-import "github.com/bytedance/sonic"
+import (
+	"context"
 
-type storageResult struct {
-	StoreKey    string `json:"StoreKey"`
-	ContentType string `json:"ContentType"`
-}
+	"github.com/bytedance/sonic"
+	"github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/infographic"
+)
 
 func extractStoreKey(result []byte) string {
-	var sr storageResult
+	var sr infographic.StorageResult
 	if err := sonic.Unmarshal(result, &sr); err != nil {
 		return ""
 	}
 	return sr.StoreKey
+}
+
+func materializeStorageResult(ctx context.Context, storage StorageGateway, result []byte) (url string, mime string) {
+	if storage == nil || len(result) == 0 {
+		return "", ""
+	}
+	var sr infographic.StorageResult
+	if err := sonic.Unmarshal(result, &sr); err != nil || sr.StoreKey == "" {
+		return "", ""
+	}
+	url, err := storage.PresignGet(ctx, sr.StoreKey)
+	if err != nil {
+		return "", sr.ContentType
+	}
+	return url, sr.ContentType
 }

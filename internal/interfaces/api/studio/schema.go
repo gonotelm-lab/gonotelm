@@ -26,19 +26,19 @@ type ArtifactTaskIdRequest struct {
 }
 
 type GetArtifactStatusResponse struct {
-	TaskId string              `json:"task_id"`
+	TaskId string                `json:"task_id"`
 	Status artifactentity.Status `json:"status"`
 }
 
 type GetArtifactResultResponse struct {
-	TaskId      string                   `json:"task_id"`
-	Status      artifactentity.Status    `json:"status"`
-	Title       string                   `json:"title"`
-	Content     string                   `json:"content,omitempty"`
-	ContentUrl  string                   `json:"content_url,omitempty"`
+	TaskId      string                    `json:"task_id"`
+	Status      artifactentity.Status     `json:"status"`
+	Title       string                    `json:"title"`
+	Content     string                    `json:"content,omitempty"`
+	ContentUrl  string                    `json:"content_url,omitempty"`
 	ContentKind artifactentity.ResultKind `json:"content_kind"`
-	MimeType    string                   `json:"mime_type,omitempty"`
-	ImageInfo   *ArtifactResultImageInfo `json:"image_info,omitempty"`
+	MimeType    string                    `json:"mime_type,omitempty"`
+	ImageInfo   *ArtifactResultImageInfo  `json:"image_info,omitempty"`
 }
 
 type ListNotebookArtifactsRequest struct {

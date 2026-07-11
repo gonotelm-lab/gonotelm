@@ -12,7 +12,7 @@ type MindmapPayload struct {
 	SourceIds  []valobj.Id `json:"source_ids"`
 }
 
-func (p *MindmapPayload) Kind() Kind              { return KindMindmap }
+func (p *MindmapPayload) Kind() Kind                { return KindMindmap }
 func (p *MindmapPayload) GetSourceIds() []valobj.Id { return p.SourceIds }
 
 type ReportPayload struct {
@@ -20,7 +20,7 @@ type ReportPayload struct {
 	SourceIds  []valobj.Id `json:"source_ids"`
 }
 
-func (p *ReportPayload) Kind() Kind              { return KindReport }
+func (p *ReportPayload) Kind() Kind                { return KindReport }
 func (p *ReportPayload) GetSourceIds() []valobj.Id { return p.SourceIds }
 
 type InfoGraphicPayload struct {
@@ -32,7 +32,7 @@ type InfoGraphicPayload struct {
 	DetailLevel  ArtifactInfoGraphicDetailLevel `json:"detail_level"`
 }
 
-func (p *InfoGraphicPayload) Kind() Kind              { return KindInfoGraphic }
+func (p *InfoGraphicPayload) Kind() Kind                { return KindInfoGraphic }
 func (p *InfoGraphicPayload) GetSourceIds() []valobj.Id { return p.SourceIds }
 
 type AudioOverviewPayload struct {
@@ -43,5 +43,5 @@ type AudioOverviewPayload struct {
 	Style      ArtifactAudioOverviewStyle `json:"style"`
 }
 
-func (p *AudioOverviewPayload) Kind() Kind              { return KindAudioOverview }
+func (p *AudioOverviewPayload) Kind() Kind                { return KindAudioOverview }
 func (p *AudioOverviewPayload) GetSourceIds() []valobj.Id { return p.SourceIds }

@@ -8,8 +8,8 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
-	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
+	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

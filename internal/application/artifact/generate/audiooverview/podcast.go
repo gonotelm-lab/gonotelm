@@ -1,4 +1,4 @@
-package prompt
+package audiooverview
 
 type PodcastStyle string
 
@@ -102,28 +102,3 @@ type StudioPodcastSpeaker struct {
 	Personality string
 	Bio         string
 }
-
-type StudioPodcastOutlineTemplateVars struct {
-	SourceIds     []string
-	Speakers      []StudioPodcastSpeaker
-	Tips          string
-	NumOfSegments int
-	Language      string
-	Style         PodcastStyle
-	StyleDesc     string
-}
-
-func (v StudioPodcastOutlineTemplateVars) PromptVars() map[string]any {
-	return map[string]any{
-		"SourceIds":     normalizeStrings(v.SourceIds),
-		"Speakers":      v.Speakers,
-		"Tips":          v.Tips,
-		"NumOfSegments": v.NumOfSegments,
-		"Language":      v.Language,
-		"StyleInfo": map[string]any{
-			"Style":       v.Style,
-			"Description": v.StyleDesc,
-		},
-	}
-}
-

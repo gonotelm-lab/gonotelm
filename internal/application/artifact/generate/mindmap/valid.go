@@ -1,4 +1,4 @@
-package prompt
+package mindmap
 
 import (
 	"regexp"
@@ -6,39 +6,6 @@ import (
 )
 
 var studioMindmapRootLineRegexp = regexp.MustCompile(`^\s*root\(\(.+\)\)\s*$`)
-
-func normalizeStrings(sources []string) []string {
-	normalized := make([]string, 0, len(sources))
-	for _, source := range sources {
-		text := strings.TrimSpace(source)
-		if text == "" {
-			continue
-		}
-		normalized = append(normalized, text)
-	}
-
-	return normalized
-}
-
-func normalizeOrientation(orientation string) string {
-	normalized := strings.ToLower(strings.TrimSpace(orientation))
-	switch normalized {
-	case "portrait", "landscape", "square":
-		return normalized
-	default:
-		return "landscape"
-	}
-}
-
-func normalizeDetailLevel(level string) string {
-	normalized := strings.ToLower(strings.TrimSpace(level))
-	switch normalized {
-	case "concise", "standard", "detailed":
-		return normalized
-	default:
-		return "standard"
-	}
-}
 
 func CheckStudioMindmapResult(content string) bool {
 	content = strings.TrimSpace(content)

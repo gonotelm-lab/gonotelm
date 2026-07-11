@@ -3,8 +3,8 @@ package entity
 import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	artifactevent "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/event"
 	artifacterrors "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/errors"
+	artifactevent "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/event"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 

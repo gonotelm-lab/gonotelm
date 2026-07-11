@@ -39,6 +39,7 @@ func (s *SourceStoreImpl) Upsert(ctx context.Context, source *schema.Source) err
 		DoUpdates: clause.Assignments(map[string]any{
 			"status":             source.Status,
 			"title":              source.Title,
+			"content":            source.Content,
 			"abstract":           source.Abstract,
 			"parsed_content_key": source.ParsedContentKey,
 			"updated_at":         source.UpdatedAt,

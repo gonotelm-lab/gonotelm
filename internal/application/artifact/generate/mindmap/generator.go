@@ -1,4 +1,4 @@
-package generate
+package mindmap
 
 import (
 	"context"
@@ -7,26 +7,34 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	generatetypes "github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/types"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 
-	artifactprompt "github.com/gonotelm-lab/gonotelm/internal/application/artifact/prompt"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 
 	einomodel "github.com/cloudwego/eino/components/model"
 	einoschema "github.com/cloudwego/eino/schema"
 )
 
+const MindmapMaxOnceToken = 32_000
+
 const (
 	mindmapTitleMinLen = 10
 	mindmapTitleMaxLen = 30
 )
 
-type MindmapGenerator struct {
-	deps *ServiceDeps
+type Generator struct {
+	deps *generatetypes.ServiceDeps
+}
+
+var _ generatetypes.Generator = &Generator{}
+
+func New(deps *generatetypes.ServiceDeps) *Generator {
+	return &Generator{deps: deps}
 }
 
 type mindmapExpectation struct {
@@ -34,23 +42,23 @@ type mindmapExpectation struct {
 	Mindmap string `json:"mindmap"`
 }
 
-func (m *MindmapGenerator) Generate(ctx context.Context, req *Request) (*Response, error) {
+func (m *Generator) Generate(ctx context.Context, req *generatetypes.Request) (*generatetypes.Response, error) {
 	expect, err := m.agentCreateMindmap(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Response{
+	return &generatetypes.Response{
 		Title:      expect.Title,
 		Result:     pkgstring.AsBytes(expect.Mindmap),
 		ResultKind: artifactentity.ResultKindInline,
 	}, nil
 }
 
-func (m *MindmapGenerator) llmOptions() []einomodel.Option {
+func (m *Generator) llmOptions() []einomodel.Option {
 	var (
-		provider = conf.Global().Logic.Studio.Mindmap.ModelProvider
-		model    = conf.Global().Logic.Studio.Mindmap.Model
+		provider = conf.Global().Studio.Mindmap.ModelProvider
+		model    = conf.Global().Studio.Mindmap.Model
 	)
 	llmOptions := []einomodel.Option{
 		chat.WithModel(model),
@@ -60,17 +68,17 @@ func (m *MindmapGenerator) llmOptions() []einomodel.Option {
 	return llmOptions
 }
 
-func (m *MindmapGenerator) agentCreateMindmap(
+func (m *Generator) agentCreateMindmap(
 	ctx context.Context,
-	req *Request,
+	req *generatetypes.Request,
 ) (*mindmapExpectation, error) {
 	llmOptions := m.llmOptions()
 
-	ag, err := buildSourceExploreAgent(
+	ag, err := generatetypes.BuildSourceExploreAgent(
 		m.deps,
-		conf.Global().Logic.Studio.Mindmap.ModelProvider,
-		conf.Global().Logic.Studio.Mindmap.Model,
-		conf.Global().Logic.Studio.Mindmap.MaxRound,
+		conf.Global().Studio.Mindmap.ModelProvider,
+		conf.Global().Studio.Mindmap.Model,
+		conf.Global().Studio.Mindmap.MaxRound,
 		llmOptions,
 		req.NotebookId,
 		req.SourceIds,
@@ -80,8 +88,8 @@ func (m *MindmapGenerator) agentCreateMindmap(
 		return nil, errors.Wrapf(errors.ErrInner, "failed to build source explore agent for mindmap, err=%v", err)
 	}
 
-	sourceIds := sourceIDsToStrings(req.SourceIds)
-	msgs, err := artifactprompt.RenderMindmap(ctx, sourceIds)
+	sourceIds := generatetypes.SourceIDsToStrings(req.SourceIds)
+	msgs, err := RenderMindmap(ctx, sourceIds)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "generate mindmap message failed, err=%v", err)
 	}
@@ -139,7 +147,7 @@ func (m *MindmapGenerator) agentCreateMindmap(
 	)
 }
 
-func (m *MindmapGenerator) parseAgentOutput(ctx context.Context, content string) (*mindmapExpectation, error) {
+func (m *Generator) parseAgentOutput(ctx context.Context, content string) (*mindmapExpectation, error) {
 	content = strings.TrimSpace(content)
 	if content == "" {
 		return nil, fmt.Errorf("empty output")
@@ -167,7 +175,7 @@ func (m *MindmapGenerator) parseAgentOutput(ctx context.Context, content string)
 		expect.Title = pkgstring.TruncateRune(expect.Title, mindmapTitleMaxLen)
 	}
 
-	if !artifactprompt.CheckStudioMindmapResult(expect.Mindmap) {
+	if !CheckStudioMindmapResult(expect.Mindmap) {
 		return nil, fmt.Errorf("mindmap format invalid")
 	}
 

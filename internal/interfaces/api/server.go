@@ -37,7 +37,6 @@ type ServerDeps struct {
 	CancelArtifactHandler        *artifactapp.CancelArtifactHandler
 	DeleteArtifactHandler        *artifactapp.DeleteArtifactHandler
 	RetryArtifactHandler         *artifactapp.RetryArtifactHandler
-	ArtifactStorage              artifactapp.StorageGateway
 }
 
 type Server struct {
@@ -77,7 +76,6 @@ type Server struct {
 	cancelArtifactHandler        *artifactapp.CancelArtifactHandler
 	deleteArtifactHandler        *artifactapp.DeleteArtifactHandler
 	retryArtifactHandler         *artifactapp.RetryArtifactHandler
-	artifactStorage              artifactapp.StorageGateway
 }
 
 func NewServer(
@@ -146,7 +144,6 @@ func NewServer(
 		cancelArtifactHandler:        deps.CancelArtifactHandler,
 		deleteArtifactHandler:        deps.DeleteArtifactHandler,
 		retryArtifactHandler:         deps.RetryArtifactHandler,
-		artifactStorage:              deps.ArtifactStorage,
 	}
 
 	s.registerRoutes()

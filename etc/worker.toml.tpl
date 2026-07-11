@@ -34,24 +34,22 @@ presignExpiry = "${GONOTELM_MINIO_PRESIGN_EXPIRY:-15m}"
 [logging]
 level = "${GONOTELM_LOG_LEVEL:-debug}"
 
-[logic]
+[studio.mindmap]
+maxRound = ${GONOTELM_STUDIO_MINDMAP_MAX_ROUND:-50}
+modelProvider = "${GONOTELM_STUDIO_MINDMAP_PROVIDER:-deepseek}"
+model = "${GONOTELM_STUDIO_MINDMAP_MODEL:-deepseek-v4-flash}"
 
-[logic.studio.mindmap]
-maxRound = ${GONOTELM_LOGIC_STUDIO_MINDMAP_MAX_ROUND:-50}
-modelProvider = "${GONOTELM_LOGIC_STUDIO_MINDMAP_PROVIDER:-deepseek}"
-model = "${GONOTELM_LOGIC_STUDIO_MINDMAP_MODEL:-deepseek-v4-flash}"
+[studio.report]
+maxRound = ${GONOTELM_STUDIO_REPORT_MAX_ROUND:-50}
+modelProvider = "${GONOTELM_STUDIO_REPORT_PROVIDER:-deepseek}"
+model = "${GONOTELM_STUDIO_REPORT_MODEL:-deepseek-v4-flash}"
 
-[logic.studio.report]
-maxRound = ${GONOTELM_LOGIC_STUDIO_REPORT_MAX_ROUND:-50}
-modelProvider = "${GONOTELM_LOGIC_STUDIO_REPORT_PROVIDER:-deepseek}"
-model = "${GONOTELM_LOGIC_STUDIO_REPORT_MODEL:-deepseek-v4-flash}"
-
-[logic.studio.infoGraphic]
-maxRound = ${GONOTELM_LOGIC_STUDIO_INFOGRAPHIC_MAX_ROUND:-50}
-modelProvider = "${GONOTELM_LOGIC_STUDIO_INFOGRAPHIC_PROVIDER:-deepseek}"
-model = "${GONOTELM_LOGIC_STUDIO_INFOGRAPHIC_MODEL:-deepseek-v4-flash}"
-imageModelProvider = "${GONOTELM_LOGIC_STUDIO_INFOGRAPHIC_IMAGE_MODEL_PROVIDER:-dashscope}"
-imageModel = "${GONOTELM_LOGIC_STUDIO_INFOGRAPHIC_IMAGE_MODEL:-qwen-image-2.0-pro}"
+[studio.infoGraphic]
+maxRound = ${GONOTELM_STUDIO_INFOGRAPHIC_MAX_ROUND:-50}
+modelProvider = "${GONOTELM_STUDIO_INFOGRAPHIC_PROVIDER:-deepseek}"
+model = "${GONOTELM_STUDIO_INFOGRAPHIC_MODEL:-deepseek-v4-flash}"
+imageModelProvider = "${GONOTELM_STUDIO_INFOGRAPHIC_IMAGE_MODEL_PROVIDER:-dashscope}"
+imageModel = "${GONOTELM_STUDIO_INFOGRAPHIC_IMAGE_MODEL:-qwen-image-2.0-pro}"
 
 [embedding]
 type = "${GONOTELM_EMBEDDING_TYPE:-dashscope}"

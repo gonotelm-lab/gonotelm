@@ -1,4 +1,4 @@
-package generate
+package infographic
 
 type StorageResult struct {
 	StoreKey    string              `json:"store_key"`

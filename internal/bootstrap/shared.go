@@ -8,8 +8,8 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	einoembed "github.com/cloudwego/eino/components/embedding"
 	embedcache "github.com/cloudwego/eino-ext/components/embedding/cache"
+	einoembed "github.com/cloudwego/eino/components/embedding"
 
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/service/agentize"

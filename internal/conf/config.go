@@ -28,7 +28,9 @@ var (
 type Config struct {
 	DeployEnv string `toml:"deployEnv"`
 
-	Logic LogicConfig `toml:"logic"`
+	Chat   ChatConfig   `toml:"chat"`
+	Source SourceConfig `toml:"source"`
+	Studio StudioConfig `toml:"studio"`
 
 	Api        ApiConfig                     `toml:"api"`
 	Database   DatabaseConfig                `toml:"database"`

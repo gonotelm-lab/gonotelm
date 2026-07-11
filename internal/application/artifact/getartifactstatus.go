@@ -20,16 +20,19 @@ type StatusResponse struct {
 	Title      string
 	Result     []byte
 	ResultKind artifactentity.ResultKind
+	ContentUrl string
+	MimeType   string
 	FlowError  string
 }
 
 type GetArtifactStatusHandler struct {
-	repo  artifactrepo.Repository
-	flowc flow.TaskClient
+	repo    artifactrepo.Repository
+	flowc   flow.TaskClient
+	storage StorageGateway
 }
 
-func NewGetArtifactStatusHandler(repo artifactrepo.Repository, flowc flow.TaskClient) *GetArtifactStatusHandler {
-	return &GetArtifactStatusHandler{repo: repo, flowc: flowc}
+func NewGetArtifactStatusHandler(repo artifactrepo.Repository, flowc flow.TaskClient, storage StorageGateway) *GetArtifactStatusHandler {
+	return &GetArtifactStatusHandler{repo: repo, flowc: flowc, storage: storage}
 }
 
 func (h *GetArtifactStatusHandler) Handle(ctx context.Context, cmd *StatusRequest) (*StatusResponse, error) {
@@ -43,7 +46,11 @@ func (h *GetArtifactStatusHandler) Handle(ctx context.Context, cmd *StatusReques
 	}
 
 	if a.IsTerminal() {
-		return &StatusResponse{Status: a.Status, Title: a.Title, Result: a.Result, ResultKind: a.ResultKind}, nil
+		resp := &StatusResponse{Status: a.Status, Title: a.Title, Result: a.Result, ResultKind: a.ResultKind}
+		if a.ResultKind.Storage() && len(a.Result) > 0 {
+			resp.ContentUrl, resp.MimeType = materializeStorageResult(ctx, h.storage, a.Result)
+		}
+		return resp, nil
 	}
 
 	if a.FlowTaskId == "" {

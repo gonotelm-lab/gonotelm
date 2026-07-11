@@ -9,20 +9,14 @@ import (
 )
 
 const (
-	DefaultMaxRound              = 10
+	DefaultMaxRound              = 30
 	DefaultSourceDocsRecallCount = 50
 	DefaultTaskTimeout           = 5 * time.Minute
 	DefaultGMMAutoMaxClusters    = 50
 	RerankDefaultTopN            = 20
 )
 
-type LogicConfig struct {
-	Chat   ChatLogicConfig   `toml:"chat"`
-	Source SourceLogicConfig `toml:"source"`
-	Studio StudioLogicConfig `toml:"studio"`
-}
-
-type ChatLogicConfig struct {
+type ChatConfig struct {
 	MaxRound              int                   `toml:"maxRound"`
 	ModelProvider         llm.Provider          `toml:"modelProvider"`
 	Model                 string                `toml:"model"` // 对话使用的模型
@@ -34,7 +28,7 @@ type ChatLogicConfig struct {
 	RerankModel           string                `toml:"rerankModel"`
 }
 
-func (c *ChatLogicConfig) GetSourceDocsRecallCount() int {
+func (c *ChatConfig) GetSourceDocsRecallCount() int {
 	if c.SourceDocsRecallCount == 0 {
 		return DefaultSourceDocsRecallCount
 	}
@@ -42,7 +36,7 @@ func (c *ChatLogicConfig) GetSourceDocsRecallCount() int {
 	return c.SourceDocsRecallCount
 }
 
-func (c *ChatLogicConfig) GetTaskTimeout() time.Duration {
+func (c *ChatConfig) GetTaskTimeout() time.Duration {
 	if c.TaskTimeout == 0 {
 		return DefaultTaskTimeout
 	}
@@ -50,7 +44,7 @@ func (c *ChatLogicConfig) GetTaskTimeout() time.Duration {
 	return c.TaskTimeout
 }
 
-func (c *ChatLogicConfig) GetMaxRound() int {
+func (c *ChatConfig) GetMaxRound() int {
 	if c.MaxRound == 0 {
 		return DefaultMaxRound
 	}
@@ -58,7 +52,7 @@ func (c *ChatLogicConfig) GetMaxRound() int {
 	return c.MaxRound
 }
 
-func (c *ChatLogicConfig) GetRerankTopN() int {
+func (c *ChatConfig) GetRerankTopN() int {
 	if c.RerankTopN == 0 {
 		return RerankDefaultTopN
 	}
@@ -66,7 +60,7 @@ func (c *ChatLogicConfig) GetRerankTopN() int {
 	return c.RerankTopN
 }
 
-type SourceLogicConfig struct {
+type SourceConfig struct {
 	ModelProvider llm.Provider `toml:"modelProvider"`
 	Model         string       `toml:"model"`
 
@@ -76,7 +70,7 @@ type SourceLogicConfig struct {
 	} `toml:"bizCache"`
 }
 
-type StudioLogicConfig struct {
+type StudioConfig struct {
 	Mindmap struct {
 		MaxRound      int          `toml:"maxRound"`
 		ModelProvider llm.Provider `toml:"modelProvider"`

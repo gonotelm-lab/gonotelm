@@ -19,13 +19,13 @@ import (
 )
 
 type multiStubRepo struct {
-	findByIdResult  *artifactentity.Artifact
-	findByIdErr     error
-	savedArtifacts  []*artifactentity.Artifact
-	listResult      []*artifactentity.Artifact
-	listErr         error
-	deletedId       valobj.Id
-	deleteErr       error
+	findByIdResult *artifactentity.Artifact
+	findByIdErr    error
+	savedArtifacts []*artifactentity.Artifact
+	listResult     []*artifactentity.Artifact
+	listErr        error
+	deletedId      valobj.Id
+	deleteErr      error
 }
 
 func (s *multiStubRepo) Save(ctx context.Context, a *artifactentity.Artifact) error {
@@ -84,7 +84,7 @@ func makeArtifact(status artifactentity.Status, flowTaskId string, userId string
 	a.Status = status
 	a.FlowTaskId = flowTaskId
 	if status == artifactentity.StatusCompleted {
-		a.Result = []byte(`{"StoreKey":"key-1"}`)
+		a.Result = []byte(`{"store_key":"key-1","content_type":"image/png"}`)
 		a.ResultKind = artifactentity.ResultKindStorage
 		a.Title = "done title"
 	}
@@ -95,7 +95,7 @@ func TestStatus_TerminalArtifact(t *testing.T) {
 	artifact := makeArtifact(artifactentity.StatusCompleted, "ft-1", "u1")
 	repo := &multiStubRepo{findByIdResult: artifact}
 	flowc := &stubFlowClient{}
-	h := NewGetArtifactStatusHandler(repo, flowc)
+	h := NewGetArtifactStatusHandler(repo, flowc, nil)
 
 	ctx := pkgcontext.WithUserId(context.Background(), "u1")
 	resp, err := h.Handle(ctx, &StatusRequest{ArtifactId: artifact.Id})
@@ -111,7 +111,7 @@ func TestStatus_ActiveArtifact_FlowGet(t *testing.T) {
 	artifact := makeArtifact(artifactentity.StatusRunning, "ft-2", "u1")
 	repo := &multiStubRepo{findByIdResult: artifact}
 	flowc := &stubFlowClient{getInfo: &flow.TaskInfo{State: flowschema.TaskState_RUNNING}}
-	h := NewGetArtifactStatusHandler(repo, flowc)
+	h := NewGetArtifactStatusHandler(repo, flowc, nil)
 
 	ctx := pkgcontext.WithUserId(context.Background(), "u1")
 	resp, err := h.Handle(ctx, &StatusRequest{ArtifactId: artifact.Id})
@@ -123,7 +123,7 @@ func TestStatus_ActiveArtifact_FlowGet(t *testing.T) {
 func TestStatus_PermissionDenied(t *testing.T) {
 	artifact := makeArtifact(artifactentity.StatusPending, "", "u2")
 	repo := &multiStubRepo{findByIdResult: artifact}
-	h := NewGetArtifactStatusHandler(repo, &stubFlowClient{})
+	h := NewGetArtifactStatusHandler(repo, &stubFlowClient{}, nil)
 
 	ctx := pkgcontext.WithUserId(context.Background(), "u1")
 	_, err := h.Handle(ctx, &StatusRequest{ArtifactId: artifact.Id})

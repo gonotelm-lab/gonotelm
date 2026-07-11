@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	artifactevent "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/event"
 	artifacterrors "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/errors"
+	artifactevent "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/event"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

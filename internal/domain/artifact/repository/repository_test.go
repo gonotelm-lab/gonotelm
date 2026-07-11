@@ -22,7 +22,7 @@ func (f *fakeRepo) ListByNotebookId(ctx context.Context, n valobj.Id, spec *List
 func (f *fakeRepo) ListByStatus(ctx context.Context, spec *ListByStatusSpec) ([]*entity.Artifact, error) {
 	return nil, nil
 }
-func (f *fakeRepo) DeleteById(ctx context.Context, id valobj.Id) error       { return nil }
+func (f *fakeRepo) DeleteById(ctx context.Context, id valobj.Id) error        { return nil }
 func (f *fakeRepo) DeleteByNotebookId(ctx context.Context, n valobj.Id) error { return nil }
 
 func TestRepositoryInterfaceSatisfied(t *testing.T) {

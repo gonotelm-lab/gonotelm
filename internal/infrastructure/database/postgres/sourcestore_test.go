@@ -503,7 +503,7 @@ func TestSourceStoreUpsert(t *testing.T) {
 		source.Kind = "nochange"
 		source.Status = "ready"
 		source.Title = "updated title"
-		source.Content = []byte("content should not change")
+		source.Content = []byte("updated content")
 		source.ParsedContentKey = "parsed/new"
 		source.Abstract = "updated abstract"
 		source.OwnerId = "12903"
@@ -519,7 +519,7 @@ func TestSourceStoreUpsert(t *testing.T) {
 		So(gotAfterUpsert.Kind, ShouldEqual, "doc")
 		So(strings.TrimSpace(gotAfterUpsert.Status), ShouldEqual, "ready")
 		So(gotAfterUpsert.Title, ShouldEqual, "updated title")
-		So(string(gotAfterUpsert.Content), ShouldEqual, string(initialContent))
+		So(string(gotAfterUpsert.Content), ShouldEqual, "updated content")
 		So(string(gotAfterUpsert.ParsedContentKey), ShouldEqual, "parsed/new")
 		So(gotAfterUpsert.Abstract, ShouldEqual, "updated abstract")
 		So(gotAfterUpsert.OwnerId, ShouldEqual, ownerID)

@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 
-	"github.com/bytedance/sonic"
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/route"
 	artifactapp "github.com/gonotelm-lab/gonotelm/internal/application/artifact"
@@ -102,23 +101,13 @@ func (s *Server) GetStudioArtifactResult(ctx context.Context, c *app.RequestCont
 		TaskId:      req.TaskId.String(),
 		Status:      resp.Status,
 		Title:       resp.Title,
+		ContentUrl:  resp.ContentUrl,
+		MimeType:    resp.MimeType,
 		ContentKind: resp.ResultKind,
 	}
 
 	if resp.ResultKind.Inline() && len(resp.Result) > 0 {
 		result.Content = string(resp.Result)
-	} else if resp.ResultKind.Storage() && len(resp.Result) > 0 && s.artifactStorage != nil {
-		var sr struct {
-			StoreKey    string `json:"StoreKey"`
-			ContentType string `json:"ContentType"`
-		}
-		if err := sonic.Unmarshal(resp.Result, &sr); err == nil && sr.StoreKey != "" {
-			url, presignErr := s.artifactStorage.PresignGet(ctx, sr.StoreKey)
-			if presignErr == nil {
-				result.ContentUrl = url
-			}
-			result.MimeType = sr.ContentType
-		}
 	}
 
 	http.OkResp(c, result)
@@ -198,5 +187,3 @@ func (s *Server) ListNotebookStudioArtifacts(ctx context.Context, c *app.Request
 		HasMore:   resp.HasMore,
 	})
 }
-
-

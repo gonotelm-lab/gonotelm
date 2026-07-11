@@ -31,12 +31,12 @@ func (s *ArtifactStoreImpl) Upsert(ctx context.Context, a *schema.Artifact) erro
 		Columns: []clause.Column{{Name: "id"}},
 		DoUpdates: clause.Assignments(map[string]any{
 			"status":       a.Status,
-			"flow_task_id":  a.FlowTaskId,
-			"title":         a.Title,
-			"result":        a.Result,
-			"result_kind":   a.ResultKind,
-			"payload":       a.Payload,
-			"updated_at":     a.UpdatedAt,
+			"flow_task_id": a.FlowTaskId,
+			"title":        a.Title,
+			"result":       a.Result,
+			"result_kind":  a.ResultKind,
+			"payload":      a.Payload,
+			"updated_at":   a.UpdatedAt,
 		}),
 	}
 	if err := s.db.WithContext(ctx).

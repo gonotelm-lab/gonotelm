@@ -42,6 +42,9 @@ type Config struct {
 	Logging    LoggingConfig          `toml:"logging"`
 	Chunking   ChunkingConfig         `toml:"chunking"`
 	Provider   chat.ProviderConfig    `toml:"provider"`
+	Flow       FlowConfig             `toml:"flow"`
+	Worker     WorkerConfig           `toml:"worker"`
+	Syncer     SyncerConfig           `toml:"syncer"`
 }
 
 func (c *Config) IsDev() bool {
@@ -109,6 +112,27 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Logging.Level == "" {
 		cfg.Logging.Level = "debug"
+	}
+	if cfg.Flow.MaxRetry <= 0 {
+		cfg.Flow.MaxRetry = 3
+	}
+	if cfg.Flow.DialTimeout == 0 {
+		cfg.Flow.DialTimeout = 5 * time.Second
+	}
+	if cfg.Syncer.PerTaskInterval == 0 {
+		cfg.Syncer.PerTaskInterval = 2 * time.Second
+	}
+	if cfg.Syncer.GlobalInterval == 0 {
+		cfg.Syncer.GlobalInterval = 5 * time.Second
+	}
+	if cfg.Syncer.GlobalBatchSize <= 0 {
+		cfg.Syncer.GlobalBatchSize = 100
+	}
+	if cfg.Worker.MaxConcurrency <= 0 {
+		cfg.Worker.MaxConcurrency = 4
+	}
+	if cfg.Worker.Heartbeat == 0 {
+		cfg.Worker.Heartbeat = 5 * time.Second
 	}
 
 	global = cfg

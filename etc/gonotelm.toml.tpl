@@ -225,3 +225,20 @@ apiKey = "${GONOTELM_AGNES_API_KEY:-}"
 baseUrl = "${GONOTELM_TEXT2IMAGE_AGNES_BASE_URL:-https://apihub.agnes-ai.com/v1/images/generations}"
 model = "${GONOTELM_TEXT2IMAGE_AGNES_MODEL:-agnes-image-2.1-flash}"
 timeout = "${GONOTELM_TEXT2IMAGE_AGNES_TIMEOUT:-1h}"
+
+[flow]
+addr        = "${GONOTELM_FLOW_ADDR:-flow.example:9443}"
+namespace   = "${GONOTELM_FLOW_NAMESPACE:-gonotelm}"
+maxRetry    = ${GONOTELM_FLOW_MAX_RETRY:-3}
+dialTimeout = "${GONOTELM_FLOW_DIAL_TIMEOUT:-5s}"
+
+[syncer]
+perTaskInterval = "${GONOTELM_SYNCER_PER_TASK_INTERVAL:-2s}"
+globalInterval   = "${GONOTELM_SYNCER_GLOBAL_INTERVAL:-5s}"
+globalBatchSize  = ${GONOTELM_SYNCER_GLOBAL_BATCH_SIZE:-100}
+
+[worker]
+name            = "${GONOTELM_WORKER_NAME:-gonotelm-worker-1}"
+maxConcurrency  = ${GONOTELM_WORKER_MAX_CONCURRENCY:-4}
+heartbeat       = "${GONOTELM_WORKER_HEARTBEAT:-5s}"
+taskTypes       = ["artifact.mindmap", "artifact.report", "artifact.info_graphic", "artifact.audio_overview"]

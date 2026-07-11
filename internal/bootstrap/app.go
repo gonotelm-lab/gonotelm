@@ -4,17 +4,24 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"sync"
 
+	"github.com/gonotelm-lab/gonotelm/internal/api"
+	usecase "github.com/gonotelm-lab/gonotelm/internal/application/artifact/usecase"
+	syncerpkg "github.com/gonotelm-lab/gonotelm/internal/application/artifact/syncer"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
+	flowcli "github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/interfaces/event"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
+	studioroutes "github.com/gonotelm-lab/gonotelm/internal/interfaces/api/studio"
 )
 
 type App struct {
 	closers []io.Closer
-	Server  interface{ Run() }
+	Server  *api.Server
 }
 
 func (a *App) Close() error {
@@ -63,7 +70,8 @@ func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
 	chatRepo := repository.NewChatRepository(infra.DB.ChatStore)
 	messageRepo := repository.NewMessageRepository(infra.DB.ChatMessageStore)
 	contextMsgRepo := repository.NewContextMessageRepository(infra.Cache.ChatMessageContextCache)
-artifactRepo := repository.NewArtifactRepository(infra.DB.ArtifactStore)
+	artifactRepo := repository.NewArtifactRepository(infra.DB.ArtifactStore)
+	streamTaskRepo := repository.NewStreamTaskRepository(infra.Cache.ChatMessageStreamCache)
 
 	// ── 3. Event Bus ──
 
@@ -75,31 +83,46 @@ artifactRepo := repository.NewArtifactRepository(infra.DB.ArtifactStore)
 
 	summarizer := adapter.NewSummarizer(infra.LLMGateway)
 
-	// ── 5. Biz objects ──
-	// TODO: Migrate biz constructors to accept database.* (NEW) types instead of dal.* (OLD) types.
-
 	_ = infra.Text2Image
 
-	// ── 6. Logic ──
-	// TODO: Migrate biz constructors to accept database.* (NEW) types instead of dal.* (OLD) types.
-	/*
-	appLogic := logic.MustNewLogic(
-		ctx,
-		oss,
-		db.NotebookStore,
-		db.ArtifactTaskStore,
-		db.SourceStore,
-		vdb.SourceDocStore,
-		llmGateway,
-		embeddingGateway,
-		text2imageGateway,
-		mqInst,
-		redisClient,
-	)
-	_ = appLogic
-	*/
+	// ── 5. Flow task client ──
 
-	// ── 7. Event handler registration ──
+	flowClient, err := flowcli.NewTaskClient(
+		cfg.Flow.Addr,
+		cfg.Flow.Namespace,
+		cfg.Flow.DialTimeout,
+		cfg.Flow.MaxRetry,
+	)
+	if err != nil {
+		return nil, err
+	}
+	addCloser(flowClient)
+
+	// ── 6. Storage gateway adapter ──
+
+	storageGateway := &storageAdapter{store: infra.Storage}
+
+	// ── 7. Syncer ──
+
+	syncerCfg := syncerpkg.Config{
+		PerTaskInterval: cfg.Syncer.PerTaskInterval,
+		GlobalInterval:  cfg.Syncer.GlobalInterval,
+		GlobalBatchSize: cfg.Syncer.GlobalBatchSize,
+	}
+	syncerInst := syncerpkg.NewSyncer(artifactRepo, flowClient, syncerCfg)
+	syncerInst.Start(ctx)
+	addCloser(&syncerCloser{syncerInst})
+
+	// ── 8. Use cases ──
+
+	generateUC := usecase.NewGenerate(artifactRepo, flowClient, notebookRepo, syncerInst)
+	statusUC := usecase.NewStatus(artifactRepo, flowClient)
+	listUC := usecase.NewList(artifactRepo, notebookRepo)
+	cancelUC := usecase.NewCancel(artifactRepo, flowClient)
+	deleteUC := usecase.NewDelete(artifactRepo, flowClient, storageGateway)
+	retryUC := usecase.NewRetry(artifactRepo, flowClient, syncerInst)
+
+	// ── 9. Event handler registration ──
 
 	event.Init(ctx, &event.EventDeps{
 		NotebookRepo:        notebookRepo,
@@ -114,13 +137,59 @@ artifactRepo := repository.NewArtifactRepository(infra.DB.ArtifactStore)
 		Summarizer:          summarizer,
 	})
 
-	// ── 8. HTTP Server ──
-	// TODO: Update api.NewServer to accept explicit params instead of *infra.Instances + *wire.Wire.
-	// See Tasks 9-12.
+	// ── 10. HTTP Server ──
 
-	return &App{closers: closers, Server: &dummyServer{}}, nil
+	svr := api.NewServer(nil, api.ServerDeps{
+		NotebookRepo:       notebookRepo,
+		SourceRepo:         sourceRepo,
+		SourceStorageRepo:  sourceStorageRepo,
+		SourceDocRepo:      sourceDocRepo,
+		ChatRepo:           chatRepo,
+		MessageRepo:        messageRepo,
+		ContextMessageRepo: contextMsgRepo,
+		StreamTaskRepo:     streamTaskRepo,
+		EventBus:           bus,
+		WaitGroup:          &sync.WaitGroup{},
+		Gateway:            infra.LLMGateway,
+	})
+
+	// ── 11. Studio routes ──
+
+	studioroutes.RegisterRoutes(svr.Hertz(), &studioroutes.Deps{
+		GenerateUC: generateUC,
+		StatusUC:   statusUC,
+		ListUC:     listUC,
+		RetryUC:    retryUC,
+		CancelUC:   cancelUC,
+		DeleteUC:   deleteUC,
+	})
+
+	return &App{closers: closers, Server: svr}, nil
 }
 
-type dummyServer struct{}
+// ── bridge types ──
 
-func (d *dummyServer) Run() {}
+type storageAdapter struct {
+	store storage.Storage
+}
+
+func (a *storageAdapter) DeleteObject(ctx context.Context, key string) error {
+	return a.store.DeleteObject(ctx, &storage.DeleteObjectRequest{Key: key})
+}
+
+func (a *storageAdapter) PresignGet(ctx context.Context, key string) (string, error) {
+	resp, err := a.store.PresignedGetObject(ctx, &storage.PresignedGetObjectRequest{Key: key})
+	if err != nil {
+		return "", err
+	}
+	return resp.Url, nil
+}
+
+type syncerCloser struct {
+	syncer *syncerpkg.Syncer
+}
+
+func (s *syncerCloser) Close() error {
+	s.syncer.Shutdown(context.Background())
+	return nil
+}

@@ -140,6 +140,8 @@ func (s *Server) registerRoutes() {
 	s.registerChatRoutes(v1Group)
 }
 
+func (s *Server) Hertz() *server.Hertz { return s.h }
+
 func (s *Server) Run() {
 	s.h.Spin()
 }

@@ -32,10 +32,10 @@ type InfoGraphicPayload struct {
 func (p *InfoGraphicPayload) Kind() Kind { return KindInfoGraphic }
 
 type AudioOverviewPayload struct {
-	NotebookId valobj.Id                `json:"notebook_id"`
-	SourceIds  []valobj.Id              `json:"source_ids"`
-	Tip        string                   `json:"tip"`
-	Language   string                   `json:"language"`
+	NotebookId valobj.Id                  `json:"notebook_id"`
+	SourceIds  []valobj.Id                `json:"source_ids"`
+	Tip        string                     `json:"tip"`
+	Language   string                     `json:"language"`
 	Style      ArtifactAudioOverviewStyle `json:"style"`
 }
 

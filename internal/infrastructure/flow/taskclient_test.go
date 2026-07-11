@@ -13,10 +13,12 @@ type fakeClient struct {
 	CancelFn func(ctx context.Context, id string) error
 }
 
-func (f *fakeClient) Submit(ctx context.Context, t string, p []byte) (string, error) { return f.SubmitFn(ctx, t, p) }
-func (f *fakeClient) Get(ctx context.Context, id string) (*TaskInfo, error)            { return f.GetFn(ctx, id) }
-func (f *fakeClient) Cancel(ctx context.Context, id string) error                     { return f.CancelFn(ctx, id) }
-func (f *fakeClient) Close() error                                                     { return nil }
+func (f *fakeClient) Submit(ctx context.Context, t string, p []byte) (string, error) {
+	return f.SubmitFn(ctx, t, p)
+}
+func (f *fakeClient) Get(ctx context.Context, id string) (*TaskInfo, error) { return f.GetFn(ctx, id) }
+func (f *fakeClient) Cancel(ctx context.Context, id string) error           { return f.CancelFn(ctx, id) }
+func (f *fakeClient) Close() error                                          { return nil }
 
 // validates interface shape only — real client is exercised in integration test
 func TestTaskClientInterface(t *testing.T) {

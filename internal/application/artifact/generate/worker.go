@@ -5,19 +5,19 @@ import (
 	"encoding/json"
 	"fmt"
 
-	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
-	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	flowworker "github.com/gonotelm-lab/flow/client/worker"
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 
 	"github.com/bytedance/sonic"
 )
 
 type WorkerInput struct {
-	ArtifactId string   `json:"artifact_id"`
-	NotebookId string   `json:"notebook_id"`
-	UserId     string   `json:"user_id"`
-	SourceIds  []string `json:"source_ids"`
-	Kind       string   `json:"kind"`
+	ArtifactId string          `json:"artifact_id"`
+	NotebookId string          `json:"notebook_id"`
+	UserId     string          `json:"user_id"`
+	SourceIds  []string        `json:"source_ids"`
+	Kind       string          `json:"kind"`
 	Payload    json.RawMessage `json:"payload"`
 }
 

@@ -7,6 +7,6 @@ func Select[T any](slice []T, indices []int) []T {
 			selected = append(selected, slice[index])
 		}
 	}
-	
+
 	return selected
 }

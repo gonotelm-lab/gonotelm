@@ -4,11 +4,11 @@ import (
 	"context"
 	"strings"
 
+	flowworker "github.com/gonotelm-lab/flow/client/worker"
 	artifactgeneration "github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate"
 	artifactprompt "github.com/gonotelm-lab/gonotelm/internal/application/artifact/prompt"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
-	flowworker "github.com/gonotelm-lab/flow/client/worker"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -41,12 +41,18 @@ func NewWorkerApp(ctx context.Context, cfg *conf.Config) (*WorkerApp, error) {
 		Prompt:        artifactprompt.New("zh"),
 	}
 
+	taskTypes := []string{
+		"artifact.mindmap",
+		"artifact.report",
+		"artifact.info_graphic",
+		"artifact.audio_overview",
+	}
 	app := &WorkerApp{shared: shared}
-	for _, taskType := range cfg.Worker.TaskTypes {
+	for _, taskType := range taskTypes {
 		wcfg := flowworker.ConfigWithDefaults(flowworker.Config{
 			Namespace:         cfg.Flow.Namespace,
 			TaskType:          taskType,
-			Name:              cfg.Worker.Name,
+			Name:              "gonotelm-worker",
 			MaxConcurrency:    cfg.Worker.MaxConcurrency,
 			HeartbeatInterval: cfg.Worker.Heartbeat,
 		})

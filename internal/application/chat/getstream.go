@@ -25,9 +25,9 @@ func NewGetStreamHandler(streamTaskRepo chatrepo.StreamTaskRepository) *GetStrea
 }
 
 type GetStreamQuery struct {
-	ChatId       valobj.Id
-	TaskId       valobj.Id
-	LastEventId  string
+	ChatId      valobj.Id
+	TaskId      valobj.Id
+	LastEventId string
 }
 
 type StreamItem struct {

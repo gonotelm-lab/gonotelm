@@ -65,7 +65,7 @@ func TestRerank_TextQueryObject(t *testing.T) {
 			{Text: "文本排序模型是一种语义理解模型"},
 			{Text: "猫是一种可爱的动物"},
 		},
-		TopN: 1,
+		TopN:            1,
 		ReturnDocuments: true,
 	})
 	if err != nil {

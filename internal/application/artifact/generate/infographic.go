@@ -22,11 +22,11 @@ import (
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 
 	"github.com/bytedance/sonic"
-	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
-	artifactprompt "github.com/gonotelm-lab/gonotelm/internal/application/artifact/prompt"
-	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	einomodel "github.com/cloudwego/eino/components/model"
 	einoschema "github.com/cloudwego/eino/schema"
+	artifactprompt "github.com/gonotelm-lab/gonotelm/internal/application/artifact/prompt"
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	t2ischema "github.com/gonotelm-lab/multimodal/image/schema"
 	t2iutil "github.com/gonotelm-lab/multimodal/image/util"
 )

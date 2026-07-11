@@ -11,24 +11,24 @@ import (
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 	"github.com/gonotelm-lab/gonotelm/pkg/http/middleware"
 )
 
 type ServerDeps struct {
-	NotebookRepo      notebookrepo.Repository
-	SourceRepo        sourcerepo.Repository
-	SourceStorageRepo sourcerepo.StorageRepository
-	SourceDocRepo     sourcerepo.SourceDocRepository
-	ChatRepo          chatrepo.Repository
-	MessageRepo       chatrepo.MessageRepository
+	NotebookRepo       notebookrepo.Repository
+	SourceRepo         sourcerepo.Repository
+	SourceStorageRepo  sourcerepo.StorageRepository
+	SourceDocRepo      sourcerepo.SourceDocRepository
+	ChatRepo           chatrepo.Repository
+	MessageRepo        chatrepo.MessageRepository
 	ContextMessageRepo chatrepo.ContextMessageRepository
-	StreamTaskRepo    chatrepo.StreamTaskRepository
-	EventBus          eventbus.EventBus
-	WaitGroup         *sync.WaitGroup
-	Gateway           *chat.Gateway
+	StreamTaskRepo     chatrepo.StreamTaskRepository
+	EventBus           eventbus.EventBus
+	WaitGroup          *sync.WaitGroup
+	Gateway            *chat.Gateway
 }
 
 type Server struct {
@@ -78,7 +78,7 @@ func NewServer(
 	)
 
 	s := &Server{
-		h:           hz,
+		h:                          hz,
 		checkNotebookAccessHandler: notebookapp.NewCheckNotebookAccessHandler(deps.NotebookRepo),
 		getNotebookHandler:         notebookapp.NewGetNotebookHandler(deps.NotebookRepo),
 		createNotebookHandler:      notebookapp.NewCreateNotebookHandler(deps.NotebookRepo, deps.EventBus),

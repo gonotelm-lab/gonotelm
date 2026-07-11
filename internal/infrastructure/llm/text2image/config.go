@@ -1,8 +1,8 @@
 package text2image
 
 import (
-	"github.com/gonotelm-lab/multimodal/image/dashscope"
 	"github.com/gonotelm-lab/multimodal/image/agnes"
+	"github.com/gonotelm-lab/multimodal/image/dashscope"
 )
 
 type Text2ImageProvider string
@@ -17,7 +17,7 @@ const (
 )
 
 type Text2ImageConfig struct {
-	Type      Text2ImageProvider    `toml:"type"`
-	DashScope dashscope.Config `toml:"dashscope"`
-	Agnes     agnes.Config     `toml:"agnes"`
+	Type      Text2ImageProvider `toml:"type"`
+	DashScope dashscope.Config   `toml:"dashscope"`
+	Agnes     agnes.Config       `toml:"agnes"`
 }

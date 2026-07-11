@@ -5,7 +5,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	chatdomain "github.com/gonotelm-lab/gonotelm/internal/domain/chat/entity"
-	schema 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/schema"
+	schema "github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 

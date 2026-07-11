@@ -143,7 +143,7 @@ func mergeRanges(source []byte, ranges []byteRange) string {
 	if len(ranges) == 0 {
 		return ""
 	}
-	return string(source[ranges[0].start : ranges[len(ranges)-1].end])
+	return string(source[ranges[0].start:ranges[len(ranges)-1].end])
 }
 
 func mergeRangeList(ranges []byteRange) (byteRange, bool) {

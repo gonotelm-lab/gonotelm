@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	configPath := flag.String("config", "./etc/gonotelm.toml.tpl", "config file path")
+	configPath := flag.String("config", "./etc/worker.toml.tpl", "config file path")
 	flag.Parse()
 
 	cfg, err := conf.Load(*configPath)

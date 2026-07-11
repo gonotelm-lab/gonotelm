@@ -1,9 +1,5 @@
 deployEnv = "dev"
 
-[api]
-port = 7099
-exitWaitTimeout = "${GONOTELM_API_EXIT_WAIT_TIMEOUT:-30s}"
-
 [database]
 type = "postgres"
 host = "${GONOTELM_DB_HOST:-127.0.0.1}"
@@ -54,15 +50,6 @@ level = "${GONOTELM_LOG_LEVEL:-debug}"
 
 [logic]
 
-[logic.chat]
-modelProvider = "${GONOTELM_LOGIC_CHAT_PROVIDER:-qwen}"
-model = "${GONOTELM_LOGIC_CHAT_MODEL:-glm-5.1}"
-maxRound = ${GONOTELM_LOGIC_CHAT_MAX_ROUND:-10}
-rerankEnabled = ${GONOTELM_LOGIC_CHAT_RERANK_ENABLED:-false}
-rerankProvider = "${GONOTELM_LOGIC_RERANK_PROVIDER:-dashscope}"
-rerankTopN = ${GONOTELM_LOGIC_CHAT_RERANK_TOP_N:-30}
-rerankModel = "${GONOTELM_LOGIC_CHAT_RERANK_MODEL:-qwen3-rerank}"
-
 [logic.source]
 modelProvider = "${GONOTELM_LOGIC_SOURCE_PROVIDER:-qwen}"
 model = "${GONOTELM_LOGIC_SOURCE_MODEL:-qwen3.5-27b}"
@@ -102,42 +89,11 @@ type = "${GONOTELM_EMBEDDING_TYPE:-dashscope}"
 batchSize = ${GONOTELM_EMBEDDING_BATCH_SIZE:-10}
 maxConcurrency = ${GONOTELM_EMBEDDING_MAX_CONCURRENCY:-4}
 
-[embedding.ark]
-apiKey = "${GONOTELM_ARK_API_KEY:-}"
-accessKey = "${GONOTELM_ARK_ACCESS_KEY:-}"
-secretKey = "${GONOTELM_ARK_SECRET_KEY:-}"
-baseUrl = "${GONOTELM_ARK_BASE_URL:-https://ark.cn-beijing.volces.com/api/v3}"
-region = "${GONOTELM_ARK_REGION:-cn-beijing}"
-model = "${GONOTELM_ARK_MODEL:-}"
-apiType = "${GONOTELM_ARK_API_TYPE:-text_api}"
-timeout = "${GONOTELM_ARK_TIMEOUT:-10m}"
-retryTimes = ${GONOTELM_ARK_RETRY_TIMES:-2}
-maxConcurrentRequests = ${GONOTELM_ARK_MAX_CONCURRENT_REQUESTS:-5}
-
 [embedding.dashscope]
 apiKey = "${GONOTELM_DASHSCOPE_API_KEY:-}"
 model = "${GONOTELM_DASHSCOPE_MODEL:-text-embedding-v4}"
 timeout = "${GONOTELM_DASHSCOPE_TIMEOUT:-30s}"
 dimensions = ${GONOTELM_DASHSCOPE_DIMENSIONS:-1024}
-
-[embedding.gemini]
-apiKey = "${GONOTELM_GEMINI_API_KEY:-}"
-backend = "${GONOTELM_GEMINI_BACKEND:-gemini_api}"
-project = "${GONOTELM_GEMINI_PROJECT:-}"
-location = "${GONOTELM_GEMINI_LOCATION:-}"
-model = "${GONOTELM_GEMINI_MODEL:-gemini-embedding-001}"
-taskType = "${GONOTELM_GEMINI_TASK_TYPE:-RETRIEVAL_DOCUMENT}"
-title = "${GONOTELM_GEMINI_TITLE:-}"
-outputDimensionality = ${GONOTELM_GEMINI_EMBED_DIMENSIONS:-1024}
-mimeType = "${GONOTELM_GEMINI_MIME_TYPE:-text/plain}"
-autoTruncate = ${GONOTELM_GEMINI_AUTO_TRUNCATE:-true}
-
-[embedding.ollama]
-baseUrl = "${GONOTELM_OLLAMA_BASE_URL:-http://localhost:11434}"
-model = "${GONOTELM_OLLAMA_MODEL:-bge-m3}"
-timeout = "${GONOTELM_OLLAMA_TIMEOUT:-30s}"
-truncate = ${GONOTELM_OLLAMA_TRUNCATE:-false}
-keepAlive = "${GONOTELM_OLLAMA_KEEP_ALIVE:-5m}"
 
 [embedding.openai]
 apiKey = "${GONOTELM_OPENAI_API_KEY:-}"
@@ -150,29 +106,6 @@ byAzure = ${GONOTELM_OPENAI_BY_AZURE:-false}
 baseUrl = "${GONOTELM_OPENAI_BASE_URL:-}"
 apiVersion = "${GONOTELM_OPENAI_API_VERSION:-}"
 
-[embedding.qianfan]
-ak = "${GONOTELM_QIANFAN_AK:-}"
-sk = "${GONOTELM_QIANFAN_SK:-}"
-accessKey = "${GONOTELM_QIANFAN_ACCESS_KEY:-}"
-secretKey = "${GONOTELM_QIANFAN_SECRET_KEY:-}"
-accessToken = "${GONOTELM_QIANFAN_ACCESS_TOKEN:-}"
-bearerToken = "${GONOTELM_QIANFAN_BEARER_TOKEN:-}"
-model = "${GONOTELM_QIANFAN_MODEL:-Embedding-V1}"
-
-[embedding.tencentcloud]
-secretId = "${GONOTELM_TENCENTCLOUD_SECRET_ID:-}"
-secretKey = "${GONOTELM_TENCENTCLOUD_SECRET_KEY:-}"
-region = "${GONOTELM_TENCENTCLOUD_REGION:-ap-guangzhou}"
-
-[rerank]
-type = "${GONOTELM_RERANK_TYPE:-dashscope}"
-
-[rerank.dashscope]
-apiKey = "${GONOTELM_DASHSCOPE_API_KEY:-}"
-baseUrl = "${GONOTELM_RERANK_DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/compatible-api/v1/reranks}"
-model = "${GONOTELM_RERANK_DASHSCOPE_MODEL:-qwen3-rerank}"
-timeout = "${GONOTELM_RERANK_DASHSCOPE_TIMEOUT:-30s}"
-
 [provider]
 
 [provider.deepseek]
@@ -182,15 +115,6 @@ baseUrl = "${GONOTELM_DEEPSEEK_BASE_URL:-https://api.deepseek.com}"
 model = "${GONOTELM_DEEPSEEK_MODEL:-deepseek-v4-flash}"
 maxTokens = ${GONOTELM_DEEPSEEK_MAX_TOKENS:-16384}
 thinkingEnabled = false
-
-[provider.openai]
-apiKey = "${GONOTELM_OPENAI_API_KEY:-}"
-baseUrl = "${GONOTELM_OPENAI_BASE_URL:-https://api.openai.com/v1}"
-model = "${GONOTELM_OPENAI_MODEL:-gpt-4o-mini}"
-timeout = "${GONOTELM_OPENAI_TIMEOUT:-5m}"
-maxTokens = ${GONOTELM_OPENAI_MAX_TOKENS:-16384}
-temperature = ${GONOTELM_OPENAI_TEMPERATURE:-1.0}
-reasoningEffort = "${GONOTELM_OPENAI_REASONING_EFFORT:-}"
 
 [provider.qwen]
 apiKey = "${GONOTELM_DASHSCOPE_API_KEY:-}"
@@ -202,15 +126,6 @@ temperature = ${GONOTELM_QWEN_TEMPERATURE:-1.0}
 topP = ${GONOTELM_QWEN_TOP_P:-1.0}
 enableThinking = ${GONOTELM_QWEN_ENABLE_THINKING:-false}
 
-[provider.agnes]
-apiKey = "${GONOTELM_AGNES_API_KEY:-}"
-baseUrl = "${GONOTELM_AGNES_BASE_URL:-https://apihub.agnes-ai.com/v1}"
-model = "${GONOTELM_AGNES_MODEL:-agnes-2.0-flash}"
-timeout = "${GONOTELM_AGNES_TIMEOUT:-5m}"
-maxTokens = ${GONOTELM_AGNES_MAX_TOKENS:-16384}
-temperature = ${GONOTELM_AGNES_TEMPERATURE:-1.0}
-topP = ${GONOTELM_AGNES_TOP_P:-1.0}
-
 [text2image]
 type = "${GONOTELM_TEXT2IMAGE_TYPE:-dashscope}"
 
@@ -220,21 +135,12 @@ baseUrl = "${GONOTELM_TEXT2IMAGE_DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.
 model = "${GONOTELM_TEXT2IMAGE_DASHSCOPE_MODEL:-qwen-image-2.0-pro}"
 timeout = "${GONOTELM_TEXT2IMAGE_DASHSCOPE_TIMEOUT:-1h}"
 
-[text2image.agnes]
-apiKey = "${GONOTELM_AGNES_API_KEY:-}"
-baseUrl = "${GONOTELM_TEXT2IMAGE_AGNES_BASE_URL:-https://apihub.agnes-ai.com/v1/images/generations}"
-model = "${GONOTELM_TEXT2IMAGE_AGNES_MODEL:-agnes-image-2.1-flash}"
-timeout = "${GONOTELM_TEXT2IMAGE_AGNES_TIMEOUT:-1h}"
-
 [flow]
 addr        = "${GONOTELM_FLOW_ADDR:-flow.example:9443}"
 namespace   = "${GONOTELM_FLOW_NAMESPACE:-gonotelm}"
 maxRetry    = ${GONOTELM_FLOW_MAX_RETRY:-3}
 dialTimeout = "${GONOTELM_FLOW_DIAL_TIMEOUT:-5s}"
 
-[syncer]
-perTaskInterval = "${GONOTELM_SYNCER_PER_TASK_INTERVAL:-2s}"
-globalInterval   = "${GONOTELM_SYNCER_GLOBAL_INTERVAL:-5s}"
-globalBatchSize  = ${GONOTELM_SYNCER_GLOBAL_BATCH_SIZE:-100}
-
-
+[worker]
+maxConcurrency  = ${GONOTELM_WORKER_MAX_CONCURRENCY:-4}
+heartbeat       = "${GONOTELM_WORKER_HEARTBEAT:-5s}"

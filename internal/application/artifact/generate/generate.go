@@ -3,9 +3,9 @@ package generate
 import (
 	"context"
 
-	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
-	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactprompt "github.com/gonotelm-lab/gonotelm/internal/application/artifact/prompt"
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/service/agentize"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image"

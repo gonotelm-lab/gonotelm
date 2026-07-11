@@ -20,10 +20,10 @@ type FileSourceContent struct {
 }
 
 type Source struct {
-	Id     string             `json:"id"`
+	Id     string                `json:"id"`
 	Kind   sourcevo.SourceKind   `json:"kind"`
 	Status sourcevo.SourceStatus `json:"status"`
-	Title  string             `json:"title"`
+	Title  string                `json:"title"`
 
 	Text *TextSourceContent `json:"text,omitempty"`
 	Url  *UrlSourceContent  `json:"url,omitempty"`
@@ -95,4 +95,3 @@ func ToSourcesFromDomainDetails(
 	}
 	return resp
 }
-

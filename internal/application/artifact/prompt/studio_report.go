@@ -1,7 +1,5 @@
 package prompt
 
-import ()
-
 type StudioReportTemplateVars struct {
 	SourceIds []string
 }

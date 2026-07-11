@@ -5,19 +5,19 @@ import "time"
 type EmbeddingType string
 
 const (
-	Ark             EmbeddingType = "ark"
+	Ark                EmbeddingType = "ark"
 	EmbeddingDashScope EmbeddingType = "dashscope"
-	Gemini          EmbeddingType = "gemini"
-	Ollama          EmbeddingType = "ollama"
-	OpenAI          EmbeddingType = "openai"
-	Qianfan         EmbeddingType = "qianfan"
-	TencentCloud    EmbeddingType = "tencentcloud"
+	Gemini             EmbeddingType = "gemini"
+	Ollama             EmbeddingType = "ollama"
+	OpenAI             EmbeddingType = "openai"
+	Qianfan            EmbeddingType = "qianfan"
+	TencentCloud       EmbeddingType = "tencentcloud"
 )
 
 type EmbeddingConfig struct {
-	Type EmbeddingType `toml:"type"`
-	BatchSize      int `toml:"batchSize"`
-	MaxConcurrency int `toml:"maxConcurrency"`
+	Type           EmbeddingType `toml:"type"`
+	BatchSize      int           `toml:"batchSize"`
+	MaxConcurrency int           `toml:"maxConcurrency"`
 
 	Ark          ArkConfig          `toml:"ark"`
 	DashScope    DashScopeConfig    `toml:"dashscope"`

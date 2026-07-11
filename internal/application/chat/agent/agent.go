@@ -8,7 +8,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/application/chat/agent/tools"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	domainagent "github.com/gonotelm-lab/gonotelm/pkg/agent"
 	chatentity "github.com/gonotelm-lab/gonotelm/internal/domain/chat/entity"
 	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
@@ -17,6 +16,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/service/agentize"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
+	domainagent "github.com/gonotelm-lab/gonotelm/pkg/agent"
 
 	"github.com/bytedance/sonic"
 	einotool "github.com/cloudwego/eino/components/tool"

@@ -13,6 +13,6 @@ const (
 )
 
 type RerankConfig struct {
-	Type      RerankProvider    `toml:"type"`
+	Type      RerankProvider   `toml:"type"`
 	DashScope dashscope.Config `toml:"dashscope"`
 }

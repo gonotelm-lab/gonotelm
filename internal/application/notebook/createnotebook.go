@@ -7,19 +7,19 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
-	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
+	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type CreateNotebookHandler struct {
 	notebookRepo notebookrepo.Repository
-	eventBus   eventbus.EventBus
+	eventBus     eventbus.EventBus
 }
 
 func NewCreateNotebookHandler(notebookRepo notebookrepo.Repository, eventBus eventbus.EventBus) *CreateNotebookHandler {
 	return &CreateNotebookHandler{
 		notebookRepo: notebookRepo,
-		eventBus:   eventBus,
+		eventBus:     eventBus,
 	}
 }
 

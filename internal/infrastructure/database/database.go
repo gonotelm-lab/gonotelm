@@ -185,7 +185,7 @@ type DAL struct {
 	ChatStore         ChatStore
 	ChatMessageStore  ChatMessageStore
 	ArtifactTaskStore ArtifactTaskStore
-	ArtifactStore      ArtifactStore
+	ArtifactStore     ArtifactStore
 }
 
 func NewDAL(
@@ -212,4 +212,3 @@ func (d *DAL) Close(ctx context.Context) error {
 	slog.WarnContext(ctx, "closing database connections...")
 	return d.Closer.Close(ctx)
 }
-

@@ -8,11 +8,11 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/route"
-	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/schema"
 	sourceapp "github.com/gonotelm-lab/gonotelm/internal/application/source"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourcevo "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity/vo"
+	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/schema"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
@@ -290,10 +290,10 @@ func toGetSourceDocResponse(
 	}
 
 	resp := &GetSourceDocResponse{
-		SourceId:       sourceId,
-		DocId:          doc.Id.String(),
-		SourceTitle:    sourceTitle,
-		Content:        doc.Content,
+		SourceId:    sourceId,
+		DocId:       doc.Id.String(),
+		SourceTitle: sourceTitle,
+		Content:     doc.Content,
 	}
 	if doc.RunePos != nil {
 		resp.Position = &SourceDocPosition{
@@ -334,8 +334,8 @@ func (s *Server) GetSourceDoc(ctx context.Context, c *app.RequestContext) {
 const maxBatchGetSourceDocsCount = 50
 
 type BatchGetSourceDocsRequest struct {
-	Id     uuid.UUID   `path:"id,required"` // source id
-	Ids    []string    `query:"ids,required"`
+	Id     uuid.UUID `path:"id,required"` // source id
+	Ids    []string  `query:"ids,required"`
 	docIds []valobj.Id
 }
 

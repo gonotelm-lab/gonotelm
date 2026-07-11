@@ -14,8 +14,8 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 
-	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	artifactprompt "github.com/gonotelm-lab/gonotelm/internal/application/artifact/prompt"
+	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 
 	einomodel "github.com/cloudwego/eino/components/model"
 	einoschema "github.com/cloudwego/eino/schema"

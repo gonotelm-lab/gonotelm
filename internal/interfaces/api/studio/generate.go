@@ -16,10 +16,10 @@ func (d *Deps) Generate(ctx context.Context, c *app.RequestContext) {
 	}
 
 	resp, err := d.GenerateHandler.Handle(ctx, &artifact.GenerateRequest{
-		NotebookId:  req.NotebookId,
-		Kind:        req.Kind,
-		SourceIds:   req.SourceIds,
-		InfoGraphic: req.InfoGraphic.toPayload(),
+		NotebookId:    req.NotebookId,
+		Kind:          req.Kind,
+		SourceIds:     req.SourceIds,
+		InfoGraphic:   req.InfoGraphic.toPayload(),
 		AudioOverview: req.AudioOverview.toPayload(),
 	})
 	if err != nil {

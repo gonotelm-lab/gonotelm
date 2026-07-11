@@ -24,10 +24,8 @@ globalInterval   = "5s"
 globalBatchSize  = 100
 
 [worker]
-name            = "gonotelm-worker-1"
 maxConcurrency  = 4
 heartbeat       = "5s"
-taskTypes       = ["artifact.mindmap", "artifact.report", "artifact.info_graphic", "artifact.audio_overview"]
 `
 
 func TestLoad_FlowWorkerSyncer(t *testing.T) {
@@ -42,7 +40,6 @@ func TestLoad_FlowWorkerSyncer(t *testing.T) {
 
 	assert.Equal(t, 4, cfg.Worker.MaxConcurrency)
 	assert.Equal(t, 5*time.Second, cfg.Worker.Heartbeat)
-	assert.Len(t, cfg.Worker.TaskTypes, 4)
 
 	assert.Equal(t, 2*time.Second, cfg.Syncer.PerTaskInterval)
 	assert.Equal(t, 5*time.Second, cfg.Syncer.GlobalInterval)

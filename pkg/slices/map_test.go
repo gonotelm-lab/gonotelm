@@ -54,8 +54,8 @@ func TestAsMap(t *testing.T) {
 }
 
 func TestAsMapF(t *testing.T) {
-	type user  struct {
-		id int
+	type user struct {
+		id   int
 		name string
 	}
 
@@ -76,7 +76,7 @@ func TestAsMapF(t *testing.T) {
 	if !maps.Equal(got, want) {
 		t.Fatalf("unexpected map, got=%v want=%v", got, want)
 	}
-}	
+}
 
 func TestAsMapF_LastValueWins(t *testing.T) {
 	type user struct {

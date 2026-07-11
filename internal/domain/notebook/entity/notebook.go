@@ -66,7 +66,6 @@ func (n *Notebook) validate() error {
 	return nil
 }
 
-
 func (n *Notebook) Delete() {
 	n.Base.Delete()
 	n.Base.AddEvent(notebookevent.NewEvent(n.Id, notebookevent.EventActionDelete))

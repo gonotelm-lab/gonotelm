@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"time"
 
-	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 )
 
 func (s *Syncer) PollOne(ctx context.Context, artifactId valobj.Id) {

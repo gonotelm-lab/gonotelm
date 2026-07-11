@@ -216,8 +216,8 @@ type SourceDocBatchGetParams struct {
 	// required
 	NotebookId string
 	// omit if empty
-	SourceId   string
-	DocIds     []string
+	SourceId string
+	DocIds   []string
 }
 
 type SourceDocQueryParams struct {

@@ -1,7 +1,5 @@
 package prompt
 
-import ()
-
 type PodcastStyle string
 
 const (

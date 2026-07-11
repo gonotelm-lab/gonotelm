@@ -11,7 +11,7 @@ import (
 )
 
 type outerEventBus struct {
-	producer mq.Producer
+	producer  mq.Producer
 	mqFactory *mq.MQ
 
 	mu        sync.Mutex
@@ -102,6 +102,6 @@ func (b *outerEventBus) Close(ctx context.Context) error {
 			closeErr = err
 		}
 	}
-	
+
 	return closeErr
 }

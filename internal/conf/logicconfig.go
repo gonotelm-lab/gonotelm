@@ -23,15 +23,15 @@ type LogicConfig struct {
 }
 
 type ChatLogicConfig struct {
-	MaxRound              int             `toml:"maxRound"`
-	ModelProvider         	llm.Provider   `toml:"modelProvider"`
-	Model                 string          `toml:"model"` // 对话使用的模型
-	SourceDocsRecallCount int             `toml:"sourceDocsRecallCount"`
-	TaskTimeout           time.Duration   `toml:"taskTimeout"`    // 流式任务超时时间
-	RerankProvider        	rerank.RerankProvider `toml:"rerankProvider"` // 重排序提供商
-	RerankEnabled         bool            `toml:"rerankEnabled"`
-	RerankTopN            int             `toml:"rerankTopN"`
-	RerankModel           string          `toml:"rerankModel"`
+	MaxRound              int                   `toml:"maxRound"`
+	ModelProvider         llm.Provider          `toml:"modelProvider"`
+	Model                 string                `toml:"model"` // 对话使用的模型
+	SourceDocsRecallCount int                   `toml:"sourceDocsRecallCount"`
+	TaskTimeout           time.Duration         `toml:"taskTimeout"`    // 流式任务超时时间
+	RerankProvider        rerank.RerankProvider `toml:"rerankProvider"` // 重排序提供商
+	RerankEnabled         bool                  `toml:"rerankEnabled"`
+	RerankTopN            int                   `toml:"rerankTopN"`
+	RerankModel           string                `toml:"rerankModel"`
 }
 
 func (c *ChatLogicConfig) GetSourceDocsRecallCount() int {
@@ -67,8 +67,8 @@ func (c *ChatLogicConfig) GetRerankTopN() int {
 }
 
 type SourceLogicConfig struct {
-	ModelProvider 	llm.Provider `toml:"modelProvider"`
-	Model         string        `toml:"model"`
+	ModelProvider llm.Provider `toml:"modelProvider"`
+	Model         string       `toml:"model"`
 
 	BizCache struct {
 		Eviction time.Duration `toml:"eviction"`
@@ -78,29 +78,29 @@ type SourceLogicConfig struct {
 
 type StudioLogicConfig struct {
 	Mindmap struct {
-		MaxRound      int           `toml:"maxRound"`
-		ModelProvider 	llm.Provider `toml:"modelProvider"`
-		Model         string        `toml:"model"`
+		MaxRound      int          `toml:"maxRound"`
+		ModelProvider llm.Provider `toml:"modelProvider"`
+		Model         string       `toml:"model"`
 	} `toml:"mindmap"`
 
 	Report struct {
-		MaxRound      int           `toml:"maxRound"`
-		ModelProvider 	llm.Provider `toml:"modelProvider"`
-		Model         string        `toml:"model"`
+		MaxRound      int          `toml:"maxRound"`
+		ModelProvider llm.Provider `toml:"modelProvider"`
+		Model         string       `toml:"model"`
 	} `toml:"report"`
 
 	InfoGraphic struct {
-		MaxRound           int                 `toml:"maxRound"`
-		ModelProvider      	llm.Provider       `toml:"modelProvider"`
-		Model              string              `toml:"model"`
-		ImageModelProvider 	text2image.Text2ImageProvider `toml:"imageModelProvider"`
-		ImageModel         string              `toml:"imageModel"`
+		MaxRound           int                           `toml:"maxRound"`
+		ModelProvider      llm.Provider                  `toml:"modelProvider"`
+		Model              string                        `toml:"model"`
+		ImageModelProvider text2image.Text2ImageProvider `toml:"imageModelProvider"`
+		ImageModel         string                        `toml:"imageModel"`
 	} `toml:"infoGraphic"`
 
 	AudioOverview struct {
-		MaxRound      int           `toml:"maxRound"`
-		ModelProvider 	llm.Provider `toml:"modelProvider"`
-		Model         string        `toml:"model"`
+		MaxRound      int          `toml:"maxRound"`
+		ModelProvider llm.Provider `toml:"modelProvider"`
+		Model         string       `toml:"model"`
 	} `toml:"audioOverview"`
 
 	TaskConfig struct {

@@ -51,8 +51,8 @@ const (
 	ResultKindStorage ResultKind = "storage"
 )
 
-func (r ResultKind) Inline() bool  { return r == ResultKindInline }
-func (r ResultKind) Storage() bool { return r == ResultKindStorage }
+func (r ResultKind) Inline() bool   { return r == ResultKindInline }
+func (r ResultKind) Storage() bool  { return r == ResultKindStorage }
 func (r ResultKind) String() string { return string(r) }
 
 type Artifact struct {
@@ -107,5 +107,5 @@ func (a *Artifact) IsTerminal() bool {
 	return a.Status.Completed() || a.Status.Failed() || a.Status.Cancelled()
 }
 
-func NewArtifactId() valobj.Id             { return valobj.Id(uuid.NewV7()) }
+func NewArtifactId() valobj.Id                     { return valobj.Id(uuid.NewV7()) }
 func NewArtifactIdFromUUID(id valobj.Id) valobj.Id { return id }

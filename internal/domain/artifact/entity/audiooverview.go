@@ -4,9 +4,9 @@ type ArtifactAudioOverviewStyle string
 
 const (
 	ArtifactAudioOverviewStyleDeepResearch ArtifactAudioOverviewStyle = "deep-research"
-	ArtifactAudioOverviewStyleAbstract    ArtifactAudioOverviewStyle = "abstract"
-	ArtifactAudioOverviewStyleDiscussion  ArtifactAudioOverviewStyle = "discussion"
-	ArtifactAudioOverviewStyleDebate      ArtifactAudioOverviewStyle = "debate"
+	ArtifactAudioOverviewStyleAbstract     ArtifactAudioOverviewStyle = "abstract"
+	ArtifactAudioOverviewStyleDiscussion   ArtifactAudioOverviewStyle = "discussion"
+	ArtifactAudioOverviewStyleDebate       ArtifactAudioOverviewStyle = "debate"
 )
 
 func (s ArtifactAudioOverviewStyle) String() string { return string(s) }

@@ -11,6 +11,7 @@ import (
 	einoembed "github.com/cloudwego/eino/components/embedding"
 
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
+	"github.com/gonotelm-lab/gonotelm/internal/domain/source/service/agentize"
 	oldcache "github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache"
 	cacheredis "github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache/redis"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
@@ -23,12 +24,11 @@ import (
 	oldmqimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
 	mqkafka "github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq/kafka"
 	infrarepo "github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository"
-	oldstorageimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
+	oldstorageimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	storageminio "github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage/minio"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
 	vdbmilvus "github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/milvus"
-	"github.com/gonotelm-lab/gonotelm/internal/domain/source/service/agentize"
 )
 
 type SharedInfra struct {
@@ -150,18 +150,18 @@ func (s *SharedInfra) Close(ctx context.Context) error {
 func newLLMGateway(cfg *infrallm.ProviderConfig) (*chat.Gateway, error) {
 	llmCfg := &infrallm.ProviderConfig{
 		OpenAI: infrallm.OpenAIChatConfig{
-			ApiKey:          cfg.OpenAI.ApiKey,
-			Timeout:         cfg.OpenAI.Timeout,
-			BaseUrl:         cfg.OpenAI.BaseUrl,
-			Model:           cfg.OpenAI.Model,
-			MaxTokens:       cfg.OpenAI.MaxTokens,
-			Temperature:     cfg.OpenAI.Temperature,
-			TopP:            cfg.OpenAI.TopP,
+			ApiKey:           cfg.OpenAI.ApiKey,
+			Timeout:          cfg.OpenAI.Timeout,
+			BaseUrl:          cfg.OpenAI.BaseUrl,
+			Model:            cfg.OpenAI.Model,
+			MaxTokens:        cfg.OpenAI.MaxTokens,
+			Temperature:      cfg.OpenAI.Temperature,
+			TopP:             cfg.OpenAI.TopP,
 			PresencePenalty:  cfg.OpenAI.PresencePenalty,
-			Seed:            cfg.OpenAI.Seed,
+			Seed:             cfg.OpenAI.Seed,
 			FrequencyPenalty: cfg.OpenAI.FrequencyPenalty,
-			ReasoningEffort: cfg.OpenAI.ReasoningEffort,
-			MaxConcurrency:  cfg.OpenAI.MaxConcurrency,
+			ReasoningEffort:  cfg.OpenAI.ReasoningEffort,
+			MaxConcurrency:   cfg.OpenAI.MaxConcurrency,
 		},
 		DeepSeek: infrallm.DeepSeekChatConfig{
 			ApiKey:           cfg.DeepSeek.ApiKey,

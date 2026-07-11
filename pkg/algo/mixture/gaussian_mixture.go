@@ -137,13 +137,13 @@ type Evaluation struct {
 	// - x1 -> cluster 0
 	// - x2 -> cluster 1
 	// - x3 -> cluster 2
-	Labels               []int
+	Labels []int
 	// Weights stores the mixture weight for each cluster index.
 	//
 	// Example:
 	// - Weights: [0.25, 0.50, 0.25]
 	// - Meaning: cluster 0/1/2 occupies about 25% / 50% / 25% probability mass.
-	Weights              []float64
+	Weights []float64
 	// Means stores the centroid vector for each cluster index.
 	//
 	// Example:

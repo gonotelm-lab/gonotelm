@@ -86,7 +86,7 @@ func (s *SourceStoreImpl) CountByNotebookId(
 func (s *SourceStoreImpl) BatchCountByNotebookIds(ctx context.Context, notebookIds []database.Id) (map[database.Id]int64, error) {
 	var rows []struct {
 		NotebookId database.Id `gorm:"column:notebook_id"`
-		Count      int64  `gorm:"column:count"`
+		Count      int64       `gorm:"column:count"`
 	}
 
 	err := s.db.WithContext(ctx).

@@ -6,17 +6,17 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api"
 	"github.com/gonotelm-lab/gonotelm/internal/application/artifact"
 	syncerpkg "github.com/gonotelm-lab/gonotelm/internal/application/artifact/syncer"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	flowcli "github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/adapter"
-	"github.com/gonotelm-lab/gonotelm/internal/interfaces/event"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
+	flowcli "github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
+	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api"
 	studioroutes "github.com/gonotelm-lab/gonotelm/internal/interfaces/api/studio"
+	"github.com/gonotelm-lab/gonotelm/internal/interfaces/event"
 )
 
 type App struct {
@@ -125,16 +125,16 @@ func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
 	// ── 9. Event handler registration ──
 
 	event.Init(ctx, &event.EventDeps{
-		NotebookRepo:        notebookRepo,
-		SourceRepo:          sourceRepo,
-		SourceStorageRepo:   sourceStorageRepo,
-		SourceDocRepo:       sourceDocRepo,
-		ChatRepo:            chatRepo,
-		MessageRepo:         messageRepo,
-		ContextMessageRepo:  contextMsgRepo,
-		ArtifactTaskRepo:    artifactRepo,
-		EventBus:            bus,
-		Summarizer:          summarizer,
+		NotebookRepo:       notebookRepo,
+		SourceRepo:         sourceRepo,
+		SourceStorageRepo:  sourceStorageRepo,
+		SourceDocRepo:      sourceDocRepo,
+		ChatRepo:           chatRepo,
+		MessageRepo:        messageRepo,
+		ContextMessageRepo: contextMsgRepo,
+		ArtifactTaskRepo:   artifactRepo,
+		EventBus:           bus,
+		Summarizer:         summarizer,
 	})
 
 	// ── 10. HTTP Server ──

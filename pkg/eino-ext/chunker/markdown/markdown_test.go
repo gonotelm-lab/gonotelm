@@ -3,9 +3,9 @@ package markdown
 import (
 	"context"
 	"os"
-	"unicode/utf8"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/cloudwego/eino/components/document"
 	"github.com/cloudwego/eino/schema"

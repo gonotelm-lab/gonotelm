@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/milvus-io/milvus/client/v2/milvusclient"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
 	"github.com/gonotelm-lab/gonotelm/pkg/misc"
+	"github.com/milvus-io/milvus/client/v2/milvusclient"
 
 	"google.golang.org/grpc"
 )

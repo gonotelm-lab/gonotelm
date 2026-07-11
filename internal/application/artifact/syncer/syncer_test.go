@@ -7,9 +7,9 @@ import (
 	"time"
 
 	flowschema "github.com/gonotelm-lab/flow/api/schema/v1"
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
-	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 	"github.com/stretchr/testify/assert"
@@ -139,7 +139,7 @@ func (f *syncTestFlow) Get(ctx context.Context, flowTaskId string) (*flow.TaskIn
 }
 
 func (f *syncTestFlow) Cancel(ctx context.Context, flowTaskId string) error { return nil }
-func (f *syncTestFlow) Close() error                                          { return nil }
+func (f *syncTestFlow) Close() error                                        { return nil }
 
 var _ flow.TaskClient = &syncTestFlow{}
 

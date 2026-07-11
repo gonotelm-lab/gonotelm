@@ -1,7 +1,5 @@
 package prompt
 
-import ()
-
 type StudioMindmapV2TemplateVars struct {
 	SourceIds []string
 }

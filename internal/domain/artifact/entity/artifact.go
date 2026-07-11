@@ -42,6 +42,8 @@ func (s Status) Failed() bool    { return s == StatusFailed }
 func (s Status) Cancelled() bool { return s == StatusCancelled }
 func (s Status) String() string  { return string(s) }
 
+func (s Status) IsTerminal() bool { return s.Completed() || s.Failed() || s.Cancelled() }
+
 type ResultKind string
 
 const (

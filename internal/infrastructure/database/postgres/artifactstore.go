@@ -96,7 +96,14 @@ func (s *ArtifactStoreImpl) UpdateFlowTaskId(ctx context.Context, id database.Id
 	if len(oldStatuses) > 0 {
 		q = q.Where("status IN ?", oldStatuses)
 	}
-	if err := q.Updates(map[string]any{"flow_task_id": flowTaskId, "status": "pending", "updated_at": gorm.Expr("now()")}).Error; err != nil {
+	if err := q.Updates(map[string]any{
+		"flow_task_id": flowTaskId,
+		"status":       "pending",
+		"title":        "",
+		"result":       nil,
+		"result_kind":  "",
+		"updated_at":   gorm.Expr("now()"),
+	}).Error; err != nil {
 		return sql.WrapErr(err)
 	}
 	return nil

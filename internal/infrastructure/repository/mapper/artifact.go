@@ -29,8 +29,8 @@ func ArtifactToSchema(a *artifactentity.Artifact) *schema.Artifact {
 		Result:     a.Result,
 		ResultKind: a.ResultKind.String(),
 		Payload:    payloadBytes,
-		CreatedAt:  a.CreateTime.Value(),
-		UpdatedAt:  a.UpdateTime.Value(),
+		CreatedAt:  a.CreateTime.Time(),
+		UpdatedAt:  a.UpdateTime.Time(),
 	}
 }
 
@@ -39,7 +39,7 @@ func ArtifactFromSchema(sch *schema.Artifact) *artifactentity.Artifact {
 		Base: entity.Base{
 			Id:         valobj.Id(sch.Id),
 			CreateTime: valobj.NewTimeFromId(valobj.Id(sch.Id)),
-			UpdateTime: valobj.NewTimeFrom(sch.UpdatedAt),
+			UpdateTime: valobj.NewTimeFrom(sch.UpdatedAt.UnixMilli()),
 		},
 		NotebookId: valobj.Id(sch.NotebookId),
 		UserId:     sch.UserId,

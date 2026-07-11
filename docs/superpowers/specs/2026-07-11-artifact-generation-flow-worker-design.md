@@ -6,6 +6,8 @@
 
 完成 DDD 重构最后一个业务领域的建模，并引入两个新入口：`cmd/worker`（worker 进程）和 `internal/domain/artifact`（领域层）。
 
+**重构彻底性**：本次是彻底重构，目标是重构完成后 `internal/app/` 整个目录删除。artifact 业务是 `internal/app/` 最后的消费者；一旦它迁出，旧的 `internal/app/{biz,logic,model,agent,constants}` 与 `internal/api/` 都不再有引用，一并删除。重构完成后 `internal/` 只剩 DDD 四层（domain/application/infrastructure/interfaces）+ core/bootstrap/conf。
+
 ## Background
 
 ### 现状
@@ -359,24 +361,46 @@ task-types       = ["artifact.mindmap", "artifact.report", "artifact.info_graphi
 ### 表迁移
 
 - 废弃 `artifact_tasks` 表（保留旧迁移记录），新建 `artifacts` 表迁移脚本 `migration/db/xxx_artifacts.sql`。
-- 存量数据迁移：将 `artifact_tasks` 终态行映射到 `artifacts` 行（对齐字段、丢弃 `RunId`/`LockNo`/`expiredAt`）。存量的 pending/running 行无法映射 flowTaskId，提交期允许直接清表（产品同意低风险）。
+- 存量数据迁移：将 `artifact_tasks` 终态行映射到 `artifacts` 行（对齐字段、丢弃 `RunId`/`LockNo`/`expiredAt`）。存量的 pending/running 行无法映射 `flowTaskId`（旧表与 flow 无关联），需要在部署前手工处理：要么把这类任务标 cancelled 后丢弃，要么等存量消耗完再上线。
 
 ### 代码迁移
 
+artifact 是 `internal/app/` 的最后消费者。本次迁移完成后，旧目录全部删除。
+
 | 旧路径 | 处理 |
 |---|---|
-| `internal/app/logic/studio/` | 4 generator 逻辑参考迁移到 `internal/application/artifact/generate/`，删除旧包 |
-| `internal/app/agent/tool/` | 不复用，改用 `internal/application/chat/agent/tools/`（agentize-backed） |
-| `internal/app/biz/prompt/studio*.go` | 抽到 `internal/application/artifact/prompt/` |
-| `internal/app/biz/artifact/` | 删除，业务走 domain repo |
-| `internal/app/model/artifact.go` | 删除，entity 在 `internal/domain/artifact/entity/` 重建 |
-| `internal/api/studioapi.go`、`notebookapi.go` 中的 studio 路由 | 迁到 `internal/interfaces/api/studio/`（新建） |
+| `internal/app/logic/studio/{mindmap,report,infographic,audiooverview}.go` | 参考、重写到 `internal/application/artifact/generate/`，删除 |
+| `internal/app/logic/studio/{taskloop,taskdispatcher,agentcommon,payload,artifact,logic}.go` | 不复用：调度交 flow，artifact DTO 走 entity，删除 |
+| `internal/app/agent/`（含 tool/） | 不复用，generator 走 `pkg/agent` + `internal/application/chat/agent/tools/`（agentize-backed），删除 |
+| `internal/app/biz/prompt/studio*.go` | 模板抽到 `internal/application/artifact/prompt/` 后删除 |
+| `internal/app/biz/prompt/` 其余 | 若 chat 等已迁走则已无业务消费；最终整 `biz/prompt` 不再被新层引用，随 `internal/app/` 一并删 |
+| `internal/app/biz/artifact/` | 删除，业务走 domain repository |
+| `internal/app/biz/` 其余 | 已被前期 chat/notebook/source DDD 业务替代，artifact 是最后一项消费方；删除 |
+| `internal/app/model/` | DTO 在 entity 与 schema 重建，删除 |
+| `internal/app/constants/` | 如有仍被新层引用，迁走；否则随 `internal/app/` 删除 |
+| `internal/app/logic.go`（顶层 `Logic` 聚合） | 不复用，新层走各自 application usecase，删除 |
+| `internal/api/`（旧 HTTP 层）| studio 路由迁到 `internal/interfaces/api/studio/`；notebook 路由如未迁则一并迁到 `internal/interfaces/api/notebook/`，全目录删除 |
 | `internal/application/studio/eventhandle/onnotebookdeleted.go` | 保留，改用新 artifact repository |
 | `internal/interfaces/event/eventhandler.go` | 相关注册保留 |
 
+重构后 `internal/` 结构：
+
+```
+internal/
+├── application/   (chat, notebook, source, artifact)
+├── bootstrap/     (app.go [API], worker_app.go [worker], shared.go)
+├── conf/          (含新增 flow/syncer/worker section)
+├── core/          (不变)
+├── domain/        (artifact, chat, notebook, source)
+├── infrastructure/(database, repository, llm, storage, ...)
+└── interfaces/    (api, event)
+```
+
 ### DDD 重构收尾
 
-本工作完成后，studio 业务从旧 `internal/app/{biz,logic,model}` 完整迁出，DDD 重构剩余的其他业务（source、chat、notebook）已在前期完成，本工作即重构最后一公里。
+本工作完成后，所有业务均从 `internal/app/{biz,logic,model,agent,constants}` 与 `internal/api/` 完整迁出。`internal/app/` 与 `internal/api/` 整个目录删除，DDD 重构正式收尾。重构后 `internal/` 只剩 DDD 四层 + `core`/`bootstrap`/`conf`。
+
+删除验证：`go build ./cmd/gonotelm && go build ./cmd/worker` 通过、`go vet ./...` 通过、无任何包引用 `internal/app` 或 `internal/api` 的 import path 残留。
 
 ## Error Handling
 
@@ -409,6 +433,5 @@ task-types       = ["artifact.mindmap", "artifact.report", "artifact.info_graphi
 
 ## Scope & Non-Goals
 
-- 本工作覆盖：artifact domain 建模、application use cases、HTTP 路由迁移、worker 进程与 generator、状态同步器、artifacts 表迁移。
-- 不覆盖：flow 服务自身的改动（.flow 不动）；chat/notebook/source 业务的 DDD 迁移（已完成）；agentize.Service 的扩展（按需小改）；旧 studio generator 逻辑的算法重写（仅平台迁移）。
-- 实施完后旧 `internal/app/logic/studio/`、`internal/app/biz/artifact/`、`internal/app/model/artifact.go` 删除，DDD 重构收尾。
+- 本工作覆盖：artifact domain 建模、application use cases、HTTP 路由迁移、worker 进程与 generator、状态同步器、artifacts 表迁移；**彻底删除 `internal/app/` 整目录**与 `internal/api/` 旧 HTTP 层，DDD 重构正式收尾。
+- 不覆盖：flow 服务自身的改动（`flow/` 不动）；chat/notebook/source 业务的 DDD 迁移（已完成，但它们的旧引用本次随 `internal/app/` 删除时一并清理）；agentize.Service 的扩展（按需小改）；旧 studio generator 逻辑的算法重写（仅平台迁移）。

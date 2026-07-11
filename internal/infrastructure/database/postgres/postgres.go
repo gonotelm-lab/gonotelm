@@ -34,5 +34,6 @@ func Open(cfg conf.DatabaseConfig) (*database.DAL, error) {
 		NewChatStoreImpl(db),
 		NewChatMessageStoreImpl(db),
 		NewArtifactTaskStoreImpl(db),
+		NewArtifactStoreImpl(db),
 	), nil
 }

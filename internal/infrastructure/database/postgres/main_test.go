@@ -16,6 +16,7 @@ var (
 	testSourceStore       *SourceStoreImpl
 	testChatMessageStore  *ChatMessageStoreImpl
 	testArtifactTaskStore *ArtifactTaskStoreImpl
+	testArtifactStore     *ArtifactStoreImpl
 )
 
 func TestMain(m *testing.M) {
@@ -35,6 +36,7 @@ func TestMain(m *testing.M) {
 	testSourceStore = NewSourceStoreImpl(testDB)
 	testChatMessageStore = NewChatMessageStoreImpl(testDB)
 	testArtifactTaskStore = NewArtifactTaskStoreImpl(testDB)
+	testArtifactStore = NewArtifactStoreImpl(testDB)
 
 	m.Run()
 

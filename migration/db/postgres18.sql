@@ -117,3 +117,22 @@ COMMENT ON COLUMN artifact_tasks.lock_no IS 'artifact task lock number for locki
 COMMENT ON COLUMN artifact_tasks.payload IS 'artifact task payload';
 COMMENT ON COLUMN artifact_tasks.created_at IS 'artifact task created time (unix ms)';
 COMMENT ON COLUMN artifact_tasks.expired_at IS 'task expired time (unix ms)';
+
+CREATE TABLE IF NOT EXISTS artifacts (
+  id            UUID        PRIMARY KEY,
+  notebook_id   UUID        NOT NULL,
+  user_id       VARCHAR(128) NOT NULL,
+  kind          VARCHAR(32) NOT NULL,
+  status        VARCHAR(16) NOT NULL,
+  flow_task_id  VARCHAR(64) NOT NULL,
+  title         VARCHAR(256) NULL,
+  result        BYTEA       NULL,
+  result_kind   VARCHAR(16) NULL,
+  payload       JSONB       NOT NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_artifacts_notebook ON artifacts(notebook_id);
+CREATE INDEX IF NOT EXISTS idx_artifacts_status  ON artifacts(status);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_artifacts_flow_task_id ON artifacts(flow_task_id);

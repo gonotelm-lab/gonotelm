@@ -22,3 +22,11 @@ type Artifact struct {
 }
 
 func (Artifact) TableName() string { return "artifacts" }
+
+type ArtifactUpdateStatusParams struct {
+	NewStatus  string
+	Title      string
+	Result     []byte
+	ResultKind string
+	UpdatedAt  time.Time
+}

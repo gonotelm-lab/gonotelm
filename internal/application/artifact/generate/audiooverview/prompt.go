@@ -18,20 +18,27 @@ var podcastOutlinePromptContent string
 
 var podcastOutlineTpl = prompt.FromMessages(einoschema.Jinja2, einoschema.SystemMessage(podcastOutlinePromptContent))
 
-func RenderPodcastOutline(ctx context.Context, sourceIds []string, lang string, tips string, style artifactentity.ArtifactAudioOverviewStyle) ([]*einoschema.Message, error) {
-	vars := StudioPodcastOutlineTemplateVars{
-		SourceIds: sourceIds,
-		Language:  lang,
-		Tips:      tips,
-	}
-	info, ok := builtinPodcastInfos[style]
+func RenderPodcastOutline(
+	ctx context.Context,
+	sourceIds []string,
+	lang string,
+	tips string,
+	style artifactentity.ArtifactAudioOverviewStyle,
+) ([]*einoschema.Message, error) {
+	ep, ok := artifactentity.BuiltinEpisodes[style]
 	if !ok {
-		info = builtinPodcastInfos[artifactentity.ArtifactAudioOverviewStyleDefault()]
+		ep = artifactentity.BuiltinEpisodes[artifactentity.ArtifactAudioOverviewStyleDefault()]
 	}
-	vars.Style = info.Style
-	vars.StyleDesc = info.Description
-	vars.Speakers = info.Speakers
-	vars.NumOfSegments = info.NumOfSegments
+
+	vars := StudioPodcastOutlineTemplateVars{
+		SourceIds:     sourceIds,
+		Language:      lang,
+		Tips:          tips,
+		Style:         ep.Style,
+		StyleDesc:     ep.Description,
+		Speakers:      ep.Speakers,
+		NumOfSegments: ep.NumSegments,
+	}
 
 	msgs, err := podcastOutlineTpl.Format(ctx, vars.PromptVars())
 	if err != nil {
@@ -42,7 +49,7 @@ func RenderPodcastOutline(ctx context.Context, sourceIds []string, lang string, 
 
 type StudioPodcastOutlineTemplateVars struct {
 	SourceIds     []string
-	Speakers      []StudioPodcastSpeaker
+	Speakers      []artifactentity.AudioSpeaker
 	Tips          string
 	NumOfSegments int
 	Language      string

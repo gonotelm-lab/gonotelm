@@ -30,6 +30,10 @@ func (o ArtifactInfoGraphicOrientation) ImageSize() (int, int) {
 	return 1280, 720
 }
 
+func ArtifactInfoGraphicOrientationDefault() ArtifactInfoGraphicOrientation {
+	return ArtifactInfoGraphicOrientationLandscape
+}
+
 type ArtifactInfoGraphicDetailLevel string
 
 const (
@@ -47,4 +51,8 @@ func (d ArtifactInfoGraphicDetailLevel) Supported() bool {
 		return true
 	}
 	return false
+}
+
+func ArtifactInfoGraphicDetailLevelDefault() ArtifactInfoGraphicDetailLevel {
+	return ArtifactInfoGraphicDetailLevelStandard
 }

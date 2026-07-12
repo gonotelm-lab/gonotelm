@@ -20,3 +20,7 @@ func (s ArtifactAudioOverviewStyle) Supported() bool {
 	}
 	return false
 }
+
+func ArtifactAudioOverviewStyleDefault() ArtifactAudioOverviewStyle {
+	return ArtifactAudioOverviewStyleAbstract
+}

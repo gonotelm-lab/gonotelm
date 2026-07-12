@@ -10,6 +10,8 @@ import (
 
 	"github.com/cloudwego/eino/components/prompt"
 	einoschema "github.com/cloudwego/eino/schema"
+
+	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 )
 
 //go:embed studio-infographic.jinja
@@ -21,28 +23,8 @@ type TemplateVars struct {
 	SourceIds    []string
 	TextLanguage string
 	ExtraPrompt  string
-	Orientation  string
-	DetailLevel  string
-}
-
-func normalizeOrientation(orientation string) string {
-	normalized := strings.ToLower(strings.TrimSpace(orientation))
-	switch normalized {
-	case "portrait", "landscape", "square":
-		return normalized
-	default:
-		return "landscape"
-	}
-}
-
-func normalizeDetailLevel(level string) string {
-	normalized := strings.ToLower(strings.TrimSpace(level))
-	switch normalized {
-	case "concise", "standard", "detailed":
-		return normalized
-	default:
-		return "standard"
-	}
+	Orientation  artifactentity.ArtifactInfoGraphicOrientation
+	DetailLevel  artifactentity.ArtifactInfoGraphicDetailLevel
 }
 
 func (v TemplateVars) promptVars() map[string]any {
@@ -50,8 +32,8 @@ func (v TemplateVars) promptVars() map[string]any {
 		"SourceIds":    types.NormalizeStrings(v.SourceIds),
 		"TextLanguage": strings.TrimSpace(v.TextLanguage),
 		"ExtraPrompt":  strings.TrimSpace(v.ExtraPrompt),
-		"Orientation":  normalizeOrientation(v.Orientation),
-		"DetailLevel":  normalizeDetailLevel(v.DetailLevel),
+		"Orientation":  v.Orientation.String(),
+		"DetailLevel":  v.DetailLevel.String(),
 	}
 }
 

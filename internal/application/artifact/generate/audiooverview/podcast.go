@@ -1,16 +1,9 @@
 package audiooverview
 
-type PodcastStyle string
-
-const (
-	PodcastStyleDeepResearch PodcastStyle = "deep-research"
-	PodcastStyleAbstract     PodcastStyle = "abstract"
-	PodcastStyleDiscussion   PodcastStyle = "discussion"
-	PodcastStyleDebate       PodcastStyle = "debate"
-)
+import artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 
 type PodcastInfo struct {
-	Style         PodcastStyle
+	Style         artifactentity.ArtifactAudioOverviewStyle
 	Description   string
 	Speakers      []StudioPodcastSpeaker
 	NumOfSegments int
@@ -70,27 +63,27 @@ var builtinPodcastSpeakers = map[string]StudioPodcastSpeaker{
 	},
 }
 
-var builtinPodcastInfos = map[PodcastStyle]PodcastInfo{
-	PodcastStyleDeepResearch: {
-		Style:         PodcastStyleDeepResearch,
+var builtinPodcastInfos = map[artifactentity.ArtifactAudioOverviewStyle]PodcastInfo{
+	artifactentity.ArtifactAudioOverviewStyleDeepResearch: {
+		Style:         artifactentity.ArtifactAudioOverviewStyleDeepResearch,
 		Description:   "Deep research on the topic with source-based analysis, key evidence, and practical takeaways",
 		Speakers:      []StudioPodcastSpeaker{builtinPodcastSpeakers["John"], builtinPodcastSpeakers["Linda"]},
 		NumOfSegments: 7,
 	},
-	PodcastStyleAbstract: {
-		Style:         PodcastStyleAbstract,
+	artifactentity.ArtifactAudioOverviewStyleAbstract: {
+		Style:         artifactentity.ArtifactAudioOverviewStyleAbstract,
 		Description:   "Short briefing on the topic covering the core idea, context, and main conclusion",
 		Speakers:      []StudioPodcastSpeaker{builtinPodcastSpeakers["Amy"]},
 		NumOfSegments: 3,
 	},
-	PodcastStyleDiscussion: {
-		Style:         PodcastStyleDiscussion,
+	artifactentity.ArtifactAudioOverviewStyleDiscussion: {
+		Style:         artifactentity.ArtifactAudioOverviewStyleDiscussion,
 		Description:   "Multiple perspectives discussion on the topic with viewpoint comparison and trade-off analysis",
 		Speakers:      []StudioPodcastSpeaker{builtinPodcastSpeakers["Sophia"], builtinPodcastSpeakers["David"], builtinPodcastSpeakers["James"]},
 		NumOfSegments: 6,
 	},
-	PodcastStyleDebate: {
-		Style:         PodcastStyleDebate,
+	artifactentity.ArtifactAudioOverviewStyleDebate: {
+		Style:         artifactentity.ArtifactAudioOverviewStyleDebate,
 		Description:   "Two opposing sides debate on the topic with arguments, rebuttals, and a balanced wrap-up",
 		Speakers:      []StudioPodcastSpeaker{builtinPodcastSpeakers["James"], builtinPodcastSpeakers["Olivia"]},
 		NumOfSegments: 5,

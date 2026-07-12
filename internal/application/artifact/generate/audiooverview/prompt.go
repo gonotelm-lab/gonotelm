@@ -9,6 +9,8 @@ import (
 
 	"github.com/cloudwego/eino/components/prompt"
 	einoschema "github.com/cloudwego/eino/schema"
+
+	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 )
 
 //go:embed studio-podcast-outline.jinja
@@ -16,7 +18,7 @@ var podcastOutlinePromptContent string
 
 var podcastOutlineTpl = prompt.FromMessages(einoschema.Jinja2, einoschema.SystemMessage(podcastOutlinePromptContent))
 
-func RenderPodcastOutline(ctx context.Context, sourceIds []string, lang string, tips string, style PodcastStyle) ([]*einoschema.Message, error) {
+func RenderPodcastOutline(ctx context.Context, sourceIds []string, lang string, tips string, style artifactentity.ArtifactAudioOverviewStyle) ([]*einoschema.Message, error) {
 	vars := StudioPodcastOutlineTemplateVars{
 		SourceIds: sourceIds,
 		Language:  lang,
@@ -24,7 +26,7 @@ func RenderPodcastOutline(ctx context.Context, sourceIds []string, lang string, 
 	}
 	info, ok := builtinPodcastInfos[style]
 	if !ok {
-		info = builtinPodcastInfos[PodcastStyleAbstract]
+		info = builtinPodcastInfos[artifactentity.ArtifactAudioOverviewStyleDefault()]
 	}
 	vars.Style = info.Style
 	vars.StyleDesc = info.Description
@@ -44,7 +46,7 @@ type StudioPodcastOutlineTemplateVars struct {
 	Tips          string
 	NumOfSegments int
 	Language      string
-	Style         PodcastStyle
+	Style         artifactentity.ArtifactAudioOverviewStyle
 	StyleDesc     string
 }
 

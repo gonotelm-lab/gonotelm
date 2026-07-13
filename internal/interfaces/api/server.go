@@ -9,10 +9,12 @@ import (
 	notebookapp "github.com/gonotelm-lab/gonotelm/internal/application/notebook"
 	sourceapp "github.com/gonotelm-lab/gonotelm/internal/application/source"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
+	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 	"github.com/gonotelm-lab/gonotelm/pkg/http/middleware"
@@ -31,12 +33,10 @@ type ServerDeps struct {
 	WaitGroup          *sync.WaitGroup
 	Gateway            *chat.Gateway
 
-	GenerateArtifactHandler      *artifactapp.GenerateArtifactHandler
-	GetArtifactStatusHandler     *artifactapp.GetArtifactStatusHandler
-	ListNotebookArtifactsHandler *artifactapp.ListArtifactsHandler
-	CancelArtifactHandler        *artifactapp.CancelArtifactHandler
-	DeleteArtifactHandler        *artifactapp.DeleteArtifactHandler
-	RetryArtifactHandler         *artifactapp.RetryArtifactHandler
+	ArtifactRepo artifactrepo.Repository
+	FlowClient   flow.TaskClient
+	Poller       artifactapp.Poller
+	StorageGW    artifactapp.StorageGateway
 }
 
 type Server struct {
@@ -138,12 +138,18 @@ func NewServer(
 			deps.ContextMessageRepo,
 		),
 
-		generateArtifactHandler:      deps.GenerateArtifactHandler,
-		getArtifactStatusHandler:     deps.GetArtifactStatusHandler,
-		listNotebookArtifactsHandler: deps.ListNotebookArtifactsHandler,
-		cancelArtifactHandler:        deps.CancelArtifactHandler,
-		deleteArtifactHandler:        deps.DeleteArtifactHandler,
-		retryArtifactHandler:         deps.RetryArtifactHandler,
+		generateArtifactHandler: artifactapp.NewGenerateArtifactHandler(
+			deps.ArtifactRepo,
+			deps.FlowClient,
+			deps.NotebookRepo,
+			deps.Poller,
+			deps.EventBus,
+		),
+		getArtifactStatusHandler:     artifactapp.NewGetArtifactStatusHandler(deps.ArtifactRepo, deps.FlowClient, deps.StorageGW),
+		listNotebookArtifactsHandler: artifactapp.NewListArtifactsHandler(deps.ArtifactRepo, deps.NotebookRepo),
+		cancelArtifactHandler:        artifactapp.NewCancelArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.EventBus),
+		deleteArtifactHandler:        artifactapp.NewDeleteArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.StorageGW),
+		retryArtifactHandler:         artifactapp.NewRetryArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.Poller, deps.EventBus),
 	}
 
 	s.registerRoutes()

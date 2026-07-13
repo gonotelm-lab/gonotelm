@@ -14,7 +14,7 @@ import (
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 )
 
-//go:embed studio-infographic.jinja
+//go:embed infographic.jinja
 var infographicPromptContent string
 
 var infographicTpl = prompt.FromMessages(einoschema.Jinja2, einoschema.SystemMessage(infographicPromptContent))

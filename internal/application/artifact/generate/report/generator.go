@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"strings"
 
-	generatetypes "github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/types"
+	"github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/types"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
@@ -20,16 +20,16 @@ import (
 const MaxNotebookNameLength = 128
 
 type Generator struct {
-	deps *generatetypes.ServiceDeps
+	deps *types.ServiceDeps
 }
 
-var _ generatetypes.Generator = &Generator{}
+var _ types.Generator = &Generator{}
 
-func New(deps *generatetypes.ServiceDeps) *Generator {
+func New(deps *types.ServiceDeps) *Generator {
 	return &Generator{deps: deps}
 }
 
-func (r *Generator) Generate(ctx context.Context, req *generatetypes.Request) (*generatetypes.Response, error) {
+func (r *Generator) Generate(ctx context.Context, req *types.Request) (*types.Response, error) {
 	reportText, err := r.agentCreateReport(ctx, req)
 	if err != nil {
 		return nil, err
@@ -37,7 +37,7 @@ func (r *Generator) Generate(ctx context.Context, req *generatetypes.Request) (*
 
 	title := r.generateTitle(ctx, reportText, req)
 
-	return &generatetypes.Response{
+	return &types.Response{
 		Title:      title,
 		Result:     pkgstring.AsBytes(reportText),
 		ResultKind: artifactentity.ResultKindInline,
@@ -46,7 +46,7 @@ func (r *Generator) Generate(ctx context.Context, req *generatetypes.Request) (*
 
 func (r *Generator) agentCreateReport(
 	ctx context.Context,
-	req *generatetypes.Request,
+	req *types.Request,
 ) (string, error) {
 	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioReportScene)
 
@@ -57,7 +57,7 @@ func (r *Generator) agentCreateReport(
 		maxRound            = conf.Global().Studio.Report.MaxRound
 	)
 
-	ag, err := generatetypes.BuildSourceExploreAgent(
+	ag, err := types.BuildSourceExploreAgent(
 		r.deps,
 		reportModelProvider,
 		reportModel,
@@ -71,7 +71,7 @@ func (r *Generator) agentCreateReport(
 		return "", errors.Wrapf(errors.ErrInner, "build source explore agent for report failed, err=%v", err)
 	}
 
-	sourceIds := generatetypes.SourceIDsToStrings(req.SourceIds)
+	sourceIds := types.SourceIDsToStrings(req.SourceIds)
 	msgs, err := RenderReport(ctx, sourceIds)
 	if err != nil {
 		return "", errors.Wrapf(errors.ErrInner, "generate report message failed, err=%v", err)
@@ -87,7 +87,7 @@ func (r *Generator) agentCreateReport(
 	return string(output.Content), nil
 }
 
-func (r *Generator) generateTitle(ctx context.Context, report string, req *generatetypes.Request) string {
+func (r *Generator) generateTitle(ctx context.Context, report string, req *types.Request) string {
 	title := ""
 	titleMakerMsgs, err := RenderTitleMaker(ctx, report)
 	if err != nil {

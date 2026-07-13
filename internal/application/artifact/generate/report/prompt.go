@@ -11,7 +11,7 @@ import (
 	einoschema "github.com/cloudwego/eino/schema"
 )
 
-//go:embed studio-report.jinja
+//go:embed report.jinja
 var reportPromptContent string
 
 var reportTpl = prompt.FromMessages(einoschema.Jinja2, einoschema.SystemMessage(reportPromptContent))

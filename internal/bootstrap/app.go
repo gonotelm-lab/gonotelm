@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/gonotelm-lab/gonotelm/internal/application/artifact"
 	syncerpkg "github.com/gonotelm-lab/gonotelm/internal/application/artifact/syncer"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/adapter"
@@ -118,13 +117,6 @@ func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
 
 	// ── 8. Use cases ──
 
-	generateUC := artifact.NewGenerateArtifactHandler(artifactRepo, flowClient, notebookRepo, syncerInst, bus)
-	statusUC := artifact.NewGetArtifactStatusHandler(artifactRepo, flowClient, storageGateway)
-	listUC := artifact.NewListArtifactsHandler(artifactRepo, notebookRepo)
-	cancelUC := artifact.NewCancelArtifactHandler(artifactRepo, flowClient, bus)
-	deleteUC := artifact.NewDeleteArtifactHandler(artifactRepo, flowClient, storageGateway)
-	retryUC := artifact.NewRetryArtifactHandler(artifactRepo, flowClient, syncerInst, bus)
-
 	// ── 9. Event handler registration ──
 
 	event.Init(ctx, &event.EventDeps{
@@ -155,12 +147,10 @@ func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
 		WaitGroup:          &sync.WaitGroup{},
 		Gateway:            infra.LLMGateway,
 
-		GenerateArtifactHandler:      generateUC,
-		GetArtifactStatusHandler:     statusUC,
-		ListNotebookArtifactsHandler: listUC,
-		CancelArtifactHandler:        cancelUC,
-		DeleteArtifactHandler:        deleteUC,
-		RetryArtifactHandler:         retryUC,
+		ArtifactRepo: artifactRepo,
+		FlowClient:   flowClient,
+		Poller:       syncerInst,
+		StorageGW:    storageGateway,
 	})
 
 	return &App{closers: closers, Server: svr}, nil

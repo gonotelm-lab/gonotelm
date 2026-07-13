@@ -15,6 +15,15 @@ import (
 
 const taskTypePrefix = "artifact."
 
+var (
+	buildinTaskTypes = []string{
+		"artifact.mindmap",
+		"artifact.report",
+		"artifact.info_graphic",
+		"artifact.audio_overview",
+	}
+)
+
 type WorkerApp struct {
 	shared  *SharedInfra
 	clients []*flowworker.Client
@@ -40,18 +49,12 @@ func NewWorkerApp(ctx context.Context, cfg *conf.Config) (*WorkerApp, error) {
 		ObjectStorage: shared.Storage,
 	}
 
-	taskTypes := []string{
-		"artifact.mindmap",
-		"artifact.report",
-		"artifact.info_graphic",
-		"artifact.audio_overview",
-	}
 	app := &WorkerApp{shared: shared}
-	for _, taskType := range taskTypes {
+	for _, taskType := range buildinTaskTypes {
 		wcfg := flowworker.ConfigWithDefaults(flowworker.Config{
 			Namespace:         cfg.Flow.Namespace,
 			TaskType:          taskType,
-			Name:              "gonotelm-worker-" + strings.TrimPrefix(taskType, taskTypePrefix),
+			Name:              "gnw-" + strings.TrimPrefix(taskType, taskTypePrefix),
 			MaxConcurrency:    cfg.Worker.MaxConcurrency,
 			HeartbeatInterval: cfg.Worker.Heartbeat,
 		})

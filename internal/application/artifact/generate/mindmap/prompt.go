@@ -11,7 +11,7 @@ import (
 	einoschema "github.com/cloudwego/eino/schema"
 )
 
-//go:embed studio-mindmap.jinja
+//go:embed mindmap.jinja
 var mindmapPromptContent string
 
 var mindmapTpl = prompt.FromMessages(einoschema.Jinja2, einoschema.SystemMessage(mindmapPromptContent))

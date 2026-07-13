@@ -24,7 +24,7 @@ func ConfigWithDefaults(cfg Config) Config {
 		cfg.PerTaskInterval = 2 * time.Second
 	}
 	if cfg.GlobalInterval <= 0 {
-		cfg.GlobalInterval = 5 * time.Second
+		cfg.GlobalInterval = 10 * time.Second
 	}
 	if cfg.GlobalBatchSize <= 0 {
 		cfg.GlobalBatchSize = 100

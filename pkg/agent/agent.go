@@ -72,6 +72,9 @@ type Agent[State any] struct {
 	accMsgs []*EinoMessage         // 累计的历史消息
 	usage   *einoschema.TokenUsage // 累计token使用
 
+	// beforeChat hook 只在首次 React 时执行（如注入系统提示词）
+	beforeChatOnce sync.Once
+
 	// 全部工具被调用前回调
 	beforeToolCall BeforeToolCallHook[State]
 	// 全部工具被调用后回调
@@ -183,9 +186,23 @@ func (a *Agent[State]) BindTools(tools map[string]einotool.InvokableTool) error 
 
 // 清空所有已绑定的工具
 // 可以在React循环中动态删减工具
+// 如需恢复，调用方需重新调用 BindTools
 func (a *Agent[State]) StripTools() {
 	a.tooledLLM = a.cfg.BaseLLM
 	clear(a.tools)
+}
+
+// Clear 重置 agent 的对话上下文和 token 用量，不影响工具绑定和配置。
+func (a *Agent[State]) Clear() {
+	a.accMsgs = nil
+	a.beforeChatOnce = sync.Once{}
+	a.usage = &einoschema.TokenUsage{
+		PromptTokens:            0,
+		PromptTokenDetails:      einoschema.PromptTokenDetails{},
+		CompletionTokens:        0,
+		TotalTokens:             0,
+		CompletionTokensDetails: einoschema.CompletionTokensDetails{},
+	}
 }
 
 func (a *Agent[State]) AccumulatedMessages() []*EinoMessage {
@@ -200,14 +217,6 @@ func (a *Agent[State]) BaseLLM() eino.ToolCallingChatModel {
 	return a.cfg.BaseLLM
 }
 
-func (a *Agent[State]) setAccumulatedMessages(msgs []*EinoMessage) {
-	if len(msgs) == 0 {
-		a.accMsgs = nil
-		return
-	}
-	a.accMsgs = append(a.accMsgs[:0], msgs...)
-}
-
 func (a *Agent[State]) appendAccumulatedMessages(msgs ...*EinoMessage) {
 	if len(msgs) == 0 {
 		return
@@ -216,6 +225,9 @@ func (a *Agent[State]) appendAccumulatedMessages(msgs ...*EinoMessage) {
 }
 
 // 与模型交互 并返回最终的回答
+//
+// 多次调用 React/ReactStream 时，传入的 msgs 会追加到已有上下文之后，
+// 实现 agent 跨阶段复用。调用 Clear() 可清空上下文。
 func (a *Agent[State]) ReactStream(
 	ctx context.Context,
 	msgs []*EinoMessage,
@@ -223,20 +235,27 @@ func (a *Agent[State]) ReactStream(
 	if len(msgs) == 0 {
 		return nil, errors.ErrParams.Msg("no messages to chat")
 	}
-	a.setAccumulatedMessages(msgs)
 
-	msgs, err := a.handleBeforeChat(ctx, msgs)
+	// beforeChat hook 只作用于本轮新增的 msgs，不触及已有 accMsgs
+	newMsgs, err := a.handleBeforeChat(ctx, msgs)
 	if err != nil {
 		return nil, errors.WithMessage(err, "handle before chat failed")
 	}
+	a.appendAccumulatedMessages(newMsgs...)
+
+	// workingMsgs 是本轮发给 LLM 的消息，在 accMsgs 基础上构建
+	// beforeRound hook 可能注入临时消息（如 FinalRoundInstruction），这些只作用于当轮不写入 accMsgs
+	workingMsgs := append([]*EinoMessage{}, a.accMsgs...)
 
 	for round := range a.cfg.MaxRound {
-		msgs, err = a.handleBeforeRound(ctx, round, msgs)
+		roundMsgs, err := a.handleBeforeRound(ctx, round, workingMsgs)
 		if err != nil {
 			return nil, errors.WithMessagef(err, "before round %d failed", round)
 		}
+		// handleBeforeRound 可能返回新 slice（注入了临时消息），用 roundMsgs 发给 LLM
+		workingMsgs = roundMsgs
 
-		stream, err := a.tooledLLM.Stream(ctx, msgs, a.cfg.Options...)
+		stream, err := a.tooledLLM.Stream(ctx, workingMsgs, a.cfg.Options...)
 		if err != nil {
 			return nil, errors.WithMessage(err, "stream chat failed")
 		}
@@ -291,15 +310,14 @@ func (a *Agent[State]) ReactStream(
 					roundMsgs := make([]*EinoMessage, 0, 1+len(toolMsgs))
 					roundMsgs = append(roundMsgs, msg)
 					roundMsgs = append(roundMsgs, toolMsgs...)
-					msgs = append(msgs, roundMsgs...)
+					workingMsgs = append(workingMsgs, roundMsgs...)
 					a.appendAccumulatedMessages(roundMsgs...)
 					if a.msgAppender != nil {
 						a.msgAppender(ctx, a.state, roundMsgs)
 					}
-
 				} else {
 					// 认为已经结束
-					msgs = append(msgs, msg)
+					workingMsgs = append(workingMsgs, msg)
 					a.appendAccumulatedMessages(msg)
 					if a.msgAppender != nil {
 						a.msgAppender(ctx, a.state, []*EinoMessage{msg})
@@ -324,6 +342,9 @@ func (a *Agent[State]) ReactStream(
 }
 
 // 非流式输出
+//
+// 多次调用 React/ReactStream 时，传入的 msgs 会追加到已有上下文之后，
+// 实现 agent 跨阶段复用。调用 Clear() 可清空上下文。
 func (a *Agent[State]) React(
 	ctx context.Context,
 	msgs []*EinoMessage,
@@ -331,20 +352,25 @@ func (a *Agent[State]) React(
 	if len(msgs) == 0 {
 		return nil, errors.ErrParams.Msg("no messages to chat")
 	}
-	a.setAccumulatedMessages(msgs)
 
-	msgs, err := a.handleBeforeChat(ctx, msgs)
+	newMsgs, err := a.handleBeforeChat(ctx, msgs)
 	if err != nil {
 		return nil, errors.WithMessage(err, "handle before chat failed")
 	}
+	a.appendAccumulatedMessages(newMsgs...)
+
+	// workingMsgs 是本轮发给 LLM 的消息，在 accMsgs 基础上构建
+	// beforeRound hook 可能注入临时消息（如 FinalRoundInstruction），这些只作用于当轮不写入 accMsgs
+	workingMsgs := append([]*EinoMessage{}, a.accMsgs...)
 
 	for round := range a.cfg.MaxRound {
-		msgs, err = a.handleBeforeRound(ctx, round, msgs)
+		roundMsgs, err := a.handleBeforeRound(ctx, round, workingMsgs)
 		if err != nil {
 			return nil, errors.WithMessagef(err, "before round %d failed", round)
 		}
+		workingMsgs = roundMsgs
 
-		responseMsg, err := a.tooledLLM.Generate(ctx, msgs, a.cfg.Options...)
+		responseMsg, err := a.tooledLLM.Generate(ctx, workingMsgs, a.cfg.Options...)
 		if err != nil {
 			return nil, errors.WithMessage(err, "generate chat failed")
 		}
@@ -356,7 +382,7 @@ func (a *Agent[State]) React(
 			roundMsgs := make([]*EinoMessage, 0, 1+len(toolMsgs))
 			roundMsgs = append(roundMsgs, responseMsg)
 			roundMsgs = append(roundMsgs, toolMsgs...)
-			msgs = append(msgs, roundMsgs...)
+			workingMsgs = append(workingMsgs, roundMsgs...)
 			a.appendAccumulatedMessages(roundMsgs...)
 			if a.msgAppender != nil {
 				a.msgAppender(ctx, a.state, roundMsgs)
@@ -387,15 +413,14 @@ func (a *Agent[State]) handleBeforeChat(
 	msgs []*EinoMessage,
 ) ([]*EinoMessage, error) {
 	if a.beforeChat != nil {
-		newMsgs, err := a.beforeChat(ctx, a.state, msgs)
-		if err != nil {
-			return nil, errors.WithMessage(err, "before chat failed")
+		var hookErr error
+		a.beforeChatOnce.Do(func() {
+			msgs, hookErr = a.beforeChat(ctx, a.state, msgs)
+		})
+		if hookErr != nil {
+			return nil, hookErr
 		}
-
-		a.setAccumulatedMessages(newMsgs)
-		return newMsgs, nil
 	}
-
 	return msgs, nil
 }
 
@@ -403,15 +428,8 @@ func (a *Agent[State]) handleBeforeRound(
 	ctx context.Context, round int, msgs []*EinoMessage,
 ) ([]*EinoMessage, error) {
 	if a.beforeRound != nil {
-		newMsgs, err := a.beforeRound(ctx, round, a.state, msgs)
-		if err != nil {
-			return nil, errors.WithMessage(err, "before round failed")
-		}
-
-		a.setAccumulatedMessages(newMsgs)
-		return newMsgs, nil
+		return a.beforeRound(ctx, round, a.state, msgs)
 	}
-
 	return msgs, nil
 }
 

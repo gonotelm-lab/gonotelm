@@ -7,7 +7,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	generatetypes "github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/types"
+	"github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/types"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
@@ -28,12 +28,12 @@ const (
 )
 
 type Generator struct {
-	deps *generatetypes.ServiceDeps
+	deps *types.ServiceDeps
 }
 
-var _ generatetypes.Generator = &Generator{}
+var _ types.Generator = &Generator{}
 
-func New(deps *generatetypes.ServiceDeps) *Generator {
+func New(deps *types.ServiceDeps) *Generator {
 	return &Generator{deps: deps}
 }
 
@@ -42,13 +42,13 @@ type mindmapExpectation struct {
 	Mindmap string `json:"mindmap"`
 }
 
-func (m *Generator) Generate(ctx context.Context, req *generatetypes.Request) (*generatetypes.Response, error) {
+func (m *Generator) Generate(ctx context.Context, req *types.Request) (*types.Response, error) {
 	expect, err := m.agentCreateMindmap(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 
-	return &generatetypes.Response{
+	return &types.Response{
 		Title:      expect.Title,
 		Result:     pkgstring.AsBytes(expect.Mindmap),
 		ResultKind: artifactentity.ResultKindInline,
@@ -70,11 +70,11 @@ func (m *Generator) llmOptions() []einomodel.Option {
 
 func (m *Generator) agentCreateMindmap(
 	ctx context.Context,
-	req *generatetypes.Request,
+	req *types.Request,
 ) (*mindmapExpectation, error) {
 	llmOptions := m.llmOptions()
 
-	ag, err := generatetypes.BuildSourceExploreAgent(
+	ag, err := types.BuildSourceExploreAgent(
 		m.deps,
 		conf.Global().Studio.Mindmap.ModelProvider,
 		conf.Global().Studio.Mindmap.Model,
@@ -88,7 +88,7 @@ func (m *Generator) agentCreateMindmap(
 		return nil, errors.Wrapf(errors.ErrInner, "failed to build source explore agent for mindmap, err=%v", err)
 	}
 
-	sourceIds := generatetypes.SourceIDsToStrings(req.SourceIds)
+	sourceIds := types.SourceIDsToStrings(req.SourceIds)
 	msgs, err := RenderMindmap(ctx, sourceIds)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "generate mindmap message failed, err=%v", err)
@@ -111,20 +111,11 @@ func (m *Generator) agentCreateMindmap(
 	)
 
 	msgs = append([]*einoschema.Message{}, ag.AccumulatedMessages()...)
-	compensateMsg := &einoschema.Message{
-		Role: einoschema.User,
-		Content: fmt.Sprintf(
-			"你刚才输出的结果不符合要求，请严格重输。\n当前输出：\n%s\n\n"+
-				"要求：\n"+
-				"1) 只输出一个合法 JSON 对象，不要任何解释性文字\n"+
-				"2) JSON 字段必须且仅能包含 title 和 mindmap\n"+
-				"3) title 长度必须为 10-30 字\n"+
-				"4) mindmap 必须是完整 mermaid mindmap 代码块字符串\n"+
-				"5) 不允许输出 ```json 代码块包裹",
-			output.Content,
-		),
-	}
-	msgs = append(msgs, compensateMsg)
+	msgs = append(msgs, types.BuildCompensateMessage(output.Content, []string{
+		"JSON 字段必须且仅能包含 title 和 mindmap",
+		"title 长度必须为 10-30 字",
+		"mindmap 必须是完整 mermaid mindmap 代码块字符串",
+	}))
 
 	llmResp, genErr := ag.BaseLLM().Generate(ctx, msgs, llmOptions...)
 	if genErr != nil {

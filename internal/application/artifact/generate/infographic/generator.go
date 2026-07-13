@@ -13,7 +13,7 @@ import (
 
 	"github.com/gabriel-vasile/mimetype"
 
-	generatetypes "github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/types"
+	"github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/types"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
@@ -34,12 +34,12 @@ import (
 const MaxArtifactTitleLength = 128
 
 type Generator struct {
-	deps *generatetypes.ServiceDeps
+	deps *types.ServiceDeps
 }
 
-var _ generatetypes.Generator = &Generator{}
+var _ types.Generator = &Generator{}
 
-func New(deps *generatetypes.ServiceDeps) *Generator {
+func New(deps *types.ServiceDeps) *Generator {
 	return &Generator{deps: deps}
 }
 
@@ -48,7 +48,7 @@ type infographicExpectation struct {
 	ImagePrompt string `json:"image_prompt"`
 }
 
-func (ig *Generator) Generate(ctx context.Context, req *generatetypes.Request) (*generatetypes.Response, error) {
+func (ig *Generator) Generate(ctx context.Context, req *types.Request) (*types.Response, error) {
 	payload, ok := req.Payload.(*artifactentity.InfoGraphicPayload)
 	if !ok {
 		return nil, errors.ErrParams.Msgf("infographic generator expects InfoGraphicPayload")
@@ -64,7 +64,7 @@ func (ig *Generator) Generate(ctx context.Context, req *generatetypes.Request) (
 		return nil, errors.Wrapf(errors.ErrSerde, "marshal infographic storage result err=%v", err)
 	}
 
-	return &generatetypes.Response{
+	return &types.Response{
 		Title:      expect.Title,
 		Result:     result,
 		ResultKind: artifactentity.ResultKindStorage,
@@ -105,7 +105,7 @@ func (ig *Generator) generateImagePrompt(
 
 	bindAllTools := payload.DetailLevel != artifactentity.ArtifactInfoGraphicDetailLevelConcise
 
-	ag, err := generatetypes.BuildSourceExploreAgent(
+	ag, err := types.BuildSourceExploreAgent(
 		ig.deps,
 		cfg.ModelProvider,
 		cfg.Model,
@@ -119,7 +119,7 @@ func (ig *Generator) generateImagePrompt(
 		return nil, errors.WithMessagef(err, "failed to build source explore agent for infographic")
 	}
 
-	sourceIds := generatetypes.SourceIDsToStrings(payload.SourceIds)
+	sourceIds := types.SourceIDsToStrings(payload.SourceIds)
 	vars := TemplateVars{
 		SourceIds:    sourceIds,
 		TextLanguage: payload.TextLanguage,
@@ -152,19 +152,11 @@ func (ig *Generator) generateImagePrompt(
 	)
 
 	msgs = append([]*einoschema.Message{}, ag.AccumulatedMessages()...)
-	msgs = append(msgs, &einoschema.Message{
-		Role: einoschema.User,
-		Content: fmt.Sprintf(
-			"你刚才输出的结果不符合要求，请严格重输。\n当前输出：\n%s\n\n"+
-				"要求：\n"+
-				"1) 只输出一个合法 JSON 对象，不要任何解释性文字\n"+
-				"2) JSON 字段必须且仅能包含 title 和 image_prompt\n"+
-				"3) title 长度必须为 10-30 字\n"+
-				"4) image_prompt 必须为完整文生图 prompt 字符串\n"+
-				"5) 不允许输出 ```json 代码块包裹",
-			output.Content,
-		),
-	})
+	msgs = append(msgs, types.BuildCompensateMessage(output.Content, []string{
+		"JSON 字段必须且仅能包含 title 和 image_prompt",
+		"title 长度必须为 10-30 字",
+		"image_prompt 必须为完整文生图 prompt 字符串",
+	}))
 
 	llmResp, genErr := ag.BaseLLM().Generate(ctx, msgs, modelOption)
 	if genErr != nil {

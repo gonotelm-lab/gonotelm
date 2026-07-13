@@ -31,7 +31,7 @@ func (a *App) Close() error {
 	return nil
 }
 
-func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
+func NewApp(ctx context.Context, cfg *conf.AppConfig) (_ *App, outErr error) {
 	var closers []io.Closer
 	addCloser := func(c io.Closer) { closers = append(closers, c) }
 	defer func() {
@@ -44,7 +44,7 @@ func NewApp(ctx context.Context, cfg *conf.Config) (_ *App, outErr error) {
 		}
 	}()
 
-	infra, err := NewSharedInfra(ctx, cfg)
+	infra, err := NewSharedInfra(ctx, &cfg.InfraConfig)
 	if err != nil {
 		return nil, err
 	}

@@ -50,7 +50,7 @@ type SharedInfra struct {
 
 func (s *SharedInfra) Closers() []io.Closer { return s.closers }
 
-func NewSharedInfra(ctx context.Context, cfg *conf.Config) (_ *SharedInfra, outErr error) {
+func NewSharedInfra(ctx context.Context, cfg *conf.InfraConfig) (_ *SharedInfra, outErr error) {
 	infra := &SharedInfra{}
 	addCloser := func(c io.Closer) { infra.closers = append(infra.closers, c) }
 	defer func() {

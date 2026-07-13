@@ -28,6 +28,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	workerentity "github.com/gonotelm-lab/gonotelm/internal/domain/worker/entity"
+	workererrors "github.com/gonotelm-lab/gonotelm/internal/domain/worker/errors"
 	t2ischema "github.com/gonotelm-lab/multimodal/image/schema"
 	t2iutil "github.com/gonotelm-lab/multimodal/image/util"
 )
@@ -67,7 +68,7 @@ func (ig *Generator) Generate(ctx context.Context, req *types.Request) (*types.R
 
 	// 删掉中间产物
 	if err = ig.deps.CheckpointRepository.DeleteByArtifactId(ctx, req.ArtifactId); err != nil {
-		slog.WarnContext(ctx, "delete checkpoint failed", slog.String("artifact_id", req.ArtifactId.String()), slog.Any("err", err))
+		slog.ErrorContext(ctx, "delete checkpoint failed", slog.String("artifact_id", req.ArtifactId.String()), slog.Any("err", err))
 	}
 
 	return &types.Response{
@@ -86,7 +87,9 @@ func (ig *Generator) generate(
 
 	ckpt, err := ig.deps.CheckpointRepository.FindByArtifactId(ctx, taskId)
 	if err != nil {
-		slog.WarnContext(ctx, "find checkpoint failed", slog.String("artifact_id", taskId.String()), slog.Any("err", err))
+		if !errors.Is(err, workererrors.ErrCheckpointNotFound) {
+			slog.ErrorContext(ctx, "find checkpoint failed", slog.String("artifact_id", taskId.String()), slog.Any("err", err))
+		}
 	}
 
 	var expect *infographicExpectation
@@ -129,7 +132,7 @@ func (ig *Generator) generateImagePrompt(
 	ctx context.Context,
 	payload *artifactentity.InfoGraphicPayload,
 ) (*infographicExpectation, error) {
-	cfg := conf.Global().Studio.InfoGraphic
+	cfg := conf.WorkerGlobal().Studio.InfoGraphic
 	modelOption := chat.WithModel(cfg.Model)
 
 	bindAllTools := payload.DetailLevel != artifactentity.InfoGraphicDetailLevelConcise
@@ -247,7 +250,7 @@ func (ig *Generator) generateAndStoreImage(
 	payload *artifactentity.InfoGraphicPayload,
 	imagePrompt string,
 ) (*StorageResult, error) {
-	cfg := conf.Global().Studio.InfoGraphic
+	cfg := conf.WorkerGlobal().Studio.InfoGraphic
 
 	generator, err := ig.deps.Text2Image.GetProvider(cfg.ImageModelProvider)
 	if err != nil {

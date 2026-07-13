@@ -28,11 +28,13 @@ func (s *Service) GetSourceDetail(
 		Access: &entity.SourceAccess{},
 	}
 
-	prr, err := s.storageRepo.PresignGet(ctx, source.ParsedContentKey)
-	if err != nil {
-		return nil, errors.WithMessagef(err, "presign get parsed content failed, source_id=%s", source.Id)
+	if source.ParsedContentKey != "" {
+		prr, err := s.storageRepo.PresignGet(ctx, source.ParsedContentKey)
+		if err != nil {
+			return nil, errors.WithMessagef(err, "presign get parsed content failed, source_id=%s", source.Id)
+		}
+		sourceDetail.Access.ParsedContentUrl = prr.Url
 	}
-	sourceDetail.Access.ParsedContentUrl = prr.Url
 
 	if source.Kind.IsFile() {
 		fc, err := source.GetFileContent()

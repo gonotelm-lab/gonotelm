@@ -23,18 +23,16 @@ func main() {
 }
 
 func initConfig(configPath string) {
-	cfg, err := conf.Load(configPath)
+	_, err := conf.LoadAppConfig(configPath)
 	if err != nil {
 		panic(err)
 	}
-
-	conf.SetGlobal(cfg)
 }
 
 func initLogger() {
 	pkglog.Init()
 
-	cfg := conf.Global()
+	cfg := conf.AppGlobal()
 	if cfg == nil {
 		return
 	}
@@ -44,15 +42,11 @@ func initLogger() {
 	}
 }
 
-// run wires the application using bootstrap.NewApp.
-// NOTE: bootstrap.NewApp is partially wired — Tasks 11-12 will complete the logic,
-// event handler registration, and HTTP server wiring. The build may not fully
-// compile until those tasks are done.
 func run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	app, err := bootstrap.NewApp(ctx, conf.Global())
+	app, err := bootstrap.NewApp(ctx, conf.AppGlobal())
 	if err != nil {
 		return err
 	}

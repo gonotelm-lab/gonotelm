@@ -16,20 +16,20 @@ func main() {
 	configPath := flag.String("config", "./etc/worker.toml.tpl", "config file path")
 	flag.Parse()
 
-	cfg, err := conf.Load(*configPath)
+	_, err := conf.LoadWorkerConfig(*configPath)
 	if err != nil {
 		panic(err)
 	}
-	conf.SetGlobal(cfg)
+
 	pkglog.Init()
-	if err := pkglog.SetLevelText(cfg.Logging.Level); err != nil {
+	if err := pkglog.SetLevelText(conf.WorkerGlobal().Logging.Level); err != nil {
 		panic(err)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	app, err := bootstrap.NewWorkerApp(ctx, cfg)
+	app, err := bootstrap.NewWorkerApp(ctx, conf.WorkerGlobal())
 	if err != nil {
 		slog.Error("new worker app failed", "err", err)
 		return

@@ -51,10 +51,10 @@ func (r *Generator) generate(
 	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioReportScene)
 
 	var (
-		reportModel         = conf.Global().Studio.Report.Model
-		reportModelProvider = conf.Global().Studio.Report.ModelProvider
+		reportModel         = conf.WorkerGlobal().Studio.Report.Model
+		reportModelProvider = conf.WorkerGlobal().Studio.Report.ModelProvider
 		modelOption         = chat.WithModel(reportModel)
-		maxRound            = conf.Global().Studio.Report.MaxRound
+		maxRound            = conf.WorkerGlobal().Studio.Report.MaxRound
 	)
 
 	ag, err := types.BuildSourceExploreAgent(
@@ -93,8 +93,8 @@ func (r *Generator) generateTitle(ctx context.Context, report string, req *types
 	if err != nil {
 		slog.ErrorContext(ctx, "generate title maker message failed", slog.Any("err", err))
 	} else {
-		modelOption := chat.WithModel(conf.Global().Studio.Report.Model)
-		llmModel, llmErr := r.deps.LLMGateway.GetProvider(conf.Global().Studio.Report.ModelProvider)
+		modelOption := chat.WithModel(conf.WorkerGlobal().Studio.Report.Model)
+		llmModel, llmErr := r.deps.LLMGateway.GetProvider(conf.WorkerGlobal().Studio.Report.ModelProvider)
 		if llmErr != nil {
 			slog.ErrorContext(ctx, "get llm provider for title generation failed", slog.Any("err", llmErr))
 		} else {

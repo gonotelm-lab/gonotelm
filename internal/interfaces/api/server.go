@@ -83,12 +83,12 @@ func NewServer(
 ) *Server {
 	hz := server.Default(
 		server.WithCustomBinder(http.NewCanonicalBinder()),
-		server.WithHostPorts(conf.Global().Api.HostPort()),
-		server.WithExitWaitTime(conf.Global().Api.ExitWaitTimeout),
+		server.WithHostPorts(conf.AppGlobal().Api.HostPort()),
+		server.WithExitWaitTime(conf.AppGlobal().Api.ExitWaitTimeout),
 		server.WithDisablePrintRoute(true),
 	)
 	hz.Use(
-		middleware.LogRequest(middleware.WithLogAllError(conf.Global().IsDev())),
+		middleware.LogRequest(middleware.WithLogAllError(conf.AppGlobal().IsDev())),
 	)
 
 	s := &Server{

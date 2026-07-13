@@ -49,9 +49,9 @@ func (i *Interceptor) OnEnd(
 		return ctx
 	}
 
-	attrs := getTokenUsageAttrs(modelOutput.TokenUsage)
-	attrs = append(attrs, slog.Any("info", info))
-	slog.DebugContext(ctx, "[Interceptor] OnEnd", attrs...)
+	// attrs := getTokenUsageAttrs(modelOutput.TokenUsage)
+	// attrs = append(attrs, slog.Any("info", info))
+	// slog.DebugContext(ctx, "[Interceptor] OnEnd", attrs...)
 	return ctx
 }
 

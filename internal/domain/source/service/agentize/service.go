@@ -60,6 +60,7 @@ func NewService(
 	}
 
 	bgc := bigcache.DefaultConfig(config.CacheEviction)
+	bgc.Shards = 64
 	bgc.HardMaxCacheSize = config.CacheMaxMB
 	bgc.Logger = &log.BigcacheLogger{}
 	bgc.Verbose = true

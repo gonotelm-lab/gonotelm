@@ -69,28 +69,6 @@ model = "${GONOTELM_SOURCE_MODEL:-qwen3.5-27b}"
 eviction = "${GONOTELM_SOURCE_BIZCACHE_EVICTION:-15m}"
 maxMB = ${GONOTELM_SOURCE_BIZCACHE_MAX_MB:-1024}
 
-[studio.mindmap]
-maxRound = ${GONOTELM_STUDIO_MINDMAP_MAX_ROUND:-50}
-modelProvider = "${GONOTELM_STUDIO_MINDMAP_PROVIDER:-deepseek}"
-model = "${GONOTELM_STUDIO_MINDMAP_MODEL:-deepseek-v4-flash}"
-
-[studio.report]
-maxRound = ${GONOTELM_STUDIO_REPORT_MAX_ROUND:-50}
-modelProvider = "${GONOTELM_STUDIO_REPORT_PROVIDER:-deepseek}"
-model = "${GONOTELM_STUDIO_REPORT_MODEL:-deepseek-v4-flash}"
-
-[studio.infoGraphic]
-maxRound = ${GONOTELM_STUDIO_INFOGRAPHIC_MAX_ROUND:-50}
-modelProvider = "${GONOTELM_STUDIO_INFOGRAPHIC_PROVIDER:-deepseek}"
-model = "${GONOTELM_STUDIO_INFOGRAPHIC_MODEL:-deepseek-v4-flash}"
-imageModelProvider = "${GONOTELM_STUDIO_INFOGRAPHIC_IMAGE_MODEL_PROVIDER:-dashscope}"
-imageModel = "${GONOTELM_STUDIO_INFOGRAPHIC_IMAGE_MODEL:-qwen-image-2.0-pro}"
-
-[studio.audioOverview]
-maxRound = ${GONOTELM_STUDIO_AUDIOOVERVIEW_MAX_ROUND:-50}
-modelProvider = "${GONOTELM_STUDIO_AUDIOOVERVIEW_PROVIDER:-deepseek}"
-model = "${GONOTELM_STUDIO_AUDIOOVERVIEW_MODEL:-deepseek-v4-flash}"
-
 [chunking]
 size = ${GONOTELM_CHUNKING_SIZE:-500}
 overlapSize = ${GONOTELM_CHUNKING_OVERLAP_SIZE:-75}
@@ -234,5 +212,3 @@ dialTimeout = "${GONOTELM_FLOW_DIAL_TIMEOUT:-5s}"
 perTaskInterval = "${GONOTELM_SYNCER_PER_TASK_INTERVAL:-2s}"
 globalInterval   = "${GONOTELM_SYNCER_GLOBAL_INTERVAL:-5s}"
 globalBatchSize  = ${GONOTELM_SYNCER_GLOBAL_BATCH_SIZE:-100}
-
-

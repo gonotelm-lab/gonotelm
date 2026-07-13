@@ -31,8 +31,8 @@ type WorkerApp struct {
 	cancel  context.CancelFunc
 }
 
-func NewWorkerApp(ctx context.Context, cfg *conf.Config) (*WorkerApp, error) {
-	shared, err := NewSharedInfra(ctx, cfg)
+func NewWorkerApp(ctx context.Context, cfg *conf.WorkerConfig) (*WorkerApp, error) {
+	shared, err := NewSharedInfra(ctx, &cfg.InfraConfig)
 	if err != nil {
 		return nil, err
 	}

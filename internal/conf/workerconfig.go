@@ -2,7 +2,7 @@ package conf
 
 import "time"
 
-type WorkerConfig struct {
+type WorkerPoolConfig struct {
 	MaxConcurrency int           `toml:"maxConcurrency"`
 	Heartbeat      time.Duration `toml:"heartbeat"`
 }

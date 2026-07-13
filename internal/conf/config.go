@@ -21,35 +21,55 @@ import (
 )
 
 var (
-	global        *Config
-	setGlobalOnce sync.Once
+	appGlobal        *AppConfig
+	workerGlobal     *WorkerConfig
+	setAppOnce    sync.Once
+	setWorkerOnce sync.Once
 )
 
-type Config struct {
-	DeployEnv string `toml:"deployEnv"`
-
-	Chat   ChatConfig   `toml:"chat"`
-	Source SourceConfig `toml:"source"`
-	Studio StudioConfig `toml:"studio"`
-
-	Api        ApiConfig                     `toml:"api"`
+type InfraConfig struct {
 	Database   DatabaseConfig                `toml:"database"`
-	Redis      cache.RedisCacheConfig        `toml:"redis"`
 	VectorDB   vectordb.Config               `toml:"vectorDb"`
 	Storage    storageimpl.StorageTypeConfig `toml:"storage"`
-	MsgQueue   mqimpl.Config                 `toml:"msgQueue"`
-	Embedding  embedding.EmbeddingConfig     `toml:"embedding"`
-	Rerank     rerank.RerankConfig           `toml:"rerank"`
-	Text2Image text2image.Text2ImageConfig   `toml:"text2image"`
-	Logging    LoggingConfig                 `toml:"logging"`
-	Chunking   ChunkingConfig                `toml:"chunking"`
 	Provider   chat.ProviderConfig           `toml:"provider"`
-	Flow       FlowConfig                    `toml:"flow"`
-	Worker     WorkerConfig                  `toml:"worker"`
-	Syncer     SyncerConfig                  `toml:"syncer"`
+	Embedding  embedding.EmbeddingConfig     `toml:"embedding"`
+	Text2Image text2image.Text2ImageConfig   `toml:"text2image"`
+
+	Redis    cache.RedisCacheConfig `toml:"redis"`
+	MsgQueue mqimpl.Config          `toml:"msgQueue"`
 }
 
-func (c *Config) IsDev() bool {
+type AppConfig struct {
+	InfraConfig
+
+	DeployEnv string `toml:"deployEnv"`
+
+	Api      ApiConfig          `toml:"api"`
+	Chat     ChatConfig         `toml:"chat"`
+	Source   SourceConfig       `toml:"source"`
+	Rerank   rerank.RerankConfig `toml:"rerank"`
+	Logging  LoggingConfig      `toml:"logging"`
+	Chunking ChunkingConfig     `toml:"chunking"`
+	Flow     FlowConfig         `toml:"flow"`
+	Worker   WorkerPoolConfig   `toml:"worker"`
+	Syncer   SyncerConfig       `toml:"syncer"`
+}
+
+type WorkerConfig struct {
+	InfraConfig
+
+	DeployEnv string          `toml:"deployEnv"`
+	Studio    StudioConfig    `toml:"studio"`
+	Logging   LoggingConfig   `toml:"logging"`
+	Flow      FlowConfig      `toml:"flow"`
+	Worker    WorkerPoolConfig `toml:"worker"`
+}
+
+func (c *AppConfig) IsDev() bool {
+	return c.DeployEnv == "dev"
+}
+
+func (c *WorkerConfig) IsDev() bool {
 	return c.DeployEnv == "dev"
 }
 
@@ -75,85 +95,9 @@ type LoggingConfig struct {
 	Level string `toml:"level"`
 }
 
-func Load(path string) (*Config, error) {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("read config file %q failed: %w", path, err)
-	}
-
-	expanded, err := envsubst.String(string(raw))
-	if err != nil {
-		return nil, fmt.Errorf("expand env in config file %q failed: %w", path, err)
-	}
-
-	cfg := &Config{}
-	if _, err := toml.Decode(expanded, cfg); err != nil {
-		return nil, fmt.Errorf("decode config file %q failed: %w", path, err)
-	}
-
-	if cfg.Storage.Type == "" {
-		cfg.Storage.Type = storageimpl.Minio
-	}
-	if cfg.MsgQueue.Type == "" {
-		cfg.MsgQueue.Type = mqimpl.Kafka
-	}
-	if cfg.Embedding.Type == "" {
-		cfg.Embedding.Type = embedding.EmbeddingDashScope
-	}
-	if cfg.Rerank.Type == "" {
-		cfg.Rerank.Type = rerank.RerankDashScope
-	}
-	if cfg.Text2Image.Type == "" {
-		cfg.Text2Image.Type = text2image.Text2ImageDashScope
-	}
-	if cfg.Embedding.BatchSize <= 0 {
-		cfg.Embedding.BatchSize = 10
-	}
-	if cfg.Embedding.MaxConcurrency <= 0 {
-		cfg.Embedding.MaxConcurrency = 4
-	}
-	if cfg.Logging.Level == "" {
-		cfg.Logging.Level = "debug"
-	}
-	if cfg.Flow.MaxRetry <= 0 {
-		cfg.Flow.MaxRetry = 3
-	}
-	if cfg.Flow.DialTimeout == 0 {
-		cfg.Flow.DialTimeout = 5 * time.Second
-	}
-	if cfg.Syncer.PerTaskInterval == 0 {
-		cfg.Syncer.PerTaskInterval = 2 * time.Second
-	}
-	if cfg.Syncer.GlobalInterval == 0 {
-		cfg.Syncer.GlobalInterval = 5 * time.Second
-	}
-	if cfg.Syncer.GlobalBatchSize <= 0 {
-		cfg.Syncer.GlobalBatchSize = 100
-	}
-	if cfg.Worker.MaxConcurrency <= 0 {
-		cfg.Worker.MaxConcurrency = 4
-	}
-	if cfg.Worker.Heartbeat == 0 {
-		cfg.Worker.Heartbeat = 5 * time.Second
-	}
-
-	global = cfg
-
-	return cfg, nil
-}
-
-func Global() *Config {
-	return global
-}
-
-func SetGlobal(cfg *Config) {
-	setGlobalOnce.Do(func() {
-		global = cfg
-	})
-}
-
-func (c *Config) SQLConfig() *sql.Config {
-	return c.Database.ToSQLConfig()
+type ChunkingConfig struct {
+	Size        int `toml:"size"`
+	OverlapSize int `toml:"overlapSize"`
 }
 
 func (d *DatabaseConfig) ToSQLConfig() *sql.Config {
@@ -166,7 +110,153 @@ func (d *DatabaseConfig) ToSQLConfig() *sql.Config {
 	}
 }
 
-type ChunkingConfig struct {
-	Size        int `toml:"size"`
-	OverlapSize int `toml:"overlapSize"`
+func loadTOML(path string, cfg interface{}) error {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read config file %q failed: %w", path, err)
+	}
+
+	expanded, err := envsubst.String(string(raw))
+	if err != nil {
+		return fmt.Errorf("expand env in config file %q failed: %w", path, err)
+	}
+
+	if _, err := toml.Decode(expanded, cfg); err != nil {
+		return fmt.Errorf("decode config file %q failed: %w", path, err)
+	}
+
+	return nil
+}
+
+func LoadAppConfig(path string) (*AppConfig, error) {
+	cfg := &AppConfig{}
+	if err := loadTOML(path, cfg); err != nil {
+		return nil, err
+	}
+
+	cfg.applyDefaults()
+
+	appGlobal = cfg
+	return cfg, nil
+}
+
+func LoadWorkerConfig(path string) (*WorkerConfig, error) {
+	cfg := &WorkerConfig{}
+	if err := loadTOML(path, cfg); err != nil {
+		return nil, err
+	}
+
+	cfg.applyDefaults()
+
+	workerGlobal = cfg
+	return cfg, nil
+}
+
+func (c *AppConfig) applyDefaults() {
+	if c.Storage.Type == "" {
+		c.Storage.Type = storageimpl.Minio
+	}
+	if c.MsgQueue.Type == "" {
+		c.MsgQueue.Type = mqimpl.Kafka
+	}
+	if c.Embedding.Type == "" {
+		c.Embedding.Type = embedding.EmbeddingDashScope
+	}
+	if c.Rerank.Type == "" {
+		c.Rerank.Type = rerank.RerankDashScope
+	}
+	if c.Text2Image.Type == "" {
+		c.Text2Image.Type = text2image.Text2ImageDashScope
+	}
+	if c.Embedding.BatchSize <= 0 {
+		c.Embedding.BatchSize = 10
+	}
+	if c.Embedding.MaxConcurrency <= 0 {
+		c.Embedding.MaxConcurrency = 4
+	}
+	if c.Logging.Level == "" {
+		c.Logging.Level = "debug"
+	}
+	if c.Flow.MaxRetry <= 0 {
+		c.Flow.MaxRetry = 3
+	}
+	if c.Flow.DialTimeout == 0 {
+		c.Flow.DialTimeout = 5 * time.Second
+	}
+	if c.Syncer.PerTaskInterval == 0 {
+		c.Syncer.PerTaskInterval = 2 * time.Second
+	}
+	if c.Syncer.GlobalInterval == 0 {
+		c.Syncer.GlobalInterval = 5 * time.Second
+	}
+	if c.Syncer.GlobalBatchSize <= 0 {
+		c.Syncer.GlobalBatchSize = 100
+	}
+	if c.Worker.MaxConcurrency <= 0 {
+		c.Worker.MaxConcurrency = 4
+	}
+	if c.Worker.Heartbeat == 0 {
+		c.Worker.Heartbeat = 5 * time.Second
+	}
+}
+
+func (c *WorkerConfig) applyDefaults() {
+	if c.Storage.Type == "" {
+		c.Storage.Type = storageimpl.Minio
+	}
+	if c.Embedding.Type == "" {
+		c.Embedding.Type = embedding.EmbeddingDashScope
+	}
+	if c.Text2Image.Type == "" {
+		c.Text2Image.Type = text2image.Text2ImageDashScope
+	}
+	if c.Embedding.BatchSize <= 0 {
+		c.Embedding.BatchSize = 10
+	}
+	if c.Embedding.MaxConcurrency <= 0 {
+		c.Embedding.MaxConcurrency = 4
+	}
+	if c.Logging.Level == "" {
+		c.Logging.Level = "debug"
+	}
+	if c.Flow.MaxRetry <= 0 {
+		c.Flow.MaxRetry = 3
+	}
+	if c.Flow.DialTimeout == 0 {
+		c.Flow.DialTimeout = 5 * time.Second
+	}
+	if c.Worker.MaxConcurrency <= 0 {
+		c.Worker.MaxConcurrency = 4
+	}
+	if c.Worker.Heartbeat == 0 {
+		c.Worker.Heartbeat = 5 * time.Second
+	}
+}
+
+func AppGlobal() *AppConfig {
+	return appGlobal
+}
+
+func SetAppGlobal(cfg *AppConfig) {
+	setAppOnce.Do(func() {
+		appGlobal = cfg
+	})
+}
+
+func WorkerGlobal() *WorkerConfig {
+	return workerGlobal
+}
+
+func SetWorkerGlobal(cfg *WorkerConfig) {
+	setWorkerOnce.Do(func() {
+		workerGlobal = cfg
+	})
+}
+
+func (c *AppConfig) SQLConfig() *sql.Config {
+	return c.Database.ToSQLConfig()
+}
+
+func (c *WorkerConfig) SQLConfig() *sql.Config {
+	return c.Database.ToSQLConfig()
 }

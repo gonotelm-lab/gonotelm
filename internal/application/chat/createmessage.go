@@ -274,7 +274,7 @@ func (h *CreateMessageHandler) beginStreamTask(
 	slog.DebugContext(ctx, "begin agent run",
 		slog.Any("chat_id", bundle.chatId), slog.Any("task_id", taskId), slog.Any("msg_id", msgId),
 	)
-	chatCfg := conf.Global().Chat
+	chatCfg := conf.AppGlobal().Chat
 	runResponse, err := agt.Run(ctx, &chatagent.RunRequest{
 		UserId:          pkgcontext.GetUserId(ctx),
 		Notebook:        bundle.targetNotebook,

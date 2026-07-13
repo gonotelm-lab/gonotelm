@@ -10,6 +10,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	workerentity "github.com/gonotelm-lab/gonotelm/internal/domain/worker/entity"
+	workererrors "github.com/gonotelm-lab/gonotelm/internal/domain/worker/errors"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	pkgagent "github.com/gonotelm-lab/gonotelm/pkg/agent"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
@@ -77,7 +78,9 @@ func (a *Generator) Generate(ctx context.Context, req *types.Request) (*types.Re
 	// see if we can find any checkpoint for this artifact id
 	ckpt, err := a.deps.CheckpointRepository.FindByArtifactId(ctx, req.ArtifactId)
 	if err != nil {
-		slog.WarnContext(ctx, "find checkpoint failed", slog.String("artifact_id", req.ArtifactId.String()), slog.Any("err", err))
+		if !errors.Is(err, workererrors.ErrCheckpointNotFound) {
+			slog.ErrorContext(ctx, "find checkpoint failed", slog.String("artifact_id", req.ArtifactId.String()), slog.Any("err", err))
+		}
 	} else {
 		var tmpOutline podcastOutlineExpectation
 		if err = sonic.Unmarshal(ckpt.Field1, &tmpOutline); err != nil {
@@ -135,10 +138,14 @@ func (a *Generator) Generate(ctx context.Context, req *types.Request) (*types.Re
 		return nil, errors.Wrapf(errors.ErrSerde, "marshal podcast transcript err=%v", err)
 	}
 
+	if err = a.generateAudio(); err != nil {
+		return nil, errors.WithMessagef(err, "generate audio failed")
+	}
+
 	// 确认成功 可以删掉 checkpoint
-	// if err = a.deps.CheckpointRepository.DeleteByArtifactId(ctx, req.ArtifactId); err != nil {
-	// 	slog.WarnContext(ctx, "delete checkpoint failed", slog.String("artifact_id", req.ArtifactId.String()), slog.Any("err", err))
-	// }
+	if err = a.deps.CheckpointRepository.DeleteByArtifactId(ctx, req.ArtifactId); err != nil {
+		slog.ErrorContext(ctx, "delete checkpoint failed", slog.String("artifact_id", req.ArtifactId.String()), slog.Any("err", err))
+	}
 
 	return &types.Response{
 		Title:      transcript.Title,
@@ -149,8 +156,8 @@ func (a *Generator) Generate(ctx context.Context, req *types.Request) (*types.Re
 
 func (a *Generator) llmOptions() []einomodel.Option {
 	var (
-		provider = conf.Global().Studio.AudioOverview.ModelProvider
-		model    = conf.Global().Studio.AudioOverview.Model
+		provider = conf.WorkerGlobal().Studio.AudioOverview.ModelProvider
+		model    = conf.WorkerGlobal().Studio.AudioOverview.Model
 	)
 	return []einomodel.Option{
 		chat.WithModel(model),
@@ -162,9 +169,9 @@ func (a *Generator) llmOptions() []einomodel.Option {
 func (a *Generator) buildAgent(req *types.Request) (*pkgagent.Agent[*types.SessionState], error) {
 	return types.BuildSourceExploreAgent(
 		a.deps,
-		conf.Global().Studio.AudioOverview.ModelProvider,
-		conf.Global().Studio.AudioOverview.Model,
-		conf.Global().Studio.AudioOverview.MaxRound,
+		conf.WorkerGlobal().Studio.AudioOverview.ModelProvider,
+		conf.WorkerGlobal().Studio.AudioOverview.Model,
+		conf.WorkerGlobal().Studio.AudioOverview.MaxRound,
 		a.llmOptions(),
 		req.NotebookId,
 		req.SourceIds,
@@ -406,4 +413,8 @@ func (a *Generator) parseTranscriptOutput(
 	}
 
 	return &expect, nil
+}
+
+func (a *Generator) generateAudio() error {
+	return fmt.Errorf("not implemented")
 }

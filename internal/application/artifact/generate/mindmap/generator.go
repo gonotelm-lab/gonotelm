@@ -57,8 +57,8 @@ func (m *Generator) Generate(ctx context.Context, req *types.Request) (*types.Re
 
 func (m *Generator) llmOptions() []einomodel.Option {
 	var (
-		provider = conf.Global().Studio.Mindmap.ModelProvider
-		model    = conf.Global().Studio.Mindmap.Model
+		provider = conf.WorkerGlobal().Studio.Mindmap.ModelProvider
+		model    = conf.WorkerGlobal().Studio.Mindmap.Model
 	)
 	llmOptions := []einomodel.Option{
 		chat.WithModel(model),
@@ -76,9 +76,9 @@ func (m *Generator) generate(
 
 	ag, err := types.BuildSourceExploreAgent(
 		m.deps,
-		conf.Global().Studio.Mindmap.ModelProvider,
-		conf.Global().Studio.Mindmap.Model,
-		conf.Global().Studio.Mindmap.MaxRound,
+		conf.WorkerGlobal().Studio.Mindmap.ModelProvider,
+		conf.WorkerGlobal().Studio.Mindmap.Model,
+		conf.WorkerGlobal().Studio.Mindmap.MaxRound,
 		llmOptions,
 		req.NotebookId,
 		req.SourceIds,

@@ -19,7 +19,7 @@ type WorkerInput struct {
 	UserId     string          `json:"user_id"`
 	SourceIds  []string        `json:"source_ids"`
 	Kind       string          `json:"kind"`
-	Payload    json.RawMessage `json:"payload"`
+	Payload    json.RawMessage `json:"payload"` // 不同的kind有不同的payload结构
 }
 
 type WorkerOutput struct {
@@ -64,6 +64,7 @@ func RegisterTypedWorker(client *flowworker.Client, deps *generatetypes.ServiceD
 		if err != nil {
 			return WorkerOutput{}, err
 		}
+
 		return WorkerOutput{
 			Title:      resp.Title,
 			Result:     resp.Result,
@@ -97,6 +98,7 @@ func decodePayload(kind artifactentity.Kind, raw json.RawMessage) (artifactentit
 		if err := sonic.Unmarshal(raw, &p); err != nil {
 			return nil, err
 		}
+
 		return &p, nil
 	default:
 		return nil, fmt.Errorf("unsupported kind: %s", kind)

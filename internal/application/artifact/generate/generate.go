@@ -7,12 +7,12 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/infographic"
 	"github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/mindmap"
 	"github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/report"
-	generatetypes "github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/types"
+	"github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/types"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
-func Run(ctx context.Context, deps *generatetypes.ServiceDeps, req *generatetypes.Request) (*generatetypes.Response, error) {
+func Run(ctx context.Context, deps *types.ServiceDeps, req *types.Request) (*types.Response, error) {
 	g, err := newGenerator(req.Kind, deps)
 	if err != nil {
 		return nil, err
@@ -20,7 +20,7 @@ func Run(ctx context.Context, deps *generatetypes.ServiceDeps, req *generatetype
 	return g.Generate(ctx, req)
 }
 
-func newGenerator(kind artifactentity.Kind, deps *generatetypes.ServiceDeps) (generatetypes.Generator, error) {
+func newGenerator(kind artifactentity.Kind, deps *types.ServiceDeps) (types.Generator, error) {
 	switch kind {
 	case artifactentity.KindMindmap:
 		return mindmap.New(deps), nil

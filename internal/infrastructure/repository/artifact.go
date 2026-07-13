@@ -35,7 +35,8 @@ func (r *ArtifactRepositoryImpl) FindById(ctx context.Context, id valobj.Id) (*a
 		}
 		return nil, err
 	}
-	return mapper.ArtifactFromSchema(sch), nil
+
+	return mapper.ArtifactFromSchema(sch)
 }
 
 func (r *ArtifactRepositoryImpl) ListByNotebookId(
@@ -50,8 +51,13 @@ func (r *ArtifactRepositoryImpl) ListByNotebookId(
 	}
 	out := make([]*artifactentity.Artifact, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, mapper.ArtifactFromSchema(row))
+		a, err := mapper.ArtifactFromSchema(row)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, a)
 	}
+
 	return out, nil
 }
 
@@ -71,8 +77,13 @@ func (r *ArtifactRepositoryImpl) ListByStatus(
 	}
 	out := make([]*artifactentity.Artifact, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, mapper.ArtifactFromSchema(row))
+		a, err := mapper.ArtifactFromSchema(row)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, a)
 	}
+
 	return out, nil
 }
 

@@ -2,20 +2,21 @@ package postgres
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
 	"github.com/gonotelm-lab/gonotelm/pkg/misc"
-
-	pg "gorm.io/driver/postgres"
-	"gorm.io/gorm"
+	"github.com/gonotelm-lab/gonotelm/pkg/sql"
 )
 
-func Open(cfg conf.DatabaseConfig) (*database.DAL, error) {
-	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-		cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.DBName)
-	db, err := gorm.Open(pg.Open(dsn), &gorm.Config{})
+func Open(cfg conf.DatabaseConfig) (*database.Dao, error) {
+	db, err := sql.OpenPgSql(&sql.Config{
+		Host:     cfg.Host,
+		Port:     cfg.Port,
+		User:     cfg.User,
+		Password: cfg.Password,
+		DbName:   cfg.DBName,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -27,13 +28,13 @@ func Open(cfg conf.DatabaseConfig) (*database.DAL, error) {
 		return nil
 	})
 
-	return database.NewDAL(
+	return database.NewDao(
 		closer,
 		NewNotebookStoreImpl(db),
 		NewSourceStoreImpl(db),
 		NewChatStoreImpl(db),
 		NewChatMessageStoreImpl(db),
-		NewArtifactTaskStoreImpl(db),
 		NewArtifactStoreImpl(db),
+		NewWorkerCheckpointStoreImpl(db),
 	), nil
 }

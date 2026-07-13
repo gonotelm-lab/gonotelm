@@ -6,29 +6,29 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type ArtifactAudioOverviewStyle string
+type AudioOverviewStyle string
 
 const (
-	ArtifactAudioOverviewStyleDeepResearch ArtifactAudioOverviewStyle = "deep-research"
-	ArtifactAudioOverviewStyleAbstract     ArtifactAudioOverviewStyle = "abstract"
-	ArtifactAudioOverviewStyleDiscussion   ArtifactAudioOverviewStyle = "discussion"
-	ArtifactAudioOverviewStyleDebate       ArtifactAudioOverviewStyle = "debate"
+	AudioOverviewStyleDeepResearch AudioOverviewStyle = "deep-research"
+	AudioOverviewStyleAbstract     AudioOverviewStyle = "abstract"
+	AudioOverviewStyleDiscussion   AudioOverviewStyle = "discussion"
+	AudioOverviewStyleDebate       AudioOverviewStyle = "debate"
 )
 
-func (s ArtifactAudioOverviewStyle) String() string { return string(s) }
-func (s ArtifactAudioOverviewStyle) Supported() bool {
+func (s AudioOverviewStyle) String() string { return string(s) }
+func (s AudioOverviewStyle) Supported() bool {
 	switch s {
-	case ArtifactAudioOverviewStyleDeepResearch,
-		ArtifactAudioOverviewStyleAbstract,
-		ArtifactAudioOverviewStyleDiscussion,
-		ArtifactAudioOverviewStyleDebate:
+	case AudioOverviewStyleDeepResearch,
+		AudioOverviewStyleAbstract,
+		AudioOverviewStyleDiscussion,
+		AudioOverviewStyleDebate:
 		return true
 	}
 	return false
 }
 
-func ArtifactAudioOverviewStyleDefault() ArtifactAudioOverviewStyle {
-	return ArtifactAudioOverviewStyleAbstract
+func AudioOverviewStyleDefault() AudioOverviewStyle {
+	return AudioOverviewStyleAbstract
 }
 
 type AudioSpeaker struct {
@@ -38,14 +38,14 @@ type AudioSpeaker struct {
 }
 
 type AudioEpisode struct {
-	Style        ArtifactAudioOverviewStyle `yaml:"style"`
-	Title        string                     `yaml:"title"`
-	Description  string                     `yaml:"description"`
-	SpeakerKeys  []string                   `yaml:"speakers"`
-	SpeakerRoles map[string]string          `yaml:"speaker_roles"`
-	NumSegments  int                        `yaml:"num_of_segments"`
-	SegmentFlow  []string                   `yaml:"segment_flow"`
-	Speakers     []AudioSpeaker             `yaml:"-"`
+	Style        AudioOverviewStyle `yaml:"style"`
+	Title        string             `yaml:"title"`
+	Description  string             `yaml:"description"`
+	SpeakerKeys  []string           `yaml:"speakers"`
+	SpeakerRoles map[string]string  `yaml:"speaker_roles"`
+	NumSegments  int                `yaml:"num_of_segments"`
+	SegmentFlow  []string           `yaml:"segment_flow"`
+	Speakers     []AudioSpeaker     `yaml:"-"`
 }
 
 //go:embed assets/audiospeakers.yml
@@ -54,8 +54,10 @@ var speakersYAML []byte
 //go:embed assets/audioepisodes.yml
 var episodesYAML []byte
 
-var BuiltinSpeakers map[string]AudioSpeaker
-var BuiltinEpisodes map[ArtifactAudioOverviewStyle]*AudioEpisode
+var (
+	BuiltinSpeakers map[string]AudioSpeaker
+	BuiltinEpisodes map[AudioOverviewStyle]*AudioEpisode
+)
 
 func init() {
 	var sf struct {
@@ -68,20 +70,20 @@ func init() {
 
 	var ef struct {
 		Episodes map[string]struct {
-			Style        ArtifactAudioOverviewStyle `yaml:"style"`
-			Title        string                     `yaml:"title"`
-			Description  string                     `yaml:"description"`
-			SpeakerKeys  []string                   `yaml:"speakers"`
-			SpeakerRoles map[string]string          `yaml:"speaker_roles"`
-			NumSegments  int                        `yaml:"num_of_segments"`
-			SegmentFlow  []string                   `yaml:"segment_flow"`
+			Style        AudioOverviewStyle `yaml:"style"`
+			Title        string             `yaml:"title"`
+			Description  string             `yaml:"description"`
+			SpeakerKeys  []string           `yaml:"speakers"`
+			SpeakerRoles map[string]string  `yaml:"speaker_roles"`
+			NumSegments  int                `yaml:"num_of_segments"`
+			SegmentFlow  []string           `yaml:"segment_flow"`
 		} `yaml:"episodes"`
 	}
 	if err := yaml.Unmarshal(episodesYAML, &ef); err != nil {
 		panic("failed to parse audioepisodes.yml: " + err.Error())
 	}
 
-	BuiltinEpisodes = make(map[ArtifactAudioOverviewStyle]*AudioEpisode, len(ef.Episodes))
+	BuiltinEpisodes = make(map[AudioOverviewStyle]*AudioEpisode, len(ef.Episodes))
 	for _, ep := range ef.Episodes {
 		speakers := make([]AudioSpeaker, 0, len(ep.SpeakerKeys))
 		for _, key := range ep.SpeakerKeys {

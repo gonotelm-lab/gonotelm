@@ -29,17 +29,17 @@ func ArtifactToSchema(a *artifactentity.Artifact) *schema.Artifact {
 		Result:     a.Result,
 		ResultKind: a.ResultKind.String(),
 		Payload:    payloadBytes,
-		CreatedAt:  a.CreateTime.Time(),
-		UpdatedAt:  a.UpdateTime.Time(),
+		CreatedAt:  a.CreateTime.Value(),
+		UpdatedAt:  a.UpdateTime.Value(),
 	}
 }
 
-func ArtifactFromSchema(sch *schema.Artifact) *artifactentity.Artifact {
+func ArtifactFromSchema(sch *schema.Artifact) (*artifactentity.Artifact, error) {
 	a := &artifactentity.Artifact{
 		Base: entity.Base{
 			Id:         valobj.Id(sch.Id),
 			CreateTime: valobj.NewTimeFromId(valobj.Id(sch.Id)),
-			UpdateTime: valobj.NewTimeFrom(sch.UpdatedAt.UnixMilli()),
+			UpdateTime: valobj.NewTimeFrom(sch.UpdatedAt),
 		},
 		NotebookId: valobj.Id(sch.NotebookId),
 		UserId:     sch.UserId,
@@ -50,37 +50,43 @@ func ArtifactFromSchema(sch *schema.Artifact) *artifactentity.Artifact {
 		Result:     sch.Result,
 		ResultKind: artifactentity.ResultKind(sch.ResultKind),
 	}
-	a.Payload = decodePayload(a.Kind, sch.Payload)
-	return a
+	payload, err := decodePayload(a.Kind, sch.Payload)
+	if err != nil {
+		return nil, err
+	}
+	a.Payload = payload
+	return a, nil
 }
 
-func decodePayload(kind artifactentity.Kind, b []byte) artifactentity.Payload {
+func decodePayload(kind artifactentity.Kind, b []byte) (artifactentity.Payload, error) {
+	if len(b) == 0 {
+		return nil, nil
+	}
 	switch kind {
 	case artifactentity.KindMindmap:
 		var p artifactentity.MindmapPayload
-		mustUnmarshal(b, &p)
-		return &p
+		if err := sonic.Unmarshal(b, &p); err != nil {
+			return nil, err
+		}
+		return &p, nil
 	case artifactentity.KindReport:
 		var p artifactentity.ReportPayload
-		mustUnmarshal(b, &p)
-		return &p
+		if err := sonic.Unmarshal(b, &p); err != nil {
+			return nil, err
+		}
+		return &p, nil
 	case artifactentity.KindInfoGraphic:
 		var p artifactentity.InfoGraphicPayload
-		mustUnmarshal(b, &p)
-		return &p
+		if err := sonic.Unmarshal(b, &p); err != nil {
+			return nil, err
+		}
+		return &p, nil
 	case artifactentity.KindAudioOverview:
 		var p artifactentity.AudioOverviewPayload
-		mustUnmarshal(b, &p)
-		return &p
+		if err := sonic.Unmarshal(b, &p); err != nil {
+			return nil, err
+		}
+		return &p, nil
 	}
-	return nil
-}
-
-func mustUnmarshal(b []byte, v any) {
-	if len(b) == 0 {
-		return
-	}
-	if err := sonic.Unmarshal(b, v); err != nil {
-		panic("unmarshal artifact payload: " + err.Error())
-	}
+	return nil, nil
 }

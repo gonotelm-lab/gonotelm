@@ -43,7 +43,7 @@ type mindmapExpectation struct {
 }
 
 func (m *Generator) Generate(ctx context.Context, req *types.Request) (*types.Response, error) {
-	expect, err := m.agentCreateMindmap(ctx, req)
+	expect, err := m.generate(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +68,7 @@ func (m *Generator) llmOptions() []einomodel.Option {
 	return llmOptions
 }
 
-func (m *Generator) agentCreateMindmap(
+func (m *Generator) generate(
 	ctx context.Context,
 	req *types.Request,
 ) (*mindmapExpectation, error) {

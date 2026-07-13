@@ -1,58 +1,59 @@
 package entity
 
-type ArtifactInfoGraphicOrientation string
+type InfoGraphicOrientation string
 
 const (
-	ArtifactInfoGraphicOrientationPortrait  ArtifactInfoGraphicOrientation = "portrait"
-	ArtifactInfoGraphicOrientationLandscape ArtifactInfoGraphicOrientation = "landscape"
-	ArtifactInfoGraphicOrientationSquare    ArtifactInfoGraphicOrientation = "square"
+	InfoGraphicOrientationPortrait  InfoGraphicOrientation = "portrait"
+	InfoGraphicOrientationLandscape InfoGraphicOrientation = "landscape"
+	InfoGraphicOrientationSquare    InfoGraphicOrientation = "square"
 )
 
-func (o ArtifactInfoGraphicOrientation) String() string { return string(o) }
-func (o ArtifactInfoGraphicOrientation) Supported() bool {
+func (o InfoGraphicOrientation) String() string { return string(o) }
+func (o InfoGraphicOrientation) Supported() bool {
 	switch o {
-	case ArtifactInfoGraphicOrientationPortrait,
-		ArtifactInfoGraphicOrientationLandscape,
-		ArtifactInfoGraphicOrientationSquare:
+	case InfoGraphicOrientationPortrait,
+		InfoGraphicOrientationLandscape,
+		InfoGraphicOrientationSquare:
 		return true
 	}
 	return false
 }
-func (o ArtifactInfoGraphicOrientation) ImageSize() (int, int) {
+
+func (o InfoGraphicOrientation) ImageSize() (int, int) {
 	switch o {
-	case ArtifactInfoGraphicOrientationPortrait:
+	case InfoGraphicOrientationPortrait:
 		return 720, 1280
-	case ArtifactInfoGraphicOrientationLandscape:
+	case InfoGraphicOrientationLandscape:
 		return 1280, 720
-	case ArtifactInfoGraphicOrientationSquare:
+	case InfoGraphicOrientationSquare:
 		return 1024, 1024
 	}
 	return 1280, 720
 }
 
-func ArtifactInfoGraphicOrientationDefault() ArtifactInfoGraphicOrientation {
-	return ArtifactInfoGraphicOrientationLandscape
+func InfoGraphicOrientationDefault() InfoGraphicOrientation {
+	return InfoGraphicOrientationLandscape
 }
 
-type ArtifactInfoGraphicDetailLevel string
+type InfoGraphicDetailLevel string
 
 const (
-	ArtifactInfoGraphicDetailLevelConcise  ArtifactInfoGraphicDetailLevel = "concise"
-	ArtifactInfoGraphicDetailLevelStandard ArtifactInfoGraphicDetailLevel = "standard"
-	ArtifactInfoGraphicDetailLevelDetailed ArtifactInfoGraphicDetailLevel = "detailed"
+	InfoGraphicDetailLevelConcise  InfoGraphicDetailLevel = "concise"
+	InfoGraphicDetailLevelStandard InfoGraphicDetailLevel = "standard"
+	InfoGraphicDetailLevelDetailed InfoGraphicDetailLevel = "detailed"
 )
 
-func (d ArtifactInfoGraphicDetailLevel) String() string { return string(d) }
-func (d ArtifactInfoGraphicDetailLevel) Supported() bool {
+func (d InfoGraphicDetailLevel) String() string { return string(d) }
+func (d InfoGraphicDetailLevel) Supported() bool {
 	switch d {
-	case ArtifactInfoGraphicDetailLevelConcise,
-		ArtifactInfoGraphicDetailLevelStandard,
-		ArtifactInfoGraphicDetailLevelDetailed:
+	case InfoGraphicDetailLevelConcise,
+		InfoGraphicDetailLevelStandard,
+		InfoGraphicDetailLevelDetailed:
 		return true
 	}
 	return false
 }
 
-func ArtifactInfoGraphicDetailLevelDefault() ArtifactInfoGraphicDetailLevel {
-	return ArtifactInfoGraphicDetailLevelStandard
+func InfoGraphicDetailLevelDefault() InfoGraphicDetailLevel {
+	return InfoGraphicDetailLevelStandard
 }

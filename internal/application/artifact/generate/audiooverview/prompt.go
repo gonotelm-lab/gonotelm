@@ -28,11 +28,11 @@ func RenderPodcastOutline(
 	sourceIds []string,
 	lang string,
 	tips string,
-	style artifactentity.ArtifactAudioOverviewStyle,
+	style artifactentity.AudioOverviewStyle,
 ) ([]*einoschema.Message, error) {
 	ep, ok := artifactentity.BuiltinEpisodes[style]
 	if !ok {
-		ep = artifactentity.BuiltinEpisodes[artifactentity.ArtifactAudioOverviewStyleDefault()]
+		ep = artifactentity.BuiltinEpisodes[artifactentity.AudioOverviewStyleDefault()]
 	}
 
 	vars := StudioPodcastOutlineTemplateVars{
@@ -57,12 +57,12 @@ func RenderPodcastTranscript(
 	sourceIds []string,
 	lang string,
 	tips string,
-	style artifactentity.ArtifactAudioOverviewStyle,
+	style artifactentity.AudioOverviewStyle,
 	outline *podcastOutlineExpectation,
 ) ([]*einoschema.Message, error) {
 	ep, ok := artifactentity.BuiltinEpisodes[style]
 	if !ok {
-		ep = artifactentity.BuiltinEpisodes[artifactentity.ArtifactAudioOverviewStyleDefault()]
+		ep = artifactentity.BuiltinEpisodes[artifactentity.AudioOverviewStyleDefault()]
 	}
 
 	segments := make([]map[string]string, 0, len(outline.Segments))
@@ -101,7 +101,7 @@ type StudioPodcastOutlineTemplateVars struct {
 	Tips          string
 	NumOfSegments int
 	Language      string
-	Style         artifactentity.ArtifactAudioOverviewStyle
+	Style         artifactentity.AudioOverviewStyle
 	StyleDesc     string
 }
 
@@ -126,7 +126,7 @@ type StudioPodcastTranscriptTemplateVars struct {
 	SegmentFlow  []string
 	Tips         string
 	Language     string
-	Style        artifactentity.ArtifactAudioOverviewStyle
+	Style        artifactentity.AudioOverviewStyle
 	StyleDesc    string
 	Outline      map[string]any
 }

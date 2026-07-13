@@ -81,45 +81,8 @@ COMMENT ON COLUMN chat_messages.content IS 'message content';
 COMMENT ON COLUMN chat_messages.seq_no IS 'message sequence number(unix nano)';
 COMMENT ON COLUMN chat_messages.extra IS 'message extra information';
 
-CREATE TABLE artifact_tasks (
-  id UUID PRIMARY KEY DEFAULT uuidv7(),
-  notebook_id UUID NOT NULL DEFAULT uuidv7(),
-  kind VARCHAR(16) NOT NULL DEFAULT '',
-  status VARCHAR(16) NOT NULL DEFAULT '',
-  title VARCHAR(128) NOT NULL DEFAULT '',
-  result BYTEA,
-  result_kind VARCHAR(16) NOT NULL DEFAULT '',
-  user_id VARCHAR(255) NOT NULL DEFAULT '',
-  run_id VARCHAR(36) NOT NULL DEFAULT '',
-  lock_no INTEGER NOT NULL DEFAULT 0,
-  payload BYTEA,
-  created_at BIGINT NOT NULL DEFAULT 0,
-  updated_at BIGINT NOT NULL DEFAULT 0,
-  expired_at BIGINT NOT NULL DEFAULT 0
-);
-
-CREATE INDEX idx_artifact_tasks_notebook_id ON artifact_tasks (notebook_id);
-CREATE INDEX idx_artifact_tasks_status_created_at ON artifact_tasks (status, created_at);
-CREATE INDEX idx_artifact_tasks_expired_at ON artifact_tasks (expired_at);
-
-COMMENT ON TABLE artifact_tasks IS 'studio artifact tasks table';
-COMMENT ON COLUMN artifact_tasks.id IS 'artifact task id, primary key';
-COMMENT ON COLUMN artifact_tasks.notebook_id IS 'associated notebook id';
-COMMENT ON COLUMN artifact_tasks.kind IS 'artifact task kind';
-COMMENT ON COLUMN artifact_tasks.status IS 'artifact task processing state';
-COMMENT ON COLUMN artifact_tasks.title IS 'artifact task title';
-COMMENT ON COLUMN artifact_tasks.result IS 'artifact task result';
-COMMENT ON COLUMN artifact_tasks.result_kind IS 'artifact task result kind';
-COMMENT ON COLUMN artifact_tasks.user_id IS 'artifact task user id';
-COMMENT ON COLUMN artifact_tasks.updated_at IS 'artifact task updated time (unix ms)';
-COMMENT ON COLUMN artifact_tasks.run_id IS 'artifact task run id';
-COMMENT ON COLUMN artifact_tasks.lock_no IS 'artifact task lock number for locking';
-COMMENT ON COLUMN artifact_tasks.payload IS 'artifact task payload';
-COMMENT ON COLUMN artifact_tasks.created_at IS 'artifact task created time (unix ms)';
-COMMENT ON COLUMN artifact_tasks.expired_at IS 'task expired time (unix ms)';
-
 CREATE TABLE IF NOT EXISTS artifacts (
-  id            UUID        PRIMARY KEY,
+  id            UUID        PRIMARY KEY DEFAULT uuidv7(),
   notebook_id   UUID        NOT NULL,
   user_id       VARCHAR(128) NOT NULL,
   kind          VARCHAR(32) NOT NULL,
@@ -129,10 +92,51 @@ CREATE TABLE IF NOT EXISTS artifacts (
   result        BYTEA       NULL,
   result_kind   VARCHAR(16) NULL,
   payload       JSONB       NOT NULL,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at    BIGINT NOT NULL DEFAULT 0,
+  updated_at    BIGINT NOT NULL DEFAULT 0
 );
+
+COMMENT ON TABLE artifacts IS 'artifacts table';
+COMMENT ON COLUMN artifacts.id IS 'artifact id, primary key';
+COMMENT ON COLUMN artifacts.notebook_id IS 'associated notebook id';
+COMMENT ON COLUMN artifacts.user_id IS 'artifact user id';
+COMMENT ON COLUMN artifacts.kind IS 'artifact kind';
+COMMENT ON COLUMN artifacts.status IS 'artifact processing state';
+COMMENT ON COLUMN artifacts.flow_task_id IS 'artifact flow task id';
+COMMENT ON COLUMN artifacts.title IS 'artifact title';
+COMMENT ON COLUMN artifacts.result IS 'artifact result';
+COMMENT ON COLUMN artifacts.result_kind IS 'artifact result kind';
+COMMENT ON COLUMN artifacts.payload IS 'artifact payload';
+COMMENT ON COLUMN artifacts.created_at IS 'artifact created time (unix ms)';
+COMMENT ON COLUMN artifacts.updated_at IS 'artifact updated time (unix ms)';
 
 CREATE INDEX IF NOT EXISTS idx_artifacts_notebook ON artifacts(notebook_id);
 CREATE INDEX IF NOT EXISTS idx_artifacts_status  ON artifacts(status);
-CREATE UNIQUE INDEX IF NOT EXISTS uq_artifacts_flow_task_id ON artifacts(flow_task_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_artifacts_flow_task_id ON artifacts(flow_task_id);
+
+CREATE TABLE IF NOT EXISTS worker_artifact_checkpoints (
+  artifact_id UUID PRIMARY KEY,
+  field1 BYTEA,
+  field2 BYTEA,
+  field3 BYTEA,
+  field4 BYTEA,
+  field5 BYTEA,
+  field6 BYTEA,
+  field7 BYTEA,
+  field8 BYTEA,
+  created_at BIGINT NOT NULL DEFAULT 0,
+  updated_at BIGINT NOT NULL DEFAULT 0
+);
+
+COMMENT ON TABLE worker_artifact_checkpoints IS 'worker artifact checkpoint table';
+COMMENT ON COLUMN worker_artifact_checkpoints.artifact_id IS 'artifact id, primary key';
+COMMENT ON COLUMN worker_artifact_checkpoints.field1 IS 'worker artifact checkpoint field1';
+COMMENT ON COLUMN worker_artifact_checkpoints.field2 IS 'worker artifact checkpoint field2';
+COMMENT ON COLUMN worker_artifact_checkpoints.field3 IS 'worker artifact checkpoint field3';
+COMMENT ON COLUMN worker_artifact_checkpoints.field4 IS 'worker artifact checkpoint field4';
+COMMENT ON COLUMN worker_artifact_checkpoints.field5 IS 'worker artifact checkpoint field5';
+COMMENT ON COLUMN worker_artifact_checkpoints.field6 IS 'worker artifact checkpoint field6';
+COMMENT ON COLUMN worker_artifact_checkpoints.field7 IS 'worker artifact checkpoint field7';
+COMMENT ON COLUMN worker_artifact_checkpoints.field8 IS 'worker artifact checkpoint field8';
+COMMENT ON COLUMN worker_artifact_checkpoints.created_at IS 'worker artifact checkpoint created time (unix ms)';
+COMMENT ON COLUMN worker_artifact_checkpoints.updated_at IS 'worker artifact checkpoint updated time (unix ms)';

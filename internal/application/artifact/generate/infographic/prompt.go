@@ -23,8 +23,8 @@ type TemplateVars struct {
 	SourceIds    []string
 	TextLanguage string
 	ExtraPrompt  string
-	Orientation  artifactentity.ArtifactInfoGraphicOrientation
-	DetailLevel  artifactentity.ArtifactInfoGraphicDetailLevel
+	Orientation  artifactentity.InfoGraphicOrientation
+	DetailLevel  artifactentity.InfoGraphicDetailLevel
 }
 
 func (v TemplateVars) promptVars() map[string]any {

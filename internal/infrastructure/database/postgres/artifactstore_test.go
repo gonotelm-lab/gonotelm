@@ -17,7 +17,7 @@ func TestArtifactStore_CreateAndGetById(t *testing.T) {
 	store := testArtifactStore
 
 	id := uuid.NewV7()
-	now := time.Now()
+	now := nowMilli()
 	in := &schema.Artifact{
 		Id: id, NotebookId: uuid.NewV7(), UserId: "u1",
 		Kind: "mindmap", Status: "pending", FlowTaskId: "ft-1",
@@ -37,7 +37,7 @@ func TestArtifactStore_Upsert(t *testing.T) {
 	store := testArtifactStore
 	id := uuid.NewV7()
 	nbId := uuid.NewV7()
-	now := time.Now()
+	now := nowMilli()
 
 	require.NoError(t, store.Create(ctx, &schema.Artifact{
 		Id: id, NotebookId: nbId, UserId: "u1",
@@ -48,7 +48,7 @@ func TestArtifactStore_Upsert(t *testing.T) {
 	require.NoError(t, store.Upsert(ctx, &schema.Artifact{
 		Id: id, NotebookId: nbId, UserId: "u1",
 		Kind: "report", Status: "running", FlowTaskId: "ft-2",
-		Payload: []byte(`{}`), CreatedAt: now, UpdatedAt: now.Add(time.Second),
+		Payload: []byte(`{}`), CreatedAt: now, UpdatedAt: now + 1000,
 	}))
 
 	got, err := store.GetById(ctx, id)
@@ -65,10 +65,12 @@ func TestArtifactStore_ListByStatus(t *testing.T) {
 		require.NoError(t, store.Create(ctx, &schema.Artifact{
 			Id: id, NotebookId: uuid.NewV7(), UserId: "u3",
 			Kind: "mindmap", Status: "pending", FlowTaskId: uuid.NewV7().String(),
-			Payload: []byte(`{}`), CreatedAt: time.Now(), UpdatedAt: time.Now(),
+			Payload: []byte(`{}`), CreatedAt: nowMilli(), UpdatedAt: nowMilli(),
 		}))
 	}
 	got, err := store.ListByStatus(ctx, []string{"pending"}, 100)
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, len(got), 2)
 }
+
+func nowMilli() int64 { return time.Now().UnixMilli() }

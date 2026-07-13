@@ -8,7 +8,10 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/types"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
+	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
+	workerentity "github.com/gonotelm-lab/gonotelm/internal/domain/worker/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
+	pkgagent "github.com/gonotelm-lab/gonotelm/pkg/agent"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -17,8 +20,6 @@ import (
 	"github.com/bytedance/sonic"
 	einomodel "github.com/cloudwego/eino/components/model"
 	einoschema "github.com/cloudwego/eino/schema"
-	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
-	pkgagent "github.com/gonotelm-lab/gonotelm/pkg/agent"
 )
 
 const MaxPodcastTitleLength = 128
@@ -68,20 +69,76 @@ func (a *Generator) Generate(ctx context.Context, req *types.Request) (*types.Re
 
 	llmOptions := a.llmOptions()
 
-	outline, err := a.generateOutline(ctx, req, payload, llmOptions)
+	var (
+		outline    *podcastOutlineExpectation
+		transcript *podcastTranscriptExpectation
+	)
+
+	// see if we can find any checkpoint for this artifact id
+	ckpt, err := a.deps.CheckpointRepository.FindByArtifactId(ctx, req.ArtifactId)
 	if err != nil {
-		return nil, err
+		slog.WarnContext(ctx, "find checkpoint failed", slog.String("artifact_id", req.ArtifactId.String()), slog.Any("err", err))
+	} else {
+		var tmpOutline podcastOutlineExpectation
+		if err = sonic.Unmarshal(ckpt.Field1, &tmpOutline); err != nil {
+			slog.WarnContext(ctx, "unmarshal outline failed", slog.String("artifact_id", req.ArtifactId.String()), slog.Any("err", err))
+		} else {
+			outline = &tmpOutline
+		}
 	}
 
-	transcript, err := a.generateTranscript(ctx, req, payload, outline, llmOptions)
-	if err != nil {
-		return nil, err
+	if outline == nil {
+		outline, err = a.generateOutline(ctx, req, payload, llmOptions)
+		if err != nil {
+			return nil, errors.Wrapf(errors.ErrInner, "generate outline failed, err=%v", err)
+		}
+
+		// save checkpoint
+		if outlineCkpt, err := sonic.Marshal(outline); err == nil {
+			if ckpt == nil {
+				ckpt = workerentity.NewCheckpoint(req.ArtifactId)
+			}
+			ckpt.UpdateField1(outlineCkpt)
+			if err = a.deps.CheckpointRepository.Save(ctx, ckpt); err != nil {
+				slog.WarnContext(ctx, "save checkpoint failed", slog.String("artifact_id", req.ArtifactId.String()), slog.Any("err", err))
+			}
+		}
+	}
+
+	// try to find transcript checkpoint
+	if ckpt != nil {
+		var tmpTranscript podcastTranscriptExpectation
+		if err = sonic.Unmarshal(ckpt.Field2, &tmpTranscript); err != nil {
+			slog.WarnContext(ctx, "unmarshal transcript failed", slog.String("artifact_id", req.ArtifactId.String()), slog.Any("err", err))
+		} else {
+			transcript = &tmpTranscript
+		}
+	}
+
+	if transcript == nil {
+		transcript, err = a.generateTranscript(ctx, req, payload, outline, llmOptions)
+		if err != nil {
+			return nil, errors.Wrapf(errors.ErrInner, "generate transcript failed, err=%v", err)
+		}
+
+		// save checkpoint again
+		if transcriptCkpt, err := sonic.Marshal(transcript); err == nil {
+			ckpt.UpdateField2(transcriptCkpt)
+			if err = a.deps.CheckpointRepository.Save(ctx, ckpt); err != nil {
+				slog.WarnContext(ctx, "save checkpoint failed", slog.String("artifact_id", req.ArtifactId.String()), slog.Any("err", err))
+			}
+		}
 	}
 
 	result, err := sonic.Marshal(transcript)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrSerde, "marshal podcast transcript err=%v", err)
 	}
+
+	// 确认成功 可以删掉 checkpoint
+	// if err = a.deps.CheckpointRepository.DeleteByArtifactId(ctx, req.ArtifactId); err != nil {
+	// 	slog.WarnContext(ctx, "delete checkpoint failed", slog.String("artifact_id", req.ArtifactId.String()), slog.Any("err", err))
+	// }
 
 	return &types.Response{
 		Title:      transcript.Title,

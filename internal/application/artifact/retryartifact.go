@@ -66,8 +66,10 @@ func (h *RetryArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error 
 			slog.ErrorContext(ctx, "publish artifact event failed", "artifact_id", a.Id, "err", err)
 		}
 	}
+
 	if h.poller != nil {
 		go h.poller.PollOne(context.WithoutCancel(ctx), a.Id)
 	}
+
 	return nil
 }

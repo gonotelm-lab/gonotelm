@@ -26,19 +26,36 @@ type Event struct {
 }
 
 func NewCompletedEvent(artifactId, notebookId valobj.Id) *Event {
-	return &Event{artifactId: artifactId, notebookId: notebookId, action: ActionCompleted}
+	return &Event{
+		artifactId: artifactId,
+		notebookId: notebookId,
+		action:     ActionCompleted,
+	}
 }
 
 func NewFailedEvent(artifactId, notebookId valobj.Id) *Event {
-	return &Event{artifactId: artifactId, notebookId: notebookId, action: ActionFailed}
+	return &Event{
+		artifactId: artifactId,
+		notebookId: notebookId,
+		action:     ActionFailed,
+	}
 }
 
 func NewCancelledEvent(artifactId, notebookId valobj.Id) *Event {
-	return &Event{artifactId: artifactId, notebookId: notebookId, action: ActionCancelled}
+	return &Event{
+		artifactId: artifactId,
+		notebookId: notebookId,
+		action:     ActionCancelled,
+	}
 }
 
 func NewRetryingEvent(artifactId, notebookId valobj.Id, newFlowTaskId string) *Event {
-	return &Event{artifactId: artifactId, notebookId: notebookId, action: ActionRetrying, newFlowTaskId: newFlowTaskId}
+	return &Event{
+		artifactId:    artifactId,
+		notebookId:    notebookId,
+		action:        ActionRetrying,
+		newFlowTaskId: newFlowTaskId,
+	}
 }
 
 func (e *Event) ArtifactId() valobj.Id { return e.artifactId }

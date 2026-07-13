@@ -9,6 +9,7 @@ import (
 	generatetypes "github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/types"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
+	infrarepo "github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -43,10 +44,11 @@ func NewWorkerApp(ctx context.Context, cfg *conf.Config) (*WorkerApp, error) {
 	}
 
 	deps := &generatetypes.ServiceDeps{
-		Agentize:      shared.AgentizeService,
-		LLMGateway:    shared.LLMGateway,
-		Text2Image:    shared.Text2Image,
-		ObjectStorage: shared.Storage,
+		Agentize:             shared.AgentizeService,
+		LLMGateway:           shared.LLMGateway,
+		Text2Image:           shared.Text2Image,
+		ObjectStorage:        shared.Storage,
+		CheckpointRepository: infrarepo.NewCheckpointRepository(shared.DB.WorkerCheckpointStore),
 	}
 
 	app := &WorkerApp{shared: shared}

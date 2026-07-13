@@ -29,7 +29,8 @@ func TestArtifactRoundTrip(t *testing.T) {
 	require.NoError(t, sonic.Unmarshal(sch.Payload, &rawPayload))
 	assert.Equal(t, notebookId.String(), rawPayload["notebook_id"])
 
-	back := ArtifactFromSchema(sch)
+	back, err := ArtifactFromSchema(sch)
+	require.NoError(t, err)
 	assert.Equal(t, a.Id, back.Id)
 	assert.Equal(t, a.NotebookId, back.NotebookId)
 	assert.Equal(t, a.Kind, back.Kind)
@@ -51,7 +52,8 @@ func TestArtifactRoundTrip_Kinds(t *testing.T) {
 		a, err := artifactentity.NewArtifact(notebookId, "u1", c.kind, c.payload)
 		require.NoError(t, err)
 		sch := ArtifactToSchema(a)
-		back := ArtifactFromSchema(sch)
+		back, err := ArtifactFromSchema(sch)
+		require.NoError(t, err)
 		assert.Equal(t, a.Kind, back.Kind, "kind=%s", c.kind)
 		assert.Equal(t, a.NotebookId, back.NotebookId, "kind=%s", c.kind)
 		assert.NotNil(t, back.Payload, "kind=%s", c.kind)
@@ -69,13 +71,15 @@ func TestArtifactRoundTrip_Time(t *testing.T) {
 	assert.NotZero(t, sch.UpdatedAt)
 	assert.NotZero(t, sch.CreatedAt)
 
-	back := ArtifactFromSchema(sch)
+	back, err := ArtifactFromSchema(sch)
+	require.NoError(t, err)
 	assert.Equal(t, a.UpdateTime.Value(), back.UpdateTime.Value())
 	assert.Equal(t, a.CreateTime.Value(), back.CreateTime.Value())
 }
 
 func TestArtifactFromSchema_EmptyPayload(t *testing.T) {
 	sch := &schema.Artifact{Id: uuid.NewV7(), Kind: "unknown"}
-	back := ArtifactFromSchema(sch)
+	back, err := ArtifactFromSchema(sch)
+	require.NoError(t, err)
 	assert.Nil(t, back.Payload)
 }

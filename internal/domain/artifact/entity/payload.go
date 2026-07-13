@@ -24,23 +24,23 @@ func (p *ReportPayload) Kind() Kind                { return KindReport }
 func (p *ReportPayload) GetSourceIds() []valobj.Id { return p.SourceIds }
 
 type InfoGraphicPayload struct {
-	NotebookId   valobj.Id                      `json:"notebook_id"`
-	SourceIds    []valobj.Id                    `json:"source_ids"`
-	ExtraPrompt  string                         `json:"extra_prompt"`
-	TextLanguage string                         `json:"text_language"`
-	Orientation  ArtifactInfoGraphicOrientation `json:"orientation"`
-	DetailLevel  ArtifactInfoGraphicDetailLevel `json:"detail_level"`
+	NotebookId   valobj.Id              `json:"notebook_id"`
+	SourceIds    []valobj.Id            `json:"source_ids"`
+	ExtraPrompt  string                 `json:"extra_prompt"`
+	TextLanguage string                 `json:"text_language"`
+	Orientation  InfoGraphicOrientation `json:"orientation"`
+	DetailLevel  InfoGraphicDetailLevel `json:"detail_level"`
 }
 
 func (p *InfoGraphicPayload) Kind() Kind                { return KindInfoGraphic }
 func (p *InfoGraphicPayload) GetSourceIds() []valobj.Id { return p.SourceIds }
 
 type AudioOverviewPayload struct {
-	NotebookId valobj.Id                  `json:"notebook_id"`
-	SourceIds  []valobj.Id                `json:"source_ids"`
-	Tip        string                     `json:"tip"`
-	Language   string                     `json:"language"`
-	Style      ArtifactAudioOverviewStyle `json:"style"`
+	NotebookId valobj.Id          `json:"notebook_id"`
+	SourceIds  []valobj.Id        `json:"source_ids"`
+	Tip        string             `json:"tip"`
+	Language   string             `json:"language"`
+	Style      AudioOverviewStyle `json:"style"`
 }
 
 func (p *AudioOverviewPayload) Kind() Kind                { return KindAudioOverview }

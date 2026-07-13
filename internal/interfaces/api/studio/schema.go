@@ -55,16 +55,16 @@ type ListNotebookArtifactsResponse struct {
 }
 
 type GenerateInfoGraphicParameters struct {
-	ExtraPrompt  string                                        `json:"extra_prompt,omitempty"`
-	TextLanguage string                                        `json:"text_language,omitempty"`
-	Orientation  artifactentity.ArtifactInfoGraphicOrientation `json:"orientation,omitempty"`
-	DetailLevel  artifactentity.ArtifactInfoGraphicDetailLevel `json:"detail_level,omitempty"`
+	ExtraPrompt  string                                `json:"extra_prompt,omitempty"`
+	TextLanguage string                                `json:"text_language,omitempty"`
+	Orientation  artifactentity.InfoGraphicOrientation `json:"orientation,omitempty"`
+	DetailLevel  artifactentity.InfoGraphicDetailLevel `json:"detail_level,omitempty"`
 }
 
 type GenerateAudioOverviewParameters struct {
-	Tip      string                                    `json:"tip,omitempty"`
-	Language string                                    `json:"language,omitempty"`
-	Style    artifactentity.ArtifactAudioOverviewStyle `json:"style,omitempty"`
+	Tip      string                            `json:"tip,omitempty"`
+	Language string                            `json:"language,omitempty"`
+	Style    artifactentity.AudioOverviewStyle `json:"style,omitempty"`
 }
 
 type ArtifactResult struct {

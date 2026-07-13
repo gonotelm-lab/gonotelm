@@ -33,7 +33,7 @@ import (
 )
 
 type SharedInfra struct {
-	DB               *database.DAL
+	DB               *database.Dao
 	VDB              *vectordb.DAL
 	Redis            redis.UniversalClient
 	Cache            *oldcache.Cache

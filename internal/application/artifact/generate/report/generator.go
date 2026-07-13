@@ -30,7 +30,7 @@ func New(deps *types.ServiceDeps) *Generator {
 }
 
 func (r *Generator) Generate(ctx context.Context, req *types.Request) (*types.Response, error) {
-	reportText, err := r.agentCreateReport(ctx, req)
+	reportText, err := r.generate(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +44,7 @@ func (r *Generator) Generate(ctx context.Context, req *types.Request) (*types.Re
 	}, nil
 }
 
-func (r *Generator) agentCreateReport(
+func (r *Generator) generate(
 	ctx context.Context,
 	req *types.Request,
 ) (string, error) {

@@ -1,0 +1,3 @@
+.PHONY: gofmt
+gofmt:
+	go fmt ./...

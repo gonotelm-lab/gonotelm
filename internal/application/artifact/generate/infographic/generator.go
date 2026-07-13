@@ -27,6 +27,7 @@ import (
 	einoschema "github.com/cloudwego/eino/schema"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
+	workerentity "github.com/gonotelm-lab/gonotelm/internal/domain/worker/entity"
 	t2ischema "github.com/gonotelm-lab/multimodal/image/schema"
 	t2iutil "github.com/gonotelm-lab/multimodal/image/util"
 )
@@ -64,6 +65,11 @@ func (ig *Generator) Generate(ctx context.Context, req *types.Request) (*types.R
 		return nil, errors.Wrapf(errors.ErrSerde, "marshal infographic storage result err=%v", err)
 	}
 
+	// 删掉中间产物
+	if err = ig.deps.CheckpointRepository.DeleteByArtifactId(ctx, req.ArtifactId); err != nil {
+		slog.WarnContext(ctx, "delete checkpoint failed", slog.String("artifact_id", req.ArtifactId.String()), slog.Any("err", err))
+	}
+
 	return &types.Response{
 		Title:      expect.Title,
 		Result:     result,
@@ -78,9 +84,32 @@ func (ig *Generator) generate(
 ) (*infographicExpectation, *StorageResult, error) {
 	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioInfographicScene)
 
-	expect, err := ig.generateImagePrompt(ctx, payload)
+	ckpt, err := ig.deps.CheckpointRepository.FindByArtifactId(ctx, taskId)
 	if err != nil {
-		return nil, nil, err
+		slog.WarnContext(ctx, "find checkpoint failed", slog.String("artifact_id", taskId.String()), slog.Any("err", err))
+	}
+
+	var expect *infographicExpectation
+	if ckpt != nil && ckpt.Field1 != nil {
+		if err := sonic.Unmarshal(ckpt.Field1, &expect); err != nil {
+			slog.WarnContext(ctx, "unmarshal checkpoint prompt failed", slog.String("artifact_id", taskId.String()), slog.Any("err", err))
+		}
+	}
+
+	if expect == nil {
+		expect, err = ig.generateImagePrompt(ctx, payload)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		promptBytes, _ := sonic.Marshal(expect)
+		if ckpt == nil {
+			ckpt = workerentity.NewCheckpoint(taskId)
+		}
+		ckpt.UpdateField1(promptBytes)
+		if err := ig.deps.CheckpointRepository.Save(ctx, ckpt); err != nil {
+			slog.WarnContext(ctx, "save checkpoint failed", slog.String("artifact_id", taskId.String()), slog.Any("err", err))
+		}
 	}
 
 	slog.DebugContext(ctx, "generate infographic expectation done, now generate image",
@@ -103,7 +132,7 @@ func (ig *Generator) generateImagePrompt(
 	cfg := conf.Global().Studio.InfoGraphic
 	modelOption := chat.WithModel(cfg.Model)
 
-	bindAllTools := payload.DetailLevel != artifactentity.ArtifactInfoGraphicDetailLevelConcise
+	bindAllTools := payload.DetailLevel != artifactentity.InfoGraphicDetailLevelConcise
 
 	ag, err := types.BuildSourceExploreAgent(
 		ig.deps,

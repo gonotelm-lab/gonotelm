@@ -291,8 +291,12 @@ github.com/gomodule/redigo v1.9.3 h1:dNPSXeXv6HCq2jdyWfjgmhBdqnR6PRO3m/G05nvpPC8
 github.com/gomodule/redigo v1.9.3/go.mod h1:KsU3hiK/Ay8U42qpaJk+kuNa3C+spxapWpM+ywhcgtw=
 github.com/gonotelm-lab/flow/api v0.0.0-20260725044828-ccc5f4e3aaa6 h1:QLLdgu199tw/tD/E9RUfyiGwo9Re2bgGXpkrJzutBZI=
 github.com/gonotelm-lab/flow/api v0.0.0-20260725044828-ccc5f4e3aaa6/go.mod h1:/R9SgAneBkWC7XDsRa54mcbLl7gk+UE9zsVrMZpiDpY=
+github.com/gonotelm-lab/flow/api v0.0.0-20260725071047-e9efc3daef22 h1:1fBBpZch32oCLy1cgdUok2SknRIvBiTMKm4QL6APxLA=
+github.com/gonotelm-lab/flow/api v0.0.0-20260725071047-e9efc3daef22/go.mod h1:/R9SgAneBkWC7XDsRa54mcbLl7gk+UE9zsVrMZpiDpY=
 github.com/gonotelm-lab/flow/client v0.0.0-20260725044828-ccc5f4e3aaa6 h1:fji87Fa/OX6yVR076swbenPH+viBg27v5xt6xpjp/g0=
 github.com/gonotelm-lab/flow/client v0.0.0-20260725044828-ccc5f4e3aaa6/go.mod h1:K9d/5RlBiGNG0rOd5j+CUElT4cPgzrJmfrv6B4Gv97g=
+github.com/gonotelm-lab/flow/client v0.0.0-20260725071047-e9efc3daef22 h1:srrqYK6pjnBrYPH+FrbWeOMOkVQrte/B1Q/zGfoocqE=
+github.com/gonotelm-lab/flow/client v0.0.0-20260725071047-e9efc3daef22/go.mod h1:K9d/5RlBiGNG0rOd5j+CUElT4cPgzrJmfrv6B4Gv97g=
 github.com/gonotelm-lab/multimodal v0.2.1 h1:kIf17+xuaqlVh9E2iQN6CMvpIado9izLv46Gv3d8BA0=
 github.com/gonotelm-lab/multimodal v0.2.1/go.mod h1:VyQmUs50KDwFzm8sRoaarP6krTNoEWg1OUfVi4P5NRs=
 github.com/gonotelm-lab/multimodal v0.2.2-0.20260725062133-d6711cd43a4b h1:XhNwZTw/puKbb3qsAJR+YWHONxOYhzsTymwjpYcnKuQ=

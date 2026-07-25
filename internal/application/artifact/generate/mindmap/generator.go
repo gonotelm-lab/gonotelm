@@ -74,6 +74,11 @@ func (m *Generator) generate(
 ) (*mindmapExpectation, error) {
 	llmOptions := m.llmOptions()
 
+	tip := ""
+	if p, ok := req.Payload.(*artifactentity.MindmapPayload); ok {
+		tip = p.Tip
+	}
+
 	ag, err := types.BuildSourceExploreAgent(
 		m.deps,
 		conf.WorkerGlobal().Studio.Mindmap.ModelProvider,
@@ -89,7 +94,7 @@ func (m *Generator) generate(
 	}
 
 	sourceIds := types.SourceIDsToStrings(req.SourceIds)
-	msgs, err := RenderMindmap(ctx, sourceIds)
+	msgs, err := RenderMindmap(ctx, sourceIds, tip)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "generate mindmap message failed, err=%v", err)
 	}

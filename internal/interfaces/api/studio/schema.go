@@ -19,6 +19,8 @@ type GenerateArtifactRequest struct {
 	NotebookId    uuid.UUID                        `json:"notebook_id,required"`
 	Kind          Kind                             `json:"kind,required"`
 	SourceIds     []uuid.UUID                      `json:"source_ids,required"`
+	Mindmap       *GenerateMindmapParameters       `json:"mindmap,omitempty"`
+	Report        *GenerateReportParameters        `json:"report,omitempty"`
 	InfoGraphic   *GenerateInfoGraphicParameters   `json:"info_graphic,omitempty"`
 	AudioOverview *GenerateAudioOverviewParameters `json:"audio_overview,omitempty"`
 }
@@ -36,17 +38,6 @@ type GetArtifactStatusResponse struct {
 	Status artifactentity.Status `json:"status"`
 }
 
-type GetArtifactResultResponse struct {
-	TaskId      string                    `json:"task_id"`
-	Status      artifactentity.Status     `json:"status"`
-	Title       string                    `json:"title"`
-	Content     string                    `json:"content,omitempty"`
-	ContentUrl  string                    `json:"content_url,omitempty"`
-	ContentKind artifactentity.ResultKind `json:"content_kind"`
-	MimeType    string                    `json:"mime_type,omitempty"`
-	ImageInfo   *ArtifactResultImageInfo  `json:"image_info,omitempty"`
-}
-
 type ListNotebookArtifactsRequest struct {
 	Id     uuid.UUID `path:"id,required"`
 	Limit  int       `query:"limit"`
@@ -60,11 +51,22 @@ type ListNotebookArtifactsResponse struct {
 	HasMore   bool              `json:"has_more"`
 }
 
+type GenerateMindmapParameters struct {
+	Tip string `json:"tip,omitempty"`
+}
+
+type GenerateReportParameters struct {
+	Style    artifactentity.ReportStyle `json:"style,omitempty"`
+	Language artifactentity.Language    `json:"language,omitempty"`
+	Tip      string                     `json:"tip,omitempty"`
+}
+
 type GenerateInfoGraphicParameters struct {
 	ExtraPrompt  string                                `json:"extra_prompt,omitempty"`
 	TextLanguage string                                `json:"text_language,omitempty"`
 	Orientation  artifactentity.InfoGraphicOrientation `json:"orientation,omitempty"`
 	DetailLevel  artifactentity.InfoGraphicDetailLevel `json:"detail_level,omitempty"`
+	VisualStyle  artifactentity.InfoGraphicVisualStyle `json:"visual_style,omitempty"`
 }
 
 type GenerateAudioOverviewParameters struct {
@@ -94,11 +96,22 @@ type ArtifactResultImageInfo struct {
 	Height int `json:"height"`
 }
 
+type MindmapExtras struct {
+	Tip string `json:"tip"`
+}
+
+type ReportExtras struct {
+	Style    string `json:"style"`
+	Language string `json:"language"`
+	Tip      string `json:"tip"`
+}
+
 type InfoGraphicExtras struct {
 	Prompt       string `json:"prompt"`
 	TextLanguage string `json:"text_language"`
 	Orientation  string `json:"orientation"`
 	DetailLevel  string `json:"detail_level"`
+	VisualStyle  string `json:"visual_style"`
 }
 
 type AudioOverviewExtras struct {
@@ -125,8 +138,16 @@ func ToArtifactResult(a *artifactentity.Artifact) *ArtifactResult {
 	switch p := a.Payload.(type) {
 	case *artifactentity.MindmapPayload:
 		r.SourceIds = p.SourceIds
+		r.Extras = &MindmapExtras{
+			Tip: p.Tip,
+		}
 	case *artifactentity.ReportPayload:
 		r.SourceIds = p.SourceIds
+		r.Extras = &ReportExtras{
+			Style:    string(p.Style),
+			Language: string(p.Language),
+			Tip:      p.Tip,
+		}
 	case *artifactentity.InfoGraphicPayload:
 		r.SourceIds = p.SourceIds
 		r.Extras = &InfoGraphicExtras{
@@ -134,6 +155,7 @@ func ToArtifactResult(a *artifactentity.Artifact) *ArtifactResult {
 			TextLanguage: p.TextLanguage,
 			Orientation:  p.Orientation.String(),
 			DetailLevel:  p.DetailLevel.String(),
+			VisualStyle:  p.VisualStyle.String(),
 		}
 	case *artifactentity.AudioOverviewPayload:
 		r.SourceIds = p.SourceIds
@@ -181,6 +203,26 @@ func ToArtifactResult(a *artifactentity.Artifact) *ArtifactResult {
 	return r
 }
 
+func (r *GenerateMindmapParameters) ToPayload() *artifactentity.MindmapPayload {
+	if r == nil {
+		return nil
+	}
+	return &artifactentity.MindmapPayload{
+		Tip: r.Tip,
+	}
+}
+
+func (r *GenerateReportParameters) ToPayload() *artifactentity.ReportPayload {
+	if r == nil {
+		return nil
+	}
+	return &artifactentity.ReportPayload{
+		Style:    r.Style,
+		Language: r.Language,
+		Tip:      r.Tip,
+	}
+}
+
 func (r *GenerateInfoGraphicParameters) ToPayload() *artifactentity.InfoGraphicPayload {
 	if r == nil {
 		return nil
@@ -190,6 +232,7 @@ func (r *GenerateInfoGraphicParameters) ToPayload() *artifactentity.InfoGraphicP
 		TextLanguage: r.TextLanguage,
 		Orientation:  r.Orientation,
 		DetailLevel:  r.DetailLevel,
+		VisualStyle:  r.VisualStyle,
 	}
 }
 

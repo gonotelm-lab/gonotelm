@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"unicode/utf8"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/route"
@@ -11,6 +12,8 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
+
+const maxUserTipLength = 300
 
 func (s *Server) registerStudioRoutes(g *route.RouterGroup) {
 	artifactGroup := g.Group("/studio/artifact/:task_id", s.checkArtifactAccess)
@@ -55,10 +58,22 @@ func (s *Server) GenerateStudioArtifact(ctx context.Context, c *app.RequestConte
 		return
 	}
 
+	if req.Report != nil && !req.Report.Language.IsValid() {
+		http.ErrResp(c, errors.ErrParams.Msgf("unsupported language: %s", req.Report.Language))
+		return
+	}
+
+	if err := validateStudioUserTips(&req); err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
 	resp, err := s.generateArtifactHandler.Handle(ctx, &artifactapp.GenerateRequest{
 		NotebookId:    req.NotebookId,
 		Kind:          req.Kind,
 		SourceIds:     req.SourceIds,
+		Mindmap:       req.Mindmap.ToPayload(),
+		Report:        req.Report.ToPayload(),
 		InfoGraphic:   req.InfoGraphic.ToPayload(),
 		AudioOverview: req.AudioOverview.ToPayload(),
 	})
@@ -68,6 +83,22 @@ func (s *Server) GenerateStudioArtifact(ctx context.Context, c *app.RequestConte
 	}
 
 	http.OkResp(c, studioschema.GenerateArtifactResponse{TaskId: resp.ArtifactId.String()})
+}
+
+func validateStudioUserTips(req *studioschema.GenerateArtifactRequest) error {
+	if req.Mindmap != nil && utf8.RuneCountInString(req.Mindmap.Tip) > maxUserTipLength {
+		return errors.ErrParams.Msgf("mindmap tip exceeds %d characters", maxUserTipLength)
+	}
+	if req.Report != nil && utf8.RuneCountInString(req.Report.Tip) > maxUserTipLength {
+		return errors.ErrParams.Msgf("report tip exceeds %d characters", maxUserTipLength)
+	}
+	if req.InfoGraphic != nil && utf8.RuneCountInString(req.InfoGraphic.ExtraPrompt) > maxUserTipLength {
+		return errors.ErrParams.Msgf("info_graphic prompt exceeds %d characters", maxUserTipLength)
+	}
+	if req.AudioOverview != nil && utf8.RuneCountInString(req.AudioOverview.Tip) > maxUserTipLength {
+		return errors.ErrParams.Msgf("audio_overview tip exceeds %d characters", maxUserTipLength)
+	}
+	return nil
 }
 
 func (s *Server) GetStudioArtifactStatus(ctx context.Context, c *app.RequestContext) {
@@ -96,26 +127,29 @@ func (s *Server) GetStudioArtifactResult(ctx context.Context, c *app.RequestCont
 		return
 	}
 
-	resp, err := s.getArtifactStatusHandler.Handle(ctx, &artifactapp.StatusRequest{ArtifactId: req.TaskId})
+	a, err := s.getArtifactStatusHandler.FindById(ctx, req.TaskId)
 	if err != nil {
 		http.ErrResp(c, err)
 		return
 	}
 
-	result := studioschema.GetArtifactResultResponse{
+	if a.IsTerminal() {
+		http.OkResp(c, studioschema.ToArtifactResult(a))
+		return
+	}
+
+	info, err := s.getArtifactStatusHandler.Handle(ctx, &artifactapp.StatusRequest{ArtifactId: req.TaskId})
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	result := studioschema.ArtifactResult{
 		TaskId:      req.TaskId.String(),
-		Status:      resp.Status,
-		Title:       resp.Title,
-		ContentUrl:  resp.ContentUrl,
-		MimeType:    resp.MimeType,
-		ContentKind: resp.ResultKind,
+		ContentKind: string(info.ResultKind),
+		Status:      string(info.Status),
 	}
-
-	if resp.ResultKind.Inline() && len(resp.Result) > 0 {
-		result.Content = string(resp.Result)
-	}
-
-	http.OkResp(c, result)
+	http.OkResp(c, &result)
 }
 
 func (s *Server) DeleteStudioArtifact(ctx context.Context, c *app.RequestContext) {

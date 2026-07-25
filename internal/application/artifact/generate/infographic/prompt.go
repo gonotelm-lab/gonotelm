@@ -25,6 +25,7 @@ type TemplateVars struct {
 	ExtraPrompt  string
 	Orientation  artifactentity.InfoGraphicOrientation
 	DetailLevel  artifactentity.InfoGraphicDetailLevel
+	VisualStyle  artifactentity.InfoGraphicVisualStyle
 }
 
 func (v TemplateVars) promptVars() map[string]any {
@@ -34,6 +35,7 @@ func (v TemplateVars) promptVars() map[string]any {
 		"ExtraPrompt":  strings.TrimSpace(v.ExtraPrompt),
 		"Orientation":  v.Orientation.String(),
 		"DetailLevel":  v.DetailLevel.String(),
+		"VisualStyle":  v.VisualStyle.String(),
 	}
 }
 

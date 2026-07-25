@@ -55,7 +55,18 @@ func (r *Generator) generate(
 		reportModelProvider = conf.WorkerGlobal().Studio.Report.ModelProvider
 		modelOption         = chat.WithModel(reportModel)
 		maxRound            = conf.WorkerGlobal().Studio.Report.MaxRound
+		style               = artifactentity.ReportStyleDefaultStyle()
+		language            = artifactentity.LanguageAuto
+		tip                 = ""
 	)
+
+	if p, ok := req.Payload.(*artifactentity.ReportPayload); ok {
+		if p.Style.Supported() {
+			style = p.Style
+		}
+		language = p.Language
+		tip = p.Tip
+	}
 
 	ag, err := types.BuildSourceExploreAgent(
 		r.deps,
@@ -72,7 +83,7 @@ func (r *Generator) generate(
 	}
 
 	sourceIds := types.SourceIDsToStrings(req.SourceIds)
-	msgs, err := RenderReport(ctx, sourceIds)
+	msgs, err := RenderReport(ctx, sourceIds, style, language, tip)
 	if err != nil {
 		return "", errors.Wrapf(errors.ErrInner, "generate report message failed, err=%v", err)
 	}

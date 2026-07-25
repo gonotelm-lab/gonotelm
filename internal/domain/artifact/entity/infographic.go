@@ -35,6 +35,31 @@ func InfoGraphicOrientationDefault() InfoGraphicOrientation {
 	return InfoGraphicOrientationLandscape
 }
 
+type InfoGraphicVisualStyle string
+
+const (
+	InfoGraphicVisualStyleDefault    InfoGraphicVisualStyle = "default"
+	InfoGraphicVisualStyleHandDrawn  InfoGraphicVisualStyle = "hand-drawn"
+	InfoGraphicVisualStyleAnime      InfoGraphicVisualStyle = "anime"
+	InfoGraphicVisualStyleCute       InfoGraphicVisualStyle = "cute"
+	InfoGraphicVisualStyleEducational InfoGraphicVisualStyle = "educational"
+	InfoGraphicVisualStyleMinimal25D  InfoGraphicVisualStyle = "minimal-2.5d"
+)
+
+func (s InfoGraphicVisualStyle) String() string { return string(s) }
+func (s InfoGraphicVisualStyle) Supported() bool {
+	switch s {
+	case InfoGraphicVisualStyleDefault,
+		InfoGraphicVisualStyleHandDrawn,
+		InfoGraphicVisualStyleAnime,
+		InfoGraphicVisualStyleCute,
+		InfoGraphicVisualStyleEducational,
+		InfoGraphicVisualStyleMinimal25D:
+		return true
+	}
+	return false
+}
+
 type InfoGraphicDetailLevel string
 
 const (

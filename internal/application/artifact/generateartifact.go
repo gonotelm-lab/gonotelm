@@ -19,6 +19,8 @@ type GenerateRequest struct {
 	NotebookId    valobj.Id
 	Kind          artifactentity.Kind
 	SourceIds     []valobj.Id
+	Mindmap       *artifactentity.MindmapPayload
+	Report        *artifactentity.ReportPayload
 	InfoGraphic   *artifactentity.InfoGraphicPayload
 	AudioOverview *artifactentity.AudioOverviewPayload
 }
@@ -104,9 +106,19 @@ func (h *GenerateArtifactHandler) Handle(ctx context.Context, cmd *GenerateReque
 func buildPayload(req *GenerateRequest) (artifactentity.Payload, error) {
 	switch req.Kind {
 	case artifactentity.KindMindmap:
-		return &artifactentity.MindmapPayload{NotebookId: req.NotebookId, SourceIds: req.SourceIds}, nil
+		if req.Mindmap == nil {
+			return &artifactentity.MindmapPayload{NotebookId: req.NotebookId, SourceIds: req.SourceIds}, nil
+		}
+		req.Mindmap.NotebookId = req.NotebookId
+		req.Mindmap.SourceIds = req.SourceIds
+		return req.Mindmap, nil
 	case artifactentity.KindReport:
-		return &artifactentity.ReportPayload{NotebookId: req.NotebookId, SourceIds: req.SourceIds}, nil
+		if req.Report == nil {
+			return &artifactentity.ReportPayload{NotebookId: req.NotebookId, SourceIds: req.SourceIds}, nil
+		}
+		req.Report.NotebookId = req.NotebookId
+		req.Report.SourceIds = req.SourceIds
+		return req.Report, nil
 	case artifactentity.KindInfoGraphic:
 		if req.InfoGraphic == nil {
 			return nil, errors.ErrParams.Msgf("info_graphic payload required")

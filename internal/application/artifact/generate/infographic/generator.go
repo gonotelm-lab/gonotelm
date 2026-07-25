@@ -158,6 +158,7 @@ func (ig *Generator) generateImagePrompt(
 		ExtraPrompt:  payload.ExtraPrompt,
 		Orientation:  payload.Orientation,
 		DetailLevel:  payload.DetailLevel,
+		VisualStyle:  payload.VisualStyle,
 	}
 	msgs, err := RenderInfographic(ctx, vars)
 	if err != nil {

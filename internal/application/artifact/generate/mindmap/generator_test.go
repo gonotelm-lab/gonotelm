@@ -16,7 +16,7 @@ func TestCheckStudioMindmapResult(t *testing.T) {
 }
 
 func TestRenderMindmap(t *testing.T) {
-	msgs, err := RenderMindmap(t.Context(), []string{"src-1"})
+	msgs, err := RenderMindmap(t.Context(), []string{"src-1"}, "")
 	require.NoError(t, err)
 	assert.NotEmpty(t, msgs)
 	assert.Contains(t, msgs[len(msgs)-1].Content, "src-1")

@@ -10,14 +10,40 @@ type Payload interface {
 type MindmapPayload struct {
 	NotebookId valobj.Id   `json:"notebook_id"`
 	SourceIds  []valobj.Id `json:"source_ids"`
+	Tip        string      `json:"tip"`
 }
 
 func (p *MindmapPayload) Kind() Kind                { return KindMindmap }
 func (p *MindmapPayload) GetSourceIds() []valobj.Id { return p.SourceIds }
 
+type ReportStyle string
+
+const (
+	ReportStyleDefault    ReportStyle = "default"
+	ReportStyleBrief      ReportStyle = "brief"
+	ReportStyleStudyGuide ReportStyle = "study-guide"
+	ReportStyleDetailed   ReportStyle = "detailed"
+)
+
+func (s ReportStyle) String() string { return string(s) }
+func (s ReportStyle) Supported() bool {
+	switch s {
+	case ReportStyleDefault, ReportStyleBrief, ReportStyleStudyGuide, ReportStyleDetailed:
+		return true
+	}
+	return false
+}
+
+func ReportStyleDefaultStyle() ReportStyle {
+	return ReportStyleDefault
+}
+
 type ReportPayload struct {
 	NotebookId valobj.Id   `json:"notebook_id"`
 	SourceIds  []valobj.Id `json:"source_ids"`
+	Style      ReportStyle `json:"style"`
+	Language   Language    `json:"language"`
+	Tip        string      `json:"tip"`
 }
 
 func (p *ReportPayload) Kind() Kind                { return KindReport }
@@ -30,6 +56,7 @@ type InfoGraphicPayload struct {
 	TextLanguage string                 `json:"text_language"`
 	Orientation  InfoGraphicOrientation `json:"orientation"`
 	DetailLevel  InfoGraphicDetailLevel `json:"detail_level"`
+	VisualStyle  InfoGraphicVisualStyle `json:"visual_style"`
 }
 
 func (p *InfoGraphicPayload) Kind() Kind                { return KindInfoGraphic }

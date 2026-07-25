@@ -66,10 +66,10 @@ func (ig *Generator) Generate(ctx context.Context, req *types.Request) (*types.R
 		return nil, errors.Wrapf(errors.ErrSerde, "marshal infographic storage result err=%v", err)
 	}
 
-	// 删掉中间产物
-	if err = ig.deps.CheckpointRepository.DeleteByArtifactId(ctx, req.ArtifactId); err != nil {
-		slog.ErrorContext(ctx, "delete checkpoint failed", slog.String("artifact_id", req.ArtifactId.String()), slog.Any("err", err))
-	}
+	// 暂时保留 checkpoint 审计
+	// if err = ig.deps.CheckpointRepository.DeleteByArtifactId(ctx, req.ArtifactId); err != nil {
+	// 	slog.ErrorContext(ctx, "delete checkpoint failed", slog.String("artifact_id", req.ArtifactId.String()), slog.Any("err", err))
+	// }
 
 	return &types.Response{
 		Title:      expect.Title,
@@ -215,7 +215,7 @@ func (ig *Generator) parseAgentOutput(
 	ctx context.Context,
 	content string,
 ) (*infographicExpectation, error) {
-	content = strings.TrimSpace(content)
+	content = pkgstring.StripJSONPrefix(content)
 	if content == "" {
 		return nil, fmt.Errorf("empty output")
 	}
@@ -224,8 +224,8 @@ func (ig *Generator) parseAgentOutput(
 	decoder := pkgjson.Decoder{
 		DisallowUnknownFields: true,
 		LogOnDirectFailure: func(err error, _ []byte) {
-			slog.WarnContext(ctx,
-				"infographic direct output unmarshal failed, fallback to extracted json candidates",
+			slog.DebugContext(ctx,
+				"infographic direct unmarshal did not match, fallback to json extraction",
 				slog.Any("err", err),
 			)
 		},

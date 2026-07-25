@@ -139,7 +139,7 @@ func (m *Generator) generate(
 }
 
 func (m *Generator) parseAgentOutput(ctx context.Context, content string) (*mindmapExpectation, error) {
-	content = strings.TrimSpace(content)
+	content = pkgstring.StripJSONPrefix(content)
 	if content == "" {
 		return nil, fmt.Errorf("empty output")
 	}
@@ -148,7 +148,7 @@ func (m *Generator) parseAgentOutput(ctx context.Context, content string) (*mind
 	decoder := pkgjson.Decoder{
 		DisallowUnknownFields: true,
 		LogOnDirectFailure: func(err error, _ []byte) {
-			slog.WarnContext(ctx, "mindmap direct output unmarshal failed, fallback to extracted json candidates",
+			slog.DebugContext(ctx, "mindmap direct unmarshal did not match, fallback to json extraction",
 				slog.Any("err", err))
 		},
 	}

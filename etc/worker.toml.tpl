@@ -101,9 +101,6 @@ temperature = ${GONOTELM_QWEN_TEMPERATURE:-1.0}
 topP = ${GONOTELM_QWEN_TOP_P:-1.0}
 enableThinking = ${GONOTELM_QWEN_ENABLE_THINKING:-false}
 
-[text2image]
-type = "${GONOTELM_TEXT2IMAGE_TYPE:-dashscope}"
-
 [text2image.dashscope]
 apiKey = "${GONOTELM_DASHSCOPE_API_KEY:-}"
 baseUrl = "${GONOTELM_TEXT2IMAGE_DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation}"
@@ -115,9 +112,6 @@ apiKey = "${GONOTELM_AGNES_API_KEY:-}"
 baseUrl = "${GONOTELM_TEXT2IMAGE_AGNES_BASE_URL:-https://apihub.agnes-ai.com/v1/images/generations}"
 model = "${GONOTELM_TEXT2IMAGE_AGNES_MODEL:-agnes-image-2.1-flash}"
 timeout = "${GONOTELM_TEXT2IMAGE_AGNES_TIMEOUT:-1h}"
-
-[text2audio]
-type = "${GONOTELM_TEXT2AUDIO_TYPE:-dashscope}"
 
 [text2audio.dashscope]
 apiKey = "${GONOTELM_DASHSCOPE_API_KEY:-}"

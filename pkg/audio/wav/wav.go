@@ -1,5 +1,5 @@
-// Package wav 提供标准 RIFF/WAVE (PCM) 格式音频的解析、编码与拼接能力。
-// 仅支持 PCM (format=1)；Concat 要求所有输入格式一致，不做重采样。
+// Package wav 提供标准 RIFF/WAVE (PCM, format=1) 音频的解析、编码与拼接能力。
+// Concat 要求所有输入格式一致，不做重采样。
 package wav
 
 import (
@@ -34,11 +34,24 @@ func Parse(data []byte) (*PCM, error) {
 		chunkSize := binary.LittleEndian.Uint32(data[off+4 : off+8])
 		bodyStart := off + 8
 		bodyEnd := bodyStart + int(chunkSize)
+		actualEnd := bodyEnd
+
 		if bodyEnd > len(data) {
-			return nil, fmt.Errorf("wav chunk %q truncated (want=%d have=%d)",
-				chunkID, bodyEnd, len(data))
+			remaining := len(data) - bodyStart
+			switch chunkID {
+			case "data":
+				if remaining > 0 {
+					actualEnd = len(data)
+				} else {
+					return nil, fmt.Errorf("wav data chunk missing: want=%d have=0", chunkSize)
+				}
+			default:
+				return nil, fmt.Errorf("wav chunk %q truncated (want=%d have=%d)",
+					chunkID, bodyEnd, len(data))
+			}
 		}
-		body := data[bodyStart:bodyEnd]
+
+		body := data[bodyStart:actualEnd]
 
 		switch chunkID {
 		case "fmt ":
@@ -56,7 +69,6 @@ func Parse(data []byte) (*PCM, error) {
 			out.Data = body
 		}
 
-		// chunks 以偶数字节对齐
 		off = bodyEnd + int(chunkSize&1)
 	}
 
@@ -70,8 +82,9 @@ func Parse(data []byte) (*PCM, error) {
 }
 
 func Encode(pcm []byte, numChannels uint16, sampleRate uint32, bitsPerSample uint16) []byte {
-	byteRate := sampleRate * uint32(numChannels) * uint32(bitsPerSample) / 8
-	blockAlign := numChannels * bitsPerSample / 8
+	bytesPerSample := int(bitsPerSample / 8)
+	byteRate := sampleRate * uint32(numChannels) * uint32(bytesPerSample)
+	blockAlign := numChannels * uint16(bytesPerSample)
 	dataSize := uint32(len(pcm))
 
 	out := make([]byte, 44+len(pcm))

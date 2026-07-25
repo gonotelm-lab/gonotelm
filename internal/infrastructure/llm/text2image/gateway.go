@@ -20,22 +20,11 @@ func NewText2ImageGateway(cfg *Text2ImageConfig, opts ...pkgt2i.ClientOption) (*
 		return nil, fmt.Errorf("text2image config must not be nil")
 	}
 
-	gw := &Text2ImageGateway{
+	return &Text2ImageGateway{
 		cfg:        cfg,
 		clientOpts: opts,
 		providers:  make(map[Text2ImageProvider]pkgt2i.Generator),
-	}
-
-	defaultProvider := cfg.Type
-	if defaultProvider == "" {
-		defaultProvider = Text2ImageDashScope
-	}
-
-	if _, err := gw.initProvider(defaultProvider); err != nil {
-		return nil, err
-	}
-
-	return gw, nil
+	}, nil
 }
 
 func (g *Text2ImageGateway) GetProvider(providerType Text2ImageProvider) (pkgt2i.Generator, error) {

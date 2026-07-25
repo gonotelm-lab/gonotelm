@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"strings"
 	"sync"
 
 	"github.com/bytedance/sonic"
@@ -27,13 +26,13 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
-type audioStorageResult struct {
+type AudioStorageResult struct {
 	StoreKey    string                  `json:"store_key"`
 	ContentType string                  `json:"content_type"`
-	Audio       *audioStorageResultMeta `json:"audio,omitempty"`
+	Audio       *AudioStorageResultMeta `json:"audio,omitempty"`
 }
 
-type audioStorageResultMeta struct {
+type AudioStorageResultMeta struct {
 	Format        string `json:"format"`
 	NumChannels   int    `json:"channels"`
 	SampleRate    int    `json:"sample_rate"`
@@ -83,8 +82,13 @@ func collectTurns(t *podcastTranscriptExpectation) []synthesizedTurn {
 	return turns
 }
 
-// buildSpeakerVoiceMap 取当前 style 对应 episode 的 speakers，按 speaker 名 → provider voice 建映射。
-func buildSpeakerVoiceMap(style artifactentity.AudioOverviewStyle, provider text2audio.Text2AudioProvider) (map[string]string, error) {
+// buildSpeakerVoiceMap 取当前 style 对应 episode 的 speakers，按 speaker 名 → provider voice 建映射，
+// 并按请求语言选择对应音色。
+func buildSpeakerVoiceMap(
+	style artifactentity.AudioOverviewStyle,
+	provider text2audio.Text2AudioProvider,
+	lang artifactentity.Language,
+) (map[string]string, error) {
 	ep, ok := artifactentity.BuiltinEpisodes[style]
 	if !ok {
 		ep, ok = artifactentity.BuiltinEpisodes[artifactentity.AudioOverviewStyleDefault()]
@@ -96,17 +100,28 @@ func buildSpeakerVoiceMap(style artifactentity.AudioOverviewStyle, provider text
 	providerKey := provider.String()
 	m := make(map[string]string, len(ep.Speakers))
 	for _, sp := range ep.Speakers {
-		voice, ok := sp.Voices[providerKey]
-		if !ok || strings.TrimSpace(voice) == "" {
+		langMap, ok := sp.Voices[providerKey]
+		if !ok {
 			return nil, errors.ErrInner.Msgf(
 				"speaker %q has no voice mapping for provider %q",
 				sp.Name, providerKey,
+			)
+		}
+		voice := resolveVoice(langMap, lang)
+		if voice == "" {
+			return nil, errors.ErrInner.Msgf(
+				"speaker %q has no voice for language %q in provider %q",
+				sp.Name, lang, providerKey,
 			)
 		}
 		m[sp.Name] = voice
 	}
 
 	return m, nil
+}
+
+func resolveVoice(langMap map[string]string, lang artifactentity.Language) string {
+	return langMap[string(lang)]
 }
 
 func wavOptionForProvider(provider text2audio.Text2AudioProvider) audios.Option {
@@ -142,7 +157,7 @@ func (a *Generator) generateAudio(
 	payload *artifactentity.AudioOverviewPayload,
 	transcript *podcastTranscriptExpectation,
 	ckpt *workerentity.Checkpoint,
-) (*audioStorageResult, error) {
+) (*AudioStorageResult, error) {
 	slog.DebugContext(ctx, "[audio] generateAudio start",
 		slog.String("artifact_id", req.ArtifactId.String()),
 		slog.String("notebook_id", payload.NotebookId.String()),
@@ -166,7 +181,7 @@ func (a *Generator) generateAudio(
 		return nil, errors.WithMessagef(err, "get text2audio provider failed")
 	}
 
-	voiceByID, err := buildSpeakerVoiceMap(payload.Style, provider)
+	voiceByID, err := buildSpeakerVoiceMap(payload.Style, provider, payload.Language)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +226,37 @@ func (a *Generator) generateAudio(
 
 	orderedPCMs, err := a.assembleOrderedPCMs(ctx, len(turns), meta)
 	if err != nil {
-		return nil, errors.WithMessagef(err, "assemble ordered pcms failed")
+		slog.WarnContext(ctx, "assemble ordered pcms failed, resetting checkpoint and re-synthesizing",
+			slog.String("artifact_id", req.ArtifactId.String()),
+			slog.Any("err", err),
+		)
+		meta.Parts = nil
+		meta.NumChannels = 0
+		meta.SampleRate = 0
+		meta.BitsPerSample = 0
+		if err := a.persistAudioCheckpoint(ctx, req.ArtifactId, ckpt, meta); err != nil {
+			slog.ErrorContext(ctx, "reset audio checkpoint failed",
+				slog.String("artifact_id", req.ArtifactId.String()),
+				slog.Any("err", err),
+			)
+		}
+		if err = a.synthesizePendingTurns(ctx,
+			payload,
+			turns,
+			meta,
+			req.ArtifactId,
+			ckpt,
+			audioGenerator,
+			voiceByID,
+			provider,
+			cfg.AudioModel,
+		); err != nil {
+			return nil, errors.WithMessagef(err, "re-synthesize pending turns failed")
+		}
+		orderedPCMs, err = a.assembleOrderedPCMs(ctx, len(turns), meta)
+		if err != nil {
+			return nil, errors.WithMessagef(err, "re-assemble ordered pcms failed")
+		}
 	}
 
 	slog.DebugContext(ctx, "[audio] concatenating PCMs",
@@ -259,10 +304,10 @@ func (a *Generator) generateAudio(
 		}
 	}
 
-	return &audioStorageResult{
+	return &AudioStorageResult{
 		StoreKey:    storeKey,
 		ContentType: "audio/wav",
-		Audio: &audioStorageResultMeta{
+		Audio: &AudioStorageResultMeta{
 			Format:        "wav",
 			NumChannels:   int(merged.NumChannels),
 			SampleRate:    int(merged.SampleRate),
@@ -519,7 +564,7 @@ func (a *Generator) cleanupIntermediateAudio(ctx context.Context, meta *audioChe
 	if err := a.deps.ObjectStorage.BatchDeleteObject(ctx, &storage.BatchDeleteObjectRequest{
 		Keys: keys,
 	}); err != nil {
-		slog.WarnContext(ctx, "cleanup intermediate audio failed",
+		slog.ErrorContext(ctx, "cleanup intermediate audio failed",
 			slog.Int("count", len(keys)),
 			slog.Any("err", err),
 		)
@@ -527,6 +572,31 @@ func (a *Generator) cleanupIntermediateAudio(ctx context.Context, meta *audioChe
 	}
 
 	slog.InfoContext(ctx, "intermediate audio cleaned up", slog.Int("count", len(keys)))
+}
+
+// discardStaleAudio 清理废弃的中间音频并清空 field3。
+// 当 transcript 被重新生成（field2 是新写入的）但 checkpoint.field3 仍有旧数据时，
+// 旧音频与新 transcript 不匹配，必须丢弃并从零重新合成。
+func (a *Generator) discardStaleAudio(ctx context.Context, artifactId valobj.Id, ckpt *workerentity.Checkpoint) {
+	meta := restoreAudioMeta(ckpt)
+	if meta == nil || len(meta.Parts) == 0 {
+		return
+	}
+
+	slog.WarnContext(ctx, "discarding stale intermediate audio",
+		slog.String("artifact_id", artifactId.String()),
+		slog.Int("part_count", len(meta.Parts)),
+	)
+
+	a.cleanupIntermediateAudio(ctx, meta)
+
+	ckpt.UpdateField3(nil)
+	if err := a.deps.CheckpointRepository.Save(ctx, ckpt); err != nil {
+		slog.ErrorContext(ctx, "clear stale audio checkpoint failed",
+			slog.String("artifact_id", artifactId.String()),
+			slog.Any("err", err),
+		)
+	}
 }
 
 func (a *Generator) persistAudioCheckpoint(
@@ -543,7 +613,12 @@ func (a *Generator) persistAudioCheckpoint(
 		return err
 	}
 	if ckpt == nil {
-		ckpt = workerentity.NewCheckpoint(artifactId)
+		loaded, loadErr := a.deps.CheckpointRepository.FindByArtifactId(ctx, artifactId)
+		if loadErr == nil && loaded != nil {
+			ckpt = loaded
+		} else {
+			ckpt = workerentity.NewCheckpoint(artifactId)
+		}
 	}
 	ckpt.UpdateField3(data)
 
@@ -586,8 +661,8 @@ func formatAudioStoreKey(notebookId, artifactId valobj.Id) string {
 	return fmt.Sprintf("artifact/%s/%s.wav", notebookId.String(), artifactId.String())
 }
 
-// formatIntermediateAudioStoreKey 格式 artifact/{nb}/{art}/audio/turn_{index:04d}.wav
+// formatIntermediateAudioStoreKey 格式 artifact/{nb}/{art}/audio/turn_{index:06d}.wav
 func formatIntermediateAudioStoreKey(notebookId, artifactId valobj.Id, index int) string {
-	return fmt.Sprintf("artifact/%s/%s/audio/turn_%04d.wav",
+	return fmt.Sprintf("artifact/%s/%s/audio/turn_%06d.wav",
 		notebookId.String(), artifactId.String(), index)
 }

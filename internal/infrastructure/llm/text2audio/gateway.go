@@ -20,22 +20,11 @@ func NewText2AudioGateway(cfg *Text2AudioConfig, opts ...audios.ClientOption) (*
 		return nil, fmt.Errorf("text2audio config must not be nil")
 	}
 
-	gw := &Text2AudioGateway{
+	return &Text2AudioGateway{
 		cfg:        cfg,
 		clientOpts: opts,
 		providers:  make(map[Text2AudioProvider]audios.Generator),
-	}
-
-	defaultProvider := cfg.Type
-	if defaultProvider == "" {
-		defaultProvider = Text2AudioDashScope
-	}
-
-	if _, err := gw.initProvider(defaultProvider); err != nil {
-		return nil, err
-	}
-
-	return gw, nil
+	}, nil
 }
 
 func (g *Text2AudioGateway) GetProvider(providerType Text2AudioProvider) (audios.Generator, error) {

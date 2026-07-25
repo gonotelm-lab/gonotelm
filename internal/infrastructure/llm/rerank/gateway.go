@@ -20,22 +20,11 @@ func NewRerankGateway(cfg *RerankConfig, opts ...pkgrerank.ClientOption) (*Reran
 		return nil, fmt.Errorf("rerank config must not be nil")
 	}
 
-	gw := &RerankGateway{
+	return &RerankGateway{
 		cfg:        cfg,
 		clientOpts: opts,
 		providers:  make(map[RerankProvider]pkgrerank.Reranker),
-	}
-
-	defaultProvider := cfg.Type
-	if defaultProvider == "" {
-		defaultProvider = RerankDashScope
-	}
-
-	if _, err := gw.initProvider(defaultProvider); err != nil {
-		return nil, err
-	}
-
-	return gw, nil
+	}, nil
 }
 
 func (g *RerankGateway) GetProvider(providerType RerankProvider) (pkgrerank.Reranker, error) {

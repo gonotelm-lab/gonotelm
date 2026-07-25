@@ -32,12 +32,12 @@ func AudioOverviewStyleDefault() AudioOverviewStyle {
 }
 
 type AudioSpeaker struct {
-	Key         string            `yaml:"key"`
-	Name        string            `yaml:"name"`
-	Personality string            `yaml:"personality"`
-	Bio         string            `yaml:"bio"`
-	Gender      string            `yaml:"gender"`
-	Voices      map[string]string `yaml:"voices"` // provider: voice_id
+	Key         string                       `yaml:"key"`
+	Name        string                       `yaml:"name"`
+	Personality string                       `yaml:"personality"`
+	Bio         string                       `yaml:"bio"`
+	Gender      string                       `yaml:"gender"`
+	Voices      map[string]map[string]string `yaml:"voices"` // provider → (language → voice_id)
 }
 
 type AudioEpisode struct {

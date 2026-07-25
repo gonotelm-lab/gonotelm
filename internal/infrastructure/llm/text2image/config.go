@@ -17,7 +17,6 @@ const (
 )
 
 type Text2ImageConfig struct {
-	Type      Text2ImageProvider `toml:"type"`
-	DashScope dashscope.Config   `toml:"dashscope"`
-	Agnes     agnes.Config       `toml:"agnes"`
+	DashScope dashscope.Config `toml:"dashscope"`
+	Agnes     agnes.Config     `toml:"agnes"`
 }

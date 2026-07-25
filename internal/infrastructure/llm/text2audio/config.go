@@ -2,8 +2,8 @@ package text2audio
 
 import (
 	"github.com/gonotelm-lab/multimodal/audio/dashscope"
-	"github.com/gonotelm-lab/multimodal/audio/minimax"
 	"github.com/gonotelm-lab/multimodal/audio/mimo"
+	"github.com/gonotelm-lab/multimodal/audio/minimax"
 )
 
 type Text2AudioProvider string
@@ -19,8 +19,7 @@ const (
 )
 
 type Text2AudioConfig struct {
-	Type      Text2AudioProvider `toml:"type"`
-	DashScope dashscope.Config   `toml:"dashscope"`
-	Mimo      mimo.Config        `toml:"mimo"`
-	MiniMax   minimax.Config    `toml:"minimax"`
+	DashScope dashscope.Config `toml:"dashscope"`
+	Mimo      mimo.Config      `toml:"mimo"`
+	MiniMax   minimax.Config   `toml:"minimax"`
 }

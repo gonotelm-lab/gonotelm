@@ -6,16 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache"
-	chat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
-	embedding "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/embedding"
 	rerank "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/rerank"
-	text2audio "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio"
-	text2image "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image"
 	mqimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
-	storageimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
-	"github.com/gonotelm-lab/gonotelm/pkg/sql"
 
 	"github.com/BurntSushi/toml"
 	"github.com/a8m/envsubst"
@@ -27,19 +19,6 @@ var (
 	setAppOnce    sync.Once
 	setWorkerOnce sync.Once
 )
-
-type InfraConfig struct {
-	Database   DatabaseConfig                `toml:"database"`
-	VectorDB   vectordb.Config               `toml:"vectorDb"`
-	Storage    storageimpl.StorageTypeConfig `toml:"storage"`
-	Provider   chat.ProviderConfig           `toml:"provider"`
-	Embedding  embedding.EmbeddingConfig     `toml:"embedding"`
-	Text2Image text2image.Text2ImageConfig   `toml:"text2image"`
-	Text2Audio text2audio.Text2AudioConfig   `toml:"text2audio"`
-
-	Redis    cache.RedisCacheConfig `toml:"redis"`
-	MsgQueue mqimpl.Config          `toml:"msgQueue"`
-}
 
 type AppConfig struct {
 	InfraConfig
@@ -63,11 +42,11 @@ type SyncerConfig struct {
 }
 
 func (c *AppConfig) IsDev() bool {
-	return c.DeployEnv == "dev"
+	return IsDevEnv(c.DeployEnv)
 }
 
 func (c *WorkerConfig) IsDev() bool {
-	return c.DeployEnv == "dev"
+	return IsDevEnv(c.DeployEnv)
 }
 
 type ApiConfig struct {
@@ -79,28 +58,9 @@ func (c *ApiConfig) HostPort() string {
 	return fmt.Sprintf(":%d", c.Port)
 }
 
-type DatabaseConfig struct {
-	Type     string `toml:"type"`
-	Host     string `toml:"host"`
-	Port     int    `toml:"port"`
-	User     string `toml:"user"`
-	Password string `toml:"password"`
-	DBName   string `toml:"dbName"`
-}
-
 type ChunkingConfig struct {
 	Size        int `toml:"size"`
 	OverlapSize int `toml:"overlapSize"`
-}
-
-func (d *DatabaseConfig) ToSQLConfig() *sql.Config {
-	return &sql.Config{
-		Host:     d.Host,
-		Port:     d.Port,
-		User:     d.User,
-		Password: d.Password,
-		DbName:   d.DBName,
-	}
 }
 
 func loadTOML(path string, cfg interface{}) error {
@@ -146,38 +106,12 @@ func LoadWorkerConfig(path string) (*WorkerConfig, error) {
 }
 
 func (c *AppConfig) applyDefaults() {
-	if c.Storage.Type == "" {
-		c.Storage.Type = storageimpl.Minio
-	}
+	c.InfraConfig.applyDefaults()
+	c.Logging.applyDefaults()
+	c.Flow.applyDefaults()
+
 	if c.MsgQueue.Type == "" {
 		c.MsgQueue.Type = mqimpl.Kafka
-	}
-	if c.Embedding.Type == "" {
-		c.Embedding.Type = embedding.EmbeddingDashScope
-	}
-	if c.Rerank.Type == "" {
-		c.Rerank.Type = rerank.RerankDashScope
-	}
-	if c.Text2Image.Type == "" {
-		c.Text2Image.Type = text2image.Text2ImageDashScope
-	}
-	if c.Text2Audio.Type == "" {
-		c.Text2Audio.Type = text2audio.Text2AudioDashScope
-	}
-	if c.Embedding.BatchSize <= 0 {
-		c.Embedding.BatchSize = 10
-	}
-	if c.Embedding.MaxConcurrency <= 0 {
-		c.Embedding.MaxConcurrency = 4
-	}
-	if c.Logging.Level == "" {
-		c.Logging.Level = "debug"
-	}
-	if c.Flow.MaxRetry <= 0 {
-		c.Flow.MaxRetry = 3
-	}
-	if c.Flow.DialTimeout == 0 {
-		c.Flow.DialTimeout = 5 * time.Second
 	}
 	if c.Syncer.PerTaskInterval == 0 {
 		c.Syncer.PerTaskInterval = 2 * time.Second
@@ -191,33 +125,10 @@ func (c *AppConfig) applyDefaults() {
 }
 
 func (c *WorkerConfig) applyDefaults() {
-	if c.Storage.Type == "" {
-		c.Storage.Type = storageimpl.Minio
-	}
-	if c.Embedding.Type == "" {
-		c.Embedding.Type = embedding.EmbeddingDashScope
-	}
-	if c.Text2Image.Type == "" {
-		c.Text2Image.Type = text2image.Text2ImageDashScope
-	}
-	if c.Text2Audio.Type == "" {
-		c.Text2Audio.Type = text2audio.Text2AudioDashScope
-	}
-	if c.Embedding.BatchSize <= 0 {
-		c.Embedding.BatchSize = 10
-	}
-	if c.Embedding.MaxConcurrency <= 0 {
-		c.Embedding.MaxConcurrency = 4
-	}
-	if c.Logging.Level == "" {
-		c.Logging.Level = "debug"
-	}
-	if c.Flow.MaxRetry <= 0 {
-		c.Flow.MaxRetry = 3
-	}
-	if c.Flow.DialTimeout == 0 {
-		c.Flow.DialTimeout = 5 * time.Second
-	}
+	c.InfraConfig.applyDefaults()
+	c.Logging.applyDefaults()
+	c.Flow.applyDefaults()
+
 	if c.Worker.MaxConcurrency <= 0 {
 		c.Worker.MaxConcurrency = 4
 	}
@@ -244,12 +155,4 @@ func SetWorkerGlobal(cfg *WorkerConfig) {
 	setWorkerOnce.Do(func() {
 		workerGlobal = cfg
 	})
-}
-
-func (c *AppConfig) SQLConfig() *sql.Config {
-	return c.Database.ToSQLConfig()
-}
-
-func (c *WorkerConfig) SQLConfig() *sql.Config {
-	return c.Database.ToSQLConfig()
 }

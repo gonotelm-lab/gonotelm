@@ -3,8 +3,10 @@ package artifact
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/bytedance/sonic"
+	flowschema "github.com/gonotelm-lab/flow/api/schema/v1"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifacterrors "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/errors"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
@@ -13,6 +15,17 @@ import (
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
+
+const retryCancelWaitTimeout = 30 * time.Second
+const retryCancelPollInterval = 500 * time.Millisecond
+
+func isTaskTerminal(state flowschema.TaskState) bool {
+	switch state {
+	case flowschema.TaskState_DONE, flowschema.TaskState_FAILED, flowschema.TaskState_CANCELLED:
+		return true
+	}
+	return false
+}
 
 type RetryArtifactHandler struct {
 	repo     artifactrepo.Repository
@@ -35,6 +48,17 @@ func (h *RetryArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error 
 	}
 
 	oldFlowTaskId := a.FlowTaskId
+
+	if oldFlowTaskId != "" {
+		if err := h.cancelAndWait(ctx, oldFlowTaskId); err != nil {
+			slog.WarnContext(ctx, "cancel old flow task on retry failed, proceeding anyway",
+				"artifact_id", cmd,
+				"old_flow_task_id", oldFlowTaskId,
+				slog.Any("err", err),
+			)
+		}
+	}
+
 	payloadBytes, err := sonic.Marshal(a.Payload)
 	if err != nil {
 		return errors.Wrapf(errors.ErrSerde, "marshal payload on retry err=%v", err)
@@ -58,9 +82,6 @@ func (h *RetryArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error 
 		return errors.WithMessage(err, "save retried artifact failed")
 	}
 
-	if oldFlowTaskId != "" && oldFlowTaskId != newFlowTaskId {
-		go func() { _ = h.flowc.Cancel(context.WithoutCancel(ctx), oldFlowTaskId) }()
-	}
 	for _, evt := range a.PullEvents() {
 		if err := h.eventBus.Publish(ctx, evt); err != nil {
 			slog.ErrorContext(ctx, "publish artifact event failed", "artifact_id", a.Id, "err", err)
@@ -72,4 +93,37 @@ func (h *RetryArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error 
 	}
 
 	return nil
+}
+
+func (h *RetryArtifactHandler) cancelAndWait(ctx context.Context, flowTaskId string) error {
+	info, err := h.flowc.Get(ctx, flowTaskId)
+	if err != nil {
+		return nil
+	}
+	if isTaskTerminal(info.State) {
+		return nil
+	}
+
+	if err := h.flowc.Cancel(ctx, flowTaskId); err != nil {
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, retryCancelWaitTimeout)
+	defer cancel()
+
+	ticker := time.NewTicker(retryCancelPollInterval)
+	defer ticker.Stop()
+
+	for {
+		info, err := h.flowc.Get(ctx, flowTaskId)
+		if err == nil && isTaskTerminal(info.State) {
+			return nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+		}
+	}
 }

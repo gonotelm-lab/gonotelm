@@ -1,13 +1,19 @@
 package studio
 
 import (
+	"github.com/bytedance/sonic"
+
+	audiooverview "github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/audiooverview"
+	infographic "github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/infographic"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 
-type Kind = artifactentity.Kind
-type Status = artifactentity.Status
-type ResultKind = artifactentity.ResultKind
+type (
+	Kind       = artifactentity.Kind
+	Status     = artifactentity.Status
+	ResultKind = artifactentity.ResultKind
+)
 
 type GenerateArtifactRequest struct {
 	NotebookId    uuid.UUID                        `json:"notebook_id,required"`
@@ -95,6 +101,16 @@ type InfoGraphicExtras struct {
 	DetailLevel  string `json:"detail_level"`
 }
 
+type AudioOverviewExtras struct {
+	Tip        string `json:"tip"`
+	Language   string `json:"language"`
+	Style      string `json:"style"`
+	Format     string `json:"format,omitempty"`
+	Channels   int    `json:"channels,omitempty"`
+	SampleRate int    `json:"sample_rate,omitempty"`
+	DurationMs int64  `json:"duration_ms,omitempty"`
+}
+
 func ToArtifactResult(a *artifactentity.Artifact) *ArtifactResult {
 	r := &ArtifactResult{
 		NotebookId:  a.NotebookId.String(),
@@ -121,10 +137,45 @@ func ToArtifactResult(a *artifactentity.Artifact) *ArtifactResult {
 		}
 	case *artifactentity.AudioOverviewPayload:
 		r.SourceIds = p.SourceIds
+		r.Extras = &AudioOverviewExtras{
+			Tip:      p.Tip,
+			Language: string(p.Language),
+			Style:    string(p.Style),
+		}
 	}
 
 	if a.ResultKind.Inline() && a.Result != nil {
 		r.Content = string(a.Result)
+	}
+	if a.ResultKind.Storage() && a.Result != nil {
+		switch a.Kind {
+		case artifactentity.KindInfoGraphic:
+			var sr infographic.StorageResult
+			if sonic.Unmarshal(a.Result, &sr) == nil {
+				r.MimeType = sr.ContentType
+				if sr.Image != nil {
+					r.ImageInfo = &ArtifactResultImageInfo{
+						Width:  sr.Image.Width,
+						Height: sr.Image.Height,
+					}
+				}
+			}
+		case artifactentity.KindAudioOverview:
+			var sr audiooverview.AudioStorageResult
+			if sonic.Unmarshal(a.Result, &sr) == nil {
+				r.MimeType = sr.ContentType
+				if sr.Audio != nil {
+					if r.Extras == nil {
+						r.Extras = &AudioOverviewExtras{}
+					}
+					extra := r.Extras.(*AudioOverviewExtras)
+					extra.DurationMs = sr.Audio.DurationMs
+					extra.Format = sr.Audio.Format
+					extra.Channels = sr.Audio.NumChannels
+					extra.SampleRate = sr.Audio.SampleRate
+				}
+			}
+		}
 	}
 
 	return r

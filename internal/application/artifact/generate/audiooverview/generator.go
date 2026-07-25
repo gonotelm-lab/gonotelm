@@ -73,14 +73,18 @@ func (a *Generator) Generate(ctx context.Context, req *types.Request) (*types.Re
 	llmOptions := a.llmOptions()
 	ckpt := a.loadCheckpoint(ctx, req)
 
-	outline, err := a.ensureOutline(ctx, req, payload, ckpt, llmOptions)
+	outline, ckpt, err := a.ensureOutline(ctx, req, payload, ckpt, llmOptions)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "generate outline failed, err=%v", err)
 	}
 
-	transcript, err := a.ensureTranscript(ctx, req, payload, ckpt, outline, llmOptions)
+	transcript, ckpt, transcriptRestored, err := a.ensureTranscript(ctx, req, payload, ckpt, outline, llmOptions)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "generate transcript failed, err=%v", err)
+	}
+
+	if !transcriptRestored && ckpt != nil && ckpt.Field3 != nil {
+		a.discardStaleAudio(ctx, req.ArtifactId, ckpt)
 	}
 
 	audioResult, err := a.generateAudio(ctx, req, payload, transcript, ckpt)
@@ -94,7 +98,8 @@ func (a *Generator) Generate(ctx context.Context, req *types.Request) (*types.Re
 		return nil, errors.WithMessagef(err, "generate audio failed")
 	}
 
-	a.cleanupCheckpoint(ctx, req)
+	// 暂时保留 checkpoint 审计
+	// a.cleanupCheckpoint(ctx, req)
 	return a.buildAudioResponse(transcript, audioResult)
 }
 
@@ -116,18 +121,22 @@ func (a *Generator) ensureOutline(
 	payload *artifactentity.AudioOverviewPayload,
 	ckpt *workerentity.Checkpoint,
 	llmOptions []einomodel.Option,
-) (*podcastOutlineExpectation, error) {
+) (*podcastOutlineExpectation, *workerentity.Checkpoint, error) {
 	if outline := restoreOutline(ctx, req.ArtifactId, ckpt); outline != nil {
-		return outline, nil
+		return outline, ckpt, nil
 	}
 
 	outline, err := a.generateOutline(ctx, req, payload, llmOptions)
 	if err != nil {
-		return nil, err
+		return nil, ckpt, err
 	}
 
-	a.saveCheckpointStep1(ctx, req.ArtifactId, ckpt, outline)
-	return outline, nil
+	ckpt, err = a.saveCheckpointStep1(ctx, req.ArtifactId, ckpt, outline)
+	if err != nil {
+		return nil, nil, errors.Wrapf(errors.ErrInner, "save outline checkpoint failed, err=%v", err)
+	}
+
+	return outline, ckpt, nil
 }
 
 func (a *Generator) ensureTranscript(
@@ -137,18 +146,22 @@ func (a *Generator) ensureTranscript(
 	ckpt *workerentity.Checkpoint,
 	outline *podcastOutlineExpectation,
 	llmOptions []einomodel.Option,
-) (*podcastTranscriptExpectation, error) {
+) (*podcastTranscriptExpectation, *workerentity.Checkpoint, bool, error) {
 	if transcript := restoreTranscript(ctx, req.ArtifactId, ckpt); transcript != nil {
-		return transcript, nil
+		return transcript, ckpt, true, nil
 	}
 
 	transcript, err := a.generateTranscript(ctx, req, payload, outline, llmOptions)
 	if err != nil {
-		return nil, err
+		return nil, ckpt, false, err
 	}
 
-	a.saveCheckpointStep2(ctx, req.ArtifactId, ckpt, transcript)
-	return transcript, nil
+	ckpt, err = a.saveCheckpointStep2(ctx, req.ArtifactId, ckpt, transcript)
+	if err != nil {
+		return nil, nil, false, errors.Wrapf(errors.ErrInner, "save transcript checkpoint failed, err=%v", err)
+	}
+
+	return transcript, ckpt, false, nil
 }
 
 func (a *Generator) cleanupCheckpoint(ctx context.Context, req *types.Request) {
@@ -160,7 +173,7 @@ func (a *Generator) cleanupCheckpoint(ctx context.Context, req *types.Request) {
 
 func (a *Generator) buildAudioResponse(
 	transcript *podcastTranscriptExpectation,
-	audioResult *audioStorageResult,
+	audioResult *AudioStorageResult,
 ) (*types.Response, error) {
 	result, err := sonic.Marshal(audioResult)
 	if err != nil {
@@ -206,19 +219,16 @@ func (a *Generator) saveCheckpointStep1(
 	artifactId valobj.Id,
 	ckpt *workerentity.Checkpoint,
 	outline *podcastOutlineExpectation,
-) {
+) (*workerentity.Checkpoint, error) {
 	data, err := sonic.Marshal(outline)
 	if err != nil {
-		return
+		return nil, err
 	}
 	if ckpt == nil {
 		ckpt = workerentity.NewCheckpoint(artifactId)
 	}
 	ckpt.UpdateField1(data)
-	if err = a.deps.CheckpointRepository.Save(ctx, ckpt); err != nil {
-		slog.WarnContext(ctx, "save checkpoint failed",
-			slog.String("artifact_id", artifactId.String()), slog.Any("err", err))
-	}
+	return ckpt, a.deps.CheckpointRepository.Save(ctx, ckpt)
 }
 
 func (a *Generator) saveCheckpointStep2(
@@ -226,19 +236,16 @@ func (a *Generator) saveCheckpointStep2(
 	artifactId valobj.Id,
 	ckpt *workerentity.Checkpoint,
 	transcript *podcastTranscriptExpectation,
-) {
+) (*workerentity.Checkpoint, error) {
 	data, err := sonic.Marshal(transcript)
 	if err != nil {
-		return
+		return nil, err
 	}
 	if ckpt == nil {
 		ckpt = workerentity.NewCheckpoint(artifactId)
 	}
 	ckpt.UpdateField2(data)
-	if err = a.deps.CheckpointRepository.Save(ctx, ckpt); err != nil {
-		slog.WarnContext(ctx, "save checkpoint failed",
-			slog.String("artifact_id", artifactId.String()), slog.Any("err", err))
-	}
+	return ckpt, a.deps.CheckpointRepository.Save(ctx, ckpt)
 }
 
 func (a *Generator) llmOptions() []einomodel.Option {
@@ -347,7 +354,7 @@ func (a *Generator) generateTranscript(
 		return nil, errors.Wrapf(errors.ErrInner, "render podcast transcript prompt failed, err=%v", err)
 	}
 
-	voiceSkills := voices.GetProviderSkill(conf.WorkerGlobal().Text2Audio.Type)
+	voiceSkills := voices.GetProviderSkill(conf.WorkerGlobal().Studio.AudioOverview.AudioModelProvider)
 	if len(voiceSkills) > 0 {
 		msgs = append(msgs, einoschema.UserMessage(voiceSkills))
 	}
@@ -401,7 +408,7 @@ func (a *Generator) generateTranscript(
 }
 
 func (a *Generator) parseOutlineOutput(ctx context.Context, content string) (*podcastOutlineExpectation, error) {
-	content = strings.TrimSpace(content)
+	content = pkgstring.StripJSONPrefix(content)
 	if content == "" {
 		return nil, fmt.Errorf("empty output")
 	}
@@ -410,8 +417,8 @@ func (a *Generator) parseOutlineOutput(ctx context.Context, content string) (*po
 	decoder := pkgjson.Decoder{
 		DisallowUnknownFields: true,
 		LogOnDirectFailure: func(err error, _ []byte) {
-			slog.WarnContext(ctx,
-				"podcast outline direct output unmarshal failed, fallback to extracted json candidates",
+			slog.DebugContext(ctx,
+				"podcast outline direct unmarshal did not match, fallback to json extraction",
 				slog.Any("err", err),
 			)
 		},
@@ -451,7 +458,7 @@ func (a *Generator) parseTranscriptOutput(
 	content string,
 	outline *podcastOutlineExpectation,
 ) (*podcastTranscriptExpectation, error) {
-	content = strings.TrimSpace(content)
+	content = pkgstring.StripJSONPrefix(content)
 	if content == "" {
 		return nil, fmt.Errorf("empty output")
 	}
@@ -460,8 +467,8 @@ func (a *Generator) parseTranscriptOutput(
 	decoder := pkgjson.Decoder{
 		DisallowUnknownFields: true,
 		LogOnDirectFailure: func(err error, _ []byte) {
-			slog.WarnContext(ctx,
-				"podcast transcript direct output unmarshal failed, fallback to extracted json candidates",
+			slog.DebugContext(ctx,
+				"podcast transcript direct unmarshal did not match, fallback to json extraction",
 				slog.Any("err", err),
 			)
 		},

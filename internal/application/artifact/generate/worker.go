@@ -9,6 +9,8 @@ import (
 	generatetypes "github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/types"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
+	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	errx "github.com/gonotelm-lab/multimodal/error"
 
 	"github.com/bytedance/sonic"
 )
@@ -19,7 +21,7 @@ type WorkerInput struct {
 	UserId     string          `json:"user_id"`
 	SourceIds  []string        `json:"source_ids"`
 	Kind       string          `json:"kind"`
-	Payload    json.RawMessage `json:"payload"` // 不同的kind有不同的payload结构
+	Payload    json.RawMessage `json:"payload"`
 }
 
 type WorkerOutput struct {
@@ -29,27 +31,27 @@ type WorkerOutput struct {
 }
 
 func RegisterTypedWorker(client *flowworker.Client, deps *generatetypes.ServiceDeps) {
-	flowworker.RegisterTyped(client, func(ctx context.Context, in WorkerInput) (WorkerOutput, error) {
+	flowworker.RegisterTypedResult(client, func(ctx context.Context, in WorkerInput) (flowworker.Result, error) {
 		kind := artifactentity.Kind(in.Kind)
 		if !kind.Supported() {
-			return WorkerOutput{}, fmt.Errorf("unsupported artifact kind: %s", kind)
+			return paramErrorResult("unsupported artifact kind: %s", kind), nil
 		}
 
 		artifactId, err := parseId(in.ArtifactId)
 		if err != nil {
-			return WorkerOutput{}, fmt.Errorf("artifact_id: %w", err)
+			return paramErrorResult("artifact_id: %v", err), nil
 		}
 		notebookId, err := parseId(in.NotebookId)
 		if err != nil {
-			return WorkerOutput{}, fmt.Errorf("notebook_id: %w", err)
+			return paramErrorResult("notebook_id: %v", err), nil
 		}
 		sourceIds, err := parseIds(in.SourceIds)
 		if err != nil {
-			return WorkerOutput{}, fmt.Errorf("source_ids: %w", err)
+			return paramErrorResult("source_ids: %v", err), nil
 		}
 		payload, err := decodePayload(kind, in.Payload)
 		if err != nil {
-			return WorkerOutput{}, fmt.Errorf("payload: %w", err)
+			return paramErrorResult("payload: %v", err), nil
 		}
 
 		req := &generatetypes.Request{
@@ -62,15 +64,44 @@ func RegisterTypedWorker(client *flowworker.Client, deps *generatetypes.ServiceD
 		}
 		resp, err := Run(ctx, deps, req)
 		if err != nil {
-			return WorkerOutput{}, err
+			errMsg := err.Error()
+			return flowworker.ErrorResult{
+				Data:      []byte(errMsg),
+				SkipRetry: shouldSkipRetry(err),
+			}, nil
 		}
 
-		return WorkerOutput{
+		data, err := sonic.Marshal(WorkerOutput{
 			Title:      resp.Title,
 			Result:     resp.Result,
 			ResultKind: string(resp.ResultKind),
-		}, nil
+		})
+		if err != nil {
+			return flowworker.ErrorResult{
+				Data:      []byte(err.Error()),
+				SkipRetry: true,
+			}, nil
+		}
+		return flowworker.OkResult{Data: data}, nil
 	})
+}
+
+func paramErrorResult(format string, args ...any) flowworker.Result {
+	err := errors.ErrParams.Msgf(format, args...)
+	return flowworker.ErrorResult{
+		Data:      []byte(err.Error()),
+		SkipRetry: true,
+	}
+}
+
+func shouldSkipRetry(err error) bool {
+	if errx.GetKind(err) != 0 {
+		return !errx.IsRetryable(err)
+	}
+	if errors.Is(err, errors.ErrParams) || errors.Is(err, errors.ErrSerde) {
+		return true
+	}
+	return false
 }
 
 func decodePayload(kind artifactentity.Kind, raw json.RawMessage) (artifactentity.Payload, error) {
@@ -98,7 +129,6 @@ func decodePayload(kind artifactentity.Kind, raw json.RawMessage) (artifactentit
 		if err := sonic.Unmarshal(raw, &p); err != nil {
 			return nil, err
 		}
-
 		return &p, nil
 	default:
 		return nil, fmt.Errorf("unsupported kind: %s", kind)

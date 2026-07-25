@@ -13,10 +13,12 @@ import (
 type TaskState = flowschema.TaskState
 
 type TaskInfo struct {
-	ID     string
-	State  TaskState
-	Result []byte
-	Error  []byte
+	ID        string
+	State     TaskState
+	Result    []byte
+	Error     []byte
+	MaxRetry  int
+	AttemptNo int
 }
 
 type TaskClient interface {
@@ -58,7 +60,7 @@ func (t *TaskClientImpl) Get(ctx context.Context, flowTaskId string) (*TaskInfo,
 	if err != nil {
 		return nil, err
 	}
-	return &TaskInfo{ID: tk.Id, State: tk.State, Result: tk.Result, Error: tk.Error}, nil
+	return &TaskInfo{ID: tk.Id, State: tk.State, Result: tk.Result, Error: tk.Error, MaxRetry: int(tk.MaxRetry), AttemptNo: int(tk.AttemptNo)}, nil
 }
 
 func (t *TaskClientImpl) Cancel(ctx context.Context, flowTaskId string) error {

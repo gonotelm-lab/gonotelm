@@ -6,8 +6,10 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/audiooverview/assets/voices"
 	"github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/types"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	workerentity "github.com/gonotelm-lab/gonotelm/internal/domain/worker/entity"
 	workererrors "github.com/gonotelm-lab/gonotelm/internal/domain/worker/errors"
@@ -46,8 +48,9 @@ type podcastOutlineExpectation struct {
 }
 
 type podcastTranscriptTurn struct {
-	Speaker string `json:"speaker"`
-	Text    string `json:"text"`
+	Speaker          string `json:"speaker"`
+	Text             string `json:"text"`
+	VoiceInstruction string `json:"voice_instruction"`
 }
 
 type podcastTranscriptSegment struct {
@@ -67,91 +70,175 @@ func (a *Generator) Generate(ctx context.Context, req *types.Request) (*types.Re
 	}
 
 	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioAudioOverviewScene)
-
 	llmOptions := a.llmOptions()
+	ckpt := a.loadCheckpoint(ctx, req)
 
-	var (
-		outline    *podcastOutlineExpectation
-		transcript *podcastTranscriptExpectation
-	)
-
-	// see if we can find any checkpoint for this artifact id
-	ckpt, err := a.deps.CheckpointRepository.FindByArtifactId(ctx, req.ArtifactId)
+	outline, err := a.ensureOutline(ctx, req, payload, ckpt, llmOptions)
 	if err != nil {
-		if !errors.Is(err, workererrors.ErrCheckpointNotFound) {
-			slog.ErrorContext(ctx, "find checkpoint failed", slog.String("artifact_id", req.ArtifactId.String()), slog.Any("err", err))
-		}
-	} else {
-		var tmpOutline podcastOutlineExpectation
-		if err = sonic.Unmarshal(ckpt.Field1, &tmpOutline); err != nil {
-			slog.WarnContext(ctx, "unmarshal outline failed", slog.String("artifact_id", req.ArtifactId.String()), slog.Any("err", err))
-		} else {
-			outline = &tmpOutline
-		}
+		return nil, errors.Wrapf(errors.ErrInner, "generate outline failed, err=%v", err)
 	}
 
-	if outline == nil {
-		outline, err = a.generateOutline(ctx, req, payload, llmOptions)
-		if err != nil {
-			return nil, errors.Wrapf(errors.ErrInner, "generate outline failed, err=%v", err)
-		}
-
-		// save checkpoint
-		if outlineCkpt, err := sonic.Marshal(outline); err == nil {
-			if ckpt == nil {
-				ckpt = workerentity.NewCheckpoint(req.ArtifactId)
-			}
-			ckpt.UpdateField1(outlineCkpt)
-			if err = a.deps.CheckpointRepository.Save(ctx, ckpt); err != nil {
-				slog.WarnContext(ctx, "save checkpoint failed", slog.String("artifact_id", req.ArtifactId.String()), slog.Any("err", err))
-			}
-		}
-	}
-
-	// try to find transcript checkpoint
-	if ckpt != nil {
-		var tmpTranscript podcastTranscriptExpectation
-		if err = sonic.Unmarshal(ckpt.Field2, &tmpTranscript); err != nil {
-			slog.WarnContext(ctx, "unmarshal transcript failed", slog.String("artifact_id", req.ArtifactId.String()), slog.Any("err", err))
-		} else {
-			transcript = &tmpTranscript
-		}
-	}
-
-	if transcript == nil {
-		transcript, err = a.generateTranscript(ctx, req, payload, outline, llmOptions)
-		if err != nil {
-			return nil, errors.Wrapf(errors.ErrInner, "generate transcript failed, err=%v", err)
-		}
-
-		// save checkpoint again
-		if transcriptCkpt, err := sonic.Marshal(transcript); err == nil {
-			ckpt.UpdateField2(transcriptCkpt)
-			if err = a.deps.CheckpointRepository.Save(ctx, ckpt); err != nil {
-				slog.WarnContext(ctx, "save checkpoint failed", slog.String("artifact_id", req.ArtifactId.String()), slog.Any("err", err))
-			}
-		}
-	}
-
-	result, err := sonic.Marshal(transcript)
+	transcript, err := a.ensureTranscript(ctx, req, payload, ckpt, outline, llmOptions)
 	if err != nil {
-		return nil, errors.Wrapf(errors.ErrSerde, "marshal podcast transcript err=%v", err)
+		return nil, errors.Wrapf(errors.ErrInner, "generate transcript failed, err=%v", err)
 	}
 
-	if err = a.generateAudio(); err != nil {
+	audioResult, err := a.generateAudio(ctx, req, payload, transcript, ckpt)
+	if err != nil {
+		slog.ErrorContext(ctx, "generate audio failed",
+			slog.String("artifact_id", req.ArtifactId.String()),
+			slog.String("notebook_id", payload.NotebookId.String()),
+			slog.String("style", string(payload.Style)),
+			slog.Any("err", err),
+		)
 		return nil, errors.WithMessagef(err, "generate audio failed")
 	}
 
-	// 确认成功 可以删掉 checkpoint
-	if err = a.deps.CheckpointRepository.DeleteByArtifactId(ctx, req.ArtifactId); err != nil {
-		slog.ErrorContext(ctx, "delete checkpoint failed", slog.String("artifact_id", req.ArtifactId.String()), slog.Any("err", err))
+	a.cleanupCheckpoint(ctx, req)
+	return a.buildAudioResponse(transcript, audioResult)
+}
+
+func (a *Generator) loadCheckpoint(ctx context.Context, req *types.Request) *workerentity.Checkpoint {
+	ckpt, err := a.deps.CheckpointRepository.FindByArtifactId(ctx, req.ArtifactId)
+	if err != nil {
+		if !errors.Is(err, workererrors.ErrCheckpointNotFound) {
+			slog.ErrorContext(ctx, "find checkpoint failed",
+				slog.String("artifact_id", req.ArtifactId.String()), slog.Any("err", err))
+		}
+		return nil
+	}
+	return ckpt
+}
+
+func (a *Generator) ensureOutline(
+	ctx context.Context,
+	req *types.Request,
+	payload *artifactentity.AudioOverviewPayload,
+	ckpt *workerentity.Checkpoint,
+	llmOptions []einomodel.Option,
+) (*podcastOutlineExpectation, error) {
+	if outline := restoreOutline(ctx, req.ArtifactId, ckpt); outline != nil {
+		return outline, nil
 	}
 
+	outline, err := a.generateOutline(ctx, req, payload, llmOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	a.saveCheckpointStep1(ctx, req.ArtifactId, ckpt, outline)
+	return outline, nil
+}
+
+func (a *Generator) ensureTranscript(
+	ctx context.Context,
+	req *types.Request,
+	payload *artifactentity.AudioOverviewPayload,
+	ckpt *workerentity.Checkpoint,
+	outline *podcastOutlineExpectation,
+	llmOptions []einomodel.Option,
+) (*podcastTranscriptExpectation, error) {
+	if transcript := restoreTranscript(ctx, req.ArtifactId, ckpt); transcript != nil {
+		return transcript, nil
+	}
+
+	transcript, err := a.generateTranscript(ctx, req, payload, outline, llmOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	a.saveCheckpointStep2(ctx, req.ArtifactId, ckpt, transcript)
+	return transcript, nil
+}
+
+func (a *Generator) cleanupCheckpoint(ctx context.Context, req *types.Request) {
+	if err := a.deps.CheckpointRepository.DeleteByArtifactId(ctx, req.ArtifactId); err != nil {
+		slog.ErrorContext(ctx, "delete checkpoint failed",
+			slog.String("artifact_id", req.ArtifactId.String()), slog.Any("err", err))
+	}
+}
+
+func (a *Generator) buildAudioResponse(
+	transcript *podcastTranscriptExpectation,
+	audioResult *audioStorageResult,
+) (*types.Response, error) {
+	result, err := sonic.Marshal(audioResult)
+	if err != nil {
+		return nil, errors.Wrapf(errors.ErrSerde, "marshal podcast audio result err=%v", err)
+	}
 	return &types.Response{
 		Title:      transcript.Title,
 		Result:     result,
-		ResultKind: artifactentity.ResultKindInline,
+		ResultKind: artifactentity.ResultKindStorage,
 	}, nil
+}
+
+func restoreOutline(ctx context.Context, artifactId valobj.Id, ckpt *workerentity.Checkpoint) *podcastOutlineExpectation {
+	if ckpt == nil || ckpt.Field1 == nil {
+		return nil
+	}
+	var outline podcastOutlineExpectation
+	if err := sonic.Unmarshal(ckpt.Field1, &outline); err != nil {
+		slog.WarnContext(ctx, "unmarshal outline failed",
+			slog.String("artifact_id", artifactId.String()), slog.Any("err", err))
+		return nil
+	}
+
+	return &outline
+}
+
+func restoreTranscript(ctx context.Context, artifactId valobj.Id, ckpt *workerentity.Checkpoint) *podcastTranscriptExpectation {
+	if ckpt == nil || ckpt.Field2 == nil {
+		return nil
+	}
+	var transcript podcastTranscriptExpectation
+	if err := sonic.Unmarshal(ckpt.Field2, &transcript); err != nil {
+		slog.WarnContext(ctx, "unmarshal transcript failed",
+			slog.String("artifact_id", artifactId.String()), slog.Any("err", err))
+		return nil
+	}
+
+	return &transcript
+}
+
+func (a *Generator) saveCheckpointStep1(
+	ctx context.Context,
+	artifactId valobj.Id,
+	ckpt *workerentity.Checkpoint,
+	outline *podcastOutlineExpectation,
+) {
+	data, err := sonic.Marshal(outline)
+	if err != nil {
+		return
+	}
+	if ckpt == nil {
+		ckpt = workerentity.NewCheckpoint(artifactId)
+	}
+	ckpt.UpdateField1(data)
+	if err = a.deps.CheckpointRepository.Save(ctx, ckpt); err != nil {
+		slog.WarnContext(ctx, "save checkpoint failed",
+			slog.String("artifact_id", artifactId.String()), slog.Any("err", err))
+	}
+}
+
+func (a *Generator) saveCheckpointStep2(
+	ctx context.Context,
+	artifactId valobj.Id,
+	ckpt *workerentity.Checkpoint,
+	transcript *podcastTranscriptExpectation,
+) {
+	data, err := sonic.Marshal(transcript)
+	if err != nil {
+		return
+	}
+	if ckpt == nil {
+		ckpt = workerentity.NewCheckpoint(artifactId)
+	}
+	ckpt.UpdateField2(data)
+	if err = a.deps.CheckpointRepository.Save(ctx, ckpt); err != nil {
+		slog.WarnContext(ctx, "save checkpoint failed",
+			slog.String("artifact_id", artifactId.String()), slog.Any("err", err))
+	}
 }
 
 func (a *Generator) llmOptions() []einomodel.Option {
@@ -260,6 +347,11 @@ func (a *Generator) generateTranscript(
 		return nil, errors.Wrapf(errors.ErrInner, "render podcast transcript prompt failed, err=%v", err)
 	}
 
+	voiceSkills := voices.GetProviderSkill(conf.WorkerGlobal().Text2Audio.Type)
+	if len(voiceSkills) > 0 {
+		msgs = append(msgs, einoschema.UserMessage(voiceSkills))
+	}
+
 	output, err := ag.React(ctx, msgs)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "generate podcast transcript output failed, err=%v", err)
@@ -283,7 +375,8 @@ func (a *Generator) generateTranscript(
 		"JSON 字段必须且仅能包含 title 和 segments",
 		"title 与大纲标题一致",
 		"segments 数量与大纲一致，每个元素包含 name 和 dialogue 字段",
-		"dialogue 是数组，每个元素包含 speaker 和 text 字段",
+		"dialogue 是数组，每个元素包含 speaker、text 和 voice_instruction 字段",
+		"voice_instruction 为语音指令",
 	}))
 
 	llmResp, genErr := ag.BaseLLM().Generate(ctx, compensateMsgs, llmOptions...)
@@ -401,20 +494,21 @@ func (a *Generator) parseTranscriptOutput(
 			return nil, fmt.Errorf("transcript segment[%d] dialogue is empty", i)
 		}
 		for j := range expect.Segments[i].Dialogue {
-			expect.Segments[i].Dialogue[j].Speaker = strings.TrimSpace(expect.Segments[i].Dialogue[j].Speaker)
-			expect.Segments[i].Dialogue[j].Text = strings.TrimSpace(expect.Segments[i].Dialogue[j].Text)
-			if expect.Segments[i].Dialogue[j].Speaker == "" {
+			turn := &expect.Segments[i].Dialogue[j]
+			turn.Speaker = strings.TrimSpace(turn.Speaker)
+			turn.Text = strings.TrimSpace(turn.Text)
+			turn.VoiceInstruction = strings.TrimSpace(turn.VoiceInstruction)
+			if turn.Speaker == "" {
 				return nil, fmt.Errorf("segment[%d] dialogue[%d] speaker is empty", i, j)
 			}
-			if expect.Segments[i].Dialogue[j].Text == "" {
+			if turn.Text == "" {
 				return nil, fmt.Errorf("segment[%d] dialogue[%d] text is empty", i, j)
+			}
+			if turn.VoiceInstruction == "" {
+				return nil, fmt.Errorf("segment[%d] dialogue[%d] voice_instruction is empty", i, j)
 			}
 		}
 	}
 
 	return &expect, nil
-}
-
-func (a *Generator) generateAudio() error {
-	return fmt.Errorf("not implemented")
 }

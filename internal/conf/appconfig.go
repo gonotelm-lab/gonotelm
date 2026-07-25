@@ -10,6 +10,7 @@ import (
 	chat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
 	embedding "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/embedding"
 	rerank "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/rerank"
+	text2audio "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio"
 	text2image "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image"
 	mqimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
 	storageimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
@@ -21,8 +22,8 @@ import (
 )
 
 var (
-	appGlobal        *AppConfig
-	workerGlobal     *WorkerConfig
+	appGlobal     *AppConfig
+	workerGlobal  *WorkerConfig
 	setAppOnce    sync.Once
 	setWorkerOnce sync.Once
 )
@@ -34,6 +35,7 @@ type InfraConfig struct {
 	Provider   chat.ProviderConfig           `toml:"provider"`
 	Embedding  embedding.EmbeddingConfig     `toml:"embedding"`
 	Text2Image text2image.Text2ImageConfig   `toml:"text2image"`
+	Text2Audio text2audio.Text2AudioConfig   `toml:"text2audio"`
 
 	Redis    cache.RedisCacheConfig `toml:"redis"`
 	MsgQueue mqimpl.Config          `toml:"msgQueue"`
@@ -44,25 +46,20 @@ type AppConfig struct {
 
 	DeployEnv string `toml:"deployEnv"`
 
-	Api      ApiConfig          `toml:"api"`
-	Chat     ChatConfig         `toml:"chat"`
-	Source   SourceConfig       `toml:"source"`
+	Api      ApiConfig           `toml:"api"`
+	Chat     ChatConfig          `toml:"chat"`
+	Source   SourceConfig        `toml:"source"`
 	Rerank   rerank.RerankConfig `toml:"rerank"`
-	Logging  LoggingConfig      `toml:"logging"`
-	Chunking ChunkingConfig     `toml:"chunking"`
-	Flow     FlowConfig         `toml:"flow"`
-	Worker   WorkerPoolConfig   `toml:"worker"`
-	Syncer   SyncerConfig       `toml:"syncer"`
+	Logging  LoggingConfig       `toml:"logging"`
+	Chunking ChunkingConfig      `toml:"chunking"`
+	Flow     FlowConfig          `toml:"flow"`
+	Syncer   SyncerConfig        `toml:"syncer"`
 }
 
-type WorkerConfig struct {
-	InfraConfig
-
-	DeployEnv string          `toml:"deployEnv"`
-	Studio    StudioConfig    `toml:"studio"`
-	Logging   LoggingConfig   `toml:"logging"`
-	Flow      FlowConfig      `toml:"flow"`
-	Worker    WorkerPoolConfig `toml:"worker"`
+type SyncerConfig struct {
+	PerTaskInterval time.Duration `toml:"perTaskInterval"`
+	GlobalInterval  time.Duration `toml:"globalInterval"`
+	GlobalBatchSize int           `toml:"globalBatchSize"`
 }
 
 func (c *AppConfig) IsDev() bool {
@@ -89,10 +86,6 @@ type DatabaseConfig struct {
 	User     string `toml:"user"`
 	Password string `toml:"password"`
 	DBName   string `toml:"dbName"`
-}
-
-type LoggingConfig struct {
-	Level string `toml:"level"`
 }
 
 type ChunkingConfig struct {
@@ -168,6 +161,9 @@ func (c *AppConfig) applyDefaults() {
 	if c.Text2Image.Type == "" {
 		c.Text2Image.Type = text2image.Text2ImageDashScope
 	}
+	if c.Text2Audio.Type == "" {
+		c.Text2Audio.Type = text2audio.Text2AudioDashScope
+	}
 	if c.Embedding.BatchSize <= 0 {
 		c.Embedding.BatchSize = 10
 	}
@@ -192,12 +188,6 @@ func (c *AppConfig) applyDefaults() {
 	if c.Syncer.GlobalBatchSize <= 0 {
 		c.Syncer.GlobalBatchSize = 100
 	}
-	if c.Worker.MaxConcurrency <= 0 {
-		c.Worker.MaxConcurrency = 4
-	}
-	if c.Worker.Heartbeat == 0 {
-		c.Worker.Heartbeat = 5 * time.Second
-	}
 }
 
 func (c *WorkerConfig) applyDefaults() {
@@ -209,6 +199,9 @@ func (c *WorkerConfig) applyDefaults() {
 	}
 	if c.Text2Image.Type == "" {
 		c.Text2Image.Type = text2image.Text2ImageDashScope
+	}
+	if c.Text2Audio.Type == "" {
+		c.Text2Audio.Type = text2audio.Text2AudioDashScope
 	}
 	if c.Embedding.BatchSize <= 0 {
 		c.Embedding.BatchSize = 10

@@ -265,7 +265,7 @@ func (ig *Generator) generateAndStoreImage(
 			Size:   fmt.Sprintf("%dx%d", w, h),
 		})
 	if err != nil {
-		return nil, errors.Wrapf(errors.ErrInner, "text2image generate failed, err=%v", err)
+		return nil, errors.Wrapf(err, "text2image generate failed")
 	}
 
 	imageReader, err := t2iutil.ResolveResponse(resp, t2iutil.WithResolveContext(ctx))

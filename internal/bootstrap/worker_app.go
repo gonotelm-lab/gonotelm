@@ -47,6 +47,7 @@ func NewWorkerApp(ctx context.Context, cfg *conf.WorkerConfig) (*WorkerApp, erro
 		Agentize:             shared.AgentizeService,
 		LLMGateway:           shared.LLMGateway,
 		Text2Image:           shared.Text2Image,
+		Text2Audio:           shared.Text2Audio,
 		ObjectStorage:        shared.Storage,
 		CheckpointRepository: infrarepo.NewCheckpointRepository(shared.DB.WorkerCheckpointStore),
 	}

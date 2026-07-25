@@ -42,6 +42,17 @@
 - 主持人简介：{{ speaker.Bio }}
 {% endfor %}
 
+# 输入（仅来源 id）
+
+{% if SourceIds and SourceIds|length > 0 %}
+- 来源列表（source_ids）：
+{% for sid in SourceIds %}
+  - {{sid}}
+{% endfor %}
+{% else %}
+- 来源列表（source_ids）：（无）
+{% endif %}
+
 # 输出要求
 
 你的要求是仅输出一份 **JSON** 格式的大纲内容（正文中不需要输出其它解释性文字），包含title和segments两个字段，格式如下：
@@ -59,15 +70,3 @@
     }
   ]
 }
-
-# 输入（仅来源 id）
-
-{% if SourceIds and SourceIds|length > 0 %}
-- 来源列表（source_ids）：
-{% for sid in SourceIds %}
-  - {{sid}}
-{% endfor %}
-{% else %}
-- 来源列表（source_ids）：（无）
-{% endif %}
-

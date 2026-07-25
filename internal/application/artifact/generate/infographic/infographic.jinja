@@ -46,6 +46,17 @@
 - **画面方向**：（未指定）默认 `landscape`。  
 {% endif %}
 
+# 输入
+
+{% if SourceIds and SourceIds|length > 0 %}
+- 来源列表（source_ids）：
+{% for sid in SourceIds %}
+  - {{sid}}
+{% endfor %}
+{% else %}
+- 来源列表（source_ids）：（无）
+{% endif %}
+
 # 输出格式约束（严格）
 
 - 只输出一个 JSON 对象，不要解释文字，不要 Markdown，不要用 ```json 包裹。  
@@ -61,14 +72,3 @@
 
 正向示例（仅结构参考，不可照抄）：
 {"title":"Rust所有权与借用核心知识图解","image_prompt":"横版教育信息图，扁平化手绘插画，黑色描边略带粗糙感，米色奶油色纸张质感，温暖教育向气质。\n\n顶部标题区，下方三栏并列，底部总结。\n\n主标题「Rust 所有权与借用」。\n\n左栏「所有权」配箱子插画，要点「唯一所有者」「作用域释放」；中栏「借用」配箭头插画，要点「不可变借用可多个」「可变借用仅一个」；右栏「生命周期」配连线插画，要点「引用不超数据寿命」。\n\n底部「编译期保证内存安全」，留白充足，无人物面孔，无品牌 Logo。"}
-
-# 输入
-
-{% if SourceIds and SourceIds|length > 0 %}
-- 来源列表（source_ids）：
-{% for sid in SourceIds %}
-  - {{sid}}
-{% endfor %}
-{% else %}
-- 来源列表（source_ids）：（无）
-{% endif %}

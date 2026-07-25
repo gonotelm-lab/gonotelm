@@ -9,6 +9,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
 )
 
 func (s *Syncer) PollOne(ctx context.Context, artifactId valobj.Id) {
@@ -39,7 +40,7 @@ func (s *Syncer) pollOnce(ctx context.Context, artifactId valobj.Id) (done bool,
 	if err != nil {
 		return true, err
 	}
-	if a.IsTerminal() {
+	if a.Status == artifactentity.StatusCompleted || a.Status == artifactentity.StatusCancelled {
 		return true, nil
 	}
 	info, err := s.flow.Get(ctx, a.FlowTaskId)
@@ -48,6 +49,9 @@ func (s *Syncer) pollOnce(ctx context.Context, artifactId valobj.Id) (done bool,
 	}
 	newStatus := mapFlowState(info.State)
 	if newStatus == a.Status {
+		if newStatus == artifactentity.StatusFailed && retriesExhausted(info) {
+			return true, nil
+		}
 		return false, nil
 	}
 	switch newStatus {
@@ -74,5 +78,15 @@ func (s *Syncer) pollOnce(ctx context.Context, artifactId valobj.Id) (done bool,
 			slog.WarnContext(ctx, "publish artifact event failed", "artifact_id", a.Id, "err", err)
 		}
 	}
-	return newStatus.IsTerminal(), nil
+	switch newStatus {
+	case artifactentity.StatusCompleted, artifactentity.StatusCancelled:
+		return true, nil
+	case artifactentity.StatusFailed:
+		return retriesExhausted(info), nil
+	}
+	return false, nil
+}
+
+func retriesExhausted(info *flow.TaskInfo) bool {
+	return info.AttemptNo > info.MaxRetry
 }

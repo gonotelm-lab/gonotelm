@@ -1,6 +1,7 @@
 package json
 
 import (
+	"bytes"
 	stdjson "encoding/json"
 	"fmt"
 	"reflect"
@@ -50,6 +51,12 @@ func (d Decoder) Unmarshal(data []byte, v any) error {
 		d.LogOnDirectFailure(directErr, data)
 	}
 
+	if sanitized := fixUnescapedQuotes(data); !bytes.Equal(sanitized, data) {
+		if err := tryUnmarshal(sanitized, v, d); err == nil {
+			return nil
+		}
+	}
+
 	content := strings.TrimSpace(string(data))
 	candidates := jsonObjectCandidates(content)
 	lastErr := directErr
@@ -59,16 +66,17 @@ func (d Decoder) Unmarshal(data []byte, v any) error {
 		}
 
 		candidateBytes := []byte(candidate)
-		if err := sonic.Unmarshal(candidateBytes, v); err == nil {
-			if d.DisallowUnknownFields {
-				if err := rejectUnknownFields(candidateBytes, v); err != nil {
-					lastErr = err
-					continue
-				}
-			}
+		if err := tryUnmarshal(candidateBytes, v, d); err == nil {
 			return nil
 		} else {
 			lastErr = err
+		}
+
+		sanitized := fixUnescapedQuotes(candidateBytes)
+		if !bytes.Equal(sanitized, candidateBytes) {
+			if err := tryUnmarshal(sanitized, v, d); err == nil {
+				return nil
+			}
 		}
 	}
 
@@ -77,6 +85,84 @@ func (d Decoder) Unmarshal(data []byte, v any) error {
 	}
 
 	return directErr
+}
+
+func tryUnmarshal(data []byte, v any, d Decoder) error {
+	if err := sonic.Unmarshal(data, v); err != nil {
+		return err
+	}
+	if d.DisallowUnknownFields {
+		if err := rejectUnknownFields(data, v); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func fixUnescapedQuotes(data []byte) []byte {
+	if len(data) == 0 {
+		return data
+	}
+
+	var result []byte
+	if cap(result) < len(data) {
+		result = make([]byte, 0, len(data)+len(data)/10)
+	}
+
+	const (
+		stateNormal  = 0
+		stateInStr   = 1
+		stateEscNext = 2
+	)
+
+	state := stateNormal
+
+	for i := 0; i < len(data); i++ {
+		ch := data[i]
+
+		switch state {
+		case stateNormal:
+			result = append(result, ch)
+			if ch == '"' {
+				state = stateInStr
+			}
+
+		case stateInStr:
+			if ch == '\\' {
+				state = stateEscNext
+				result = append(result, ch)
+			} else if ch == '"' {
+				if isClosingQuote(data, i) {
+					result = append(result, ch)
+					state = stateNormal
+				} else {
+					result = append(result, '\\', '"')
+				}
+			} else {
+				result = append(result, ch)
+			}
+
+		case stateEscNext:
+			result = append(result, ch)
+			state = stateInStr
+		}
+	}
+
+	return result
+}
+
+func isClosingQuote(data []byte, i int) bool {
+	for j := i + 1; j < len(data); j++ {
+		switch data[j] {
+		case ' ', '\t', '\n', '\r':
+			continue
+		case ',', '}', ']', ':':
+			return true
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func rejectUnknownFields(data []byte, v any) error {

@@ -32,9 +32,12 @@ func AudioOverviewStyleDefault() AudioOverviewStyle {
 }
 
 type AudioSpeaker struct {
-	Name        string `yaml:"name"`
-	Personality string `yaml:"personality"`
-	Bio         string `yaml:"bio"`
+	Key         string            `yaml:"key"`
+	Name        string            `yaml:"name"`
+	Personality string            `yaml:"personality"`
+	Bio         string            `yaml:"bio"`
+	Gender      string            `yaml:"gender"`
+	Voices      map[string]string `yaml:"voices"` // provider: voice_id
 }
 
 type AudioEpisode struct {
@@ -49,10 +52,10 @@ type AudioEpisode struct {
 }
 
 //go:embed assets/audiospeakers.yml
-var speakersYAML []byte
+var speakersYaml []byte
 
 //go:embed assets/audioepisodes.yml
-var episodesYAML []byte
+var episodesYaml []byte
 
 var (
 	BuiltinSpeakers map[string]AudioSpeaker
@@ -63,10 +66,14 @@ func init() {
 	var sf struct {
 		Speakers map[string]AudioSpeaker `yaml:"speakers"`
 	}
-	if err := yaml.Unmarshal(speakersYAML, &sf); err != nil {
+	if err := yaml.Unmarshal(speakersYaml, &sf); err != nil {
 		panic("failed to parse audiospeakers.yml: " + err.Error())
 	}
-	BuiltinSpeakers = sf.Speakers
+	BuiltinSpeakers = make(map[string]AudioSpeaker, len(sf.Speakers))
+	for k, sp := range sf.Speakers {
+		sp.Key = k
+		BuiltinSpeakers[k] = sp
+	}
 
 	var ef struct {
 		Episodes map[string]struct {
@@ -79,7 +86,7 @@ func init() {
 			SegmentFlow  []string           `yaml:"segment_flow"`
 		} `yaml:"episodes"`
 	}
-	if err := yaml.Unmarshal(episodesYAML, &ef); err != nil {
+	if err := yaml.Unmarshal(episodesYaml, &ef); err != nil {
 		panic("failed to parse audioepisodes.yml: " + err.Error())
 	}
 

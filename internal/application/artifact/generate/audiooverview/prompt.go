@@ -26,7 +26,7 @@ var podcastTranscriptTpl = prompt.FromMessages(einoschema.Jinja2, einoschema.Sys
 func RenderPodcastOutline(
 	ctx context.Context,
 	sourceIds []string,
-	lang string,
+	lang artifactentity.Language,
 	tips string,
 	style artifactentity.AudioOverviewStyle,
 ) ([]*einoschema.Message, error) {
@@ -55,7 +55,7 @@ func RenderPodcastOutline(
 func RenderPodcastTranscript(
 	ctx context.Context,
 	sourceIds []string,
-	lang string,
+	lang artifactentity.Language,
 	tips string,
 	style artifactentity.AudioOverviewStyle,
 	outline *podcastOutlineExpectation,
@@ -100,7 +100,7 @@ type StudioPodcastOutlineTemplateVars struct {
 	Speakers      []artifactentity.AudioSpeaker
 	Tips          string
 	NumOfSegments int
-	Language      string
+	Language      artifactentity.Language
 	Style         artifactentity.AudioOverviewStyle
 	StyleDesc     string
 }
@@ -111,7 +111,7 @@ func (v StudioPodcastOutlineTemplateVars) PromptVars() map[string]any {
 		"Speakers":      v.Speakers,
 		"Tips":          v.Tips,
 		"NumOfSegments": v.NumOfSegments,
-		"Language":      v.Language,
+		"Language":      v.Language.DisplayName(),
 		"StyleInfo": map[string]any{
 			"Style":       v.Style,
 			"Description": v.StyleDesc,
@@ -125,7 +125,7 @@ type StudioPodcastTranscriptTemplateVars struct {
 	SpeakerRoles map[string]string
 	SegmentFlow  []string
 	Tips         string
-	Language     string
+	Language     artifactentity.Language
 	Style        artifactentity.AudioOverviewStyle
 	StyleDesc    string
 	Outline      map[string]any
@@ -138,7 +138,7 @@ func (v StudioPodcastTranscriptTemplateVars) PromptVars() map[string]any {
 		"SpeakerRoles": v.SpeakerRoles,
 		"SegmentFlow":  v.SegmentFlow,
 		"Tips":         v.Tips,
-		"Language":     v.Language,
+		"Language":     v.Language.DisplayName(),
 		"StyleInfo": map[string]any{
 			"Style":       v.Style,
 			"Description": v.StyleDesc,

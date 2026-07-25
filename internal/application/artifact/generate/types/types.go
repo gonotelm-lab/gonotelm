@@ -8,6 +8,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/service/agentize"
 	workerrepo "github.com/gonotelm-lab/gonotelm/internal/domain/worker/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 )
@@ -31,6 +32,7 @@ type ServiceDeps struct {
 	Agentize             *agentize.Service
 	LLMGateway           *chat.Gateway
 	Text2Image           *text2image.Text2ImageGateway
+	Text2Audio           *text2audio.Text2AudioGateway
 	ObjectStorage        storage.Storage
 	CheckpointRepository workerrepo.CheckpointRepository
 }

@@ -50,6 +50,11 @@ func (s *Server) GenerateStudioArtifact(ctx context.Context, c *app.RequestConte
 		return
 	}
 
+	if req.AudioOverview != nil && !req.AudioOverview.Language.IsValid() {
+		http.ErrResp(c, errors.ErrParams.Msgf("unsupported language: %s", req.AudioOverview.Language))
+		return
+	}
+
 	resp, err := s.generateArtifactHandler.Handle(ctx, &artifactapp.GenerateRequest{
 		NotebookId:    req.NotebookId,
 		Kind:          req.Kind,

@@ -63,7 +63,7 @@ type GenerateInfoGraphicParameters struct {
 
 type GenerateAudioOverviewParameters struct {
 	Tip      string                            `json:"tip,omitempty"`
-	Language string                            `json:"language,omitempty"`
+	Language artifactentity.Language           `json:"language,omitempty"`
 	Style    artifactentity.AudioOverviewStyle `json:"style,omitempty"`
 }
 

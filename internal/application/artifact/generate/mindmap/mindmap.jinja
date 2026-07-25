@@ -24,6 +24,17 @@
 - 叶子节点用短语，单节点尽量 <= 18 字。  
 - 缩进仅空格，每层 +2 空格，禁止 Tab。
 
+# 输入（仅来源 id）
+
+{% if SourceIds and SourceIds|length > 0 %}
+- 来源列表（source_ids）：
+{% for sid in SourceIds %}
+  - {{sid}}
+{% endfor %}
+{% else %}
+- 来源列表（source_ids）：（无）
+{% endif %}
+
 # 输出格式约束（严格）
 - 只输出一个 JSON 对象，不要解释文字，不要额外 Markdown。  
 - JSON 字段必须且仅能为：`title`、`mindmap`。  
@@ -37,14 +48,3 @@
 
 正向示例（仅示例结构，不可照抄内容）：
 {"title":"Rust核心知识结构化思维导图","mindmap":"```mermaid\nmindmap\n  root((Rust核心知识))\n    所有权与借用\n      所有权规则\n      借用检查\n    并发与异步\n      线程与通道\n      async/await\n```"}
-
-# 输入（仅来源 id）
-
-{% if SourceIds and SourceIds|length > 0 %}
-- 来源列表（source_ids）：
-{% for sid in SourceIds %}
-  - {{sid}}
-{% endfor %}
-{% else %}
-- 来源列表（source_ids）：（无）
-{% endif %}

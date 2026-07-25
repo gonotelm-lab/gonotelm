@@ -6,43 +6,43 @@ import (
 	"io"
 	"log/slog"
 
-	"github.com/redis/go-redis/v9"
-
-	embedcache "github.com/cloudwego/eino-ext/components/embedding/cache"
-	einoembed "github.com/cloudwego/eino/components/embedding"
-
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/service/agentize"
-	oldcache "github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache"
-	cacheredis "github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache/redis"
+	infracache "github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache/redis"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
-	dbpostgres "github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/postgres"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/postgres"
 	infrallm "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
-	embedding "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/embedding"
-	text2image "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/embedding"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
-	oldmqimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
 	mqkafka "github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq/kafka"
 	infrarepo "github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
-	oldstorageimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
-	storageminio "github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage/minio"
+	infrastorage "github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage/minio"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
-	vdbmilvus "github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/milvus"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/milvus"
+
+	embedcache "github.com/cloudwego/eino-ext/components/embedding/cache"
+	einoembed "github.com/cloudwego/eino/components/embedding"
+	redisv9 "github.com/redis/go-redis/v9"
 )
 
 type SharedInfra struct {
 	DB               *database.Dao
 	VDB              *vectordb.DAL
-	Redis            redis.UniversalClient
-	Cache            *oldcache.Cache
+	Redis            redisv9.UniversalClient
+	Cache            *infracache.Cache
 	MQ               *mq.MQ
 	Storage          storage.Storage
 	LLMGateway       *chat.Gateway
 	EmbeddingGateway *embedding.EmbeddingGateway
 	Embedder         einoembed.Embedder
 	Text2Image       *text2image.Text2ImageGateway
+	Text2Audio       *text2audio.Text2AudioGateway
 	AgentizeService  *agentize.Service
 
 	closers []io.Closer
@@ -63,29 +63,29 @@ func NewSharedInfra(ctx context.Context, cfg *conf.InfraConfig) (_ *SharedInfra,
 		}
 	}()
 
-	db, err := dbpostgres.Open(cfg.Database)
+	db, err := postgres.Open(cfg.Database)
 	if err != nil {
 		return nil, fmt.Errorf("database: %w", err)
 	}
 	addCloser(contextCloser(func(ctx context.Context) error { return db.Close(ctx) }))
 	infra.DB = db
 
-	vdb, err := vdbmilvus.Open(&cfg.VectorDB)
+	vdb, err := milvus.Open(&cfg.VectorDB)
 	if err != nil {
 		return nil, fmt.Errorf("vectordb: %w", err)
 	}
 	addCloser(contextCloser(func(ctx context.Context) error { return vdb.Close(ctx) }))
 	infra.VDB = vdb
 
-	var redisClient redis.UniversalClient
+	var redisClient redisv9.UniversalClient
 	if len(cfg.Redis.Addrs) > 0 {
-		if err := oldcache.Init(&cfg.Redis); err != nil {
+		if err := infracache.Init(&cfg.Redis); err != nil {
 			return nil, fmt.Errorf("cache init: %w", err)
 		}
-		redisClient = oldcache.GetRedis()
+		redisClient = infracache.GetRedis()
 		addCloser(contextCloser(func(ctx context.Context) error { return redisClient.Close() }))
 		infra.Redis = redisClient
-		infra.Cache = cacheredis.NewCache(redisClient)
+		infra.Cache = redis.NewCache(redisClient)
 	}
 
 	if cfg.MsgQueue.Type != "" {
@@ -132,6 +132,12 @@ func NewSharedInfra(ctx context.Context, cfg *conf.InfraConfig) (_ *SharedInfra,
 		return nil, fmt.Errorf("text2image gateway: %w", err)
 	}
 	infra.Text2Image = text2imageGateway
+
+	text2audioGateway, err := text2audio.NewText2AudioGateway(&cfg.Text2Audio)
+	if err != nil {
+		return nil, fmt.Errorf("text2audio gateway: %w", err)
+	}
+	infra.Text2Audio = text2audioGateway
 
 	sourceRepo := infrarepo.NewSourceRepository(db.SourceStore)
 	storageRepo := infrarepo.NewSourceStorageRepository(oss)
@@ -220,9 +226,9 @@ func newLLMGateway(cfg *infrallm.ProviderConfig) (*chat.Gateway, error) {
 	return chat.New(llmCfg)
 }
 
-func newMQ(cfg *oldmqimpl.Config) (*mq.MQ, error) {
+func newMQ(cfg *mq.Config) (*mq.MQ, error) {
 	switch cfg.Type {
-	case oldmqimpl.Kafka:
+	case mq.Kafka:
 		kc := cfg.Kafka
 		return &mq.MQ{
 			NewProducer: func() mq.Producer {
@@ -249,11 +255,11 @@ func newMQ(cfg *oldmqimpl.Config) (*mq.MQ, error) {
 	}
 }
 
-func newStorage(cfg *oldstorageimpl.StorageTypeConfig) (storage.Storage, error) {
+func newStorage(cfg *infrastorage.StorageTypeConfig) (storage.Storage, error) {
 	switch cfg.Type {
-	case oldstorageimpl.Minio:
+	case infrastorage.Minio:
 		mc := cfg.Minio
-		return storageminio.New(&storage.Config{
+		return minio.New(&storage.Config{
 			Endpoint:      mc.Endpoint,
 			Region:        mc.Region,
 			Bucket:        mc.Bucket,

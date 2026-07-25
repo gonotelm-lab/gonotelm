@@ -39,7 +39,7 @@ type AudioOverviewPayload struct {
 	NotebookId valobj.Id          `json:"notebook_id"`
 	SourceIds  []valobj.Id        `json:"source_ids"`
 	Tip        string             `json:"tip"`
-	Language   string             `json:"language"`
+	Language   Language           `json:"language"`
 	Style      AudioOverviewStyle `json:"style"`
 }
 

@@ -11,13 +11,22 @@
 
 [![GoReportCard](https://goreportcard.com/badge/gonotelm-lab/gonotelm)](https://goreportcard.com/report/github.com/gonotelm-lab/gonotelm)
 
-## GoNoteLM 
+## GoNoteLM
+
+GoNoteLM is an AI-powered learning and knowledge-management platform. Create notebooks, upload sources, chat with an agentic RAG system, and generate rich learning artifacts — all in one place.
 
 ![GoNoteLM](docs/readme/cover.png)
 
+### Core Capabilities
+
+- **Notebooks** — Organize study materials into notebooks.
+- **Source Ingestion** — Add text, URLs, or upload files (PDF, Markdown, EPUB, Word) for AI processing.
+- **Agentic RAG Chat** — Multi-turn conversations with AI that can search, read, cite, and analyze your sources in real-time. Supports streaming responses, thinking mode, and multiple chat styles.
+- **AI Studio** — Generate 6 types of learning artifacts from your sources: Mindmap, Report, Infographic, Audio Overview, Flashcard, and Quiz.
+
 ## Studio Showcase
 
-<table border="1" cellspacing="0" cellpadding="8">
+<table width="100%" border="1" cellspacing="0" cellpadding="8">
   <tbody>
     <tr>
       <td align="center" valign="top">
@@ -31,6 +40,20 @@
       <td align="center" valign="top">
         <img src="docs/readme/studio-report.png" alt="Studio Report" width="320" /><br />
         <sub>Report</sub>
+      </td>
+    </tr>
+    <tr>
+      <td align="center" valign="top">
+        <img src="docs/readme/studio-flashcard.png" alt="Studio Flashcard" width="320" /><br />
+        <sub>Flashcard</sub>
+      </td>
+      <td align="center" valign="top">
+        <img src="docs/readme/studio-quiz.png" alt="Studio Quiz" width="320" /><br />
+        <sub>Quiz</sub>
+      </td>
+      <td align="center" valign="top">
+        <img src="docs/readme/studio-audiooverview.png" alt="Studio Audio Overview" width="320" /><br />
+        <sub>Audio Overview</sub>
       </td>
     </tr>
   </tbody>

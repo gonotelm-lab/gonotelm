@@ -18,6 +18,7 @@ const (
 	KindFlashcard     Kind = "flashcard"
 	KindQuiz          Kind = "quiz"
 	KindDataTable     Kind = "data_table"
+	KindNote          Kind = "note"
 )
 
 func (k Kind) Supported() bool {
@@ -28,7 +29,8 @@ func (k Kind) Supported() bool {
 		KindAudioOverview,
 		KindFlashcard,
 		KindQuiz,
-		KindDataTable:
+		KindDataTable,
+		KindNote:
 		return true
 	}
 	return false
@@ -112,6 +114,7 @@ func (a *Artifact) validate() error {
 	if a.Payload.Kind() != a.Kind {
 		return artifacterrors.ErrPayloadKindMismatch
 	}
+
 	return nil
 }
 

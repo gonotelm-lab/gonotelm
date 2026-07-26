@@ -55,6 +55,7 @@ func ArtifactFromSchema(sch *schema.Artifact) (*artifactentity.Artifact, error) 
 		return nil, err
 	}
 	a.Payload = payload
+
 	return a, nil
 }
 
@@ -105,6 +106,13 @@ func decodePayload(kind artifactentity.Kind, b []byte) (artifactentity.Payload, 
 			return nil, err
 		}
 		return &p, nil
+	case artifactentity.KindNote:
+		var p artifactentity.NotePayload
+		if err := sonic.Unmarshal(b, &p); err != nil {
+			return nil, err
+		}
+		return &p, nil
 	}
+
 	return nil, nil
 }

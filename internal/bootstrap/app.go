@@ -19,15 +19,22 @@ import (
 
 type App struct {
 	closers []io.Closer
+	wg      *sync.WaitGroup
 	Server  *api.Server
 }
 
 func (a *App) Close() error {
+	// 先等后台协程（chat stream / note title 等）结束，再关 DB/LLM 等依赖
+	if a.wg != nil {
+		a.wg.Wait()
+	}
+
 	for i := len(a.closers) - 1; i >= 0; i-- {
 		if err := a.closers[i].Close(); err != nil {
 			slog.Error("close error", "err", err)
 		}
 	}
+
 	return nil
 }
 
@@ -85,7 +92,11 @@ func NewApp(ctx context.Context, cfg *conf.AppConfig) (_ *App, outErr error) {
 		cfg.Source.Model,
 	)
 
-	_ = infra.Text2Image
+	titleMaker := adapter.NewTitleMaker(
+		infra.LLMGateway,
+		cfg.Source.ModelProvider,
+		cfg.Source.Model,
+	)
 
 	// ── 5. Flow task client ──
 
@@ -134,6 +145,7 @@ func NewApp(ctx context.Context, cfg *conf.AppConfig) (_ *App, outErr error) {
 
 	// ── 10. HTTP Server ──
 
+	wg := &sync.WaitGroup{}
 	svr := api.NewServer(api.ServerDeps{
 		NotebookRepo:       notebookRepo,
 		SourceRepo:         sourceRepo,
@@ -144,16 +156,22 @@ func NewApp(ctx context.Context, cfg *conf.AppConfig) (_ *App, outErr error) {
 		ContextMessageRepo: contextMsgRepo,
 		StreamTaskRepo:     streamTaskRepo,
 		EventBus:           bus,
-		WaitGroup:          &sync.WaitGroup{},
-		Gateway:            infra.LLMGateway,
+		WaitGroup:          wg,
+		LLMGateway:         infra.LLMGateway,
 
-		ArtifactRepo: artifactRepo,
-		FlowClient:   flowClient,
-		Poller:       syncerInst,
-		StorageGW:    storageGateway,
+		ArtifactRepo:   artifactRepo,
+		FlowClient:     flowClient,
+		Poller:         syncerInst,
+		StorageGateway: storageGateway,
+
+		TitleMaker: titleMaker,
 	})
 
-	return &App{closers: closers, Server: svr}, nil
+	return &App{
+		closers: closers,
+		wg:      wg,
+		Server:  svr,
+	}, nil
 }
 
 // ── bridge types ──

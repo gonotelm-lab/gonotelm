@@ -36,28 +36,38 @@ func NewGetArtifactStatusHandler(repo artifactrepo.Repository, flowc flow.TaskCl
 }
 
 func (h *GetArtifactStatusHandler) Handle(ctx context.Context, cmd *StatusRequest) (*StatusResponse, error) {
-	a, err := h.repo.FindById(ctx, cmd.ArtifactId)
+	artifact, err := h.repo.FindById(ctx, cmd.ArtifactId)
 	if err != nil {
 		return nil, err
 	}
 	userId := pkgcontext.GetUserId(ctx)
-	if !a.IsOwner(userId) {
+	if !artifact.IsOwner(userId) {
 		return nil, artifacterrors.ErrArtifactNotOwnedByUser
 	}
 
-	if a.IsTerminal() {
-		resp := &StatusResponse{Status: a.Status, Title: a.Title, Result: a.Result, ResultKind: a.ResultKind}
-		if a.ResultKind.Storage() && len(a.Result) > 0 {
-			resp.ContentUrl, resp.MimeType = materializeStorageResult(ctx, h.storage, a.Result)
+	if artifact.IsTerminal() {
+		resp := &StatusResponse{
+			Status:     artifact.Status,
+			Title:      artifact.Title,
+			Result:     artifact.Result,
+			ResultKind: artifact.ResultKind,
+		}
+		if artifact.ResultKind.Storage() && len(artifact.Result) > 0 {
+			resp.ContentUrl, resp.MimeType = materializeStorageResult(ctx, h.storage, artifact.Result)
 		}
 		return resp, nil
 	}
 
-	if a.FlowTaskId == "" {
+	// note 本地异步补 title，不经过 flow
+	if artifact.Kind == artifactentity.KindNote {
+		return &StatusResponse{Status: artifact.Status}, nil
+	}
+
+	if artifact.FlowTaskId == "" {
 		return nil, artifacterrors.ErrInvalidFlowTaskId
 	}
 
-	info, err := h.flowc.Get(ctx, a.FlowTaskId)
+	info, err := h.flowc.Get(ctx, artifact.FlowTaskId)
 	if err != nil {
 		return nil, errors.WithMessage(err, "query flow task failed")
 	}
@@ -85,7 +95,7 @@ func (h *GetArtifactStatusHandler) AttachStorageURL(ctx context.Context, a *arti
 	if a == nil || !a.ResultKind.Storage() || len(a.Result) == 0 {
 		return "", ""
 	}
-	
+
 	return materializeStorageResult(ctx, h.storage, a.Result)
 }
 

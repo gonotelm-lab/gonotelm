@@ -81,3 +81,11 @@ type AudioOverviewPayload struct {
 
 func (p *AudioOverviewPayload) Kind() Kind                { return KindAudioOverview }
 func (p *AudioOverviewPayload) GetSourceIds() []valobj.Id { return p.SourceIds }
+
+type NotePayload struct {
+	ChatId valobj.Id `json:"chat_id"`
+	MsgId  valobj.Id `json:"msg_id"`
+}
+
+func (p *NotePayload) Kind() Kind                { return KindNote }
+func (p *NotePayload) GetSourceIds() []valobj.Id { return nil }

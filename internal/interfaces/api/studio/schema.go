@@ -1,12 +1,13 @@
 package studio
 
 import (
-	"github.com/bytedance/sonic"
-
 	audiooverview "github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/audiooverview"
 	infographic "github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/infographic"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
+	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
+
+	"github.com/bytedance/sonic"
 )
 
 type (
@@ -16,9 +17,11 @@ type (
 )
 
 type GenerateArtifactRequest struct {
-	NotebookId    uuid.UUID                        `json:"notebook_id,required"`
-	Kind          Kind                             `json:"kind,required"`
-	SourceIds     []uuid.UUID                      `json:"source_ids,required"`
+	NotebookId uuid.UUID   `json:"notebook_id,required"`
+	Kind       Kind        `json:"kind,required"`
+	SourceIds  []uuid.UUID `json:"source_ids"`
+
+	// 工作区生成产物
 	Mindmap       *GenerateMindmapParameters       `json:"mindmap,omitempty"`
 	Report        *GenerateReportParameters        `json:"report,omitempty"`
 	InfoGraphic   *GenerateInfoGraphicParameters   `json:"info_graphic,omitempty"`
@@ -26,6 +29,38 @@ type GenerateArtifactRequest struct {
 	Flashcard     *GenerateFlashcardParameters     `json:"flashcard,omitempty"`
 	Quiz          *GenerateQuizParameters          `json:"quiz,omitempty"`
 	DataTable     *GenerateDataTableParameters     `json:"data_table,omitempty"`
+
+	// 保存为笔记
+	Note *GenerateNoteParameters `json:"note,omitempty"`
+}
+
+func (r *GenerateArtifactRequest) Validate() error {
+	// Kind → 对应 payload 指针；校验「kind 合法」且「匹配字段非 nil」
+	required := map[Kind]func() any{
+		artifactentity.KindMindmap:       func() any { return r.Mindmap },
+		artifactentity.KindReport:        func() any { return r.Report },
+		artifactentity.KindInfoGraphic:   func() any { return r.InfoGraphic },
+		artifactentity.KindAudioOverview: func() any { return r.AudioOverview },
+		artifactentity.KindFlashcard:     func() any { return r.Flashcard },
+		artifactentity.KindQuiz:          func() any { return r.Quiz },
+		artifactentity.KindDataTable:     func() any { return r.DataTable },
+		artifactentity.KindNote:          func() any { return r.Note },
+	}
+
+	get, ok := required[r.Kind]
+	if !ok {
+		return errors.ErrParams.Msgf("invalid kind: %s", r.Kind)
+	}
+
+	if get() == nil {
+		return errors.ErrParams.Msgf("%s is required", r.Kind)
+	}
+
+	if len(r.SourceIds) == 0 && r.Kind != artifactentity.KindNote {
+		return errors.ErrParams.Msg("source_ids are required")
+	}
+
+	return nil
 }
 
 type GenerateArtifactResponse struct {
@@ -48,10 +83,10 @@ type ListNotebookArtifactsRequest struct {
 }
 
 type ListNotebookArtifactsResponse struct {
-	Artifacts []*ArtifactResult `json:"artifacts"`
-	Limit     int               `json:"limit"`
-	Offset    int               `json:"offset"`
-	HasMore   bool              `json:"has_more"`
+	Artifacts []*ArtifactItem `json:"artifacts"`
+	Limit     int             `json:"limit"`
+	Offset    int             `json:"offset"`
+	HasMore   bool            `json:"has_more"`
 }
 
 type GenerateMindmapParameters struct {
@@ -94,7 +129,13 @@ type GenerateDataTableParameters struct {
 	Tip string `json:"tip,omitempty"`
 }
 
-type ArtifactResult struct {
+// 将对话内容保存为笔记
+type GenerateNoteParameters struct {
+	ChatId uuid.UUID `json:"chat_id,required"`
+	MsgId  uuid.UUID `json:"msg_id,required"`
+}
+
+type ArtifactItem struct {
 	NotebookId  string                   `json:"notebook_id"`
 	TaskId      string                   `json:"task_id"`
 	Kind        string                   `json:"kind"`
@@ -159,8 +200,13 @@ type DataTableExtras struct {
 	Tip string `json:"tip"`
 }
 
-func ToArtifactResult(a *artifactentity.Artifact) *ArtifactResult {
-	r := &ArtifactResult{
+type NoteExtras struct {
+	ChatId uuid.UUID `json:"chat_id"`
+	MsgId  uuid.UUID `json:"msg_id"`
+}
+
+func ToArtifactItem(a *artifactentity.Artifact) *ArtifactItem {
+	r := &ArtifactItem{
 		NotebookId:  a.NotebookId.String(),
 		TaskId:      a.Id.String(),
 		Kind:        a.Kind.String(),
@@ -218,6 +264,11 @@ func ToArtifactResult(a *artifactentity.Artifact) *ArtifactResult {
 		r.Extras = &DataTableExtras{
 			Tip: p.Tip,
 		}
+	case *artifactentity.NotePayload:
+		r.Extras = &NoteExtras{
+			ChatId: p.ChatId,
+			MsgId:  p.MsgId,
+		}
 	}
 
 	if a.ResultKind.Inline() && a.Result != nil {
@@ -257,10 +308,19 @@ func ToArtifactResult(a *artifactentity.Artifact) *ArtifactResult {
 	return r
 }
 
+func ToArtifactItems(artifacts []*artifactentity.Artifact) []*ArtifactItem {
+	results := make([]*ArtifactItem, 0, len(artifacts))
+	for _, a := range artifacts {
+		results = append(results, ToArtifactItem(a))
+	}
+	return results
+}
+
 func (r *GenerateMindmapParameters) ToPayload() *artifactentity.MindmapPayload {
 	if r == nil {
 		return nil
 	}
+
 	return &artifactentity.MindmapPayload{
 		Tip: r.Tip,
 	}
@@ -270,6 +330,7 @@ func (r *GenerateReportParameters) ToPayload() *artifactentity.ReportPayload {
 	if r == nil {
 		return nil
 	}
+
 	return &artifactentity.ReportPayload{
 		Style:    r.Style,
 		Language: r.Language,
@@ -281,6 +342,7 @@ func (r *GenerateInfoGraphicParameters) ToPayload() *artifactentity.InfoGraphicP
 	if r == nil {
 		return nil
 	}
+
 	return &artifactentity.InfoGraphicPayload{
 		ExtraPrompt:  r.ExtraPrompt,
 		TextLanguage: r.TextLanguage,
@@ -294,6 +356,7 @@ func (r *GenerateAudioOverviewParameters) ToPayload() *artifactentity.AudioOverv
 	if r == nil {
 		return nil
 	}
+
 	return &artifactentity.AudioOverviewPayload{
 		Tip:      r.Tip,
 		Language: r.Language,
@@ -305,6 +368,7 @@ func (r *GenerateFlashcardParameters) ToPayload() *artifactentity.FlashcardPaylo
 	if r == nil {
 		return nil
 	}
+
 	return &artifactentity.FlashcardPayload{
 		Count:      r.Count,
 		Difficulty: r.Difficulty,
@@ -316,6 +380,7 @@ func (r *GenerateQuizParameters) ToPayload() *artifactentity.QuizPayload {
 	if r == nil {
 		return nil
 	}
+
 	return &artifactentity.QuizPayload{
 		Count:      r.Count,
 		Difficulty: r.Difficulty,
@@ -327,15 +392,19 @@ func (r *GenerateDataTableParameters) ToPayload() *artifactentity.DataTablePaylo
 	if r == nil {
 		return nil
 	}
+
 	return &artifactentity.DataTablePayload{
 		Tip: r.Tip,
 	}
 }
 
-func ToArtifactResults(artifacts []*artifactentity.Artifact) []*ArtifactResult {
-	results := make([]*ArtifactResult, 0, len(artifacts))
-	for _, a := range artifacts {
-		results = append(results, ToArtifactResult(a))
+func (r *GenerateNoteParameters) ToPayload() *artifactentity.NotePayload {
+	if r == nil {
+		return nil
 	}
-	return results
+
+	return &artifactentity.NotePayload{
+		ChatId: r.ChatId,
+		MsgId:  r.MsgId,
+	}
 }

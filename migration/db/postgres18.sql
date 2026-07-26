@@ -102,7 +102,7 @@ COMMENT ON COLUMN artifacts.notebook_id IS 'associated notebook id';
 COMMENT ON COLUMN artifacts.user_id IS 'artifact user id';
 COMMENT ON COLUMN artifacts.kind IS 'artifact kind';
 COMMENT ON COLUMN artifacts.status IS 'artifact processing state';
-COMMENT ON COLUMN artifacts.flow_task_id IS 'artifact flow task id';
+COMMENT ON COLUMN artifacts.flow_task_id IS 'artifact flow task id; empty when no flow task (e.g. note)';
 COMMENT ON COLUMN artifacts.title IS 'artifact title';
 COMMENT ON COLUMN artifacts.result IS 'artifact result';
 COMMENT ON COLUMN artifacts.result_kind IS 'artifact result kind';
@@ -112,7 +112,8 @@ COMMENT ON COLUMN artifacts.updated_at IS 'artifact updated time (unix ms)';
 
 CREATE INDEX IF NOT EXISTS idx_artifacts_notebook ON artifacts(notebook_id);
 CREATE INDEX IF NOT EXISTS idx_artifacts_status  ON artifacts(status);
-CREATE UNIQUE INDEX IF NOT EXISTS uk_artifacts_flow_task_id ON artifacts(flow_task_id);
+-- note 等无 flow 产物 flow_task_id 为空；空串不参与唯一约束
+CREATE UNIQUE INDEX IF NOT EXISTS uk_artifacts_flow_task_id ON artifacts(flow_task_id) WHERE flow_task_id <> '';
 
 CREATE TABLE IF NOT EXISTS worker_artifact_checkpoints (
   artifact_id UUID PRIMARY KEY,

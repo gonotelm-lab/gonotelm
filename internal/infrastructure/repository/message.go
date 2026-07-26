@@ -5,9 +5,11 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/chat/entity"
+	chaterrors "github.com/gonotelm-lab/gonotelm/internal/domain/chat/errors"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository/mapper"
+	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type MessageRepositoryImpl struct {
@@ -29,6 +31,21 @@ func (r *MessageRepositoryImpl) Save(ctx context.Context, message *entity.Messag
 	}
 
 	return r.messageStore.Create(ctx, sch)
+}
+
+func (r *MessageRepositoryImpl) FindByChatIdMsgId(
+	ctx context.Context,
+	chatId, msgId valobj.Id,
+) (*entity.Message, error) {
+	sch, err := r.messageStore.GetByIdAndChatId(ctx, msgId, chatId)
+	if err != nil {
+		if errors.Is(err, errors.ErrNoRecord) {
+			return nil, chaterrors.ErrMessageNotFound
+		}
+		return nil, err
+	}
+
+	return mapper.MessageFromSchema(sch)
 }
 
 func (r *MessageRepositoryImpl) ListByChatId(

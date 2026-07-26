@@ -91,18 +91,20 @@ func (s *Server) GenerateStudioArtifact(ctx context.Context, c *app.RequestConte
 		}
 	}
 
-	resp, err := s.generateArtifactHandler.Handle(ctx, &artifactapp.GenerateRequest{
-		NotebookId:    req.NotebookId,
-		Kind:          req.Kind,
-		SourceIds:     req.SourceIds,
-		Mindmap:       req.Mindmap.ToPayload(),
-		Report:        req.Report.ToPayload(),
-		InfoGraphic:   req.InfoGraphic.ToPayload(),
-		AudioOverview: req.AudioOverview.ToPayload(),
-		Flashcard:     req.Flashcard.ToPayload(),
-		Quiz:          req.Quiz.ToPayload(),
-		DataTable:     req.DataTable.ToPayload(),
-	})
+	resp, err := s.generateArtifactHandler.Handle(ctx,
+		&artifactapp.GenerateRequest{
+			NotebookId:    req.NotebookId,
+			Kind:          req.Kind,
+			SourceIds:     req.SourceIds,
+			Mindmap:       req.Mindmap.ToPayload(),
+			Report:        req.Report.ToPayload(),
+			InfoGraphic:   req.InfoGraphic.ToPayload(),
+			AudioOverview: req.AudioOverview.ToPayload(),
+			Flashcard:     req.Flashcard.ToPayload(),
+			Quiz:          req.Quiz.ToPayload(),
+			DataTable:     req.DataTable.ToPayload(),
+			Note:    req.Note.ToPayload(),
+		})
 	if err != nil {
 		http.ErrResp(c, err)
 		return
@@ -176,7 +178,7 @@ func (s *Server) GetStudioArtifactResult(ctx context.Context, c *app.RequestCont
 	}
 
 	if a.IsTerminal() {
-		http.OkResp(c, s.toArtifactResult(ctx, a))
+		http.OkResp(c, s.toArtifactItem(ctx, a))
 		return
 	}
 
@@ -186,7 +188,7 @@ func (s *Server) GetStudioArtifactResult(ctx context.Context, c *app.RequestCont
 		return
 	}
 
-	result := studioschema.ArtifactResult{
+	result := studioschema.ArtifactItem{
 		TaskId:      req.TaskId.String(),
 		ContentKind: string(info.ResultKind),
 		Status:      string(info.Status),
@@ -262,15 +264,15 @@ func (s *Server) ListNotebookStudioArtifacts(ctx context.Context, c *app.Request
 	}
 
 	http.OkResp(c, studioschema.ListNotebookArtifactsResponse{
-		Artifacts: s.toArtifactResults(ctx, resp.Artifacts),
+		Artifacts: s.toArtifactItems(ctx, resp.Artifacts),
 		Limit:     req.Limit,
 		Offset:    req.Offset,
 		HasMore:   resp.HasMore,
 	})
 }
 
-func (s *Server) toArtifactResult(ctx context.Context, a *artifactentity.Artifact) *studioschema.ArtifactResult {
-	result := studioschema.ToArtifactResult(a)
+func (s *Server) toArtifactItem(ctx context.Context, a *artifactentity.Artifact) *studioschema.ArtifactItem {
+	result := studioschema.ToArtifactItem(a)
 	if contentURL, mime := s.getArtifactStatusHandler.AttachStorageURL(ctx, a); contentURL != "" {
 		result.ContentUrl = contentURL
 		if result.MimeType == "" {
@@ -280,10 +282,10 @@ func (s *Server) toArtifactResult(ctx context.Context, a *artifactentity.Artifac
 	return result
 }
 
-func (s *Server) toArtifactResults(ctx context.Context, artifacts []*artifactentity.Artifact) []*studioschema.ArtifactResult {
-	results := make([]*studioschema.ArtifactResult, 0, len(artifacts))
+func (s *Server) toArtifactItems(ctx context.Context, artifacts []*artifactentity.Artifact) []*studioschema.ArtifactItem {
+	results := make([]*studioschema.ArtifactItem, 0, len(artifacts))
 	for _, a := range artifacts {
-		results = append(results, s.toArtifactResult(ctx, a))
+		results = append(results, s.toArtifactItem(ctx, a))
 	}
 	return results
 }

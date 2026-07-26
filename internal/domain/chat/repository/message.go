@@ -14,6 +14,7 @@ type ListByCursorSpec struct {
 
 type MessageRepository interface {
 	Save(ctx context.Context, message *entity.Message) error
+	FindByChatIdMsgId(ctx context.Context, chatId, msgId valobj.Id) (*entity.Message, error)
 	ListByChatId(ctx context.Context, chatId valobj.Id, spec ListSpec) ([]*entity.Message, error)
 	ListByChatIdBeforeSeqNo(ctx context.Context, chatId valobj.Id, spec ListByCursorSpec) ([]*entity.Message, error)
 	DeleteByChatIds(ctx context.Context, chatIds []valobj.Id) error

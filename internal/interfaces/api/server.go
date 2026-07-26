@@ -9,6 +9,7 @@ import (
 	notebookapp "github.com/gonotelm-lab/gonotelm/internal/application/notebook"
 	sourceapp "github.com/gonotelm-lab/gonotelm/internal/application/source"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
@@ -31,12 +32,14 @@ type ServerDeps struct {
 	StreamTaskRepo     chatrepo.StreamTaskRepository
 	EventBus           eventbus.EventBus
 	WaitGroup          *sync.WaitGroup
-	Gateway            *chat.Gateway
+	LLMGateway         *chat.Gateway
 
-	ArtifactRepo artifactrepo.Repository
-	FlowClient   flow.TaskClient
-	Poller       artifactapp.Poller
-	StorageGW    artifactapp.StorageGateway
+	ArtifactRepo   artifactrepo.Repository
+	FlowClient     flow.TaskClient
+	Poller         artifactapp.Poller
+	StorageGateway artifactapp.StorageGateway
+
+	TitleMaker adapter.TitleMaker
 }
 
 type Server struct {
@@ -125,7 +128,7 @@ func NewServer(
 			deps.SourceRepo,
 			deps.SourceStorageRepo,
 			deps.SourceDocRepo,
-			deps.Gateway,
+			deps.LLMGateway,
 		),
 		listMessagesHandler: chatapp.NewListMessagesHandler(
 			deps.ChatRepo,
@@ -139,16 +142,20 @@ func NewServer(
 		),
 
 		generateArtifactHandler: artifactapp.NewGenerateArtifactHandler(
+			deps.WaitGroup,
 			deps.ArtifactRepo,
-			deps.FlowClient,
 			deps.NotebookRepo,
+			deps.ChatRepo,
+			deps.MessageRepo,
+			deps.FlowClient,
 			deps.Poller,
 			deps.EventBus,
+			deps.TitleMaker,
 		),
-		getArtifactStatusHandler:     artifactapp.NewGetArtifactStatusHandler(deps.ArtifactRepo, deps.FlowClient, deps.StorageGW),
+		getArtifactStatusHandler:     artifactapp.NewGetArtifactStatusHandler(deps.ArtifactRepo, deps.FlowClient, deps.StorageGateway),
 		listNotebookArtifactsHandler: artifactapp.NewListArtifactsHandler(deps.ArtifactRepo, deps.NotebookRepo),
 		cancelArtifactHandler:        artifactapp.NewCancelArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.EventBus),
-		deleteArtifactHandler:        artifactapp.NewDeleteArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.StorageGW),
+		deleteArtifactHandler:        artifactapp.NewDeleteArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.StorageGateway),
 		retryArtifactHandler:         artifactapp.NewRetryArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.Poller, deps.EventBus),
 	}
 

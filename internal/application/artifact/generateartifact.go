@@ -23,6 +23,7 @@ type GenerateRequest struct {
 	Report        *artifactentity.ReportPayload
 	InfoGraphic   *artifactentity.InfoGraphicPayload
 	AudioOverview *artifactentity.AudioOverviewPayload
+	Flashcard     *artifactentity.FlashcardPayload
 }
 
 type GenerateResponse struct {
@@ -107,14 +108,20 @@ func buildPayload(req *GenerateRequest) (artifactentity.Payload, error) {
 	switch req.Kind {
 	case artifactentity.KindMindmap:
 		if req.Mindmap == nil {
-			return &artifactentity.MindmapPayload{NotebookId: req.NotebookId, SourceIds: req.SourceIds}, nil
+			return &artifactentity.MindmapPayload{
+				NotebookId: req.NotebookId,
+				SourceIds:  req.SourceIds,
+			}, nil
 		}
 		req.Mindmap.NotebookId = req.NotebookId
 		req.Mindmap.SourceIds = req.SourceIds
 		return req.Mindmap, nil
 	case artifactentity.KindReport:
 		if req.Report == nil {
-			return &artifactentity.ReportPayload{NotebookId: req.NotebookId, SourceIds: req.SourceIds}, nil
+			return &artifactentity.ReportPayload{
+				NotebookId: req.NotebookId,
+				SourceIds:  req.SourceIds,
+			}, nil
 		}
 		req.Report.NotebookId = req.NotebookId
 		req.Report.SourceIds = req.SourceIds
@@ -133,6 +140,24 @@ func buildPayload(req *GenerateRequest) (artifactentity.Payload, error) {
 		req.AudioOverview.NotebookId = req.NotebookId
 		req.AudioOverview.SourceIds = req.SourceIds
 		return req.AudioOverview, nil
+	case artifactentity.KindFlashcard:
+		if req.Flashcard == nil {
+			return &artifactentity.FlashcardPayload{
+				NotebookId: req.NotebookId,
+				SourceIds:  req.SourceIds,
+				Count:      artifactentity.FlashcardCountDefaultValue(),
+				Difficulty: artifactentity.FlashcardDifficultyDefault(),
+			}, nil
+		}
+		req.Flashcard.NotebookId = req.NotebookId
+		req.Flashcard.SourceIds = req.SourceIds
+		if !req.Flashcard.Count.Supported() {
+			req.Flashcard.Count = artifactentity.FlashcardCountDefaultValue()
+		}
+		if !req.Flashcard.Difficulty.Supported() {
+			req.Flashcard.Difficulty = artifactentity.FlashcardDifficultyDefault()
+		}
+		return req.Flashcard, nil
 	}
 	return nil, errors.ErrParams.Msgf("unsupported artifact kind: %s", req.Kind)
 }

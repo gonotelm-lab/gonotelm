@@ -59,6 +59,11 @@ audioModelProvider = "${GONOTELM_STUDIO_AUDIOOVERVIEW_AUDIO_MODEL_PROVIDER:-dash
 audioModel = "${GONOTELM_STUDIO_AUDIOOVERVIEW_AUDIO_MODEL:-qwen3-tts-instruct-flash}"
 audioSynthConcurrency = ${GONOTELM_STUDIO_AUDIOOVERVIEW_AUDIO_SYNTH_CONCURRENCY:-1}
 
+[studio.flashcard]
+maxRound = ${GONOTELM_STUDIO_FLASHCARD_MAX_ROUND:-50}
+modelProvider = "${GONOTELM_STUDIO_FLASHCARD_PROVIDER:-deepseek}"
+model = "${GONOTELM_STUDIO_FLASHCARD_MODEL:-deepseek-v4-flash}"
+
 [embedding]
 type = "${GONOTELM_EMBEDDING_TYPE:-dashscope}"
 batchSize = ${GONOTELM_EMBEDDING_BATCH_SIZE:-10}

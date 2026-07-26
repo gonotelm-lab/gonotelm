@@ -68,6 +68,17 @@ func (s *Server) GenerateStudioArtifact(ctx context.Context, c *app.RequestConte
 		return
 	}
 
+	if req.Flashcard != nil {
+		if req.Flashcard.Count != "" && !req.Flashcard.Count.Supported() {
+			http.ErrResp(c, errors.ErrParams.Msgf("unsupported flashcard count: %s", req.Flashcard.Count))
+			return
+		}
+		if req.Flashcard.Difficulty != "" && !req.Flashcard.Difficulty.Supported() {
+			http.ErrResp(c, errors.ErrParams.Msgf("unsupported flashcard difficulty: %s", req.Flashcard.Difficulty))
+			return
+		}
+	}
+
 	resp, err := s.generateArtifactHandler.Handle(ctx, &artifactapp.GenerateRequest{
 		NotebookId:    req.NotebookId,
 		Kind:          req.Kind,
@@ -76,6 +87,7 @@ func (s *Server) GenerateStudioArtifact(ctx context.Context, c *app.RequestConte
 		Report:        req.Report.ToPayload(),
 		InfoGraphic:   req.InfoGraphic.ToPayload(),
 		AudioOverview: req.AudioOverview.ToPayload(),
+		Flashcard:     req.Flashcard.ToPayload(),
 	})
 	if err != nil {
 		http.ErrResp(c, err)
@@ -89,15 +101,23 @@ func validateStudioUserTips(req *studioschema.GenerateArtifactRequest) error {
 	if req.Mindmap != nil && utf8.RuneCountInString(req.Mindmap.Tip) > maxUserTipLength {
 		return errors.ErrParams.Msgf("mindmap tip exceeds %d characters", maxUserTipLength)
 	}
+
 	if req.Report != nil && utf8.RuneCountInString(req.Report.Tip) > maxUserTipLength {
 		return errors.ErrParams.Msgf("report tip exceeds %d characters", maxUserTipLength)
 	}
+
 	if req.InfoGraphic != nil && utf8.RuneCountInString(req.InfoGraphic.ExtraPrompt) > maxUserTipLength {
 		return errors.ErrParams.Msgf("info_graphic prompt exceeds %d characters", maxUserTipLength)
 	}
+
 	if req.AudioOverview != nil && utf8.RuneCountInString(req.AudioOverview.Tip) > maxUserTipLength {
 		return errors.ErrParams.Msgf("audio_overview tip exceeds %d characters", maxUserTipLength)
 	}
+	
+	if req.Flashcard != nil && utf8.RuneCountInString(req.Flashcard.Tip) > maxUserTipLength {
+		return errors.ErrParams.Msgf("flashcard tip exceeds %d characters", maxUserTipLength)
+	}
+
 	return nil
 }
 

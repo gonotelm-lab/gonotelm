@@ -116,6 +116,12 @@ type StudioConfig struct {
 		AudioSynthConcurrency int                           `toml:"audioSynthConcurrency"`
 	} `toml:"audioOverview"`
 
+	Flashcard struct {
+		MaxRound      int          `toml:"maxRound"`
+		ModelProvider llm.Provider `toml:"modelProvider"`
+		Model         string       `toml:"model"`
+	} `toml:"flashcard"`
+
 	TaskConfig struct {
 		NumClaimers        int           `toml:"numClaimers"`
 		ScanInterval       time.Duration `toml:"scanInterval"`

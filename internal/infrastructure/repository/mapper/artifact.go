@@ -87,6 +87,12 @@ func decodePayload(kind artifactentity.Kind, b []byte) (artifactentity.Payload, 
 			return nil, err
 		}
 		return &p, nil
+	case artifactentity.KindFlashcard:
+		var p artifactentity.FlashcardPayload
+		if err := sonic.Unmarshal(b, &p); err != nil {
+			return nil, err
+		}
+		return &p, nil
 	}
 	return nil, nil
 }

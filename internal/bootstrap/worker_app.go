@@ -8,7 +8,6 @@ import (
 	artifactgeneration "github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate"
 	generatetypes "github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/types"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	infrarepo "github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -22,6 +21,7 @@ var (
 		"artifact.report",
 		"artifact.info_graphic",
 		"artifact.audio_overview",
+		"artifact.flashcard",
 	}
 )
 
@@ -96,8 +96,4 @@ func (a *WorkerApp) Close(ctx context.Context) error {
 		firstErr = err
 	}
 	return firstErr
-}
-
-func kindFromTaskType(taskType string) artifactentity.Kind {
-	return artifactentity.Kind(strings.TrimPrefix(taskType, taskTypePrefix))
 }

@@ -23,6 +23,7 @@ type GenerateArtifactRequest struct {
 	Report        *GenerateReportParameters        `json:"report,omitempty"`
 	InfoGraphic   *GenerateInfoGraphicParameters   `json:"info_graphic,omitempty"`
 	AudioOverview *GenerateAudioOverviewParameters `json:"audio_overview,omitempty"`
+	Flashcard     *GenerateFlashcardParameters     `json:"flashcard,omitempty"`
 }
 
 type GenerateArtifactResponse struct {
@@ -75,6 +76,12 @@ type GenerateAudioOverviewParameters struct {
 	Style    artifactentity.AudioOverviewStyle `json:"style,omitempty"`
 }
 
+type GenerateFlashcardParameters struct {
+	Count      artifactentity.FlashcardCount      `json:"count,omitempty"`
+	Difficulty artifactentity.FlashcardDifficulty `json:"difficulty,omitempty"`
+	Tip        string                             `json:"tip,omitempty"`
+}
+
 type ArtifactResult struct {
 	NotebookId  string                   `json:"notebook_id"`
 	TaskId      string                   `json:"task_id"`
@@ -124,6 +131,12 @@ type AudioOverviewExtras struct {
 	DurationMs int64  `json:"duration_ms,omitempty"`
 }
 
+type FlashcardExtras struct {
+	Count      string `json:"count"`
+	Difficulty string `json:"difficulty"`
+	Tip        string `json:"tip"`
+}
+
 func ToArtifactResult(a *artifactentity.Artifact) *ArtifactResult {
 	r := &ArtifactResult{
 		NotebookId:  a.NotebookId.String(),
@@ -163,6 +176,13 @@ func ToArtifactResult(a *artifactentity.Artifact) *ArtifactResult {
 			Tip:      p.Tip,
 			Language: string(p.Language),
 			Style:    string(p.Style),
+		}
+	case *artifactentity.FlashcardPayload:
+		r.SourceIds = p.SourceIds
+		r.Extras = &FlashcardExtras{
+			Count:      string(p.Count),
+			Difficulty: string(p.Difficulty),
+			Tip:        p.Tip,
 		}
 	}
 
@@ -244,6 +264,17 @@ func (r *GenerateAudioOverviewParameters) ToPayload() *artifactentity.AudioOverv
 		Tip:      r.Tip,
 		Language: r.Language,
 		Style:    r.Style,
+	}
+}
+
+func (r *GenerateFlashcardParameters) ToPayload() *artifactentity.FlashcardPayload {
+	if r == nil {
+		return nil
+	}
+	return &artifactentity.FlashcardPayload{
+		Count:      r.Count,
+		Difficulty: r.Difficulty,
+		Tip:        r.Tip,
 	}
 }
 

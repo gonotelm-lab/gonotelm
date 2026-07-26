@@ -25,6 +25,7 @@ type GenerateRequest struct {
 	AudioOverview *artifactentity.AudioOverviewPayload
 	Flashcard     *artifactentity.FlashcardPayload
 	Quiz          *artifactentity.QuizPayload
+	DataTable     *artifactentity.DataTablePayload
 }
 
 type GenerateResponse struct {
@@ -177,6 +178,16 @@ func buildPayload(req *GenerateRequest) (artifactentity.Payload, error) {
 			req.Quiz.Difficulty = artifactentity.QuizDifficultyDefault()
 		}
 		return req.Quiz, nil
+	case artifactentity.KindDataTable:
+		if req.DataTable == nil {
+			return &artifactentity.DataTablePayload{
+				NotebookId: req.NotebookId,
+				SourceIds:  req.SourceIds,
+			}, nil
+		}
+		req.DataTable.NotebookId = req.NotebookId
+		req.DataTable.SourceIds = req.SourceIds
+		return req.DataTable, nil
 	}
 	return nil, errors.ErrParams.Msgf("unsupported artifact kind: %s", req.Kind)
 }

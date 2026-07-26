@@ -17,11 +17,18 @@ const (
 	KindAudioOverview Kind = "audio_overview"
 	KindFlashcard     Kind = "flashcard"
 	KindQuiz          Kind = "quiz"
+	KindDataTable     Kind = "data_table"
 )
 
 func (k Kind) Supported() bool {
 	switch k {
-	case KindMindmap, KindReport, KindInfoGraphic, KindAudioOverview, KindFlashcard, KindQuiz:
+	case KindMindmap,
+		KindReport,
+		KindInfoGraphic,
+		KindAudioOverview,
+		KindFlashcard,
+		KindQuiz,
+		KindDataTable:
 		return true
 	}
 	return false

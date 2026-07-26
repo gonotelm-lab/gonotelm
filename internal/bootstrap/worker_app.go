@@ -15,16 +15,15 @@ import (
 
 const taskTypePrefix = "artifact."
 
-var (
-	buildinTaskTypes = []string{
-		"artifact.mindmap",
-		"artifact.report",
-		"artifact.info_graphic",
-		"artifact.audio_overview",
-		"artifact.flashcard",
-		"artifact.quiz",
-	}
-)
+var buildinTaskTypes = []string{
+	"artifact.mindmap",
+	"artifact.report",
+	"artifact.info_graphic",
+	"artifact.audio_overview",
+	"artifact.flashcard",
+	"artifact.quiz",
+	"artifact.data_table",
+}
 
 type WorkerApp struct {
 	shared  *SharedInfra
@@ -38,7 +37,10 @@ func NewWorkerApp(ctx context.Context, cfg *conf.WorkerConfig) (*WorkerApp, erro
 		return nil, err
 	}
 
-	conn, err := grpc.NewClient(cfg.Flow.Addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(
+		cfg.Flow.Addr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
 	if err != nil {
 		shared.Close(ctx)
 		return nil, err

@@ -33,8 +33,6 @@ import (
 	t2iutil "github.com/gonotelm-lab/multimodal/image/util"
 )
 
-const MaxArtifactTitleLength = 128
-
 type Generator struct {
 	deps *types.ServiceDeps
 }
@@ -45,7 +43,7 @@ func New(deps *types.ServiceDeps) *Generator {
 	return &Generator{deps: deps}
 }
 
-type infographicExpectation struct {
+type infoGraphicExpectation struct {
 	Title       string `json:"title"`
 	ImagePrompt string `json:"image_prompt"`
 }
@@ -82,7 +80,7 @@ func (ig *Generator) generate(
 	ctx context.Context,
 	taskId valobj.Id,
 	payload *artifactentity.InfoGraphicPayload,
-) (*infographicExpectation, *StorageResult, error) {
+) (*infoGraphicExpectation, *StorageResult, error) {
 	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioInfographicScene)
 
 	ckpt, err := ig.deps.CheckpointRepository.FindByArtifactId(ctx, taskId)
@@ -92,7 +90,7 @@ func (ig *Generator) generate(
 		}
 	}
 
-	var expect *infographicExpectation
+	var expect *infoGraphicExpectation
 	if ckpt != nil && ckpt.Field1 != nil {
 		if err := sonic.Unmarshal(ckpt.Field1, &expect); err != nil {
 			slog.WarnContext(ctx, "unmarshal checkpoint prompt failed", slog.String("artifact_id", taskId.String()), slog.Any("err", err))
@@ -131,7 +129,7 @@ func (ig *Generator) generate(
 func (ig *Generator) generateImagePrompt(
 	ctx context.Context,
 	payload *artifactentity.InfoGraphicPayload,
-) (*infographicExpectation, error) {
+) (*infoGraphicExpectation, error) {
 	cfg := conf.WorkerGlobal().Studio.InfoGraphic
 	modelOption := chat.WithModel(cfg.Model)
 
@@ -215,13 +213,13 @@ func (ig *Generator) generateImagePrompt(
 func (ig *Generator) parseAgentOutput(
 	ctx context.Context,
 	content string,
-) (*infographicExpectation, error) {
+) (*infoGraphicExpectation, error) {
 	content = pkgstring.StripJSONPrefix(content)
 	if content == "" {
 		return nil, fmt.Errorf("empty output")
 	}
 
-	var expect infographicExpectation
+	var expect infoGraphicExpectation
 	decoder := pkgjson.Decoder{
 		DisallowUnknownFields: true,
 		LogOnDirectFailure: func(err error, _ []byte) {
@@ -235,9 +233,8 @@ func (ig *Generator) parseAgentOutput(
 		return nil, err
 	}
 
-	expect.Title = strings.TrimSpace(expect.Title)
+	expect.Title = types.NormalizeTitle(expect.Title)
 	expect.ImagePrompt = strings.TrimSpace(expect.ImagePrompt)
-	expect.Title = pkgstring.TruncateRune(expect.Title, MaxArtifactTitleLength)
 	if expect.ImagePrompt == "" {
 		return nil, fmt.Errorf("image_prompt is empty")
 	}

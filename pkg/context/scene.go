@@ -7,10 +7,11 @@ const (
 	ChatScene                = SceneType("chat")
 	StudioMindmapScene       = SceneType("studio.mindmap")
 	StudioReportScene        = SceneType("studio.report")
-	StudioInfographicScene   = SceneType("studio.infographic")
+	StudioInfographicScene   = SceneType("studio.info_graphic")
 	StudioAudioOverviewScene = SceneType("studio.audio_overview")
 	StudioFlashcardScene     = SceneType("studio.flashcard")
 	StudioQuizScene          = SceneType("studio.quiz")
+	StudioDataTableScene     = SceneType("studio.data_table")
 )
 
 func (s SceneType) String() string {

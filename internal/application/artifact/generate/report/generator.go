@@ -17,8 +17,6 @@ import (
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 )
 
-const MaxNotebookNameLength = 128
-
 type Generator struct {
 	deps *types.ServiceDeps
 }
@@ -124,8 +122,5 @@ func (r *Generator) generateTitle(ctx context.Context, report string, req *types
 		}
 	}
 
-	title = pkgstring.TruncateRune(title, MaxNotebookNameLength)
-	title = strings.TrimSpace(title)
-
-	return title
+	return types.NormalizeTitle(title)
 }

@@ -16,6 +16,15 @@ type MindmapPayload struct {
 func (p *MindmapPayload) Kind() Kind                { return KindMindmap }
 func (p *MindmapPayload) GetSourceIds() []valobj.Id { return p.SourceIds }
 
+type DataTablePayload struct {
+	NotebookId valobj.Id   `json:"notebook_id"`
+	SourceIds  []valobj.Id `json:"source_ids"`
+	Tip        string      `json:"tip"`
+}
+
+func (p *DataTablePayload) Kind() Kind                { return KindDataTable }
+func (p *DataTablePayload) GetSourceIds() []valobj.Id { return p.SourceIds }
+
 type ReportStyle string
 
 const (

@@ -69,6 +69,11 @@ maxRound = ${GONOTELM_STUDIO_QUIZ_MAX_ROUND:-50}
 modelProvider = "${GONOTELM_STUDIO_QUIZ_PROVIDER:-deepseek}"
 model = "${GONOTELM_STUDIO_QUIZ_MODEL:-deepseek-v4-flash}"
 
+[studio.dataTable]
+maxRound = ${GONOTELM_STUDIO_DATATABLE_MAX_ROUND:-50}
+modelProvider = "${GONOTELM_STUDIO_DATATABLE_PROVIDER:-deepseek}"
+model = "${GONOTELM_STUDIO_DATATABLE_MODEL:-deepseek-v4-flash}"
+
 [embedding]
 type = "${GONOTELM_EMBEDDING_TYPE:-dashscope}"
 batchSize = ${GONOTELM_EMBEDDING_BATCH_SIZE:-10}

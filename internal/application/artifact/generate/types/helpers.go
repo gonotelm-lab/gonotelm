@@ -40,3 +40,18 @@ func BuildCompensateMessage(output string, fieldRules []string) *einoschema.Mess
 		Content: b.String(),
 	}
 }
+
+// BuildCompensatePlainMessage constructs a user message that asks the LLM to
+// re-output plain text (non-JSON) under the given constraints.
+func BuildCompensatePlainMessage(output string, fieldRules []string) *einoschema.Message {
+	var b strings.Builder
+	fmt.Fprintf(&b, "你刚才输出的结果不符合要求，请严格重输。\n当前输出：\n%s\n\n要求：\n", output)
+	for i, rule := range fieldRules {
+		fmt.Fprintf(&b, "%d) %s\n", i+1, rule)
+	}
+
+	return &einoschema.Message{
+		Role:    einoschema.User,
+		Content: b.String(),
+	}
+}

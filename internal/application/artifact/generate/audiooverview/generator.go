@@ -25,8 +25,6 @@ import (
 	einoschema "github.com/cloudwego/eino/schema"
 )
 
-const MaxPodcastTitleLength = 128
-
 type Generator struct {
 	deps *types.ServiceDeps
 }
@@ -429,8 +427,7 @@ func (a *Generator) parseOutlineOutput(ctx context.Context, content string) (*po
 		return nil, err
 	}
 
-	expect.Title = strings.TrimSpace(expect.Title)
-	expect.Title = pkgstring.TruncateRune(expect.Title, MaxPodcastTitleLength)
+	expect.Title = types.NormalizeTitle(expect.Title)
 
 	if expect.Title == "" {
 		return nil, fmt.Errorf("podcast outline title is empty")

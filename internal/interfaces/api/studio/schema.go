@@ -25,6 +25,7 @@ type GenerateArtifactRequest struct {
 	AudioOverview *GenerateAudioOverviewParameters `json:"audio_overview,omitempty"`
 	Flashcard     *GenerateFlashcardParameters     `json:"flashcard,omitempty"`
 	Quiz          *GenerateQuizParameters          `json:"quiz,omitempty"`
+	DataTable     *GenerateDataTableParameters     `json:"data_table,omitempty"`
 }
 
 type GenerateArtifactResponse struct {
@@ -89,6 +90,10 @@ type GenerateQuizParameters struct {
 	Tip        string                        `json:"tip,omitempty"`
 }
 
+type GenerateDataTableParameters struct {
+	Tip string `json:"tip,omitempty"`
+}
+
 type ArtifactResult struct {
 	NotebookId  string                   `json:"notebook_id"`
 	TaskId      string                   `json:"task_id"`
@@ -150,6 +155,10 @@ type QuizExtras struct {
 	Tip        string `json:"tip"`
 }
 
+type DataTableExtras struct {
+	Tip string `json:"tip"`
+}
+
 func ToArtifactResult(a *artifactentity.Artifact) *ArtifactResult {
 	r := &ArtifactResult{
 		NotebookId:  a.NotebookId.String(),
@@ -203,6 +212,11 @@ func ToArtifactResult(a *artifactentity.Artifact) *ArtifactResult {
 			Count:      string(p.Count),
 			Difficulty: string(p.Difficulty),
 			Tip:        p.Tip,
+		}
+	case *artifactentity.DataTablePayload:
+		r.SourceIds = p.SourceIds
+		r.Extras = &DataTableExtras{
+			Tip: p.Tip,
 		}
 	}
 
@@ -306,6 +320,15 @@ func (r *GenerateQuizParameters) ToPayload() *artifactentity.QuizPayload {
 		Count:      r.Count,
 		Difficulty: r.Difficulty,
 		Tip:        r.Tip,
+	}
+}
+
+func (r *GenerateDataTableParameters) ToPayload() *artifactentity.DataTablePayload {
+	if r == nil {
+		return nil
+	}
+	return &artifactentity.DataTablePayload{
+		Tip: r.Tip,
 	}
 }
 

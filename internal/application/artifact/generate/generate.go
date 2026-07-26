@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/audiooverview"
+	"github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/datatable"
 	"github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/flashcard"
 	"github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/infographic"
 	"github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/mindmap"
@@ -36,6 +37,8 @@ func newGenerator(kind artifactentity.Kind, deps *types.ServiceDeps) (types.Gene
 		return flashcard.New(deps), nil
 	case artifactentity.KindQuiz:
 		return quiz.New(deps), nil
+	case artifactentity.KindDataTable:
+		return datatable.New(deps), nil
 	}
 	return nil, errors.ErrParams.Msgf("unsupported kind: %s", kind)
 }

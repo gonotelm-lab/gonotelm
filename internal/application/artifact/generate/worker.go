@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 
 	flowworker "github.com/gonotelm-lab/flow/client/worker"
 	generatetypes "github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/types"
@@ -65,6 +66,14 @@ func RegisterTypedWorker(client *flowworker.Client, deps *generatetypes.ServiceD
 		resp, err := Run(ctx, deps, req)
 		if err != nil {
 			errMsg := err.Error()
+			slog.Error("generate artifact failed",
+				slog.String("error", errMsg),
+				slog.Any("error_details", err),
+				slog.String("artifact_id", artifactId.String()),
+				slog.String("notebook_id", notebookId.String()),
+				slog.String("payload", string(in.Payload)),
+			)
+
 			return flowworker.ErrorResult{
 				Data:      []byte(errMsg),
 				SkipRetry: shouldSkipRetry(err),
@@ -138,6 +147,12 @@ func decodePayload(kind artifactentity.Kind, raw json.RawMessage) (artifactentit
 		return &p, nil
 	case artifactentity.KindQuiz:
 		var p artifactentity.QuizPayload
+		if err := sonic.Unmarshal(raw, &p); err != nil {
+			return nil, err
+		}
+		return &p, nil
+	case artifactentity.KindDataTable:
+		var p artifactentity.DataTablePayload
 		if err := sonic.Unmarshal(raw, &p); err != nil {
 			return nil, err
 		}

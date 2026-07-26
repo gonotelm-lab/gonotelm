@@ -15,9 +15,9 @@ import (
 )
 
 //go:embed infographic.jinja
-var infographicPromptContent string
+var infoGraphicPromptContent string
 
-var infographicTpl = prompt.FromMessages(einoschema.Jinja2, einoschema.SystemMessage(infographicPromptContent))
+var infoGraphicTpl = prompt.FromMessages(einoschema.Jinja2, einoschema.SystemMessage(infoGraphicPromptContent))
 
 type TemplateVars struct {
 	SourceIds    []string
@@ -40,7 +40,7 @@ func (v TemplateVars) promptVars() map[string]any {
 }
 
 func RenderInfographic(ctx context.Context, vars TemplateVars) ([]*einoschema.Message, error) {
-	msgs, err := infographicTpl.Format(ctx, vars.promptVars())
+	msgs, err := infoGraphicTpl.Format(ctx, vars.promptVars())
 	if err != nil {
 		return nil, fmt.Errorf("render infographic prompt: %w", err)
 	}

@@ -1,6 +1,8 @@
 package generate
 
+import "github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/types"
+
 const (
-	MaxArtifactTitleLength = 128
-	MaxNotebookNameLength  = 128
+	MaxArtifactTitleLength = types.MaxTitleLength
+	MaxNotebookNameLength  = types.MaxTitleLength
 )

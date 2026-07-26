@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/types"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
@@ -21,11 +20,6 @@ import (
 )
 
 const MindmapMaxOnceToken = 32_000
-
-const (
-	mindmapTitleMinLen = 10
-	mindmapTitleMaxLen = 30
-)
 
 type Generator struct {
 	deps *types.ServiceDeps
@@ -163,13 +157,8 @@ func (m *Generator) parseAgentOutput(ctx context.Context, content string) (*mind
 		return nil, err
 	}
 
-	expect.Title = strings.TrimSpace(expect.Title)
+	expect.Title = types.NormalizeTitle(expect.Title)
 	expect.Mindmap = strings.TrimSpace(expect.Mindmap)
-
-	titleLen := utf8.RuneCountInString(expect.Title)
-	if titleLen > mindmapTitleMinLen {
-		expect.Title = pkgstring.TruncateRune(expect.Title, mindmapTitleMaxLen)
-	}
 
 	if !CheckStudioMindmapResult(expect.Mindmap) {
 		return nil, fmt.Errorf("mindmap format invalid")

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/bytedance/sonic"
 	"github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/types"
@@ -20,11 +19,6 @@ import (
 
 	einomodel "github.com/cloudwego/eino/components/model"
 	einoschema "github.com/cloudwego/eino/schema"
-)
-
-const (
-	flashcardTitleMinLen = 10
-	flashcardTitleMaxLen = 30
 )
 
 type FlashcardCard struct {
@@ -187,17 +181,13 @@ func parseAgentOutput(ctx context.Context, content string) (*flashcardExpectatio
 		return nil, err
 	}
 
-	expect.Title = strings.TrimSpace(expect.Title)
+	expect.Title = types.NormalizeTitle(expect.Title)
 	for i := range expect.Flashcard.Cards {
 		expect.Flashcard.Cards[i].Front = strings.TrimSpace(expect.Flashcard.Cards[i].Front)
 		expect.Flashcard.Cards[i].Back = strings.TrimSpace(expect.Flashcard.Cards[i].Back)
 		expect.Flashcard.Cards[i].Hint = strings.TrimSpace(expect.Flashcard.Cards[i].Hint)
 	}
 
-	titleLen := utf8.RuneCountInString(expect.Title)
-	if titleLen > flashcardTitleMinLen {
-		expect.Title = pkgstring.TruncateRune(expect.Title, flashcardTitleMaxLen)
-	}
 	if expect.Title == "" {
 		return nil, fmt.Errorf("title empty")
 	}

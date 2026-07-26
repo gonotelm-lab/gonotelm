@@ -26,7 +26,7 @@ func BuildSourceExploreAgent(
 ) (*pkgagent.Agent[*SessionState], error) {
 	llmModel, err := deps.LLMGateway.GetProvider(modelProvider)
 	if err != nil {
-		return nil, errors.Wrapf(errors.ErrInner, "get source explore llm model failed: %v", err)
+		return nil, errors.Wrapf(errors.ErrParams, "get source explore llm model failed: %v", err)
 	}
 
 	agConfig := pkgagent.Config[*SessionState]{
@@ -55,7 +55,7 @@ func BuildSourceExploreAgent(
 		})
 	}
 	if err != nil {
-		return nil, errors.Wrapf(errors.ErrInner, "bind source tools failed: %v", err)
+		return nil, errors.Wrapf(errors.ErrParams, "bind source tools failed: %v", err)
 	}
 
 	ag.OnBeforeRound(pkgagent.NewFinalRoundHook(ag, maxRound))

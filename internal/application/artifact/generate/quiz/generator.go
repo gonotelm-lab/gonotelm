@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/bytedance/sonic"
 	"github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/types"
@@ -22,11 +21,7 @@ import (
 	einoschema "github.com/cloudwego/eino/schema"
 )
 
-const (
-	quizTitleMinLen        = 10
-	quizTitleMaxLen        = 30
-	quizMaxCompensateRetry = 3
-)
+const quizMaxCompensateRetry = 3
 
 const quizOptionCount = 4
 
@@ -222,7 +217,7 @@ func parseAgentOutput(ctx context.Context, content string) (*quizExpectation, er
 		return nil, err
 	}
 
-	expect.Title = strings.TrimSpace(expect.Title)
+	expect.Title = types.NormalizeTitle(expect.Title)
 	for i := range expect.Quiz.Questions {
 		expect.Quiz.Questions[i].Question = strings.TrimSpace(expect.Quiz.Questions[i].Question)
 		for j := range expect.Quiz.Questions[i].Options {
@@ -236,10 +231,6 @@ func parseAgentOutput(ctx context.Context, content string) (*quizExpectation, er
 		expect.Quiz.FollowUpHint[i] = strings.TrimSpace(expect.Quiz.FollowUpHint[i])
 	}
 
-	titleLen := utf8.RuneCountInString(expect.Title)
-	if titleLen > quizTitleMinLen {
-		expect.Title = pkgstring.TruncateRune(expect.Title, quizTitleMaxLen)
-	}
 	if expect.Title == "" {
 		return nil, fmt.Errorf("title empty")
 	}

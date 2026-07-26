@@ -27,6 +27,21 @@ const (
 	flashcardTitleMaxLen = 30
 )
 
+type FlashcardCard struct {
+	Front string `json:"front"`
+	Back  string `json:"back"`
+	Hint  string `json:"hint"`
+}
+
+type FlashcardContent struct {
+	Cards []FlashcardCard `json:"cards"`
+}
+
+type flashcardExpectation struct {
+	Title     string           `json:"title"`
+	Flashcard FlashcardContent `json:"flashcard"`
+}
+
 type Generator struct {
 	deps *types.ServiceDeps
 }

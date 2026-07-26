@@ -10,6 +10,7 @@ const (
 	StudioInfographicScene   = SceneType("studio.infographic")
 	StudioAudioOverviewScene = SceneType("studio.audio_overview")
 	StudioFlashcardScene     = SceneType("studio.flashcard")
+	StudioQuizScene          = SceneType("studio.quiz")
 )
 
 func (s SceneType) String() string {

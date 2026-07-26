@@ -72,7 +72,9 @@ func (s *stubStorage) DeleteObject(ctx context.Context, key string) error {
 	s.deletedKey = key
 	return nil
 }
-func (s *stubStorage) PresignGet(ctx context.Context, key string) (string, error) { return "", nil }
+func (s *stubStorage) PresignGet(ctx context.Context, key string) (string, error) {
+	return "https://signed.example.com/" + key, nil
+}
 
 var _ StorageGateway = &stubStorage{}
 
@@ -105,6 +107,19 @@ func TestStatus_TerminalArtifact(t *testing.T) {
 	assert.Equal(t, "done title", resp.Title)
 	assert.NotNil(t, resp.Result)
 	assert.Equal(t, artifactentity.ResultKindStorage, resp.ResultKind)
+}
+
+func TestAttachStorageURL_PresignsStoreKey(t *testing.T) {
+	artifact := makeArtifact(artifactentity.StatusCompleted, "ft-1", "u1")
+	h := NewGetArtifactStatusHandler(&multiStubRepo{}, &stubFlowClient{}, &stubStorage{})
+
+	url, mime := h.AttachStorageURL(context.Background(), artifact)
+	assert.Equal(t, "https://signed.example.com/key-1", url)
+	assert.Equal(t, "image/png", mime)
+
+	url, mime = h.AttachStorageURL(context.Background(), nil)
+	assert.Empty(t, url)
+	assert.Empty(t, mime)
 }
 
 func TestStatus_ActiveArtifact_FlowGet(t *testing.T) {

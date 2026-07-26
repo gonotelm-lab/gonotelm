@@ -24,6 +24,7 @@ type GenerateArtifactRequest struct {
 	InfoGraphic   *GenerateInfoGraphicParameters   `json:"info_graphic,omitempty"`
 	AudioOverview *GenerateAudioOverviewParameters `json:"audio_overview,omitempty"`
 	Flashcard     *GenerateFlashcardParameters     `json:"flashcard,omitempty"`
+	Quiz          *GenerateQuizParameters          `json:"quiz,omitempty"`
 }
 
 type GenerateArtifactResponse struct {
@@ -82,6 +83,12 @@ type GenerateFlashcardParameters struct {
 	Tip        string                             `json:"tip,omitempty"`
 }
 
+type GenerateQuizParameters struct {
+	Count      artifactentity.QuizCount      `json:"count,omitempty"`
+	Difficulty artifactentity.QuizDifficulty `json:"difficulty,omitempty"`
+	Tip        string                        `json:"tip,omitempty"`
+}
+
 type ArtifactResult struct {
 	NotebookId  string                   `json:"notebook_id"`
 	TaskId      string                   `json:"task_id"`
@@ -137,6 +144,12 @@ type FlashcardExtras struct {
 	Tip        string `json:"tip"`
 }
 
+type QuizExtras struct {
+	Count      string `json:"count"`
+	Difficulty string `json:"difficulty"`
+	Tip        string `json:"tip"`
+}
+
 func ToArtifactResult(a *artifactentity.Artifact) *ArtifactResult {
 	r := &ArtifactResult{
 		NotebookId:  a.NotebookId.String(),
@@ -180,6 +193,13 @@ func ToArtifactResult(a *artifactentity.Artifact) *ArtifactResult {
 	case *artifactentity.FlashcardPayload:
 		r.SourceIds = p.SourceIds
 		r.Extras = &FlashcardExtras{
+			Count:      string(p.Count),
+			Difficulty: string(p.Difficulty),
+			Tip:        p.Tip,
+		}
+	case *artifactentity.QuizPayload:
+		r.SourceIds = p.SourceIds
+		r.Extras = &QuizExtras{
 			Count:      string(p.Count),
 			Difficulty: string(p.Difficulty),
 			Tip:        p.Tip,
@@ -272,6 +292,17 @@ func (r *GenerateFlashcardParameters) ToPayload() *artifactentity.FlashcardPaylo
 		return nil
 	}
 	return &artifactentity.FlashcardPayload{
+		Count:      r.Count,
+		Difficulty: r.Difficulty,
+		Tip:        r.Tip,
+	}
+}
+
+func (r *GenerateQuizParameters) ToPayload() *artifactentity.QuizPayload {
+	if r == nil {
+		return nil
+	}
+	return &artifactentity.QuizPayload{
 		Count:      r.Count,
 		Difficulty: r.Difficulty,
 		Tip:        r.Tip,

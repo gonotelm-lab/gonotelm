@@ -18,6 +18,7 @@ func TestNewGenerator_SupportedKinds(t *testing.T) {
 		{artifactentity.KindInfoGraphic, true},
 		{artifactentity.KindAudioOverview, true},
 		{artifactentity.KindFlashcard, true},
+		{artifactentity.KindQuiz, true},
 	}
 
 	for _, tt := range tests {

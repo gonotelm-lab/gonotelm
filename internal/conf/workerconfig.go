@@ -122,6 +122,12 @@ type StudioConfig struct {
 		Model         string       `toml:"model"`
 	} `toml:"flashcard"`
 
+	Quiz struct {
+		MaxRound      int          `toml:"maxRound"`
+		ModelProvider llm.Provider `toml:"modelProvider"`
+		Model         string       `toml:"model"`
+	} `toml:"quiz"`
+
 	TaskConfig struct {
 		NumClaimers        int           `toml:"numClaimers"`
 		ScanInterval       time.Duration `toml:"scanInterval"`

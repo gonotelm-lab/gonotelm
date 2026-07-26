@@ -81,6 +81,14 @@ func (h *GetArtifactStatusHandler) FindById(ctx context.Context, artifactId valo
 	return h.repo.FindById(ctx, artifactId)
 }
 
+func (h *GetArtifactStatusHandler) AttachStorageURL(ctx context.Context, a *artifactentity.Artifact) (url string, mime string) {
+	if a == nil || !a.ResultKind.Storage() || len(a.Result) == 0 {
+		return "", ""
+	}
+	
+	return materializeStorageResult(ctx, h.storage, a.Result)
+}
+
 func mapFlowState(state flowschema.TaskState) artifactentity.Status {
 	switch state {
 	case flowschema.TaskState_INITED:

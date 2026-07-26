@@ -22,6 +22,7 @@ var (
 		"artifact.info_graphic",
 		"artifact.audio_overview",
 		"artifact.flashcard",
+		"artifact.quiz",
 	}
 )
 

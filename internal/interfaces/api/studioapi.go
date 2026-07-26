@@ -7,6 +7,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/route"
 	artifactapp "github.com/gonotelm-lab/gonotelm/internal/application/artifact"
+	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	studioschema "github.com/gonotelm-lab/gonotelm/internal/interfaces/api/studio"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
@@ -79,6 +80,17 @@ func (s *Server) GenerateStudioArtifact(ctx context.Context, c *app.RequestConte
 		}
 	}
 
+	if req.Quiz != nil {
+		if req.Quiz.Count != "" && !req.Quiz.Count.Supported() {
+			http.ErrResp(c, errors.ErrParams.Msgf("unsupported quiz count: %s", req.Quiz.Count))
+			return
+		}
+		if req.Quiz.Difficulty != "" && !req.Quiz.Difficulty.Supported() {
+			http.ErrResp(c, errors.ErrParams.Msgf("unsupported quiz difficulty: %s", req.Quiz.Difficulty))
+			return
+		}
+	}
+
 	resp, err := s.generateArtifactHandler.Handle(ctx, &artifactapp.GenerateRequest{
 		NotebookId:    req.NotebookId,
 		Kind:          req.Kind,
@@ -88,6 +100,7 @@ func (s *Server) GenerateStudioArtifact(ctx context.Context, c *app.RequestConte
 		InfoGraphic:   req.InfoGraphic.ToPayload(),
 		AudioOverview: req.AudioOverview.ToPayload(),
 		Flashcard:     req.Flashcard.ToPayload(),
+		Quiz:          req.Quiz.ToPayload(),
 	})
 	if err != nil {
 		http.ErrResp(c, err)
@@ -113,9 +126,13 @@ func validateStudioUserTips(req *studioschema.GenerateArtifactRequest) error {
 	if req.AudioOverview != nil && utf8.RuneCountInString(req.AudioOverview.Tip) > maxUserTipLength {
 		return errors.ErrParams.Msgf("audio_overview tip exceeds %d characters", maxUserTipLength)
 	}
-	
+
 	if req.Flashcard != nil && utf8.RuneCountInString(req.Flashcard.Tip) > maxUserTipLength {
 		return errors.ErrParams.Msgf("flashcard tip exceeds %d characters", maxUserTipLength)
+	}
+
+	if req.Quiz != nil && utf8.RuneCountInString(req.Quiz.Tip) > maxUserTipLength {
+		return errors.ErrParams.Msgf("quiz tip exceeds %d characters", maxUserTipLength)
 	}
 
 	return nil
@@ -154,7 +171,7 @@ func (s *Server) GetStudioArtifactResult(ctx context.Context, c *app.RequestCont
 	}
 
 	if a.IsTerminal() {
-		http.OkResp(c, studioschema.ToArtifactResult(a))
+		http.OkResp(c, s.toArtifactResult(ctx, a))
 		return
 	}
 
@@ -240,9 +257,28 @@ func (s *Server) ListNotebookStudioArtifacts(ctx context.Context, c *app.Request
 	}
 
 	http.OkResp(c, studioschema.ListNotebookArtifactsResponse{
-		Artifacts: studioschema.ToArtifactResults(resp.Artifacts),
+		Artifacts: s.toArtifactResults(ctx, resp.Artifacts),
 		Limit:     req.Limit,
 		Offset:    req.Offset,
 		HasMore:   resp.HasMore,
 	})
+}
+
+func (s *Server) toArtifactResult(ctx context.Context, a *artifactentity.Artifact) *studioschema.ArtifactResult {
+	result := studioschema.ToArtifactResult(a)
+	if contentURL, mime := s.getArtifactStatusHandler.AttachStorageURL(ctx, a); contentURL != "" {
+		result.ContentUrl = contentURL
+		if result.MimeType == "" {
+			result.MimeType = mime
+		}
+	}
+	return result
+}
+
+func (s *Server) toArtifactResults(ctx context.Context, artifacts []*artifactentity.Artifact) []*studioschema.ArtifactResult {
+	results := make([]*studioschema.ArtifactResult, 0, len(artifacts))
+	for _, a := range artifacts {
+		results = append(results, s.toArtifactResult(ctx, a))
+	}
+	return results
 }

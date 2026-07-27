@@ -1,4 +1,4 @@
-package conf
+package shared
 
 import (
 	"time"
@@ -18,7 +18,7 @@ type LoggingConfig struct {
 	Level string `toml:"level"`
 }
 
-func (c *LoggingConfig) applyDefaults() {
+func (c *LoggingConfig) ApplyDefaults() {
 	if c.Level == "" {
 		c.Level = "debug"
 	}
@@ -31,7 +31,7 @@ type FlowConfig struct {
 	DialTimeout time.Duration `toml:"dialTimeout"`
 }
 
-func (c *FlowConfig) applyDefaults() {
+func (c *FlowConfig) ApplyDefaults() {
 	if c.MaxRetry <= 0 {
 		c.MaxRetry = 3
 	}
@@ -59,7 +59,7 @@ func (d *DatabaseConfig) ToSQLConfig() *sql.Config {
 	}
 }
 
-// InfraConfig 为 app / worker 共用的基础设施配置。
+// InfraConfig 为 notelm / worker 共用的基础设施配置。
 type InfraConfig struct {
 	Database   DatabaseConfig                `toml:"database"`
 	VectorDB   vectordb.Config               `toml:"vectorDb"`
@@ -73,7 +73,7 @@ type InfraConfig struct {
 	MsgQueue mqimpl.Config          `toml:"msgQueue"`
 }
 
-func (c *InfraConfig) applyDefaults() {
+func (c *InfraConfig) ApplyDefaults() {
 	if c.Storage.Type == "" {
 		c.Storage.Type = storageimpl.Minio
 	}

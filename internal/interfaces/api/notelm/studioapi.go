@@ -1,4 +1,4 @@
-package api
+package notelm
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/route"
 	artifactapp "github.com/gonotelm-lab/gonotelm/internal/application/artifact"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
-	studioschema "github.com/gonotelm-lab/gonotelm/internal/interfaces/api/studio"
+	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
@@ -48,7 +48,7 @@ func (s *Server) checkArtifactAccess(ctx context.Context, c *app.RequestContext)
 }
 
 func (s *Server) GenerateStudioArtifact(ctx context.Context, c *app.RequestContext) {
-	var req studioschema.GenerateArtifactRequest
+	var req schema.GenerateArtifactRequest
 	if err := c.BindAndValidate(&req); err != nil {
 		http.ErrResp(c, err)
 		return
@@ -103,17 +103,17 @@ func (s *Server) GenerateStudioArtifact(ctx context.Context, c *app.RequestConte
 			Flashcard:     req.Flashcard.ToPayload(),
 			Quiz:          req.Quiz.ToPayload(),
 			DataTable:     req.DataTable.ToPayload(),
-			Note:    req.Note.ToPayload(),
+			Note:          req.Note.ToPayload(),
 		})
 	if err != nil {
 		http.ErrResp(c, err)
 		return
 	}
 
-	http.OkResp(c, studioschema.GenerateArtifactResponse{TaskId: resp.ArtifactId.String()})
+	http.OkResp(c, schema.GenerateArtifactResponse{TaskId: resp.ArtifactId.String()})
 }
 
-func validateStudioUserTips(req *studioschema.GenerateArtifactRequest) error {
+func validateStudioUserTips(req *schema.GenerateArtifactRequest) error {
 	if req.Mindmap != nil && utf8.RuneCountInString(req.Mindmap.Tip) > maxUserTipLength {
 		return errors.ErrParams.Msgf("mindmap tip exceeds %d characters", maxUserTipLength)
 	}
@@ -146,7 +146,7 @@ func validateStudioUserTips(req *studioschema.GenerateArtifactRequest) error {
 }
 
 func (s *Server) GetStudioArtifactStatus(ctx context.Context, c *app.RequestContext) {
-	var req studioschema.ArtifactTaskIdRequest
+	var req schema.ArtifactTaskIdRequest
 	if err := c.BindAndValidate(&req); err != nil {
 		http.ErrResp(c, err)
 		return
@@ -158,14 +158,14 @@ func (s *Server) GetStudioArtifactStatus(ctx context.Context, c *app.RequestCont
 		return
 	}
 
-	http.OkResp(c, studioschema.GetArtifactStatusResponse{
+	http.OkResp(c, schema.GetArtifactStatusResponse{
 		TaskId: req.TaskId.String(),
 		Status: resp.Status,
 	})
 }
 
 func (s *Server) GetStudioArtifactResult(ctx context.Context, c *app.RequestContext) {
-	var req studioschema.ArtifactTaskIdRequest
+	var req schema.ArtifactTaskIdRequest
 	if err := c.BindAndValidate(&req); err != nil {
 		http.ErrResp(c, err)
 		return
@@ -188,7 +188,7 @@ func (s *Server) GetStudioArtifactResult(ctx context.Context, c *app.RequestCont
 		return
 	}
 
-	result := studioschema.ArtifactItem{
+	result := schema.ArtifactItem{
 		TaskId:      req.TaskId.String(),
 		ContentKind: string(info.ResultKind),
 		Status:      string(info.Status),
@@ -197,7 +197,7 @@ func (s *Server) GetStudioArtifactResult(ctx context.Context, c *app.RequestCont
 }
 
 func (s *Server) DeleteStudioArtifact(ctx context.Context, c *app.RequestContext) {
-	var req studioschema.ArtifactTaskIdRequest
+	var req schema.ArtifactTaskIdRequest
 	if err := c.BindAndValidate(&req); err != nil {
 		http.ErrResp(c, err)
 		return
@@ -212,7 +212,7 @@ func (s *Server) DeleteStudioArtifact(ctx context.Context, c *app.RequestContext
 }
 
 func (s *Server) RetryStudioArtifactTask(ctx context.Context, c *app.RequestContext) {
-	var req studioschema.ArtifactTaskIdRequest
+	var req schema.ArtifactTaskIdRequest
 	if err := c.BindAndValidate(&req); err != nil {
 		http.ErrResp(c, err)
 		return
@@ -227,7 +227,7 @@ func (s *Server) RetryStudioArtifactTask(ctx context.Context, c *app.RequestCont
 }
 
 func (s *Server) CancelStudioArtifactTask(ctx context.Context, c *app.RequestContext) {
-	var req studioschema.ArtifactTaskIdRequest
+	var req schema.ArtifactTaskIdRequest
 	if err := c.BindAndValidate(&req); err != nil {
 		http.ErrResp(c, err)
 		return
@@ -242,7 +242,7 @@ func (s *Server) CancelStudioArtifactTask(ctx context.Context, c *app.RequestCon
 }
 
 func (s *Server) ListNotebookStudioArtifacts(ctx context.Context, c *app.RequestContext) {
-	var req studioschema.ListNotebookArtifactsRequest
+	var req schema.ListNotebookArtifactsRequest
 	if err := c.BindAndValidate(&req); err != nil {
 		http.ErrResp(c, err)
 		return
@@ -263,7 +263,7 @@ func (s *Server) ListNotebookStudioArtifacts(ctx context.Context, c *app.Request
 		return
 	}
 
-	http.OkResp(c, studioschema.ListNotebookArtifactsResponse{
+	http.OkResp(c, schema.ListNotebookArtifactsResponse{
 		Artifacts: s.toArtifactItems(ctx, resp.Artifacts),
 		Limit:     req.Limit,
 		Offset:    req.Offset,
@@ -271,8 +271,8 @@ func (s *Server) ListNotebookStudioArtifacts(ctx context.Context, c *app.Request
 	})
 }
 
-func (s *Server) toArtifactItem(ctx context.Context, a *artifactentity.Artifact) *studioschema.ArtifactItem {
-	result := studioschema.ToArtifactItem(a)
+func (s *Server) toArtifactItem(ctx context.Context, a *artifactentity.Artifact) *schema.ArtifactItem {
+	result := schema.ToArtifactItem(a)
 	if contentURL, mime := s.getArtifactStatusHandler.AttachStorageURL(ctx, a); contentURL != "" {
 		result.ContentUrl = contentURL
 		if result.MimeType == "" {
@@ -282,8 +282,8 @@ func (s *Server) toArtifactItem(ctx context.Context, a *artifactentity.Artifact)
 	return result
 }
 
-func (s *Server) toArtifactItems(ctx context.Context, artifacts []*artifactentity.Artifact) []*studioschema.ArtifactItem {
-	results := make([]*studioschema.ArtifactItem, 0, len(artifacts))
+func (s *Server) toArtifactItems(ctx context.Context, artifacts []*artifactentity.Artifact) []*schema.ArtifactItem {
+	results := make([]*schema.ArtifactItem, 0, len(artifacts))
 	for _, a := range artifacts {
 		results = append(results, s.toArtifactItem(ctx, a))
 	}

@@ -3,13 +3,13 @@ package postgres
 import (
 	"context"
 
-	"github.com/gonotelm-lab/gonotelm/internal/conf"
+	"github.com/gonotelm-lab/gonotelm/internal/conf/shared"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
 	"github.com/gonotelm-lab/gonotelm/pkg/misc"
 	"github.com/gonotelm-lab/gonotelm/pkg/sql"
 )
 
-func Open(cfg conf.DatabaseConfig) (*database.Dao, error) {
+func Open(cfg shared.DatabaseConfig) (*database.Dao, error) {
 	db, err := sql.OpenPgSql(&sql.Config{
 		Host:     cfg.Host,
 		Port:     cfg.Port,

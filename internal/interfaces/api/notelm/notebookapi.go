@@ -1,4 +1,4 @@
-package api
+package notelm
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	chatapp "github.com/gonotelm-lab/gonotelm/internal/application/chat"
 	notebookapp "github.com/gonotelm-lab/gonotelm/internal/application/notebook"
 	sourceapp "github.com/gonotelm-lab/gonotelm/internal/application/source"
-	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/schema"
+	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/schema"
 	pkgctx "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
@@ -48,18 +48,9 @@ func (s *Server) checkNotebookUserId(ctx context.Context, c *app.RequestContext)
 	c.Next(ctx)
 }
 
-type CreateNotebookRequest struct {
-	Name string `json:"name" validate:"max=128"`
-	Desc string `json:"desc" validate:"max=1024"`
-}
-
-type CreateNotebookResponse struct {
-	Id string `json:"id"`
-}
-
 // Create new notebook
 func (s *Server) CreateNotebook(ctx context.Context, c *app.RequestContext) {
-	var req CreateNotebookRequest
+	var req schema.CreateNotebookRequest
 	err := c.BindAndValidate(&req)
 	if err != nil {
 		http.ErrResp(c, err)
@@ -78,28 +69,11 @@ func (s *Server) CreateNotebook(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	http.OkResp(c, CreateNotebookResponse{Id: id.String()})
-}
-
-type GetNotebookRequest struct {
-	Id uuid.UUID `path:"id,required"`
-}
-
-func (r *GetNotebookRequest) Validate() error {
-	return nil
-}
-
-type GetNotebookResponse struct {
-	Id          string `json:"id"`
-	Name        string `json:"name"`
-	Desc        string `json:"desc"`
-	SourceCount int64  `json:"source_count"`
-	UpdatedAt   int64  `json:"updated_at"` // unix ms
-	CreatedAt   int64  `json:"created_at"` // unix ms
+	http.OkResp(c, schema.CreateNotebookResponse{Id: id.String()})
 }
 
 func (s *Server) GetNotebook(ctx context.Context, c *app.RequestContext) {
-	var req GetNotebookRequest
+	var req schema.GetNotebookRequest
 	err := c.BindAndValidate(&req)
 	if err != nil {
 		http.ErrResp(c, err)
@@ -112,7 +86,7 @@ func (s *Server) GetNotebook(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	http.OkResp(c, GetNotebookResponse{
+	http.OkResp(c, schema.GetNotebookResponse{
 		Id:          notebook.Id.String(),
 		Name:        notebook.Name,
 		Desc:        notebook.Description,
@@ -122,64 +96,8 @@ func (s *Server) GetNotebook(ctx context.Context, c *app.RequestContext) {
 	})
 }
 
-type ListNotebooksSortBy string
-
-const (
-	ListNotebooksSortByLastActive ListNotebooksSortBy = "last_active"
-	ListNotebooksSortByCreateTime ListNotebooksSortBy = "create_time"
-)
-
-func (s ListNotebooksSortBy) ToSortBy() notebookapp.SortBy {
-	switch s {
-	case ListNotebooksSortByLastActive:
-		return notebookapp.SortByLastActive
-	case ListNotebooksSortByCreateTime:
-		return notebookapp.SortByCreateTime
-	}
-
-	return notebookapp.SortByCreateTime
-}
-
-type ListNotebooksRequest struct {
-	Limit  int                 `query:"limit"   validate:"omitempty,min=1,max=100"`
-	Offset int                 `query:"offset"  validate:"min=0"`
-	SortBy ListNotebooksSortBy `query:"sort_by" validate:"omitempty,oneof=last_active create_time"`
-}
-
-const (
-	defaultNotebooksListLimit = 20
-)
-
-func (r *ListNotebooksRequest) Validate() error {
-	if r.Limit == 0 {
-		r.Limit = defaultNotebooksListLimit
-	}
-
-	if r.SortBy == "" {
-		r.SortBy = ListNotebooksSortByCreateTime
-	}
-
-	return nil
-}
-
-type ListNotebooksResponse struct {
-	Notebooks []*ListNotebookItemResponse `json:"notebooks"`
-	Limit     int                         `json:"limit"`
-	Offset    int                         `json:"offset"`
-	HasMore   bool                        `json:"has_more"`
-}
-
-type ListNotebookItemResponse struct {
-	Id          string `json:"id"`
-	Name        string `json:"name"`
-	Desc        string `json:"desc"`
-	SourceCount int64  `json:"source_count"`
-	UpdatedAt   int64  `json:"updated_at"` // unix ms
-	CreatedAt   int64  `json:"created_at"` // unix ms
-}
-
 func (s *Server) ListNotebooks(ctx context.Context, c *app.RequestContext) {
-	var req ListNotebooksRequest
+	var req schema.ListNotebooksRequest
 	err := c.BindAndValidate(&req)
 	if err != nil {
 		http.ErrResp(c, err)
@@ -199,9 +117,9 @@ func (s *Server) ListNotebooks(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	notebooks := make([]*ListNotebookItemResponse, 0, len(result.Notebooks))
+	notebooks := make([]*schema.ListNotebookItemResponse, 0, len(result.Notebooks))
 	for _, notebook := range result.Notebooks {
-		notebooks = append(notebooks, &ListNotebookItemResponse{
+		notebooks = append(notebooks, &schema.ListNotebookItemResponse{
 			Id:          notebook.Id.String(),
 			Name:        notebook.Name,
 			Desc:        notebook.Description,
@@ -211,7 +129,7 @@ func (s *Server) ListNotebooks(ctx context.Context, c *app.RequestContext) {
 		})
 	}
 
-	http.OkResp(c, ListNotebooksResponse{
+	http.OkResp(c, schema.ListNotebooksResponse{
 		Notebooks: notebooks,
 		Limit:     req.Limit,
 		Offset:    req.Offset,
@@ -219,32 +137,8 @@ func (s *Server) ListNotebooks(ctx context.Context, c *app.RequestContext) {
 	})
 }
 
-type ListNotebookSourcesRequest struct {
-	Id     uuid.UUID `path:"id,required"`
-	Limit  int       `query:"limit"      validate:"omitempty,min=1,max=50"`
-	Offset int       `query:"offset"     validate:"min=0"`
-}
-
-const (
-	defaultNotebookSourcesLimit = 50
-)
-
-func (r *ListNotebookSourcesRequest) Validate() error {
-	if r.Limit == 0 {
-		r.Limit = defaultNotebookSourcesLimit
-	}
-	return nil
-}
-
-type ListNotebookSourcesResponse struct {
-	Sources []*schema.Source `json:"sources"`
-	Limit   int              `json:"limit"`
-	Offset  int              `json:"offset"`
-	HasMore bool             `json:"has_more"`
-}
-
 func (s *Server) ListNotebookSources(ctx context.Context, c *app.RequestContext) {
-	var req ListNotebookSourcesRequest
+	var req schema.ListNotebookSourcesRequest
 	err := c.BindAndValidate(&req)
 	if err != nil {
 		http.ErrResp(c, err)
@@ -262,7 +156,7 @@ func (s *Server) ListNotebookSources(ctx context.Context, c *app.RequestContext)
 		return
 	}
 
-	http.OkResp(c, ListNotebookSourcesResponse{
+	http.OkResp(c, schema.ListNotebookSourcesResponse{
 		Sources: schema.ToSourcesFromDomainDetails(result.Sources),
 		Limit:   req.Limit,
 		Offset:  req.Offset,
@@ -270,13 +164,8 @@ func (s *Server) ListNotebookSources(ctx context.Context, c *app.RequestContext)
 	})
 }
 
-type UpdateNotebookNameRequest struct {
-	Id   uuid.UUID `path:"id,required"`
-	Name string    `json:"name"        validate:"min=0,max=128"`
-}
-
 func (s *Server) UpdateNotebookName(ctx context.Context, c *app.RequestContext) {
-	var req UpdateNotebookNameRequest
+	var req schema.UpdateNotebookNameRequest
 	err := c.BindAndValidate(&req)
 	if err != nil {
 		http.ErrResp(c, err)
@@ -292,20 +181,8 @@ func (s *Server) UpdateNotebookName(ctx context.Context, c *app.RequestContext) 
 	http.OkResp(c, nil)
 }
 
-type GetNotebookChatRequest struct {
-	Id uuid.UUID `path:"id,required"`
-}
-
-func (r *GetNotebookChatRequest) Validate() error {
-	return nil
-}
-
-type GetNotebookChatResponse struct {
-	ChatId string `json:"chat_id"`
-}
-
 func (s *Server) GetOrCreateNotebookChat(ctx context.Context, c *app.RequestContext) {
-	var req GetNotebookChatRequest
+	var req schema.GetNotebookChatRequest
 	err := c.BindAndValidate(&req)
 	if err != nil {
 		http.ErrResp(c, err)
@@ -322,17 +199,13 @@ func (s *Server) GetOrCreateNotebookChat(ctx context.Context, c *app.RequestCont
 		return
 	}
 
-	http.OkResp(c, GetNotebookChatResponse{
+	http.OkResp(c, schema.GetNotebookChatResponse{
 		ChatId: chat.Id.String(),
 	})
 }
 
-type DeleteNotebookRequest struct {
-	Id uuid.UUID `path:"id,required"`
-}
-
 func (s *Server) DeleteNotebook(ctx context.Context, c *app.RequestContext) {
-	var req DeleteNotebookRequest
+	var req schema.DeleteNotebookRequest
 	err := c.BindAndValidate(&req)
 	if err != nil {
 		http.ErrResp(c, err)

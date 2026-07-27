@@ -153,7 +153,7 @@ func (a *Agent) Run(ctx context.Context, req *RunRequest) (*RunResponse, error) 
 		userId:   req.UserId,
 	}
 	domainAgent := domainagent.New(domainagent.Config[*SessionState]{
-		MaxRound: conf.AppGlobal().Chat.GetMaxRound(),
+		MaxRound: conf.NotelmGlobal().Chat.GetMaxRound(),
 		BaseLLM:  toolCallingChatModel,
 		Options:  options,
 		// Verbose:  true,
@@ -222,7 +222,7 @@ func (a *Agent) Run(ctx context.Context, req *RunRequest) (*RunResponse, error) 
 }
 
 func (a *Agent) bindHooks(domainAgent *domainagent.Agent[*SessionState], req *RunRequest) {
-	domainAgent.OnBeforeRound(domainagent.NewFinalRoundHook(domainAgent, conf.AppGlobal().Chat.GetMaxRound()))
+	domainAgent.OnBeforeRound(domainagent.NewFinalRoundHook(domainAgent, conf.NotelmGlobal().Chat.GetMaxRound()))
 
 	if req.Hooks.RoundFinishedHook != nil {
 		domainAgent.OnMsgAppender(func(ctx context.Context, state *SessionState, newMsgs []*domainagent.EinoMessage) {

@@ -3,6 +3,7 @@ package conf
 import (
 	"time"
 
+	"github.com/gonotelm-lab/gonotelm/internal/conf/shared"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
 	rerank "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/rerank"
 	text2audio "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio"
@@ -18,13 +19,13 @@ const (
 )
 
 type WorkerConfig struct {
-	InfraConfig
+	shared.InfraConfig
 
-	DeployEnv string           `toml:"deployEnv"`
-	Studio    StudioConfig     `toml:"studio"`
-	Logging   LoggingConfig    `toml:"logging"`
-	Flow      FlowConfig       `toml:"flow"`
-	Worker    WorkerPoolConfig `toml:"worker"`
+	DeployEnv string               `toml:"deployEnv"`
+	Studio    StudioConfig         `toml:"studio"`
+	Logging   shared.LoggingConfig `toml:"logging"`
+	Flow      shared.FlowConfig    `toml:"flow"`
+	Worker    WorkerPoolConfig     `toml:"worker"`
 }
 
 type WorkerPoolConfig struct {

@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gonotelm-lab/gonotelm/internal/conf/shared"
 	rerank "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/rerank"
 	mqimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
 
@@ -14,25 +15,25 @@ import (
 )
 
 var (
-	appGlobal     *AppConfig
+	notelmGlobal  *NotelmConfig
 	workerGlobal  *WorkerConfig
-	setAppOnce    sync.Once
+	setNotelmOnce sync.Once
 	setWorkerOnce sync.Once
 )
 
-type AppConfig struct {
-	InfraConfig
+type NotelmConfig struct {
+	shared.InfraConfig
 
 	DeployEnv string `toml:"deployEnv"`
 
-	Api      ApiConfig           `toml:"api"`
-	Chat     ChatConfig          `toml:"chat"`
-	Source   SourceConfig        `toml:"source"`
-	Rerank   rerank.RerankConfig `toml:"rerank"`
-	Logging  LoggingConfig       `toml:"logging"`
-	Chunking ChunkingConfig      `toml:"chunking"`
-	Flow     FlowConfig          `toml:"flow"`
-	Syncer   SyncerConfig        `toml:"syncer"`
+	Api      ApiConfig            `toml:"api"`
+	Chat     ChatConfig           `toml:"chat"`
+	Source   SourceConfig         `toml:"source"`
+	Rerank   rerank.RerankConfig  `toml:"rerank"`
+	Logging  shared.LoggingConfig `toml:"logging"`
+	Chunking ChunkingConfig       `toml:"chunking"`
+	Flow     shared.FlowConfig    `toml:"flow"`
+	Syncer   SyncerConfig         `toml:"syncer"`
 }
 
 type SyncerConfig struct {
@@ -41,12 +42,12 @@ type SyncerConfig struct {
 	GlobalBatchSize int           `toml:"globalBatchSize"`
 }
 
-func (c *AppConfig) IsDev() bool {
-	return IsDevEnv(c.DeployEnv)
+func (c *NotelmConfig) IsDev() bool {
+	return shared.IsDevEnv(c.DeployEnv)
 }
 
 func (c *WorkerConfig) IsDev() bool {
-	return IsDevEnv(c.DeployEnv)
+	return shared.IsDevEnv(c.DeployEnv)
 }
 
 type ApiConfig struct {
@@ -81,15 +82,15 @@ func loadTOML(path string, cfg interface{}) error {
 	return nil
 }
 
-func LoadAppConfig(path string) (*AppConfig, error) {
-	cfg := &AppConfig{}
+func LoadNotelmConfig(path string) (*NotelmConfig, error) {
+	cfg := &NotelmConfig{}
 	if err := loadTOML(path, cfg); err != nil {
 		return nil, err
 	}
 
 	cfg.applyDefaults()
 
-	appGlobal = cfg
+	notelmGlobal = cfg
 	return cfg, nil
 }
 
@@ -105,10 +106,10 @@ func LoadWorkerConfig(path string) (*WorkerConfig, error) {
 	return cfg, nil
 }
 
-func (c *AppConfig) applyDefaults() {
-	c.InfraConfig.applyDefaults()
-	c.Logging.applyDefaults()
-	c.Flow.applyDefaults()
+func (c *NotelmConfig) applyDefaults() {
+	c.InfraConfig.ApplyDefaults()
+	c.Logging.ApplyDefaults()
+	c.Flow.ApplyDefaults()
 
 	if c.MsgQueue.Type == "" {
 		c.MsgQueue.Type = mqimpl.Kafka
@@ -125,9 +126,9 @@ func (c *AppConfig) applyDefaults() {
 }
 
 func (c *WorkerConfig) applyDefaults() {
-	c.InfraConfig.applyDefaults()
-	c.Logging.applyDefaults()
-	c.Flow.applyDefaults()
+	c.InfraConfig.ApplyDefaults()
+	c.Logging.ApplyDefaults()
+	c.Flow.ApplyDefaults()
 
 	if c.Worker.MaxConcurrency <= 0 {
 		c.Worker.MaxConcurrency = 4
@@ -137,13 +138,13 @@ func (c *WorkerConfig) applyDefaults() {
 	}
 }
 
-func AppGlobal() *AppConfig {
-	return appGlobal
+func NotelmGlobal() *NotelmConfig {
+	return notelmGlobal
 }
 
-func SetAppGlobal(cfg *AppConfig) {
-	setAppOnce.Do(func() {
-		appGlobal = cfg
+func SetNotelmGlobal(cfg *NotelmConfig) {
+	setNotelmOnce.Do(func() {
+		notelmGlobal = cfg
 	})
 }
 

@@ -13,14 +13,14 @@ import (
 	flowcli "github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
-	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api"
+	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm"
 	"github.com/gonotelm-lab/gonotelm/internal/interfaces/event"
 )
 
 type App struct {
 	closers []io.Closer
 	wg      *sync.WaitGroup
-	Server  *api.Server
+	Server  *notelm.Server
 }
 
 func (a *App) Close() error {
@@ -38,7 +38,7 @@ func (a *App) Close() error {
 	return nil
 }
 
-func NewApp(ctx context.Context, cfg *conf.AppConfig) (_ *App, outErr error) {
+func NewApp(ctx context.Context, cfg *conf.NotelmConfig) (_ *App, outErr error) {
 	var closers []io.Closer
 	addCloser := func(c io.Closer) { closers = append(closers, c) }
 	defer func() {
@@ -146,7 +146,7 @@ func NewApp(ctx context.Context, cfg *conf.AppConfig) (_ *App, outErr error) {
 	// ── 10. HTTP Server ──
 
 	wg := &sync.WaitGroup{}
-	svr := api.NewServer(api.ServerDeps{
+	svr := notelm.NewServer(notelm.ServerDeps{
 		NotebookRepo:       notebookRepo,
 		SourceRepo:         sourceRepo,
 		SourceStorageRepo:  sourceStorageRepo,

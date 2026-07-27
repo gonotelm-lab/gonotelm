@@ -1,4 +1,4 @@
-package studio
+package schema
 
 import (
 	audiooverview "github.com/gonotelm-lab/gonotelm/internal/application/artifact/generate/audiooverview"

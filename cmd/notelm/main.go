@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	configPath := flag.String("config", "./etc/gonotelm.toml.tpl", "config file path")
+	configPath := flag.String("config", "./etc/notelm.toml.tpl", "config file path")
 	flag.Parse()
 
 	initConfig(*configPath)
@@ -23,7 +23,7 @@ func main() {
 }
 
 func initConfig(configPath string) {
-	_, err := conf.LoadAppConfig(configPath)
+	_, err := conf.LoadNotelmConfig(configPath)
 	if err != nil {
 		panic(err)
 	}
@@ -32,7 +32,7 @@ func initConfig(configPath string) {
 func initLogger() {
 	pkglog.Init()
 
-	cfg := conf.AppGlobal()
+	cfg := conf.NotelmGlobal()
 	if cfg == nil {
 		return
 	}
@@ -46,7 +46,7 @@ func run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	app, err := bootstrap.NewApp(ctx, conf.AppGlobal())
+	app, err := bootstrap.NewApp(ctx, conf.NotelmGlobal())
 	if err != nil {
 		return err
 	}

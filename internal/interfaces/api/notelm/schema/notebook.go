@@ -107,7 +107,7 @@ type ListNotebookSourcesResponse struct {
 	HasMore bool      `json:"has_more"`
 }
 
-type UpdateNotebookNameRequest struct {
+type UpdateNotebookRequest struct {
 	Id   uuid.UUID `path:"id,required"`
 	Name string    `json:"name"        validate:"min=0,max=128"`
 }

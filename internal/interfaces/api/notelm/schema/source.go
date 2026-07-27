@@ -105,7 +105,7 @@ func ToSourcesFromDomainDetails(
 }
 
 type CreateSourceRequest struct {
-	NotebookId uuid.UUID `json:"notebook_id,required"`
+	NotebookId uuid.UUID `path:"id,required"`
 	Kind       string    `json:"kind,required"`
 
 	Text string `json:"text"`
@@ -308,12 +308,12 @@ type GetSourceParsedTreeRequest struct {
 	Id uuid.UUID `path:"id,required"`
 }
 
-type UpdateSourceTitleRequest struct {
+type UpdateSourceRequest struct {
 	Id    uuid.UUID `path:"id,required"`
 	Title string    `json:"title" validate:"max=255"`
 }
 
-func (r *UpdateSourceTitleRequest) Validate() error {
+func (r *UpdateSourceRequest) Validate() error {
 	r.Title = strings.TrimSpace(r.Title)
 	if r.Title == "" {
 		return errors.ErrParams.Msg("source title is empty")

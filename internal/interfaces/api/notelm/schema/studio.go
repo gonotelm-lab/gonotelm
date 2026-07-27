@@ -17,7 +17,7 @@ type (
 )
 
 type GenerateArtifactRequest struct {
-	NotebookId uuid.UUID   `json:"notebook_id,required"`
+	NotebookId uuid.UUID   `path:"id,required"`
 	Kind       Kind        `json:"kind,required"`
 	SourceIds  []uuid.UUID `json:"source_ids"`
 
@@ -68,7 +68,7 @@ type GenerateArtifactResponse struct {
 }
 
 type ArtifactTaskIdRequest struct {
-	TaskId uuid.UUID `path:"task_id,required"`
+	TaskId uuid.UUID `path:"id,required"`
 }
 
 type GetArtifactStatusResponse struct {

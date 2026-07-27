@@ -16,18 +16,30 @@ import (
 )
 
 func (s *Server) registerNotebooksRoutes(g *route.RouterGroup) {
-	g.POST("/notebook", s.CreateNotebook)
-	g.GET("/notebook/list", s.ListNotebooks)
+	// POST /api/v1/notebooks
+	g.POST("/notebooks", s.CreateNotebook)
+	// GET /api/v1/notebooks
+	g.GET("/notebooks", s.ListNotebooks)
 
-	notebookIdGroup := g.Group("/notebook/:id")
+	notebookIdGroup := g.Group("/notebooks/:id")
 	notebookIdGroup.Use(s.checkNotebookUserId)
 	{
+		// GET /api/v1/notebooks/:id
 		notebookIdGroup.GET("", s.GetNotebook)
+		// DELETE /api/v1/notebooks/:id
 		notebookIdGroup.DELETE("", s.DeleteNotebook)
-		notebookIdGroup.PUT("/name", s.UpdateNotebookName)
-		notebookIdGroup.POST("/chat", s.GetOrCreateNotebookChat)
-		notebookIdGroup.GET("/source/list", s.ListNotebookSources)
-		notebookIdGroup.GET("/studio/artifact/list", s.ListNotebookStudioArtifacts)
+		// PATCH /api/v1/notebooks/:id
+		notebookIdGroup.PATCH("", s.UpdateNotebook)
+		// GET /api/v1/notebooks/:id/sources
+		notebookIdGroup.GET("/sources", s.ListNotebookSources)
+		// GET /api/v1/notebooks/:id/artifacts
+		notebookIdGroup.GET("/artifacts", s.ListNotebookStudioArtifacts)
+		// POST /api/v1/notebooks/:id/artifacts
+		notebookIdGroup.POST("/artifacts", s.GenerateStudioArtifact)
+		// POST /api/v1/notebooks/:id/sources
+		notebookIdGroup.POST("/sources", s.CreateSource)
+		// POST /api/v1/notebooks/:id/chats
+		notebookIdGroup.POST("/chats", s.GetOrCreateNotebookChat)
 	}
 }
 
@@ -164,8 +176,8 @@ func (s *Server) ListNotebookSources(ctx context.Context, c *app.RequestContext)
 	})
 }
 
-func (s *Server) UpdateNotebookName(ctx context.Context, c *app.RequestContext) {
-	var req schema.UpdateNotebookNameRequest
+func (s *Server) UpdateNotebook(ctx context.Context, c *app.RequestContext) {
+	var req schema.UpdateNotebookRequest
 	err := c.BindAndValidate(&req)
 	if err != nil {
 		http.ErrResp(c, err)

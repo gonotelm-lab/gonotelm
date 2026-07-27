@@ -15,19 +15,25 @@ import (
 )
 
 func (s *Server) registerSourcesRoutes(g *route.RouterGroup) {
-	g.POST("/source", s.CreateSource)
-
-	sourceIdGroup := g.Group("/source/:id")
+	sourceIdGroup := g.Group("/sources/:id")
 	sourceIdGroup.Use(s.checkSourceUserMiddleware)
 	{
+		// GET /api/v1/sources/:id
 		sourceIdGroup.GET("", s.GetSource)
+		// DELETE /api/v1/sources/:id
 		sourceIdGroup.DELETE("", s.DeleteSource)
-		sourceIdGroup.POST("/file/upload", s.UploadFileSource)
-		sourceIdGroup.POST("/status", s.PollSourceStatus)       // check source processing status
-		sourceIdGroup.POST("/reload", s.RetrySourcePreparation) // retry source preparation
-		sourceIdGroup.GET("/doc/:doc_id", s.GetSourceDoc)
-		sourceIdGroup.GET("/batch/docs", s.BatchGetSourceDocs)
-		sourceIdGroup.PUT("/title", s.UpdateSourceTitle)
+		// PATCH /api/v1/sources/:id
+		sourceIdGroup.PATCH("", s.UpdateSource)
+		// POST /api/v1/sources/:id/uploads
+		sourceIdGroup.POST("/uploads", s.UploadFileSource)
+		// POST /api/v1/sources/:id/poll — may advance uploading → preparing
+		sourceIdGroup.POST("/poll", s.PollSourceStatus)
+		// POST /api/v1/sources/:id/retry
+		sourceIdGroup.POST("/retry", s.RetrySourcePreparation)
+		// GET /api/v1/sources/:id/docs
+		sourceIdGroup.GET("/docs", s.BatchGetSourceDocs)
+		// GET /api/v1/sources/:id/docs/:doc_id
+		sourceIdGroup.GET("/docs/:doc_id", s.GetSourceDoc)
 	}
 }
 
@@ -233,8 +239,8 @@ func (s *Server) GetSource(ctx context.Context, c *app.RequestContext) {
 	))
 }
 
-func (s *Server) UpdateSourceTitle(ctx context.Context, c *app.RequestContext) {
-	var req schema.UpdateSourceTitleRequest
+func (s *Server) UpdateSource(ctx context.Context, c *app.RequestContext) {
+	var req schema.UpdateSourceRequest
 	err := c.BindAndValidate(&req)
 	if err != nil {
 		http.ErrResp(c, err)

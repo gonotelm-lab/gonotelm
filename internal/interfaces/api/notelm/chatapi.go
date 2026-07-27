@@ -22,12 +22,17 @@ import (
 )
 
 func (s *Server) registerChatRoutes(g *route.RouterGroup) {
-	chatIdGroup := g.Group("/chat/:id")
+	chatIdGroup := g.Group("/chats/:id")
 	{
-		chatIdGroup.GET("/message/list", s.ListChatMessages)
-		chatIdGroup.POST("/message/create", s.ChatCreateMessage)
+		// GET /api/v1/chats/:id/messages
+		chatIdGroup.GET("/messages", s.ListChatMessages)
+		// POST /api/v1/chats/:id/messages
+		chatIdGroup.POST("/messages", s.ChatCreateMessage)
+		// POST /api/v1/chats/:id/stream/abort
 		chatIdGroup.POST("/stream/abort", s.ChatAbortStream)
-		chatIdGroup.GET("/stream", middleware.SlowRequestThreshold(60*time.Second), s.GetChatStream) // sse api
+		// GET /api/v1/chats/:id/stream — SSE
+		chatIdGroup.GET("/stream", middleware.SlowRequestThreshold(60*time.Second), s.GetChatStream)
+		// DELETE /api/v1/chats/:id/context
 		chatIdGroup.DELETE("/context", s.DeleteChatContext)
 	}
 }

@@ -17,19 +17,23 @@ import (
 const maxUserTipLength = 300
 
 func (s *Server) registerStudioRoutes(g *route.RouterGroup) {
-	artifactGroup := g.Group("/studio/artifact/:task_id", s.checkArtifactAccess)
+	artifactGroup := g.Group("/artifacts/:id", s.checkArtifactAccess)
 	{
+		// GET /api/v1/artifacts/:id
+		artifactGroup.GET("", s.GetStudioArtifact)
+		// GET /api/v1/artifacts/:id/status
 		artifactGroup.GET("/status", s.GetStudioArtifactStatus)
-		artifactGroup.GET("/result", s.GetStudioArtifactResult)
-		artifactGroup.POST("/delete", s.DeleteStudioArtifact)
+		// DELETE /api/v1/artifacts/:id
+		artifactGroup.DELETE("", s.DeleteStudioArtifact)
+		// POST /api/v1/artifacts/:id/retry
 		artifactGroup.POST("/retry", s.RetryStudioArtifactTask)
+		// POST /api/v1/artifacts/:id/cancel
 		artifactGroup.POST("/cancel", s.CancelStudioArtifactTask)
 	}
-	g.POST("/studio/artifact/generate", s.GenerateStudioArtifact)
 }
 
 func (s *Server) checkArtifactAccess(ctx context.Context, c *app.RequestContext) {
-	taskId := c.Param("task_id")
+	taskId := c.Param("id")
 	tid, err := uuid.ParseString(taskId)
 	if err != nil {
 		http.ErrResp(c, errors.ErrParams.Msgf("invalid task_id"))
@@ -164,7 +168,7 @@ func (s *Server) GetStudioArtifactStatus(ctx context.Context, c *app.RequestCont
 	})
 }
 
-func (s *Server) GetStudioArtifactResult(ctx context.Context, c *app.RequestContext) {
+func (s *Server) GetStudioArtifact(ctx context.Context, c *app.RequestContext) {
 	var req schema.ArtifactTaskIdRequest
 	if err := c.BindAndValidate(&req); err != nil {
 		http.ErrResp(c, err)

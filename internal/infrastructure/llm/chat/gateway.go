@@ -7,8 +7,6 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
 
-	deepseekext "github.com/cloudwego/eino-ext/components/model/deepseek"
-	qwenext "github.com/cloudwego/eino-ext/components/model/qwen"
 	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/eino/components"
 	einomodel "github.com/cloudwego/eino/components/model"
@@ -130,6 +128,8 @@ func (g *wrappedChatModel) Generate(
 		Component: components.ComponentOfChatModel,
 	}, &Interceptor{})
 
+	opts = applyProviderCallOptions(g.provider, false, opts)
+
 	err := g.sem.Acquire(ctx, 1)
 	if err != nil {
 		return nil, err
@@ -153,12 +153,7 @@ func (g *wrappedChatModel) Stream(
 		Component: components.ComponentOfChatModel,
 	}, &Interceptor{})
 
-	switch g.provider {
-	case llm.ProviderDeepSeek:
-		opts = append(opts, deepseekext.WithExtraFields(streamOptionsIncludeUsage))
-	case llm.ProviderQwen:
-		opts = append(opts, qwenext.WithExtraFields(streamOptionsIncludeUsage))
-	}
+	opts = applyProviderCallOptions(g.provider, true, opts)
 
 	err := g.sem.Acquire(ctx, 1)
 	if err != nil {

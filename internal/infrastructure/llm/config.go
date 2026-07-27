@@ -126,7 +126,7 @@ func (c *DeepSeekChatConfig) ToEino() *deepseek.ChatModelConfig {
 		TopLogProbs:      c.TopLogProbs,
 	}
 	if c.ThinkingEnabled {
-		dc.ThinkingConfig.Type = "enabled"
+		dc.ThinkingConfig = &deepseek.ThinkingConfig{Type: "enabled"}
 	}
 
 	return dc

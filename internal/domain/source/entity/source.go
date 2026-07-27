@@ -29,13 +29,14 @@ const (
 	MimeTypePDF      = "application/pdf"
 	MimeTypeText     = "text/plain; charset=utf-8"
 	MimeTypeMarkdown = "text/markdown; charset=utf-8"
+	MimeTypeCSV      = "text/csv; charset=utf-8"
 	MimeTypeEPUB     = "application/epub+zip"
 	MimeTypeWord     = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 )
 
 func SupportedFileMimeType(mimeType string) bool {
 	switch mimeType {
-	case MimeTypePDF, MimeTypeText, MimeTypeMarkdown, MimeTypeEPUB, MimeTypeWord:
+	case MimeTypePDF, MimeTypeText, MimeTypeMarkdown, MimeTypeCSV, MimeTypeEPUB, MimeTypeWord:
 		return true
 	}
 	return false

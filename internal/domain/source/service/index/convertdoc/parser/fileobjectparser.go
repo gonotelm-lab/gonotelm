@@ -42,7 +42,7 @@ func (p *FileObjectParser) parseByMime(
 	textParser := einoparser.TextParser{}
 
 	switch mimeType {
-	case entity.MimeTypeText, entity.MimeTypeMarkdown: // plain text or markdown is already just text itself
+	case entity.MimeTypeText, entity.MimeTypeMarkdown, entity.MimeTypeCSV: // plain text / markdown / csv
 		return textParser.Parse(ctx, r, opts...)
 	case entity.MimeTypePDF:
 		return parseByDocParser(

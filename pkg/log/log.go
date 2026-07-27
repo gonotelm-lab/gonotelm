@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/cloudwego/hertz/pkg/common/hlog"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
@@ -19,7 +20,7 @@ var (
 	defaultJSONHandler = newContextJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level:       defaultLevelVar,
 		AddSource:   true,
-		ReplaceAttr: replaceSourceFileWithBaseName,
+		ReplaceAttr: replaceAttr,
 	})
 )
 
@@ -133,17 +134,19 @@ func (h *contextJSONHandler) WithGroup(name string) slog.Handler {
 	}
 }
 
-func replaceSourceFileWithBaseName(groups []string, a slog.Attr) slog.Attr {
-	if a.Key != slog.SourceKey {
+func replaceAttr(_ []string, a slog.Attr) slog.Attr {
+	switch a.Key {
+	case slog.TimeKey:
+		return slog.Time(a.Key, a.Value.Time().Truncate(time.Millisecond))
+	case slog.SourceKey:
+		src, ok := a.Value.Any().(*slog.Source)
+		if !ok || src == nil {
+			return a
+		}
+		copySource := *src
+		copySource.File = filepath.Base(copySource.File)
+		return slog.Any(slog.SourceKey, &copySource)
+	default:
 		return a
 	}
-
-	src, ok := a.Value.Any().(*slog.Source)
-	if !ok || src == nil {
-		return a
-	}
-
-	copySource := *src
-	copySource.File = filepath.Base(copySource.File)
-	return slog.Any(slog.SourceKey, &copySource)
 }

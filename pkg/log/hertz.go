@@ -32,7 +32,7 @@ func newHertzSlogger(level *slog.LevelVar, output io.Writer) *hertzSlogger {
 	handlerOptions := &slog.HandlerOptions{
 		Level:       level,
 		AddSource:   true,
-		ReplaceAttr: replaceSourceFileWithBaseName,
+		ReplaceAttr: replaceAttr,
 	}
 	base := hslog.NewLogger(
 		hslog.WithOutput(output),

@@ -5,8 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 )
@@ -30,12 +32,12 @@ func TestContextJSONHandler_AddsUserIDFromContext(t *testing.T) {
 	}
 }
 
-func TestReplaceSourceFileWithBaseName(t *testing.T) {
+func TestReplaceAttr_SourceFileBaseNameAndTimeMillisecond(t *testing.T) {
 	var buf bytes.Buffer
 	logger := slog.New(newContextJSONHandler(&buf, &slog.HandlerOptions{
 		Level:       slog.LevelInfo,
 		AddSource:   true,
-		ReplaceAttr: replaceSourceFileWithBaseName,
+		ReplaceAttr: replaceAttr,
 	}))
 
 	logger.Info("hello")
@@ -62,6 +64,18 @@ func TestReplaceSourceFileWithBaseName(t *testing.T) {
 
 	if strings.Contains(file, "/") || strings.Contains(file, "\\") {
 		t.Fatalf("source.file should be base name, got=%q", file)
+	}
+
+	timeRaw, ok := got[slog.TimeKey].(string)
+	if !ok || timeRaw == "" {
+		t.Fatalf("time is missing, got=%v", got[slog.TimeKey])
+	}
+	if _, err := time.Parse(time.RFC3339Nano, timeRaw); err != nil {
+		t.Fatalf("time parse failed: %v, raw=%q", err, timeRaw)
+	}
+	// RFC3339Nano with millisecond precision: fractional seconds at most 3 digits.
+	if matched, _ := regexp.MatchString(`\.\d{4,}`, timeRaw); matched {
+		t.Fatalf("time should keep at most millisecond precision, got=%q", timeRaw)
 	}
 }
 

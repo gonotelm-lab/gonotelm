@@ -6,7 +6,7 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/route"
-	artifactapp "github.com/gonotelm-lab/gonotelm/internal/application/artifact"
+	artifactapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/artifact"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"

@@ -29,7 +29,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	app, err := bootstrap.NewWorkerApp(ctx, conf.WorkerGlobal())
+	app, err := bootstrap.NewWorker(ctx, conf.WorkerGlobal())
 	if err != nil {
 		slog.Error("new worker app failed", "err", err)
 		return

@@ -5,9 +5,9 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/route"
-	chatapp "github.com/gonotelm-lab/gonotelm/internal/application/chat"
-	notebookapp "github.com/gonotelm-lab/gonotelm/internal/application/notebook"
-	sourceapp "github.com/gonotelm-lab/gonotelm/internal/application/source"
+	chatapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat"
+	notebookapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/notebook"
+	sourceapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/source"
 	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/schema"
 	pkgctx "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"

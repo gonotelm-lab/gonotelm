@@ -1,7 +1,7 @@
 package schema
 
 import (
-	notebookapp "github.com/gonotelm-lab/gonotelm/internal/application/notebook"
+	notebookapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/notebook"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 

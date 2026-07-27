@@ -46,7 +46,7 @@ func run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	app, err := bootstrap.NewApp(ctx, conf.NotelmGlobal())
+	app, err := bootstrap.NewNotelm(ctx, conf.NotelmGlobal())
 	if err != nil {
 		return err
 	}

@@ -3,7 +3,7 @@ package schema
 import (
 	"math"
 
-	chatagent "github.com/gonotelm-lab/gonotelm/internal/application/chat/agent"
+	chatagent "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/agent"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )

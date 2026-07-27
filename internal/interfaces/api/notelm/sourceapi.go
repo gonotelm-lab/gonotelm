@@ -5,7 +5,7 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/route"
-	sourceapp "github.com/gonotelm-lab/gonotelm/internal/application/source"
+	sourceapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/source"
 	sourcevo "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity/vo"
 	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/schema"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"

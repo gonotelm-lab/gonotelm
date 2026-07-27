@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	flowworker "github.com/gonotelm-lab/flow/client/worker"
-	artifactgeneration "github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/generate"
-	generatetypes "github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/generate/types"
+	artifactgeneration "github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact"
+	generatetypes "github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	bootshared "github.com/gonotelm-lab/gonotelm/internal/bootstrap/shared"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	infrarepo "github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository"

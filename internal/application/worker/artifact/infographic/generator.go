@@ -13,7 +13,7 @@ import (
 
 	"github.com/gabriel-vasile/mimetype"
 
-	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/generate/types"
+	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"

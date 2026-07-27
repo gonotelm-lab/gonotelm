@@ -8,7 +8,7 @@ import (
 
 	"github.com/bytedance/sonic"
 	flowschema "github.com/gonotelm-lab/flow/api/schema/v1"
-	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/generate"
+	"github.com/gonotelm-lab/gonotelm/internal/application/shared/contract"
 	"github.com/gonotelm-lab/gonotelm/internal/core/event"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
@@ -137,9 +137,9 @@ func TestSyncer_PollOne_ReachesTerminalAndStops(t *testing.T) {
 	a := makeSyncArtifact(artifactentity.StatusPending, "ft-1")
 	repo := newSyncTestRepo(a)
 
-	// The flow task result is a marshaled generate.WorkerOutput.
+	// The flow task result is a marshaled contract.WorkerOutput.
 	innerResult := []byte("mindmap content")
-	out := generate.WorkerOutput{
+	out := contract.WorkerOutput{
 		Title:      "test title",
 		Result:     innerResult,
 		ResultKind: "inline",
@@ -173,7 +173,7 @@ func TestSyncer_PollOne_ReachesTerminalAndStops(t *testing.T) {
 }
 
 func TestSyncer_GlobalScan_CatchesPendingArtifacts(t *testing.T) {
-	out := generate.WorkerOutput{
+	out := contract.WorkerOutput{
 		Title:      "scanned title",
 		Result:     []byte("scanned result"),
 		ResultKind: "inline",

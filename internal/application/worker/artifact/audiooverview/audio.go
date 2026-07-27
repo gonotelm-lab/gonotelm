@@ -15,7 +15,7 @@ import (
 	audioutil "github.com/gonotelm-lab/multimodal/audio/util"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/generate/types"
+	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"

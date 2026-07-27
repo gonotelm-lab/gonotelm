@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/bytedance/sonic"
-	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/generate/infographic"
+	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/infographic"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

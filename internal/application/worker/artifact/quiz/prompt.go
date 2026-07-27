@@ -1,21 +1,21 @@
-package flashcard
+package quiz
 
 import (
 	"context"
 	_ "embed"
 	"fmt"
 
-	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/generate/types"
+	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 
 	"github.com/cloudwego/eino/components/prompt"
 	einoschema "github.com/cloudwego/eino/schema"
 )
 
-//go:embed flashcard.jinja
-var flashcardPromptContent string
+//go:embed quiz.jinja
+var quizPromptContent string
 
-var flashcardTpl = prompt.FromMessages(einoschema.Jinja2, einoschema.SystemMessage(flashcardPromptContent))
+var quizTpl = prompt.FromMessages(einoschema.Jinja2, einoschema.SystemMessage(quizPromptContent))
 
 type RenderVars struct {
 	SourceIds  []string
@@ -33,27 +33,27 @@ func (v RenderVars) promptVars() map[string]any {
 	}
 }
 
-func RenderFlashcard(
+func RenderQuiz(
 	ctx context.Context,
 	sourceIds []string,
-	count artifactentity.FlashcardCount,
-	difficulty artifactentity.FlashcardDifficulty,
+	count artifactentity.QuizCount,
+	difficulty artifactentity.QuizDifficulty,
 	tip string,
 ) ([]*einoschema.Message, error) {
 	if !count.Supported() {
-		count = artifactentity.FlashcardCountDefaultValue()
+		count = artifactentity.QuizCountDefaultValue()
 	}
 	if !difficulty.Supported() {
-		difficulty = artifactentity.FlashcardDifficultyDefault()
+		difficulty = artifactentity.QuizDifficultyDefault()
 	}
-	msgs, err := flashcardTpl.Format(ctx, RenderVars{
+	msgs, err := quizTpl.Format(ctx, RenderVars{
 		SourceIds:  sourceIds,
 		Count:      count.String(),
 		Difficulty: difficulty.String(),
 		Tip:        tip,
 	}.promptVars())
 	if err != nil {
-		return nil, fmt.Errorf("render flashcard prompt: %w", err)
+		return nil, fmt.Errorf("render quiz prompt: %w", err)
 	}
 	return msgs, nil
 }

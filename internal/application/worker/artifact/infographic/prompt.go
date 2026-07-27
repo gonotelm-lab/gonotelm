@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/generate/types"
+	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 
 	"github.com/cloudwego/eino/components/prompt"
 	einoschema "github.com/cloudwego/eino/schema"

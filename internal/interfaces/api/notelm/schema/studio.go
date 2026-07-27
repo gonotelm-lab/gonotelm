@@ -1,8 +1,8 @@
 package schema
 
 import (
-	audiooverview "github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/generate/audiooverview"
-	infographic "github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/generate/infographic"
+	audiooverview "github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/audiooverview"
+	infographic "github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/infographic"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"

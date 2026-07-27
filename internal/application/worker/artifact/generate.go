@@ -1,16 +1,16 @@
-package generate
+package artifact
 
 import (
 	"context"
 
-	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/generate/audiooverview"
-	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/generate/datatable"
-	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/generate/flashcard"
-	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/generate/infographic"
-	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/generate/mindmap"
-	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/generate/quiz"
-	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/generate/report"
-	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/generate/types"
+	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/audiooverview"
+	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/datatable"
+	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/flashcard"
+	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/infographic"
+	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/mindmap"
+	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/quiz"
+	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/report"
+	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )

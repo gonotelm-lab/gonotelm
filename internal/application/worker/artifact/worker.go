@@ -1,4 +1,4 @@
-package generate
+package artifact
 
 import (
 	"context"
@@ -7,7 +7,8 @@ import (
 	"log/slog"
 
 	flowworker "github.com/gonotelm-lab/flow/client/worker"
-	generatetypes "github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/generate/types"
+	"github.com/gonotelm-lab/gonotelm/internal/application/shared/contract"
+	generatetypes "github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -16,23 +17,8 @@ import (
 	"github.com/bytedance/sonic"
 )
 
-type WorkerInput struct {
-	ArtifactId string          `json:"artifact_id"`
-	NotebookId string          `json:"notebook_id"`
-	UserId     string          `json:"user_id"`
-	SourceIds  []string        `json:"source_ids"`
-	Kind       string          `json:"kind"`
-	Payload    json.RawMessage `json:"payload"`
-}
-
-type WorkerOutput struct {
-	Title      string `json:"title"`
-	Result     []byte `json:"result"`
-	ResultKind string `json:"result_kind"`
-}
-
 func RegisterTypedWorker(client *flowworker.Client, deps *generatetypes.ServiceDeps) {
-	flowworker.RegisterTypedResult(client, func(ctx context.Context, in WorkerInput) (flowworker.Result, error) {
+	flowworker.RegisterTypedResult(client, func(ctx context.Context, in contract.WorkerInput) (flowworker.Result, error) {
 		kind := artifactentity.Kind(in.Kind)
 		if !kind.Supported() {
 			return paramErrorResult("unsupported artifact kind: %s", kind), nil
@@ -80,7 +66,7 @@ func RegisterTypedWorker(client *flowworker.Client, deps *generatetypes.ServiceD
 			}, nil
 		}
 
-		data, err := sonic.Marshal(WorkerOutput{
+		data, err := sonic.Marshal(contract.WorkerOutput{
 			Title:      resp.Title,
 			Result:     resp.Result,
 			ResultKind: string(resp.ResultKind),

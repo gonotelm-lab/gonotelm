@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/bytedance/sonic"
-	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/generate/infographic"
+	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/infographic"
 )
 
 func extractStoreKey(result []byte) string {

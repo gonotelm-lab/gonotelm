@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/bytedance/sonic"
-	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/generate"
+	"github.com/gonotelm-lab/gonotelm/internal/application/shared/contract"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
@@ -56,7 +56,7 @@ func (s *Syncer) pollOnce(ctx context.Context, artifactId valobj.Id) (done bool,
 	}
 	switch newStatus {
 	case artifactentity.StatusCompleted:
-		var out generate.WorkerOutput
+		var out contract.WorkerOutput
 		if err := sonic.Unmarshal(info.Result, &out); err != nil {
 			return false, err
 		}

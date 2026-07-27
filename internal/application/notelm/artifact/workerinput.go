@@ -3,13 +3,13 @@ package artifact
 import (
 	"encoding/json"
 
-	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/generate"
+	"github.com/gonotelm-lab/gonotelm/internal/application/shared/contract"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 )
 
-func buildWorkerInput(artifact *artifactentity.Artifact, payload json.RawMessage) generate.WorkerInput {
-	return generate.WorkerInput{
+func buildWorkerInput(artifact *artifactentity.Artifact, payload json.RawMessage) contract.WorkerInput {
+	return contract.WorkerInput{
 		ArtifactId: artifact.Id.String(),
 		NotebookId: artifact.NotebookId.String(),
 		UserId:     artifact.UserId,

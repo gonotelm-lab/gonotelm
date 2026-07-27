@@ -1,10 +1,10 @@
-package generate
+package artifact
 
 import (
 	"context"
 	"testing"
 
-	generatetypes "github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/generate/types"
+	generatetypes "github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 )
 

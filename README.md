@@ -20,9 +20,9 @@ GoNoteLM is an AI-powered learning and knowledge-management platform. Create not
 ### Core Capabilities
 
 - **Notebooks** — Organize study materials into notebooks.
-- **Source Ingestion** — Add text, URLs, or upload files (PDF, Markdown, EPUB, Word) for AI processing.
+- **Source Ingestion** — Add text, URLs, or upload files (PDF, Markdown, EPUB, Word, CSV, XLSX) for AI processing.
 - **Agentic RAG Chat** — Multi-turn conversations with AI that can search, read, cite, and analyze your sources in real-time. Supports streaming responses, thinking mode, and multiple chat styles.
-- **AI Studio** — Generate 6 types of learning artifacts from your sources: Mindmap, Report, Infographic, Audio Overview, Flashcard, and Quiz.
+- **AI Studio** — Generate learning artifacts from your sources: Mindmap, Report, Infographic, Audio Overview, Flashcard, Quiz, and DataTable. You can also save an assistant chat reply as a Note artifact.
 
 ## Studio Showcase
 
@@ -55,6 +55,14 @@ GoNoteLM is an AI-powered learning and knowledge-management platform. Create not
         <img src="docs/readme/studio-audiooverview.png" alt="Studio Audio Overview" width="320" /><br />
         <sub>Audio Overview</sub>
       </td>
+    </tr>
+    <tr>
+      <td align="center" valign="top">
+        <img src="docs/readme/studio-datatable.png" alt="Studio Data Table" width="320" /><br />
+        <sub>Data Table</sub>
+      </td>
+      <td></td>
+      <td></td>
     </tr>
   </tbody>
 </table>

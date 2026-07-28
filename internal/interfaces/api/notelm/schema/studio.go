@@ -71,6 +71,27 @@ type ArtifactTaskIdRequest struct {
 	TaskId uuid.UUID `path:"id,required"`
 }
 
+type UpdateArtifactTarget string
+
+const (
+	UpdateArtifactTargetTitle UpdateArtifactTarget = "title"
+)
+
+type UpdateArtifactRequest struct {
+	Id     uuid.UUID            `path:"id,required"`
+	Target UpdateArtifactTarget `json:"target,required"`
+	Title  string               `json:"title"`
+}
+
+func (r *UpdateArtifactRequest) Validate() error {
+	switch r.Target {
+	case UpdateArtifactTargetTitle:
+		return nil
+	default:
+		return errors.ErrParams.Msgf("unsupported update target: %s", r.Target)
+	}
+}
+
 type GetArtifactStatusResponse struct {
 	TaskId string                `json:"task_id"`
 	Status artifactentity.Status `json:"status"`

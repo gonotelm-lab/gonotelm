@@ -1,12 +1,17 @@
 package entity
 
 import (
+	"strings"
+
 	"github.com/gonotelm-lab/gonotelm/internal/core/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifacterrors "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/errors"
 	artifactevent "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/event"
+	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
+
+const MaxTitleLength = 128
 
 type Kind string
 
@@ -174,6 +179,18 @@ func (a *Artifact) Retry(newFlowTaskId string) error {
 		return artifacterrors.ErrCannotRetryInState
 	}
 	a.MarkRetrying(newFlowTaskId)
+	return nil
+}
+
+func (a *Artifact) UpdateTitle(title string) error {
+	if !a.Status.Completed() {
+		return artifacterrors.ErrCannotUpdateTitleInState
+	}
+	next := strings.TrimSpace(title)
+	next = pkgstring.TruncateRune(next, MaxTitleLength)
+	a.Title = next
+	a.UpdateTime = valobj.NewTime()
+
 	return nil
 }
 

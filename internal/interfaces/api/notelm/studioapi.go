@@ -25,6 +25,8 @@ func (s *Server) registerStudioRoutes(g *route.RouterGroup) {
 		artifactGroup.GET("/status", s.GetStudioArtifactStatus)
 		// DELETE /api/v1/artifacts/:id
 		artifactGroup.DELETE("", s.DeleteStudioArtifact)
+		// PATCH /api/v1/artifacts/:id
+		artifactGroup.PATCH("", s.UpdateStudioArtifact)
 		// POST /api/v1/artifacts/:id/retry
 		artifactGroup.POST("/retry", s.RetryStudioArtifactTask)
 		// POST /api/v1/artifacts/:id/cancel
@@ -208,6 +210,34 @@ func (s *Server) DeleteStudioArtifact(ctx context.Context, c *app.RequestContext
 	}
 
 	if err := s.deleteArtifactHandler.Handle(ctx, req.TaskId); err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	http.OkResp(c, nil)
+}
+
+func (s *Server) UpdateStudioArtifact(ctx context.Context, c *app.RequestContext) {
+	var req schema.UpdateArtifactRequest
+	if err := c.BindAndValidate(&req); err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	var target artifactapp.UpdateTarget
+	switch req.Target {
+	case schema.UpdateArtifactTargetTitle:
+		target = artifactapp.UpdateTargetTitle
+	default:
+		http.ErrResp(c, errors.ErrParams.Msgf("unsupported update target: %s", req.Target))
+		return
+	}
+
+	if err := s.updateArtifactHandler.Handle(ctx, &artifactapp.UpdateCommand{
+		ArtifactId: req.Id,
+		Target:     target,
+		Title:      req.Title,
+	}); err != nil {
 		http.ErrResp(c, err)
 		return
 	}

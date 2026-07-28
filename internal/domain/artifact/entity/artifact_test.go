@@ -1,7 +1,9 @@
 package entity
 
 import (
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifacterrors "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/errors"
@@ -184,6 +186,31 @@ func TestArtifactRetry_EmitsEvent(t *testing.T) {
 	require.NoError(t, a.Retry("ft-2"))
 	events := a.PullEvents()
 	require.Len(t, events, 1)
+}
+
+func TestArtifactUpdateTitle(t *testing.T) {
+	t.Run("completed trims and allows empty", func(t *testing.T) {
+		a := newTestArtifact(t)
+		a.MarkCompleted([]byte("r"), ResultKindInline, "old")
+		require.NoError(t, a.UpdateTitle("  hello  "))
+		assert.Equal(t, "hello", a.Title)
+		require.NoError(t, a.UpdateTitle("   "))
+		assert.Equal(t, "", a.Title)
+	})
+
+	t.Run("truncates to MaxTitleLength runes", func(t *testing.T) {
+		a := newTestArtifact(t)
+		a.MarkCompleted([]byte("r"), ResultKindInline, "old")
+		long := strings.Repeat("中", MaxTitleLength+5)
+		require.NoError(t, a.UpdateTitle(long))
+		assert.Equal(t, MaxTitleLength, utf8.RuneCountInString(a.Title))
+	})
+
+	t.Run("rejects non-completed", func(t *testing.T) {
+		a := newTestArtifact(t)
+		err := a.UpdateTitle("x")
+		assert.ErrorIs(t, err, artifacterrors.ErrCannotUpdateTitleInState)
+	})
 }
 
 func newTestArtifact(t *testing.T) *Artifact {

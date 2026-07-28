@@ -145,6 +145,7 @@ func NewServer(
 			deps.WaitGroup,
 			deps.ArtifactRepo,
 			deps.NotebookRepo,
+			deps.SourceRepo,
 			deps.ChatRepo,
 			deps.MessageRepo,
 			deps.FlowClient,

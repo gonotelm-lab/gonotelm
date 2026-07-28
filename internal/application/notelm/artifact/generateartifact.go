@@ -12,6 +12,7 @@ import (
 	chatentity "github.com/gonotelm-lab/gonotelm/internal/domain/chat/entity"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
+	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
@@ -45,6 +46,7 @@ type GenerateArtifactHandler struct {
 	chatMsgRepo  chatrepo.MessageRepository
 	chatRepo     chatrepo.Repository
 	notebookRepo notebookrepo.Repository
+	sourceRepo   sourcerepo.Repository
 	flow         flow.TaskClient
 	poller       Poller
 	eventBus     eventbus.EventBus
@@ -55,6 +57,7 @@ func NewGenerateArtifactHandler(
 	wg *sync.WaitGroup,
 	artifactRepo artifactrepo.Repository,
 	notebookRepo notebookrepo.Repository,
+	sourceRepo sourcerepo.Repository,
 	chatRepo chatrepo.Repository,
 	chatMsgRepo chatrepo.MessageRepository,
 	flowc flow.TaskClient,
@@ -66,6 +69,7 @@ func NewGenerateArtifactHandler(
 		wg:           wg,
 		artifactRepo: artifactRepo,
 		notebookRepo: notebookRepo,
+		sourceRepo:   sourceRepo,
 		chatRepo:     chatRepo,
 		chatMsgRepo:  chatMsgRepo,
 		flow:         flowc,
@@ -91,7 +95,47 @@ func (h *GenerateArtifactHandler) Handle(ctx context.Context, cmd *GenerateReque
 		return h.saveAsNote(ctx, cmd, userId)
 	}
 
+	filteredIds, err := h.filterReadySources(ctx, cmd.NotebookId, cmd.SourceIds)
+	if err != nil {
+		return nil, errors.WithMessagef(err,
+			"failed to filter ready sources, notebook_id=%s, source_ids=%v",
+			cmd.NotebookId, cmd.SourceIds,
+		)
+	}
+	cmd.SourceIds = filteredIds
+
 	return h.beginArtifactTask(ctx, cmd, userId)
+}
+
+func (h *GenerateArtifactHandler) filterReadySources(
+	ctx context.Context,
+	notebookId valobj.Id,
+	sourceIds []valobj.Id,
+) ([]valobj.Id, error) {
+	if len(sourceIds) == 0 {
+		return nil, errors.ErrParams.Msgf("no sources provided, notebook_id=%s, source_ids=%v", notebookId, sourceIds)
+	}
+
+	sources, err := h.sourceRepo.GetByNotebookIdAndIds(ctx, notebookId, sourceIds)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "failed to get sources, notebook_id=%s, source_ids=%v", notebookId, sourceIds)
+	}
+
+	ids := make([]valobj.Id, 0, len(sources))
+	for _, s := range sources {
+		// filter status
+		if !s.Status.IsReady() {
+			continue
+		}
+
+		ids = append(ids, s.Id)
+	}
+
+	if len(ids) == 0 {
+		return nil, errors.ErrParams.Msgf("no ready sources found, notebook_id=%s, source_ids=%v", notebookId, sourceIds)
+	}
+
+	return ids, nil
 }
 
 func (r *GenerateRequest) buildPayload() (artifactentity.Payload, error) {

@@ -178,12 +178,20 @@ func (h *CreateMessageHandler) filterReadySources(
 	if err != nil {
 		return nil, errors.WithMessagef(err, "failed to get sources, notebook_id=%s, source_ids=%v", notebookId, sourceIds)
 	}
-
-	if len(sources) == 0 {
-		return nil, errors.ErrParams.Msgf("no sources found, notebook_id=%s, source_ids=%v", notebookId, sourceIds)
+	
+	// filter status
+	readySources := make([]*sourceentity.Source, 0, len(sources))
+	for _, source := range sources {
+		if source.Status.IsReady() {
+			readySources = append(readySources, source)
+		}
 	}
 
-	return sources, nil
+	if len(sources) == 0 {
+		return nil, errors.ErrParams.Msgf("no ready sources found, notebook_id=%s, source_ids=%v", notebookId, sourceIds)
+	}
+
+	return readySources, nil
 }
 
 type streamTaskBundle struct {

@@ -3,9 +3,9 @@ package notelm
 import (
 	"context"
 
+	artifacteventhandle "github.com/gonotelm-lab/gonotelm/internal/application/notelm/artifact/eventhandle"
 	chateventhandle "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/eventhandle"
 	sourceeventhandle "github.com/gonotelm-lab/gonotelm/internal/application/notelm/source/eventhandle"
-	studioeventhandle "github.com/gonotelm-lab/gonotelm/internal/application/notelm/studio/eventhandle"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
@@ -73,8 +73,8 @@ func registerNotebookDeletedConsumers(ctx context.Context, deps *EventDeps) erro
 		return err
 	}
 
-	return studioeventhandle.RegisterNotebookDeletedConsumer(ctx,
+	return artifacteventhandle.RegisterNotebookDeletedConsumer(ctx,
 		deps.EventBus,
-		studioeventhandle.NewDeleteNotebookArtifactTasksHandler(deps.ArtifactTaskRepo),
+		artifacteventhandle.NewDeleteNotebookArtifactTasksHandler(deps.ArtifactTaskRepo),
 	)
 }

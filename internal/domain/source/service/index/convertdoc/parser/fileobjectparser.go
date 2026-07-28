@@ -11,6 +11,7 @@ import (
 	"github.com/cloudwego/eino/schema"
 	epubparser "github.com/gonotelm-lab/gonotelm/pkg/eino-ext/parser/epub"
 	pdfparser "github.com/gonotelm-lab/gonotelm/pkg/eino-ext/parser/pdf"
+	xlsxparser "github.com/gonotelm-lab/gonotelm/pkg/eino-ext/parser/xlsx"
 )
 
 type FileObjectParser struct{}
@@ -71,6 +72,13 @@ func (p *FileObjectParser) parseByMime(
 				OutputFormat: epubparser.OutputFormatMarkdown,
 				ToPages:      false,
 			}),
+			opts...,
+		)
+	case entity.MimeTypeXLSX:
+		return parseByDocParser(
+			ctx,
+			r,
+			xlsxparser.NewXLSXParser(nil),
 			opts...,
 		)
 	}

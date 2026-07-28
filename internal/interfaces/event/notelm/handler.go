@@ -6,7 +6,6 @@ import (
 	chateventhandle "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/eventhandle"
 	sourceeventhandle "github.com/gonotelm-lab/gonotelm/internal/application/notelm/source/eventhandle"
 	studioeventhandle "github.com/gonotelm-lab/gonotelm/internal/application/notelm/studio/eventhandle"
-	adapterdefine "github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
@@ -26,33 +25,15 @@ type EventDeps struct {
 	ArtifactTaskRepo   artifactrepo.Repository
 
 	EventBus eventbus.EventBus
-
-	Summarizer adapterdefine.Summarizer
 }
 
 func Init(ctx context.Context, deps *EventDeps) {
-	if err := registerSourceConsumers(ctx, deps); err != nil {
-		panic(err)
-	}
 	if err := registerSourceInnerConsumers(ctx, deps); err != nil {
 		panic(err)
 	}
 	if err := registerNotebookDeletedConsumers(ctx, deps); err != nil {
 		panic(err)
 	}
-}
-
-func registerSourceConsumers(ctx context.Context, deps *EventDeps) error {
-	return sourceeventhandle.RegisterPreparationConsumer(ctx,
-		deps.EventBus,
-		sourceeventhandle.NewPrepareSourceHandler(
-			deps.SourceRepo,
-			deps.SourceStorageRepo,
-			deps.SourceDocRepo,
-			deps.Summarizer,
-			deps.EventBus,
-		),
-	)
 }
 
 func registerSourceInnerConsumers(ctx context.Context, deps *EventDeps) error {

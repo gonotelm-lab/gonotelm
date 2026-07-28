@@ -76,13 +76,13 @@ func (s *Service) IndexSource(
 	ctx context.Context,
 	source *entity.Source,
 ) (*IndexSourceResult, error) {
-	slog.DebugContext(ctx, "now indexing source, first converting...", slog.String("source_id", source.Id.String()))
-	result, err := s.convertSource(ctx, source)
+	slog.DebugContext(ctx, "now indexing source, converting...", slog.String("source_id", source.Id.String()))
+	handleResult, err := s.convertSource(ctx, source)
 	if err != nil {
 		return nil, errors.WithMessage(err, "convert source failed")
 	}
 
-	estimatedToken := token.Estimate(pkgstring.FromBytes(result.ParsedContent))
+	estimatedToken := token.Estimate(pkgstring.FromBytes(handleResult.ParsedContent))
 	if estimatedToken > entity.MaxSourceTextContentToken {
 		return nil, errors.Wrapf(domainerr.ErrSourceContentTooLong, "estimated token is %d", estimatedToken)
 	}
@@ -91,11 +91,6 @@ func (s *Service) IndexSource(
 		slog.String("source_id", source.Id.String()),
 		slog.Int("estimated_token", estimatedToken),
 	)
-
-	handleResult, err := s.convertSource(ctx, source)
-	if err != nil {
-		return nil, errors.WithMessage(err, "convert source failed")
-	}
 
 	sourceDocs := make([]*entity.SourceDoc, 0, len(handleResult.Docs))
 	for idx, doc := range handleResult.Docs {
@@ -118,8 +113,8 @@ func (s *Service) IndexSource(
 
 	return &IndexSourceResult{
 		SourceDocs:        sourceDocs,
-		ParsedContent:     result.ParsedContent,
-		ParsedContentType: result.ParsedContentType,
+		ParsedContent:     handleResult.ParsedContent,
+		ParsedContentType: handleResult.ParsedContentType,
 	}, nil
 }
 

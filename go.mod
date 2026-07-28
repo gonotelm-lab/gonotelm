@@ -8,7 +8,7 @@ require (
 	github.com/a8m/envsubst v1.4.2
 	github.com/allegro/bigcache/v3 v3.1.0
 	github.com/bytedance/sonic v1.15.0
-	github.com/cloudwego/eino v0.8.11
+	github.com/cloudwego/eino v0.9.13
 	github.com/cloudwego/eino-ext/components/document/parser/docx v0.0.0-20260424065505-3b3b8b5db0d0
 	github.com/cloudwego/eino-ext/components/document/transformer/splitter/html v0.0.0-20260424065505-3b3b8b5db0d0
 	github.com/cloudwego/eino-ext/components/document/transformer/splitter/recursive v0.0.0-20260424065505-3b3b8b5db0d0
@@ -171,6 +171,8 @@ require (
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.55.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
+	github.com/richardlehane/mscfb v1.0.7 // indirect
+	github.com/richardlehane/msoleps v1.0.6 // indirect
 	github.com/rogpeppe/go-internal v1.15.0 // indirect
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/sagikazarmark/locafero v0.4.0 // indirect
@@ -194,6 +196,7 @@ require (
 	github.com/tidwall/gjson v1.17.1 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
+	github.com/tiendc/go-deepcopy v1.7.2 // indirect
 	github.com/tinylib/msgp v1.6.1 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
@@ -207,6 +210,9 @@ require (
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2 // indirect
+	github.com/xuri/efp v0.0.1 // indirect
+	github.com/xuri/excelize/v2 v2.11.0 // indirect
+	github.com/xuri/nfp v0.0.2-0.20250530014748-2ddeb826f9a9 // indirect
 	github.com/yargevad/filepathx v1.0.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.3 // indirect
 	go.etcd.io/bbolt v1.3.8 // indirect

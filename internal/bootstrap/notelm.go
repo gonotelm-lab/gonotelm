@@ -87,12 +87,6 @@ func NewNotelm(ctx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outErr e
 
 	// ── 4. Adapters ──
 
-	summarizer := adapter.NewSummarizer(
-		infra.LLMGateway,
-		cfg.Source.ModelProvider,
-		cfg.Source.Model,
-	)
-
 	titleMaker := adapter.NewTitleMaker(
 		infra.LLMGateway,
 		cfg.Source.ModelProvider,
@@ -141,7 +135,6 @@ func NewNotelm(ctx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outErr e
 		ContextMessageRepo: contextMsgRepo,
 		ArtifactTaskRepo:   artifactRepo,
 		EventBus:           bus,
-		Summarizer:         summarizer,
 	})
 
 	// ── 10. HTTP Server ──

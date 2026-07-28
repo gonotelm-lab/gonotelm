@@ -9,7 +9,7 @@ import (
 
 // CompositeEventBus routes publish by event category:
 //   - inner -> in-process handlers (notebook.deleted, source.index, source.deleted, ...)
-//   - outer -> MQ (source.preparation only)
+//   - outer -> MQ (source.preparation only; consumed by cmd/sourcejob)
 //
 // Subscribe registers outer (MQ) consumers; use SubscribeInner for in-process consumers.
 type CompositeEventBus struct {
@@ -38,7 +38,7 @@ func (b *CompositeEventBus) Publish(ctx context.Context, evt event.Event) error 
 	}
 }
 
-// Subscribe registers an outer (MQ) consumer. Only source.preparation uses this path today.
+// Subscribe registers an outer (MQ) consumer. source.preparation is consumed by cmd/sourcejob.
 func (b *CompositeEventBus) Subscribe(
 	ctx context.Context,
 	topic, groupID string,

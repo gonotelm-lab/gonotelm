@@ -1,4 +1,4 @@
-package eventhandle
+package prepare
 
 import (
 	"context"
@@ -39,7 +39,7 @@ func NewPrepareSourceHandler(
 	summarizer adapter.Summarizer,
 	eventBus eventbus.EventBus,
 ) *PrepareSourceHandler {
-	handler := &PrepareSourceHandler{
+	return &PrepareSourceHandler{
 		sourceRepo:         sourceRepo,
 		sourceIndexService: index.New(index.ServiceConfig{}, sourceStorageRepo, sourceDocRepo),
 		sourceStorageRepo:  sourceStorageRepo,
@@ -47,8 +47,6 @@ func NewPrepareSourceHandler(
 		summarizer:         summarizer,
 		eventBus:           eventBus,
 	}
-
-	return handler
 }
 
 func (h *PrepareSourceHandler) Handle(
@@ -73,7 +71,6 @@ func (h *PrepareSourceHandler) Handle(
 				slog.String("stack", string(debug.Stack())),
 			)
 
-			// 本次处理失败
 			targetSource.MarkFailed()
 			if err := h.sourceRepo.Save(ctx, targetSource); err != nil {
 				slog.ErrorContext(ctx, "save source failed after panic",
@@ -84,9 +81,7 @@ func (h *PrepareSourceHandler) Handle(
 		}
 	}()
 
-	// 开始处理对来源进行处理 执行构建索引等操作
 	if isPreparationRetry(env) {
-		// clear existing indices
 		if err := h.sourceDocRepo.BatchDeleteBySourceId(
 			ctx,
 			targetSource.NotebookId,
@@ -98,7 +93,6 @@ func (h *PrepareSourceHandler) Handle(
 			)
 		}
 
-		// clear existing indices
 		if err := h.sourceStorageRepo.DeleteObject(ctx, targetSource.ParsedContentKey); err != nil {
 			slog.ErrorContext(ctx, "delete parsed content failed",
 				slog.String("source_id", sourceId.String()),
@@ -116,7 +110,6 @@ func (h *PrepareSourceHandler) Handle(
 		return errors.WithMessagef(err, "upload parsed content failed, source_id=%s", evt.Id)
 	}
 
-	// update abstract
 	if err := h.updateSourceAbstract(ctx, targetSource, result); err != nil {
 		slog.ErrorContext(ctx, "update source abstract failed",
 			slog.String("source_id", evt.Id.String()),
@@ -148,7 +141,6 @@ func (h *PrepareSourceHandler) uploadParsedContent(
 	source *entity.Source,
 	result *index.IndexSourceResult,
 ) error {
-	// 上传解析完成的文档内容
 	source.UploadParsedContent()
 	source.MarkReady()
 	if err := h.sourceStorageRepo.UploadObject(
@@ -189,7 +181,6 @@ func (h *PrepareSourceHandler) updateSourceAbstract(
 		newChunks = newChunks[:maxSummarizedChunk]
 	}
 
-	// newChunks中每个元素都生成一份摘要
 	chunkSummaries, err := batch.ParallelMap(
 		ctx,
 		newChunks,
@@ -209,7 +200,6 @@ func (h *PrepareSourceHandler) updateSourceAbstract(
 		return errors.WithMessagef(err, "generate summary failed, source_id=%s", source.Id.String())
 	}
 
-	// 给每个chunk的summary组合后再输出一句summary 作为整个source的summary
 	summarizingTexts := strings.Join(chunkSummaries, "\n")
 	summary, err := h.summarizer.Summarize(ctx, summarizingTexts)
 	if err != nil {
@@ -221,7 +211,7 @@ func (h *PrepareSourceHandler) updateSourceAbstract(
 	return nil
 }
 
-// RegisterPreparationConsumer registers the only outer (MQ) consumer.
+// RegisterPreparationConsumer registers the outer (MQ) consumer for source preparation.
 func RegisterPreparationConsumer(
 	ctx context.Context,
 	bus eventbus.EventBus,

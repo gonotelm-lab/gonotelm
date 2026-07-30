@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/url"
 
+	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
@@ -12,6 +13,7 @@ import (
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 )
 
 type CreateSourceHandler struct {
@@ -45,6 +47,12 @@ func (h *CreateSourceHandler) Handle(
 	cmd *CreateSourceHandleCommand,
 ) (valobj.Id, error) {
 	var newId valobj.Id
+	if cmd.Kind.IsUrl() && cmd.Url != nil {
+		if err := checkURLBlacklist(cmd.Url); err != nil {
+			return newId, err
+		}
+	}
+
 	curNotebook, err := h.notebookRepo.FindById(ctx, cmd.NotebookId)
 	if err != nil {
 		return newId, errors.WithMessage(err, "get notebook failed")
@@ -68,6 +76,14 @@ func (h *CreateSourceHandler) Handle(
 		return newId, errors.WithMessage(err, "create source failed")
 	}
 
+	var sourceTitle string
+	if newSource.Kind.IsText() {
+		sourceTitle = pkgstring.TruncateRune(cmd.Text, 64)
+	} else if newSource.Kind.IsUrl() {
+		sourceTitle = pkgstring.TruncateRune(cmd.Url.String(), sourceentity.MaxSourceTitleLength)
+	}
+	newSource.UpdateTitle(sourceTitle)
+
 	err = h.sourceRepo.Save(ctx, newSource)
 	if err != nil {
 		return newId, errors.WithMessage(err, "save source failed")
@@ -87,4 +103,13 @@ func (h *CreateSourceHandler) Handle(
 	}
 
 	return newSource.Id, nil
+}
+
+func checkURLBlacklist(u *url.URL) error {
+	blacklistRegex := conf.NotelmGlobal().Source.GetURLBlacklistRegex()
+	if blacklistRegex.MatchString(u.String()) {
+		return errors.ErrParams.Msgf("url not allowed: %s", u.String())
+	}
+
+	return nil
 }

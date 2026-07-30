@@ -39,7 +39,10 @@ func GetChunkSplitMethodOption(opts ...document.TransformerOption) string {
 
 func ResolveChunkSplitMethodByMime(mimeType string) string {
 	switch mimeType {
-	case entity.MimeTypePDF, entity.MimeTypeWord, entity.MimeTypeEPUB:
+	case entity.MimeTypePDF,
+		entity.MimeTypeWord,
+		entity.MimeTypeEPUB,
+		entity.MimeTypeXLSX:
 		return ChunkMarkdownSplitMethod
 	default:
 		return ChunkRecursiveSplitMethod

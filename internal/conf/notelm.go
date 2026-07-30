@@ -3,7 +3,6 @@ package conf
 import (
 	"fmt"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/conf/shared"
@@ -14,12 +13,7 @@ import (
 	"github.com/a8m/envsubst"
 )
 
-var (
-	notelmGlobal  *NotelmConfig
-	workerGlobal  *WorkerConfig
-	setNotelmOnce sync.Once
-	setWorkerOnce sync.Once
-)
+var notelmGlobal *NotelmConfig
 
 type NotelmConfig struct {
 	shared.InfraConfig
@@ -91,19 +85,9 @@ func LoadNotelmConfig(path string) (*NotelmConfig, error) {
 	cfg.applyDefaults()
 
 	notelmGlobal = cfg
-	return cfg, nil
-}
+	notelmGlobal.Source.init()
 
-func LoadWorkerConfig(path string) (*WorkerConfig, error) {
-	cfg := &WorkerConfig{}
-	if err := loadTOML(path, cfg); err != nil {
-		return nil, err
-	}
-
-	cfg.applyDefaults()
-
-	workerGlobal = cfg
-	return cfg, nil
+	return notelmGlobal, nil
 }
 
 func (c *NotelmConfig) applyDefaults() {
@@ -125,35 +109,6 @@ func (c *NotelmConfig) applyDefaults() {
 	}
 }
 
-func (c *WorkerConfig) applyDefaults() {
-	c.InfraConfig.ApplyDefaults()
-	c.Logging.ApplyDefaults()
-	c.Flow.ApplyDefaults()
-
-	if c.Worker.MaxConcurrency <= 0 {
-		c.Worker.MaxConcurrency = 4
-	}
-	if c.Worker.Heartbeat == 0 {
-		c.Worker.Heartbeat = 5 * time.Second
-	}
-}
-
 func NotelmGlobal() *NotelmConfig {
 	return notelmGlobal
-}
-
-func SetNotelmGlobal(cfg *NotelmConfig) {
-	setNotelmOnce.Do(func() {
-		notelmGlobal = cfg
-	})
-}
-
-func WorkerGlobal() *WorkerConfig {
-	return workerGlobal
-}
-
-func SetWorkerGlobal(cfg *WorkerConfig) {
-	setWorkerOnce.Do(func() {
-		workerGlobal = cfg
-	})
 }

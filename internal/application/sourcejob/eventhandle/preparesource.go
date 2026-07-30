@@ -1,4 +1,4 @@
-package prepare
+package eventhandle
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
+	sourceerr "github.com/gonotelm-lab/gonotelm/internal/domain/source/errors"
 	sourceevent "github.com/gonotelm-lab/gonotelm/internal/domain/source/event"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/service/index"
@@ -58,8 +59,17 @@ func (h *PrepareSourceHandler) Handle(
 
 	targetSource, err := h.sourceRepo.FindById(ctx, sourceId)
 	if err != nil {
+		if errors.Is(err, sourceerr.ErrSourceNotFound) {
+			return nil
+		}
+
 		return errors.WithMessagef(err, "find source failed, source_id=%s", evt.Id)
 	}
+
+	if targetSource.Status.IsReady() {
+		return nil
+	}
+
 	slog.DebugContext(ctx, "received and handling source preparation event",
 		slog.String("source_id", sourceId.String()),
 	)
@@ -103,11 +113,38 @@ func (h *PrepareSourceHandler) Handle(
 
 	result, err := h.sourceIndexService.IndexSource(ctx, targetSource)
 	if err != nil {
-		return errors.WithMessagef(err, "index source failed, source_id=%s", evt.Id)
+		slog.ErrorContext(ctx, "index source failed",
+			slog.String("source_id", sourceId.String()),
+			slog.Any("err", err),
+		)
+
+		targetSource.MarkFailed()
+		if saveErr := h.sourceRepo.Save(ctx, targetSource); saveErr != nil {
+			slog.ErrorContext(ctx, "save source failed status failed",
+				slog.String("source_id", sourceId.String()),
+				slog.Any("err", saveErr),
+			)
+		}
+
+		// 失败不要返回err 否则会导致无法提交
+		return nil
 	}
 
 	if err := h.uploadParsedContent(ctx, targetSource, result); err != nil {
-		return errors.WithMessagef(err, "upload parsed content failed, source_id=%s", evt.Id)
+		slog.ErrorContext(ctx, "upload parsed content failed",
+			slog.String("source_id", sourceId.String()),
+			slog.Any("err", err),
+		)
+
+		targetSource.MarkFailed()
+		if saveErr := h.sourceRepo.Save(ctx, targetSource); saveErr != nil {
+			slog.ErrorContext(ctx, "save source failed status failed",
+				slog.String("source_id", sourceId.String()),
+				slog.Any("err", saveErr),
+			)
+		}
+
+		return nil
 	}
 
 	if err := h.updateSourceAbstract(ctx, targetSource, result); err != nil {
@@ -118,7 +155,12 @@ func (h *PrepareSourceHandler) Handle(
 	}
 
 	if err := h.sourceRepo.Save(ctx, targetSource); err != nil {
-		return errors.WithMessagef(err, "save source failed after index, source_id=%s", evt.Id)
+		slog.ErrorContext(ctx, "save source failed after index",
+			slog.String("source_id", sourceId.String()),
+			slog.Any("err", err),
+		)
+
+		return nil
 	}
 
 	for _, domainEvent := range targetSource.PullEvents() {

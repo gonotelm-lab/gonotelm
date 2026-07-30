@@ -61,9 +61,11 @@ rerankProvider = "${GONOTELM_RERANK_PROVIDER:-dashscope}"
 rerankTopN = ${GONOTELM_CHAT_RERANK_TOP_N:-30}
 rerankModel = "${GONOTELM_CHAT_RERANK_MODEL:-qwen3-rerank}"
 
+
 [source]
 modelProvider = "${GONOTELM_SOURCE_PROVIDER:-qwen}"
 model = "${GONOTELM_SOURCE_MODEL:-qwen3.5-27b}"
+urlBlacklistRegex = "${GONOTELM_SOURCE_URL_BLACKLIST_REGEX:-(127\\.0\\.0\\.1|localhost)}"
 
 [source.bizCache]
 eviction = "${GONOTELM_SOURCE_BIZCACHE_EVICTION:-15m}"

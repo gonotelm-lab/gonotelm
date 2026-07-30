@@ -3,7 +3,7 @@ package sourcejob
 import (
 	"context"
 
-	"github.com/gonotelm-lab/gonotelm/internal/application/sourcejob/prepare"
+	"github.com/gonotelm-lab/gonotelm/internal/application/sourcejob/eventhandle"
 	adapterdefine "github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
@@ -18,9 +18,9 @@ type EventDeps struct {
 }
 
 func Init(ctx context.Context, deps *EventDeps) {
-	if err := prepare.RegisterPreparationConsumer(ctx,
+	if err := eventhandle.RegisterPreparationConsumer(ctx,
 		deps.EventBus,
-		prepare.NewPrepareSourceHandler(
+		eventhandle.NewPrepareSourceHandler(
 			deps.SourceRepo,
 			deps.SourceStorageRepo,
 			deps.SourceDocRepo,

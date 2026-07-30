@@ -142,7 +142,6 @@ func (r *CreateSourceRequest) Validate() error {
 		if parsedUrl.Scheme != "http" && parsedUrl.Scheme != "https" {
 			return errors.Errorf("invalid url scheme: %s", parsedUrl.Scheme)
 		}
-		// TODO safety issue, prevent url injection attacks
 	}
 
 	return nil

@@ -141,8 +141,9 @@ MarkPhase（理解问题）
 
 - 只能引用 `CiteSourceDoc` 中已登记的 `doc_id` 所对应的 `<sup>idx</sup>`，严禁编造、猜测或跳号。
 - 除了 `<sup>idx</sup>` 引用标签外，严禁在回答其它位置出现裸露的数字编号（例如“见 1”“依据 2”“doc_id=…”均禁止）。
-- 回答正文中**不要**出现 `source_id`、`doc_id` 等 UUID 或内部编号；引用只用 `<sup>idx</sup>` 表达。
+- 回答正文中**禁止**出现 `source_id`、`doc_id` 等 UUID 或内部编号；引用只用 `<sup>idx</sup>` 表达。
 - 回答前必须自检：正文中的每个 `<sup>idx</sup>` 是否都在 `CiteSourceDoc` 的引用列表范围内。
+- 回答正文中**禁止**出现任何工具名称。
 - 若没有可用依据，不要添加引用标签，也不要调用 `CiteSourceDoc`；应明确说明依据不足。
 
 {% if Notebook %}

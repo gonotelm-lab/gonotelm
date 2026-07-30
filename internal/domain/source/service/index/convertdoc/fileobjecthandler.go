@@ -33,7 +33,7 @@ func NewFileObjectHandler(c HandlerConfig, objGetter repository.FileObjectGetter
 	}
 }
 
-func (e *FileObjectHandler) Handle(
+func (h *FileObjectHandler) Handle(
 	ctx context.Context,
 	src *entity.Source,
 	opts ...HandleOption,
@@ -43,7 +43,7 @@ func (e *FileObjectHandler) Handle(
 		return nil, errors.Wrap(err, "get file content failed")
 	}
 
-	objBody, ok, err := e.loadObjectBody(ctx, fs.StoreKey)
+	objBody, ok, err := h.loadObjectBody(ctx, fs.StoreKey)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func (e *FileObjectHandler) Handle(
 	}
 
 	parseOpts, transformOpts := fileConversionOptions(fs)
-	docs, converted, err := e.baseHandler.doHandle(
+	docs, converted, err := h.baseHandler.doHandle(
 		ctx,
 		src,
 		bytes.NewReader(objBody),
@@ -84,8 +84,8 @@ func fileConversionOptions(fs *entity.FileSourceContent) ([]einoparser.Option, [
 	return parseOpts, transformOpts
 }
 
-func (e *FileObjectHandler) loadObjectBody(ctx context.Context, storeKey string) ([]byte, bool, error) {
-	objBody, size, err := e.objectStorage.GetObject(ctx, storeKey)
+func (h *FileObjectHandler) loadObjectBody(ctx context.Context, storeKey string) ([]byte, bool, error) {
+	objBody, size, err := h.objectStorage.GetObject(ctx, storeKey)
 	if err != nil {
 		if errors.Is(err, repository.ErrObjectNotFound) {
 			slog.ErrorContext(ctx, "file source object not found", "store_key", storeKey)
@@ -95,7 +95,7 @@ func (e *FileObjectHandler) loadObjectBody(ctx context.Context, storeKey string)
 		return nil, false, errors.Wrap(err, "get file source object failed")
 	}
 
-	if size > e.c.MaxSourceFileSizeBytes {
+	if size > h.c.MaxSourceFileSizeBytes {
 		return nil, false, errors.ErrParams.Msgf("file source object size exceeds max size, size=%d", size)
 	}
 

@@ -1,16 +1,11 @@
 package conf
 
 import (
-	"sync"
-
 	"github.com/gonotelm-lab/gonotelm/internal/conf/shared"
 	mqimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
 )
 
-var (
-	sourceJobGlobal  *SourceJobConfig
-	setSourceJobOnce sync.Once
-)
+var sourceJobGlobal *SourceJobConfig
 
 // SourceJobConfig is the config for cmd/sourcejob (source preparation consumer).
 type SourceJobConfig struct {
@@ -49,10 +44,4 @@ func (c *SourceJobConfig) applyDefaults() {
 
 func SourceJobGlobal() *SourceJobConfig {
 	return sourceJobGlobal
-}
-
-func SetSourceJobGlobal(cfg *SourceJobConfig) {
-	setSourceJobOnce.Do(func() {
-		sourceJobGlobal = cfg
-	})
 }

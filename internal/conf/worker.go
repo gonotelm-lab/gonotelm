@@ -1,6 +1,8 @@
 package conf
 
 import (
+	"regexp"
+	"sync"
 	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/conf/shared"
@@ -9,6 +11,8 @@ import (
 	text2audio "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio"
 	text2image "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image"
 )
+
+var workerGlobal *WorkerConfig
 
 const (
 	DefaultMaxRound              = 30
@@ -77,14 +81,28 @@ func (c *ChatConfig) GetRerankTopN() int {
 	return c.RerankTopN
 }
 
+var sourceUrlBlacklistRegex *regexp.Regexp
+
 type SourceConfig struct {
 	ModelProvider llm.Provider `toml:"modelProvider"`
 	Model         string       `toml:"model"`
+
+	UrlBlacklistRegex string `toml:"urlBlacklistRegex"`
 
 	BizCache struct {
 		Eviction time.Duration `toml:"eviction"`
 		MaxMB    int           `toml:"maxMB"`
 	} `toml:"bizCache"`
+}
+
+func (c *SourceConfig) init() {
+	sync.OnceFunc(func() {
+		sourceUrlBlacklistRegex = regexp.MustCompile(c.UrlBlacklistRegex)
+	})()
+}
+
+func (c *SourceConfig) GetURLBlacklistRegex() *regexp.Regexp {
+	return sourceUrlBlacklistRegex
 }
 
 type StudioConfig struct {
@@ -141,4 +159,33 @@ type StudioConfig struct {
 		NumOfWorkGroup     int           `toml:"numOfWorkGroup"`
 		NumWorkersPerGroup int           `toml:"numWorkersPerGroup"`
 	} `toml:"taskConfig"`
+}
+
+func LoadWorkerConfig(path string) (*WorkerConfig, error) {
+	cfg := &WorkerConfig{}
+	if err := loadTOML(path, cfg); err != nil {
+		return nil, err
+	}
+
+	cfg.applyDefaults()
+
+	workerGlobal = cfg
+	return cfg, nil
+}
+
+func (c *WorkerConfig) applyDefaults() {
+	c.InfraConfig.ApplyDefaults()
+	c.Logging.ApplyDefaults()
+	c.Flow.ApplyDefaults()
+
+	if c.Worker.MaxConcurrency <= 0 {
+		c.Worker.MaxConcurrency = 4
+	}
+	if c.Worker.Heartbeat == 0 {
+		c.Worker.Heartbeat = 5 * time.Second
+	}
+}
+
+func WorkerGlobal() *WorkerConfig {
+	return workerGlobal
 }

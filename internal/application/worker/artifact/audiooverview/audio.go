@@ -413,7 +413,10 @@ func (a *Generator) synthesizePendingTurns(
 				)
 			}
 
-			reader, err := audioutil.ResolveResponse(resp, audioutil.WithResolveContext(gctx))
+			reader, err := audioutil.ResolveResponse(resp,
+				audioutil.WithResolveContext(gctx),
+				audioutil.WithResolveHttpClient(a.downloadClient),
+			)
 			if err != nil {
 				slog.ErrorContext(gctx, "[audio] turn resolve response failed",
 					slog.Int("turn_index", i),

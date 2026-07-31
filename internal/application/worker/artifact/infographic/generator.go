@@ -9,7 +9,9 @@ import (
 	_ "image/png"
 	"io"
 	"log/slog"
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gabriel-vasile/mimetype"
 
@@ -20,6 +22,7 @@ import (
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/httpclient"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 
 	"github.com/bytedance/sonic"
@@ -34,13 +37,17 @@ import (
 )
 
 type Generator struct {
-	deps *types.ServiceDeps
+	deps           *types.ServiceDeps
+	downloadClient *http.Client
 }
 
 var _ types.Generator = &Generator{}
 
 func New(deps *types.ServiceDeps) *Generator {
-	return &Generator{deps: deps}
+	return &Generator{
+		deps:           deps,
+		downloadClient: httpclient.NewBuilder(nil).WithTimeout(5 * time.Minute).Build(),
+	}
 }
 
 type infoGraphicExpectation struct {
@@ -266,7 +273,10 @@ func (ig *Generator) generateAndStoreImage(
 		return nil, errors.Wrapf(err, "text2image generate failed")
 	}
 
-	imageReader, err := t2iutil.ResolveResponse(resp, t2iutil.WithResolveContext(ctx))
+	imageReader, err := t2iutil.ResolveResponse(resp,
+		t2iutil.WithResolveContext(ctx),
+		t2iutil.WithResolveHttpClient(ig.downloadClient),
+	)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "resolve generated image failed")
 	}

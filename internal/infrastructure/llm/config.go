@@ -7,6 +7,7 @@ import (
 	"github.com/cloudwego/eino-ext/components/model/openai"
 	"github.com/cloudwego/eino-ext/components/model/qwen"
 	"github.com/gonotelm-lab/gonotelm/pkg/eino-ext/model/agnes"
+	"github.com/gonotelm-lab/gonotelm/pkg/httpclient"
 )
 
 type Provider string
@@ -49,6 +50,7 @@ func (c *OpenAIChatConfig) ToEino() *openai.ChatModelConfig {
 	return &openai.ChatModelConfig{
 		APIKey:              c.ApiKey,
 		Timeout:             c.Timeout,
+		HTTPClient:          httpclient.NewBuilder(nil).WithTimeout(c.Timeout).Build(),
 		BaseURL:             c.BaseUrl,
 		Model:               c.Model,
 		MaxCompletionTokens: c.MaxTokens,
@@ -80,6 +82,7 @@ func (c *QwenChatConfig) ToEino() *qwen.ChatModelConfig {
 	return &qwen.ChatModelConfig{
 		APIKey:           c.ApiKey,
 		Timeout:          c.Timeout,
+		HTTPClient:       httpclient.NewBuilder(nil).WithTimeout(c.Timeout).Build(),
 		BaseURL:          c.BaseUrl,
 		Model:            c.Model,
 		MaxTokens:        c.MaxTokens,
@@ -114,6 +117,7 @@ func (c *DeepSeekChatConfig) ToEino() *deepseek.ChatModelConfig {
 	dc := &deepseek.ChatModelConfig{
 		APIKey:           c.ApiKey,
 		Timeout:          c.Timeout,
+		HTTPClient:       httpclient.NewBuilder(nil).WithTimeout(c.Timeout).Build(),
 		BaseURL:          c.BaseURL,
 		Path:             c.Path,
 		Model:            c.Model,
@@ -150,6 +154,7 @@ func (c *AgnesChatConfig) ToEino() *agnes.ChatModelConfig {
 	return &agnes.ChatModelConfig{
 		APIKey:              c.ApiKey,
 		Timeout:             c.Timeout,
+		HTTPClient:          httpclient.NewBuilder(nil).WithTimeout(c.Timeout).Build(),
 		BaseURL:             c.BaseUrl,
 		Model:               c.Model,
 		MaxCompletionTokens: c.MaxTokens,

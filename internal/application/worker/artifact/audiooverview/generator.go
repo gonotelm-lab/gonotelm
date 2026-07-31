@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/audiooverview/assets/voices"
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
@@ -18,6 +20,7 @@ import (
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/httpclient"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 
 	"github.com/bytedance/sonic"
@@ -26,13 +29,17 @@ import (
 )
 
 type Generator struct {
-	deps *types.ServiceDeps
+	deps           *types.ServiceDeps
+	downloadClient *http.Client
 }
 
 var _ types.Generator = &Generator{}
 
 func New(deps *types.ServiceDeps) *Generator {
-	return &Generator{deps: deps}
+	return &Generator{
+		deps:           deps,
+		downloadClient: httpclient.NewBuilder(nil).WithTimeout(5 * time.Minute).Build(),
+	}
 }
 
 type podcastOutlineSegment struct {

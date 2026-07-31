@@ -80,6 +80,7 @@ type Server struct {
 	deleteArtifactHandler        *artifactapp.DeleteArtifactHandler
 	retryArtifactHandler         *artifactapp.RetryArtifactHandler
 	updateArtifactHandler        *artifactapp.UpdateArtifactHandler
+	convertNoteToSourceHandler   *artifactapp.ConvertNoteToSourceHandler
 }
 
 func NewServer(
@@ -160,6 +161,13 @@ func NewServer(
 		deleteArtifactHandler:        artifactapp.NewDeleteArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.StorageGateway),
 		retryArtifactHandler:         artifactapp.NewRetryArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.Poller, deps.EventBus),
 		updateArtifactHandler:        artifactapp.NewUpdateArtifactHandler(deps.ArtifactRepo),
+		convertNoteToSourceHandler: artifactapp.NewConvertNoteToSourceHandler(
+			deps.ArtifactRepo,
+			deps.SourceRepo,
+			deps.NotebookRepo,
+			deps.SourceStorageRepo,
+			deps.EventBus,
+		),
 	}
 
 	s.registerRoutes()

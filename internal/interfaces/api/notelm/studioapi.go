@@ -31,6 +31,8 @@ func (s *Server) registerStudioRoutes(g *route.RouterGroup) {
 		artifactGroup.POST("/retry", s.RetryStudioArtifactTask)
 		// POST /api/v1/artifacts/:id/cancel
 		artifactGroup.POST("/cancel", s.CancelStudioArtifactTask)
+		// POST /api/v1/artifacts/:id/convert
+		artifactGroup.POST("/convert", s.ConvertNoteToSource)
 	}
 }
 
@@ -273,6 +275,26 @@ func (s *Server) CancelStudioArtifactTask(ctx context.Context, c *app.RequestCon
 	}
 
 	http.OkResp(c, nil)
+}
+
+func (s *Server) ConvertNoteToSource(ctx context.Context, c *app.RequestContext) {
+	var req schema.ArtifactTaskIdRequest
+	if err := c.BindAndValidate(&req); err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	resp, err := s.convertNoteToSourceHandler.Handle(ctx, &artifactapp.ConvertNoteToSourceCommand{
+		ArtifactId: req.TaskId,
+	})
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	http.OkResp(c, schema.ConvertNoteToSourceResponse{
+		SourceId: resp.SourceId.String(),
+	})
 }
 
 func (s *Server) ListNotebookStudioArtifacts(ctx context.Context, c *app.RequestContext) {

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	pkgt2i "github.com/gonotelm-lab/multimodal/image"
+	"github.com/gonotelm-lab/multimodal/image"
 	"github.com/gonotelm-lab/multimodal/image/agnes"
 	"github.com/gonotelm-lab/multimodal/image/dashscope"
 
@@ -16,8 +16,8 @@ const defaultGenerateTimeout = 30 * time.Minute
 func newText2ImageGenerator(
 	provider Text2ImageProvider,
 	cfg *Text2ImageConfig,
-	opts ...pkgt2i.ClientOption,
-) (pkgt2i.Generator, error) {
+	opts ...image.ClientOption,
+) (image.Generator, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("text2image config must not be nil")
 	}
@@ -32,10 +32,16 @@ func newText2ImageGenerator(
 	}
 }
 
-func withImageHTTPClient(opts []pkgt2i.ClientOption, timeout time.Duration) []pkgt2i.ClientOption {
+func withImageHTTPClient(opts []image.ClientOption, timeout time.Duration) []image.ClientOption {
 	if timeout <= 0 {
 		timeout = defaultGenerateTimeout
 	}
-	client := httpclient.NewBuilder(nil).WithTimeout(timeout).Build()
-	return append(append([]pkgt2i.ClientOption(nil), opts...), pkgt2i.WithHTTPClient(client))
+	builder := httpclient.NewBuilder(nil)
+	client := builder.WithTimeout(timeout).Build()
+
+	newOpts := []image.ClientOption{}
+	newOpts = append(newOpts, opts...)
+	newOpts = append(newOpts, image.WithHTTPClient(client))
+
+	return newOpts
 }

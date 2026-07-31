@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"time"
 
-	audios "github.com/gonotelm-lab/multimodal/audio"
+	"github.com/gonotelm-lab/multimodal/audio"
 	"github.com/gonotelm-lab/multimodal/audio/dashscope"
-	"github.com/gonotelm-lab/multimodal/audio/minimax"
 	"github.com/gonotelm-lab/multimodal/audio/mimo"
+	"github.com/gonotelm-lab/multimodal/audio/minimax"
 
 	"github.com/gonotelm-lab/gonotelm/pkg/httpclient"
 )
@@ -17,8 +17,8 @@ const defaultGenerateTimeout = 30 * time.Minute
 func newText2AudioGenerator(
 	provider Text2AudioProvider,
 	cfg *Text2AudioConfig,
-	opts ...audios.ClientOption,
-) (audios.Generator, error) {
+	opts ...audio.ClientOption,
+) (audio.Generator, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("text2audio config must not be nil")
 	}
@@ -35,10 +35,16 @@ func newText2AudioGenerator(
 	}
 }
 
-func withAudioHTTPClient(opts []audios.ClientOption, timeout time.Duration) []audios.ClientOption {
+func withAudioHTTPClient(opts []audio.ClientOption, timeout time.Duration) []audio.ClientOption {
 	if timeout <= 0 {
 		timeout = defaultGenerateTimeout
 	}
-	client := httpclient.NewBuilder(nil).WithTimeout(timeout).Build()
-	return append(append([]audios.ClientOption(nil), opts...), audios.WithHTTPClient(client))
+	builder := httpclient.NewBuilder(nil)
+	client := builder.WithTimeout(timeout).Build()
+
+	newOpts := []audio.ClientOption{}
+	newOpts = append(newOpts, opts...)
+	newOpts = append(newOpts, audio.WithHTTPClient(client))
+
+	return newOpts
 }

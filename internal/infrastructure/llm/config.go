@@ -1,6 +1,7 @@
 package llm
 
 import (
+	"net/http"
 	"time"
 
 	"github.com/cloudwego/eino-ext/components/model/deepseek"
@@ -82,7 +83,7 @@ func (c *QwenChatConfig) ToEino() *qwen.ChatModelConfig {
 	return &qwen.ChatModelConfig{
 		APIKey:           c.ApiKey,
 		Timeout:          c.Timeout,
-		HTTPClient:       httpclient.NewBuilder(nil).WithTimeout(c.Timeout).Build(),
+		HTTPClient:       newHttpClient(c.Timeout),
 		BaseURL:          c.BaseUrl,
 		Model:            c.Model,
 		MaxTokens:        c.MaxTokens,
@@ -117,7 +118,7 @@ func (c *DeepSeekChatConfig) ToEino() *deepseek.ChatModelConfig {
 	dc := &deepseek.ChatModelConfig{
 		APIKey:           c.ApiKey,
 		Timeout:          c.Timeout,
-		HTTPClient:       httpclient.NewBuilder(nil).WithTimeout(c.Timeout).Build(),
+		HTTPClient:       newHttpClient(c.Timeout),
 		BaseURL:          c.BaseURL,
 		Path:             c.Path,
 		Model:            c.Model,
@@ -154,7 +155,7 @@ func (c *AgnesChatConfig) ToEino() *agnes.ChatModelConfig {
 	return &agnes.ChatModelConfig{
 		APIKey:              c.ApiKey,
 		Timeout:             c.Timeout,
-		HTTPClient:          httpclient.NewBuilder(nil).WithTimeout(c.Timeout).Build(),
+		HTTPClient:          newHttpClient(c.Timeout),
 		BaseURL:             c.BaseUrl,
 		Model:               c.Model,
 		MaxCompletionTokens: c.MaxTokens,
@@ -164,4 +165,13 @@ func (c *AgnesChatConfig) ToEino() *agnes.ChatModelConfig {
 		FrequencyPenalty:    c.FrequencyPenalty,
 		Seed:                c.Seed,
 	}
+}
+
+func newHttpClient(timeout time.Duration) *http.Client {
+	builder := httpclient.NewBuilder(nil)
+	if timeout > 0 {
+		builder = builder.WithTimeout(timeout)
+	}
+
+	return builder.Build()
 }

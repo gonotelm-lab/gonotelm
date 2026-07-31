@@ -85,6 +85,8 @@ func NewSource(
 		return nil, err
 	}
 
+	// 不是文件直接进入可以prepare
+	// 如果是文件 需要MarkPreparing 才能进入prepare
 	if !s.Kind.IsFile() {
 		s.addPreparationEvent(false)
 	}

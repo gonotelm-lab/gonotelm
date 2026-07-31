@@ -97,6 +97,10 @@ type GetArtifactStatusResponse struct {
 	Status artifactentity.Status `json:"status"`
 }
 
+type ConvertNoteToSourceResponse struct {
+	SourceId string `json:"source_id"`
+}
+
 type ListNotebookArtifactsRequest struct {
 	Id     uuid.UUID `path:"id,required"`
 	Limit  int       `query:"limit"`

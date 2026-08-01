@@ -12,13 +12,14 @@ import (
 	sourcevo "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity/vo"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 )
 
 type CreateSourceHandler struct {
-	sourceRepo   sourcerepo.Repository
 	notebookRepo notebookrepo.Repository
+	sourceRepo   sourcerepo.Repository
 	eventBus     eventbus.EventBus
 }
 
@@ -28,8 +29,8 @@ func NewCreateSourceHandler(
 	eventBus eventbus.EventBus,
 ) *CreateSourceHandler {
 	return &CreateSourceHandler{
-		sourceRepo:   sourceRepo,
 		notebookRepo: notebookRepo,
+		sourceRepo:   sourceRepo,
 		eventBus:     eventBus,
 	}
 }
@@ -53,9 +54,13 @@ func (h *CreateSourceHandler) Handle(
 		}
 	}
 
+	userId := pkgcontext.GetUserId(ctx)
 	curNotebook, err := h.notebookRepo.FindById(ctx, cmd.NotebookId)
 	if err != nil {
-		return newId, errors.WithMessage(err, "get notebook failed")
+		return newId, errors.WithMessagef(err, "get notebook failed, notebook_id=%s", cmd.NotebookId)
+	}
+	if curNotebook.OwnerId != userId {
+		return newId, errors.ErrPermission.Msgf("notebook access denied, notebook_id=%s", cmd.NotebookId)
 	}
 
 	if err := curNotebook.AllowedToCreateSource(); err != nil {

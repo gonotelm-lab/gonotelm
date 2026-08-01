@@ -10,7 +10,7 @@ import (
 )
 
 type BatchGetSourceDocsHandler struct {
-	sourceRepo    sourcerepo.Repository
+	*baseHandler
 	sourceDocRepo sourcerepo.SourceDocRepository
 }
 
@@ -19,7 +19,7 @@ func NewBatchGetSourceDocsHandler(
 	sourceDocRepo sourcerepo.SourceDocRepository,
 ) *BatchGetSourceDocsHandler {
 	return &BatchGetSourceDocsHandler{
-		sourceRepo:    sourceRepo,
+		baseHandler:   newBaseHandler(sourceRepo),
 		sourceDocRepo: sourceDocRepo,
 	}
 }
@@ -39,9 +39,9 @@ func (h *BatchGetSourceDocsHandler) Handle(
 	ctx context.Context,
 	cmd *BatchGetSourceDocsHandleQuery,
 ) (*BatchGetSourceDocsHandleResult, error) {
-	source, err := h.sourceRepo.FindById(ctx, cmd.SourceId)
+	source, err := h.handle(ctx, cmd.SourceId)
 	if err != nil {
-		return nil, errors.WithMessagef(err, "find source failed, source_id=%s", cmd.SourceId)
+		return nil, err
 	}
 
 	docs, err := h.sourceDocRepo.BatchFind(ctx, source.NotebookId, source.Id, cmd.DocIds)

@@ -68,19 +68,21 @@ func (s *ChatMessageStoreImpl) GetByIdAndChatId(
 func (s *ChatMessageStoreImpl) ListByChatId(
 	ctx context.Context,
 	chatId database.Id,
-	limit, offset int,
+	limit, offset, orderBy int,
 ) ([]*schema.ChatMessage, error) {
 	if limit <= 0 || offset < 0 {
 		return nil, xerror.ErrParams.Msgf("invalid pagination params: limit=%d offset=%d", limit, offset)
 	}
 
+	query := s.db.WithContext(ctx).Where("chat_id = ?", chatId)
+	if orderBy == 0 {
+		query = query.Order("seq_no DESC")
+	} else {
+		query = query.Order("seq_no ASC")
+	}
+
 	var rows []*schema.ChatMessage
-	err := s.db.WithContext(ctx).
-		Where("chat_id = ?", chatId).
-		Order("seq_no DESC").
-		Limit(limit).
-		Offset(offset).
-		Find(&rows).Error
+	err := query.Limit(limit).Offset(offset).Find(&rows).Error
 	if err != nil {
 		return nil, sql.WrapErr(err)
 	}

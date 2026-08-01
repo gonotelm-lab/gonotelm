@@ -4,9 +4,7 @@ import (
 	"context"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	artifacterrors "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/errors"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
-	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
@@ -21,20 +19,17 @@ type UpdateCommand struct {
 }
 
 type UpdateArtifactHandler struct {
-	repo artifactrepo.Repository
+	*baseHandler
 }
 
 func NewUpdateArtifactHandler(repo artifactrepo.Repository) *UpdateArtifactHandler {
-	return &UpdateArtifactHandler{repo: repo}
+	return &UpdateArtifactHandler{baseHandler: newBaseHandler(repo)}
 }
 
 func (h *UpdateArtifactHandler) Handle(ctx context.Context, cmd *UpdateCommand) error {
-	a, err := h.repo.FindById(ctx, cmd.ArtifactId)
+	a, err := h.handle(ctx, cmd.ArtifactId)
 	if err != nil {
 		return err
-	}
-	if !a.IsOwner(pkgcontext.GetUserId(ctx)) {
-		return artifacterrors.ErrArtifactNotOwnedByUser
 	}
 
 	switch cmd.Target {

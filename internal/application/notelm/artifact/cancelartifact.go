@@ -5,31 +5,26 @@ import (
 	"log/slog"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	artifacterrors "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/errors"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
-	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type CancelArtifactHandler struct {
-	repo     artifactrepo.Repository
+	*baseHandler
 	flowc    flow.TaskClient
 	eventBus eventbus.EventBus
 }
 
 func NewCancelArtifactHandler(repo artifactrepo.Repository, flowc flow.TaskClient, eventBus eventbus.EventBus) *CancelArtifactHandler {
-	return &CancelArtifactHandler{repo: repo, flowc: flowc, eventBus: eventBus}
+	return &CancelArtifactHandler{baseHandler: newBaseHandler(repo), flowc: flowc, eventBus: eventBus}
 }
 
 func (h *CancelArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error {
-	a, err := h.repo.FindById(ctx, cmd)
+	a, err := h.handle(ctx, cmd)
 	if err != nil {
 		return err
-	}
-	if !a.IsOwner(pkgcontext.GetUserId(ctx)) {
-		return artifacterrors.ErrArtifactNotOwnedByUser
 	}
 	flowTaskId := a.FlowTaskId
 	if err := a.Cancel(); err != nil {

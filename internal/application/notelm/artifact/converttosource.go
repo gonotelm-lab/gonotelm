@@ -9,7 +9,6 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
-	artifacterrors "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/errors"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
@@ -30,9 +29,9 @@ type ConvertNoteToSourceResult struct {
 }
 
 type ConvertNoteToSourceHandler struct {
-	artifactRepo artifactrepo.Repository
-	sourceRepo   sourcerepo.Repository
+	*baseHandler
 	notebookRepo notebookrepo.Repository
+	sourceRepo   sourcerepo.Repository
 	storageRepo  sourcerepo.StorageRepository
 	eventBus     eventbus.EventBus
 }
@@ -45,9 +44,9 @@ func NewConvertNoteToSourceHandler(
 	eventBus eventbus.EventBus,
 ) *ConvertNoteToSourceHandler {
 	return &ConvertNoteToSourceHandler{
-		artifactRepo: artifactRepo,
-		sourceRepo:   sourceRepo,
+		baseHandler:  newBaseHandler(artifactRepo),
 		notebookRepo: notebookRepo,
+		sourceRepo:   sourceRepo,
 		storageRepo:  storageRepo,
 		eventBus:     eventBus,
 	}
@@ -59,13 +58,9 @@ func (h *ConvertNoteToSourceHandler) Handle(
 ) (*ConvertNoteToSourceResult, error) {
 	userId := pkgcontext.GetUserId(ctx)
 
-	artifact, err := h.artifactRepo.FindById(ctx, cmd.ArtifactId)
+	artifact, err := h.handle(ctx, cmd.ArtifactId)
 	if err != nil {
-		return nil, errors.WithMessagef(err, "find artifact failed, artifact_id=%s", cmd.ArtifactId)
-	}
-
-	if !artifact.IsOwner(userId) {
-		return nil, artifacterrors.ErrArtifactNotOwnedByUser
+		return nil, err
 	}
 
 	if artifact.Kind != artifactentity.KindNote {
@@ -83,7 +78,10 @@ func (h *ConvertNoteToSourceHandler) Handle(
 
 	nb, err := h.notebookRepo.FindById(ctx, artifact.NotebookId)
 	if err != nil {
-		return nil, errors.WithMessagef(err, "find notebook failed, notebook_id=%s", artifact.NotebookId)
+		return nil, errors.WithMessagef(err, "get notebook failed, notebook_id=%s", artifact.NotebookId)
+	}
+	if nb.OwnerId != userId {
+		return nil, errors.ErrPermission.Msgf("notebook access denied, notebook_id=%s", artifact.NotebookId)
 	}
 
 	if err := nb.AllowedToCreateSource(); err != nil {

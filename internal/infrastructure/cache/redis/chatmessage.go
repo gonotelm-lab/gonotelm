@@ -97,7 +97,39 @@ func (c *ChatMessageContextCacheImpl) ListAll(
 	ctx context.Context,
 	chatId string,
 ) ([]*schema.ChatContextMessage, error) {
-	list, err := c.rd.LRange(ctx, c.keyGenerator(chatId), 0, -1).Result()
+	return c.listRange(ctx, chatId, 0, -1)
+}
+
+func (c *ChatMessageContextCacheImpl) List(
+	ctx context.Context,
+	chatId string,
+	start, limit int,
+) ([]*schema.ChatContextMessage, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+
+	return c.listRange(ctx, chatId, int64(start), int64(start+limit-1))
+}
+
+func (c *ChatMessageContextCacheImpl) ListRecent(
+	ctx context.Context,
+	chatId string,
+	limit int,
+) ([]*schema.ChatContextMessage, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+
+	return c.listRange(ctx, chatId, int64(-limit), -1)
+}
+
+func (c *ChatMessageContextCacheImpl) listRange(
+	ctx context.Context,
+	chatId string,
+	start, stop int64,
+) ([]*schema.ChatContextMessage, error) {
+	list, err := c.rd.LRange(ctx, c.keyGenerator(chatId), start, stop).Result()
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrCache, "list chat context message err: %s", err.Error())
 	}
@@ -106,8 +138,7 @@ func (c *ChatMessageContextCacheImpl) ListAll(
 	for _, item := range list {
 		message, err := decodeChatContextMessage([]byte(item))
 		if err != nil {
-			return nil, errors.Wrapf(errors.ErrSerde,
-				"decode chat context message err: %s", err.Error())
+			return nil, errors.Wrapf(errors.ErrSerde, "decode chat context message err: %s", err.Error())
 		}
 		results = append(results, message)
 	}

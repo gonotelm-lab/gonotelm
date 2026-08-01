@@ -3,7 +3,9 @@ package entity
 import (
 	"time"
 
+	"github.com/gonotelm-lab/gonotelm/internal/core/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	"github.com/gonotelm-lab/gonotelm/internal/domain/chat/event"
 )
 
 type StreamTaskStatus string
@@ -29,23 +31,41 @@ func (s StreamTaskStatus) IsAborted() bool {
 }
 
 type StreamTask struct {
-	Id             valobj.Id
+	entity.Base
+
 	Status         StreamTaskStatus
-	CreateTime     int64
 	ChatId         valobj.Id
+	SourceIds      []valobj.Id
 	UserId         string
 	ExpireDuration time.Duration
 }
 
-func NewStreamTask(chatId valobj.Id, userId string) *StreamTask {
+const (
+	TaskExpireDuration = 5 * time.Minute
+)
+
+func NewStreamTask(chatId valobj.Id, sourceIds []valobj.Id, userId string) *StreamTask {
 	return &StreamTask{
-		Id:             valobj.NewUnOrderedId(),
+		Base:           entity.NewUnOrderedBase(),
 		Status:         StreamTaskStatusRunning,
-		CreateTime:     time.Now().UnixMilli(),
 		ChatId:         chatId,
+		SourceIds:      sourceIds,
 		UserId:         userId,
-		ExpireDuration: 5 * time.Minute, // TODO make this configurable
+		ExpireDuration: TaskExpireDuration,
 	}
+}
+
+func (s *StreamTask) Finish() {
+	s.Status = StreamTaskStatusFinished
+	s.UpdateTime = valobj.NewTime()
+	// add finish event
+	s.AddEvent(event.NewStreamTaskFinishEvent(s.ChatId, s.Id, s.SourceIds))
+}
+
+func (s *StreamTask) Abort() {
+	s.Status = StreamTaskStatusAborted
+	s.UpdateTime = valobj.NewTime()
+	s.AddEvent(event.NewStreamTaskAbortEvent(s.ChatId, s.Id, s.SourceIds))
 }
 
 // Stream Event  Definition

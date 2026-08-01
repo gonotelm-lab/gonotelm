@@ -3,31 +3,27 @@ package artifact
 import (
 	"context"
 
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	artifacterrors "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/errors"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
-	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type DeleteArtifactHandler struct {
-	repo    artifactrepo.Repository
+	*baseHandler
 	flowc   flow.TaskClient
-	storage StorageGateway
+	storage adapter.StorageGateway
 }
 
-func NewDeleteArtifactHandler(repo artifactrepo.Repository, flowc flow.TaskClient, storage StorageGateway) *DeleteArtifactHandler {
-	return &DeleteArtifactHandler{repo: repo, flowc: flowc, storage: storage}
+func NewDeleteArtifactHandler(repo artifactrepo.Repository, flowc flow.TaskClient, storage adapter.StorageGateway) *DeleteArtifactHandler {
+	return &DeleteArtifactHandler{baseHandler: newBaseHandler(repo), flowc: flowc, storage: storage}
 }
 
 func (h *DeleteArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error {
-	a, err := h.repo.FindById(ctx, cmd)
+	a, err := h.handle(ctx, cmd)
 	if err != nil {
 		return err
-	}
-	if !a.IsOwner(pkgcontext.GetUserId(ctx)) {
-		return artifacterrors.ErrArtifactNotOwnedByUser
 	}
 	if !a.IsTerminal() && a.FlowTaskId != "" {
 		if err := h.flowc.Cancel(ctx, a.FlowTaskId); err != nil {

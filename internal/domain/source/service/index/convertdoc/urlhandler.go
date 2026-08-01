@@ -76,7 +76,7 @@ func (h *UrlHandler) Handle(
 		return nil, errors.Wrapf(err, "fetch url content failed, url=%s", urlContent.Url)
 	}
 
-	docs, converted, err :=h.baseHandler.doHandle(
+	docs, converted, err := h.baseHandler.doHandle(
 		ctx,
 		src,
 		bytes.NewReader(content),

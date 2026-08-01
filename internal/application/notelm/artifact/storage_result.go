@@ -5,6 +5,7 @@ import (
 
 	"github.com/bytedance/sonic"
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/infographic"
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 )
 
 func extractStoreKey(result []byte) string {
@@ -15,7 +16,7 @@ func extractStoreKey(result []byte) string {
 	return sr.StoreKey
 }
 
-func materializeStorageResult(ctx context.Context, storage StorageGateway, result []byte) (url string, mime string) {
+func materializeStorageResult(ctx context.Context, storage adapter.StorageGateway, result []byte) (url string, mime string) {
 	if storage == nil || len(result) == 0 {
 		return "", ""
 	}

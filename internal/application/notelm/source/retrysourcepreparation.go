@@ -10,8 +10,8 @@ import (
 )
 
 type RetrySourcePreparationHandler struct {
-	sourceRepo sourcerepo.Repository
-	eventBus   eventbus.EventBus
+	*baseHandler
+	eventBus eventbus.EventBus
 }
 
 func NewRetrySourcePreparationHandler(
@@ -19,15 +19,15 @@ func NewRetrySourcePreparationHandler(
 	eventBus eventbus.EventBus,
 ) *RetrySourcePreparationHandler {
 	return &RetrySourcePreparationHandler{
-		sourceRepo: sourceRepo,
-		eventBus:   eventBus,
+		baseHandler: newBaseHandler(sourceRepo),
+		eventBus:    eventBus,
 	}
 }
 
 func (h *RetrySourcePreparationHandler) Handle(ctx context.Context, sourceId valobj.Id) error {
-	targetSource, err := h.sourceRepo.FindById(ctx, sourceId)
+	targetSource, err := h.handle(ctx, sourceId)
 	if err != nil {
-		return errors.WithMessagef(err, "find source failed, source_id=%s", sourceId)
+		return err
 	}
 
 	err = targetSource.RetryPreparation()

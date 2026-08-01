@@ -9,14 +9,11 @@ import (
 	sourcevo "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity/vo"
 	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/schema"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
-	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
-	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 
 func (s *Server) registerSourcesRoutes(g *route.RouterGroup) {
 	sourceIdGroup := g.Group("/sources/:id")
-	sourceIdGroup.Use(s.checkSourceUserMiddleware)
 	{
 		// GET /api/v1/sources/:id
 		sourceIdGroup.GET("", s.GetSource)
@@ -35,28 +32,6 @@ func (s *Server) registerSourcesRoutes(g *route.RouterGroup) {
 		// GET /api/v1/sources/:id/docs/:doc_id
 		sourceIdGroup.GET("/docs/:doc_id", s.GetSourceDoc)
 	}
-}
-
-func (s *Server) checkSourceUserMiddleware(ctx context.Context, c *app.RequestContext) {
-	sourceId := c.Param("id")
-	if sourceId == "" {
-		http.ErrResp(c, errors.ErrParams.Msgf("source_id is required"))
-		return
-	}
-
-	sid, err := uuid.ParseString(sourceId)
-	if err != nil {
-		http.ErrResp(c, errors.ErrParams.Msgf("invalid source_id: %s", sourceId))
-		return
-	}
-
-	err = s.checkSourceAccessHandler.Handle(ctx, sid)
-	if err != nil {
-		http.ErrResp(c, err)
-		return
-	}
-
-	c.Next(ctx)
 }
 
 func (s *Server) CreateSource(ctx context.Context, c *app.RequestContext) {
@@ -164,7 +139,7 @@ func (s *Server) DeleteSource(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	http.OkResp(c, nil)
+	http.OkRespNoContent(c)
 }
 
 // 获取来源的文档片段

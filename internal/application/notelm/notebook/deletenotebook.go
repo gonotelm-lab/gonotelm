@@ -12,24 +12,24 @@ import (
 )
 
 type DeleteNotebookHandler struct {
-	notebookRepo notebookrepo.Repository
-	eventBus     eventbus.EventBus
+	*baseHandler
+	eventBus eventbus.EventBus
 }
 
 func NewDeleteNotebookHandler(notebookRepo notebookrepo.Repository, eventBus eventbus.EventBus) *DeleteNotebookHandler {
 	return &DeleteNotebookHandler{
-		notebookRepo: notebookRepo,
-		eventBus:     eventBus,
+		baseHandler: newBaseHandler(notebookRepo),
+		eventBus:    eventBus,
 	}
 }
 
 func (h *DeleteNotebookHandler) Handle(ctx context.Context, id valobj.Id) error {
-	n, err := h.notebookRepo.FindById(ctx, id)
+	n, err := h.handle(ctx, id)
 	if err != nil {
 		if errors.Is(err, notebookerrors.ErrNotebookNotFound) {
 			return nil
 		}
-		return errors.WithMessage(err, "get notebook failed")
+		return err
 	}
 
 	n.Delete()

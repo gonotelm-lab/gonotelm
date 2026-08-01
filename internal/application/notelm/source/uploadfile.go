@@ -10,7 +10,7 @@ import (
 )
 
 type PresignUploadFileHandler struct {
-	sourceRepo  sourcerepo.Repository
+	*baseHandler
 	storageRepo sourcerepo.StorageRepository
 }
 
@@ -19,7 +19,7 @@ func NewPresignUploadFileHandler(
 	storageRepo sourcerepo.StorageRepository,
 ) *PresignUploadFileHandler {
 	return &PresignUploadFileHandler{
-		sourceRepo:  sourceRepo,
+		baseHandler: newBaseHandler(sourceRepo),
 		storageRepo: storageRepo,
 	}
 }
@@ -36,9 +36,9 @@ func (h *PresignUploadFileHandler) Handle(
 	ctx context.Context,
 	cmd *PresignUploadFileHandleCommand,
 ) (*sourcerepo.PresignUploadResult, error) {
-	targetSource, err := h.sourceRepo.FindById(ctx, cmd.SourceId)
+	targetSource, err := h.handle(ctx, cmd.SourceId)
 	if err != nil {
-		return nil, errors.WithMessagef(err, "find source failed, source_id=%s", cmd.SourceId)
+		return nil, err
 	}
 
 	err = targetSource.UploadFile(ctx, &sourceentity.UploadFileParams{

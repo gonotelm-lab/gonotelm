@@ -49,9 +49,17 @@ func (e *Event) Headers() []event.Header {
 	return nil
 }
 
-func NewEvent(notebookId valobj.Id, action EventAction) *Event {
+func newEvent(notebookId valobj.Id, action EventAction) *Event {
 	return &Event{
 		notebookId: notebookId,
 		action:     action,
 	}
+}
+
+func NewCreateEvent(notebookId valobj.Id) *Event {
+	return newEvent(notebookId, EventActionCreate)
+}
+
+func NewDeleteEvent(notebookId valobj.Id) *Event {
+	return newEvent(notebookId, EventActionDelete)
 }

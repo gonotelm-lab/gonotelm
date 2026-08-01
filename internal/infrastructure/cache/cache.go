@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache/schema"
-	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -17,14 +16,13 @@ type ChatContextMessageCache interface {
 	Destroy(ctx context.Context, chatId string) error
 	BatchDestroy(ctx context.Context, chatIds []string) error
 	ListAll(ctx context.Context, chatId string) ([]*schema.ChatContextMessage, error)
+	// 从start开始获取limit条 start从0开始
+	List(ctx context.Context, chatId string, start, limit int) ([]*schema.ChatContextMessage, error)
+	// 获取最近的limit条
+	ListRecent(ctx context.Context, chatId string, limit int) ([]*schema.ChatContextMessage, error)
 
 	Override(ctx context.Context, chatId string, messages []*schema.ChatContextMessage) error
 }
-
-var (
-	ErrTaskNotFound = errors.New("task not found")
-	ErrStreamNoData = errors.New("stream no data")
-)
 
 type ChatMessageStreamCache interface {
 	SetTask(ctx context.Context, task *schema.ChatMessageTask) (string, error)
@@ -42,9 +40,16 @@ type ChatMessageStreamCache interface {
 	PullEventStream(ctx context.Context, taskId string, args schema.PullEventStreamArgs) ([]*schema.ChatMessageStreamEvent, error)
 }
 
+type ChatSuggestionCache interface {
+	Set(ctx context.Context, chatId string, suggestion *schema.ChatSuggestion) error
+	Get(ctx context.Context, chatId string) (*schema.ChatSuggestion, error)
+	Delete(ctx context.Context, chatId string) error
+}
+
 type Cache struct {
 	ChatMessageContextCache ChatContextMessageCache
 	ChatMessageStreamCache  ChatMessageStreamCache
+	ChatSuggestionCache     ChatSuggestionCache
 }
 
 var (

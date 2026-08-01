@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	chatentity "github.com/gonotelm-lab/gonotelm/internal/domain/chat/entity"
 	chaterrors "github.com/gonotelm-lab/gonotelm/internal/domain/chat/errors"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
@@ -16,11 +16,16 @@ const defaultStreamTaskTTL = 100 * time.Minute
 
 type AbortStreamHandler struct {
 	streamTaskRepo chatrepo.StreamTaskRepository
+	eventBus       eventbus.EventBus
 }
 
-func NewAbortStreamHandler(streamTaskRepo chatrepo.StreamTaskRepository) *AbortStreamHandler {
+func NewAbortStreamHandler(
+	streamTaskRepo chatrepo.StreamTaskRepository,
+	eventBus eventbus.EventBus,
+) *AbortStreamHandler {
 	return &AbortStreamHandler{
 		streamTaskRepo: streamTaskRepo,
+		eventBus:       eventBus,
 	}
 }
 
@@ -48,10 +53,12 @@ func (h *AbortStreamHandler) Handle(ctx context.Context, cmd *AbortStreamCommand
 		return nil
 	}
 
-	task.Status = chatentity.StreamTaskStatusAborted
+	task.Abort()
 	if err := h.streamTaskRepo.Save(ctx, task); err != nil {
 		return errors.WithMessage(err, "save aborted stream task failed")
 	}
+
+	publishStreamTaskDomainEvents(ctx, h.eventBus, task)
 
 	if err := h.streamTaskRepo.SetStreamTTL(ctx, cmd.TaskId, defaultStreamTaskTTL); err != nil {
 		return errors.WithMessage(err, "set stream task ttl failed")

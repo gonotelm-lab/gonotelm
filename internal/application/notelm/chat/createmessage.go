@@ -4,9 +4,9 @@ import (
 	"context"
 	"log/slog"
 	"sync"
-	"time"
 
 	chatagent "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/agent"
+	"github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/shared"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	chatentity "github.com/gonotelm-lab/gonotelm/internal/domain/chat/entity"
@@ -16,7 +16,8 @@ import (
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/service/agentize"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
+	llmchat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	domainagent "github.com/gonotelm-lab/gonotelm/pkg/agent"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -26,10 +27,10 @@ import (
 )
 
 type CreateMessageHandler struct {
+	*baseHandler
 	wg *sync.WaitGroup
 
 	notebookRepo           notebookrepo.Repository
-	chatRepo               chatrepo.Repository
 	chatMessageRepo        chatrepo.MessageRepository
 	chatContextMessageRepo chatrepo.ContextMessageRepository
 	streamTaskRepo         chatrepo.StreamTaskRepository
@@ -37,7 +38,8 @@ type CreateMessageHandler struct {
 	sourceStorageRepo      sourcerepo.StorageRepository
 	sourceDocRepo          sourcerepo.SourceDocRepository
 	sourceAgentizeService  *agentize.Service
-	gateway                *chat.Gateway
+	chatGateway            *llmchat.Gateway
+	eventBus               eventbus.EventBus
 
 	agentService *agentize.Service
 }
@@ -45,14 +47,15 @@ type CreateMessageHandler struct {
 func NewCreateMessageHandler(
 	wg *sync.WaitGroup,
 	notebookRepo notebookrepo.Repository,
-	chatRepo chatrepo.Repository,
+	chatRepo chatrepo.ChatRepository,
 	chatMessageRepo chatrepo.MessageRepository,
 	chatContextMessageRepo chatrepo.ContextMessageRepository,
 	streamTaskRepo chatrepo.StreamTaskRepository,
 	sourceRepo sourcerepo.Repository,
 	sourceStorageRepo sourcerepo.StorageRepository,
 	sourceDocRepo sourcerepo.SourceDocRepository,
-	gateway *chat.Gateway,
+	chatGateway *llmchat.Gateway,
+	eventBus eventbus.EventBus,
 ) *CreateMessageHandler {
 	sourceAgentizeService := agentize.NewService(
 		agentize.Config{},
@@ -61,9 +64,9 @@ func NewCreateMessageHandler(
 		sourceDocRepo,
 	)
 	return &CreateMessageHandler{
+		baseHandler:            newBaseHandler(chatRepo),
 		wg:                     wg,
 		notebookRepo:           notebookRepo,
-		chatRepo:               chatRepo,
 		chatMessageRepo:        chatMessageRepo,
 		chatContextMessageRepo: chatContextMessageRepo,
 		streamTaskRepo:         streamTaskRepo,
@@ -71,9 +74,9 @@ func NewCreateMessageHandler(
 		sourceStorageRepo:      sourceStorageRepo,
 		sourceDocRepo:          sourceDocRepo,
 		sourceAgentizeService:  sourceAgentizeService,
-		gateway:                gateway,
-
-		agentService: sourceAgentizeService,
+		chatGateway:            chatGateway,
+		eventBus:               eventBus,
+		agentService:           sourceAgentizeService,
 	}
 }
 
@@ -95,22 +98,18 @@ func (h *CreateMessageHandler) Handle(
 	ctx context.Context,
 	cmd *CreateMessageCommand,
 ) (*CreateMessageResult, error) {
-	targetChat, err := h.chatRepo.FindById(ctx, cmd.ChatId)
+	targetChat, err := h.commonHandle(ctx, cmd.ChatId)
 	if err != nil {
-		return nil, errors.WithMessage(err, "find chat failed")
+		return nil, err
 	}
 
-	targetSources, err := h.filterReadySources(ctx, targetChat.NotebookId, cmd.SourceIds)
+	userId := pkgcontext.GetUserId(ctx)
+	targetSources, err := shared.FilterReadySources(ctx, h.sourceRepo, targetChat.NotebookId, cmd.SourceIds, userId)
 	if err != nil {
 		return nil, errors.WithMessagef(err,
 			"failed to filter ready sources, chat_id=%s, source_ids=%v",
 			cmd.ChatId, cmd.SourceIds,
 		)
-	}
-
-	userId := pkgcontext.GetUserId(ctx)
-	if targetChat.OwnerId != userId {
-		return nil, errors.ErrParams.Msgf("chat not belong to user, chat_id=%s", cmd.ChatId)
 	}
 
 	targetNotebook, err := h.notebookRepo.FindById(ctx, targetChat.NotebookId)
@@ -121,7 +120,7 @@ func (h *CreateMessageHandler) Handle(
 	newCtx := context.WithoutCancel(ctx)
 	taskCtx, taskCancel := context.WithCancel(newCtx)
 	// 1. add user task
-	task, eventChan := h.initStreamTask(taskCtx, taskCancel, cmd.ChatId, userId)
+	task, eventChan := h.initStreamTask(taskCtx, taskCancel, cmd.ChatId, cmd.SourceIds, userId)
 	err = h.streamTaskRepo.Save(ctx, task)
 	if err != nil {
 		taskCancel()
@@ -163,35 +162,6 @@ func (h *CreateMessageHandler) Handle(
 		MsgId:  userMsg.Id,
 		TaskId: task.Id,
 	}, nil
-}
-
-func (h *CreateMessageHandler) filterReadySources(
-	ctx context.Context,
-	notebookId valobj.Id,
-	sourceIds []valobj.Id,
-) ([]*sourceentity.Source, error) {
-	if len(sourceIds) == 0 {
-		return nil, nil
-	}
-
-	sources, err := h.sourceRepo.GetByNotebookIdAndIds(ctx, notebookId, sourceIds)
-	if err != nil {
-		return nil, errors.WithMessagef(err, "failed to get sources, notebook_id=%s, source_ids=%v", notebookId, sourceIds)
-	}
-	
-	// filter status
-	readySources := make([]*sourceentity.Source, 0, len(sources))
-	for _, source := range sources {
-		if source.Status.IsReady() {
-			readySources = append(readySources, source)
-		}
-	}
-
-	if len(sources) == 0 {
-		return nil, errors.ErrParams.Msgf("no ready sources found, notebook_id=%s, source_ids=%v", notebookId, sourceIds)
-	}
-
-	return readySources, nil
 }
 
 type streamTaskBundle struct {
@@ -266,7 +236,7 @@ func (h *CreateMessageHandler) beginStreamTask(
 		bundle.cancel()
 	}()
 
-	agt := chatagent.New(h.sourceAgentizeService, h.gateway, h.sourceRepo, h.notebookRepo)
+	agt := chatagent.New(h.sourceAgentizeService, h.chatGateway, h.sourceRepo, h.notebookRepo)
 	slog.Info("start stream task", slog.Any("task_id", taskId), slog.Any("msg_id", msgId))
 
 	// push assistant INIT event before agent run so clients can bind message id early
@@ -346,16 +316,18 @@ func (h *CreateMessageHandler) finishStreamTask(ctx context.Context, taskId valo
 	}
 
 	if task.Status.IsRunning() {
-		task.Status = chatentity.StreamTaskStatusFinished
+		task.Finish()
 		if err := h.streamTaskRepo.Save(ctx, task); err != nil {
 			slog.ErrorContext(ctx, "save finished stream task failed",
 				slog.Any("task_id", taskId),
 				slog.Any("err", err),
 			)
+		} else {
+			publishStreamTaskDomainEvents(ctx, h.eventBus, task)
 		}
 	}
 
-	if err := h.streamTaskRepo.SetStreamTTL(ctx, taskId, 10*time.Minute*10); err != nil {
+	if err := h.streamTaskRepo.SetStreamTTL(ctx, taskId, chatentity.TaskExpireDuration); err != nil {
 		slog.ErrorContext(ctx, "set stream task ttl failed",
 			slog.Any("task_id", taskId),
 			slog.Any("err", err),
@@ -443,9 +415,10 @@ func (h *CreateMessageHandler) initStreamTask(
 	ctx context.Context,
 	cancel context.CancelFunc,
 	chatId valobj.Id,
+	sourceIds []valobj.Id,
 	userId string,
 ) (*chatentity.StreamTask, chan *chatentity.StreamTaskEvent) {
-	task := chatentity.NewStreamTask(chatId, userId)
+	task := chatentity.NewStreamTask(chatId, sourceIds, userId)
 	eventChan := make(chan *chatentity.StreamTaskEvent, 1024)
 
 	h.wg.Go(func() {

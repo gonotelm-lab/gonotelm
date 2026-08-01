@@ -10,7 +10,7 @@ import (
 )
 
 type GetSourceDocHandler struct {
-	sourceRepo    sourcerepo.Repository
+	*baseHandler
 	sourceDocRepo sourcerepo.SourceDocRepository
 }
 
@@ -19,7 +19,7 @@ func NewGetSourceDocHandler(
 	sourceDocRepo sourcerepo.SourceDocRepository,
 ) *GetSourceDocHandler {
 	return &GetSourceDocHandler{
-		sourceRepo:    sourceRepo,
+		baseHandler:   newBaseHandler(sourceRepo),
 		sourceDocRepo: sourceDocRepo,
 	}
 }
@@ -39,9 +39,9 @@ func (h *GetSourceDocHandler) Handle(
 	ctx context.Context,
 	cmd *GetSourceDocHandleQuery,
 ) (*GetSourceDocHandleResult, error) {
-	source, err := h.sourceRepo.FindById(ctx, cmd.SourceId)
+	source, err := h.handle(ctx, cmd.SourceId)
 	if err != nil {
-		return nil, errors.WithMessagef(err, "find source failed, source_id=%s", cmd.SourceId)
+		return nil, err
 	}
 
 	doc, err := h.sourceDocRepo.FindById(ctx, source.NotebookId, source.Id, cmd.DocId)

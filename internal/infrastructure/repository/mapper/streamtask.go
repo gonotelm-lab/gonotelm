@@ -1,6 +1,7 @@
 package mapper
 
 import (
+	coreentity "github.com/gonotelm-lab/gonotelm/internal/core/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/chat/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache/schema"
@@ -13,8 +14,10 @@ func StreamTaskToSchema(task *entity.StreamTask) *schema.ChatMessageTask {
 	return &schema.ChatMessageTask{
 		Id:             task.Id.String(),
 		Status:         task.Status.String(),
-		CreatedAt:      task.CreateTime,
+		CreatedAt:      task.CreateTime.Value(),
+		UpdatedAt:      task.UpdateTime.Value(),
 		ChatId:         task.ChatId.String(),
+		SourceIds:      valobj.IdsToStrings(task.SourceIds),
 		UserId:         task.UserId,
 		ExpireDuration: task.ExpireDuration,
 	}
@@ -31,11 +34,20 @@ func StreamTaskFromSchema(sch *schema.ChatMessageTask) (*entity.StreamTask, erro
 		return nil, err
 	}
 
+	sourceIds, err := valobj.StringsToIds(sch.SourceIds)
+	if err != nil {
+		return nil, err
+	}
+
 	return &entity.StreamTask{
-		Id:             id,
+		Base: coreentity.Base{
+			Id:         id,
+			CreateTime: valobj.NewTimeFrom(sch.CreatedAt),
+			UpdateTime: valobj.NewTimeFrom(sch.UpdatedAt),
+		},
 		Status:         entity.StreamTaskStatus(sch.Status),
-		CreateTime:     sch.CreatedAt,
 		ChatId:         chatId,
+		SourceIds:      sourceIds,
 		UserId:         sch.UserId,
 		ExpireDuration: sch.ExpireDuration,
 	}, nil

@@ -12,24 +12,24 @@ import (
 )
 
 type DeleteSourceHandler struct {
-	sourceRepo sourcerepo.Repository
-	eventBus   eventbus.EventBus
+	*baseHandler
+	eventBus eventbus.EventBus
 }
 
 func NewDeleteSourceHandler(sourceRepo sourcerepo.Repository, eventBus eventbus.EventBus) *DeleteSourceHandler {
 	return &DeleteSourceHandler{
-		sourceRepo: sourceRepo,
-		eventBus:   eventBus,
+		baseHandler: newBaseHandler(sourceRepo),
+		eventBus:    eventBus,
 	}
 }
 
 func (h *DeleteSourceHandler) Handle(ctx context.Context, id valobj.Id) error {
-	targetSource, err := h.sourceRepo.FindById(ctx, id)
+	targetSource, err := h.handle(ctx, id)
 	if err != nil {
 		if errors.Is(err, domainerr.ErrSourceNotFound) {
 			return nil
 		}
-		return errors.WithMessagef(err, "find source failed, source_id=%s", id)
+		return err
 	}
 
 	targetSource.Delete()

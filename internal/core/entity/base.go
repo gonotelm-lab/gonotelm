@@ -39,3 +39,11 @@ func NewBase() Base {
 		UpdateTime: valobj.NewTime(),
 	}
 }
+
+func NewUnOrderedBase() Base {
+	return Base{
+		Id:         valobj.NewUnOrderedId(),
+		CreateTime: valobj.NewTime(),
+		UpdateTime: valobj.NewTime(),
+	}
+}

@@ -10,6 +10,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/pkg/idgen"
 
+	einoschema "github.com/cloudwego/eino/schema"
 	"github.com/vmihailenco/msgpack/v5"
 )
 
@@ -29,6 +30,14 @@ func (r MessageRole) String() string {
 	default:
 		return "unknown"
 	}
+}
+
+func (r MessageRole) IsUser() bool {
+	return r == MessageRoleUser
+}
+
+func (r MessageRole) IsAssistant() bool {
+	return r == MessageRoleAssistant
 }
 
 type Message struct {
@@ -234,6 +243,30 @@ func (m *Message) ConsumeEvents() []*StreamTaskEvent {
 	return events
 }
 
+func (m *Message) IsUserMessage() bool {
+	return m != nil && m.Role.IsUser()
+}
+
+func (m *Message) IsAssistantMessage() bool {
+	return m != nil && m.Role.IsAssistant()
+}
+
+func (m *Message) AsEinoMessage() *einoschema.Message {
+	if m != nil {
+		if m.IsUserMessage() {
+			content := m.lastFragment().GetRequest().GetContent().GetText().GetContent()
+			return einoschema.UserMessage(content)
+		}
+
+		if m.IsAssistantMessage() {
+			content := m.lastFragment().GetResponse().GetContent().GetText().GetContent()
+			return einoschema.AssistantMessage(content, nil)
+		}
+	}
+
+	return nil
+}
+
 // Fragment Definitions
 
 type FragmentType string
@@ -266,6 +299,38 @@ type MessageFragment struct {
 	Think    *FragmentThink    `json:"think,omitempty"`
 	Response *FragmentResponse `json:"response,omitempty"`
 	Phase    *FragmentPhase    `json:"phase,omitempty"`
+}
+
+func (f *MessageFragment) GetRequest() *FragmentRequest {
+	if f != nil {
+		return f.Request
+	}
+
+	return nil
+}
+
+func (f *MessageFragment) GetThink() *FragmentThink {
+	if f != nil {
+		return f.Think
+	}
+
+	return nil
+}
+
+func (f *MessageFragment) GetResponse() *FragmentResponse {
+	if f != nil {
+		return f.Response
+	}
+
+	return nil
+}
+
+func (f *MessageFragment) GetPhase() *FragmentPhase {
+	if f != nil {
+		return f.Phase
+	}
+
+	return nil
 }
 
 func NewMessageFragmentRequest(id int64, s string) *MessageFragment {
@@ -335,6 +400,14 @@ type FragmentRequest struct {
 	Content *FragmentContentUnion `json:"content"`
 }
 
+func (f *FragmentRequest) GetContent() *FragmentContentUnion {
+	if f != nil {
+		return f.Content
+	}
+
+	return nil
+}
+
 func (f *FragmentRequest) AppendText(s string) {
 	f.Content.AppendText(s)
 }
@@ -351,6 +424,14 @@ func (t *FragmentThink) Append(s string) {
 type FragmentResponse struct {
 	Status  FragmentStatus        `json:"status"`
 	Content *FragmentContentUnion `json:"content"`
+}
+
+func (t *FragmentResponse) GetContent() *FragmentContentUnion {
+	if t != nil {
+		return t.Content
+	}
+
+	return nil
 }
 
 func (t *FragmentResponse) AppendText(s string) {
@@ -382,6 +463,14 @@ type FragmentContentUnion struct {
 	Text *FragmentContentUnionText `json:"text"`
 }
 
+func (t *FragmentContentUnion) GetText() *FragmentContentUnionText {
+	if t != nil {
+		return t.Text
+	}
+
+	return nil
+}
+
 func (t *FragmentContentUnion) AppendText(s string) {
 	switch t.Type {
 	case FragmentContentTypeText:
@@ -410,8 +499,12 @@ func (t *FragmentContentUnionText) Append(s string) {
 	t.builder.WriteString(s)
 }
 
-func (t *FragmentContentUnionText) Content() string {
-	return t.builder.String()
+func (t *FragmentContentUnionText) GetContent() string {
+	if t != nil {
+		return t.builder.String()
+	}
+
+	return ""
 }
 
 type fragmentContentTextAlias struct {
@@ -424,7 +517,7 @@ func (t *FragmentContentUnionText) MarshalJSON() ([]byte, error) {
 		return []byte("null"), nil
 	}
 
-	return sonic.Marshal(fragmentContentTextAlias{Content: t.Content()})
+	return sonic.Marshal(fragmentContentTextAlias{Content: t.GetContent()})
 }
 
 func (t *FragmentContentUnionText) UnmarshalJSON(data []byte) error {
@@ -449,7 +542,7 @@ func (t *FragmentContentUnionText) UnmarshalJSON(data []byte) error {
 
 // Implements msgpack.Marshaler and msgpack.Unmarshaler
 func (t *FragmentContentUnionText) MarshalMsgpack() ([]byte, error) {
-	return msgpack.Marshal(fragmentContentTextAlias{Content: t.Content()})
+	return msgpack.Marshal(fragmentContentTextAlias{Content: t.GetContent()})
 }
 
 func (t *FragmentContentUnionText) UnmarshalMsgpack(data []byte) error {

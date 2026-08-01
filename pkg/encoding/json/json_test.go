@@ -10,7 +10,7 @@ type testMindmapPayload struct {
 }
 
 type testPodcastOutline struct {
-	Title    string              `json:"title"`
+	Title    string               `json:"title"`
 	Segments []testOutlineSegment `json:"segments"`
 }
 

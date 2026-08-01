@@ -4,12 +4,12 @@ import (
 	"context"
 
 	flowschema "github.com/gonotelm-lab/flow/api/schema/v1"
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	artifacterrors "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/errors"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
-	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
@@ -26,23 +26,19 @@ type StatusResponse struct {
 }
 
 type GetArtifactStatusHandler struct {
-	repo    artifactrepo.Repository
+	*baseHandler
 	flowc   flow.TaskClient
-	storage StorageGateway
+	storage adapter.StorageGateway
 }
 
-func NewGetArtifactStatusHandler(repo artifactrepo.Repository, flowc flow.TaskClient, storage StorageGateway) *GetArtifactStatusHandler {
-	return &GetArtifactStatusHandler{repo: repo, flowc: flowc, storage: storage}
+func NewGetArtifactStatusHandler(repo artifactrepo.Repository, flowc flow.TaskClient, storage adapter.StorageGateway) *GetArtifactStatusHandler {
+	return &GetArtifactStatusHandler{baseHandler: newBaseHandler(repo), flowc: flowc, storage: storage}
 }
 
 func (h *GetArtifactStatusHandler) Handle(ctx context.Context, cmd *StatusRequest) (*StatusResponse, error) {
-	artifact, err := h.repo.FindById(ctx, cmd.ArtifactId)
+	artifact, err := h.handle(ctx, cmd.ArtifactId)
 	if err != nil {
 		return nil, err
-	}
-	userId := pkgcontext.GetUserId(ctx)
-	if !artifact.IsOwner(userId) {
-		return nil, artifacterrors.ErrArtifactNotOwnedByUser
 	}
 
 	if artifact.IsTerminal() {
@@ -75,20 +71,8 @@ func (h *GetArtifactStatusHandler) Handle(ctx context.Context, cmd *StatusReques
 	return &StatusResponse{Status: mapped, FlowError: string(info.Error)}, nil
 }
 
-func (h *GetArtifactStatusHandler) CheckOwnership(ctx context.Context, artifactId valobj.Id) error {
-	a, err := h.repo.FindById(ctx, artifactId)
-	if err != nil {
-		return err
-	}
-	userId := pkgcontext.GetUserId(ctx)
-	if !a.IsOwner(userId) {
-		return artifacterrors.ErrArtifactNotOwnedByUser
-	}
-	return nil
-}
-
 func (h *GetArtifactStatusHandler) FindById(ctx context.Context, artifactId valobj.Id) (*artifactentity.Artifact, error) {
-	return h.repo.FindById(ctx, artifactId)
+	return h.handle(ctx, artifactId)
 }
 
 func (h *GetArtifactStatusHandler) AttachStorageURL(ctx context.Context, a *artifactentity.Artifact) (url string, mime string) {

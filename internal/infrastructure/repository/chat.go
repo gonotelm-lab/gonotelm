@@ -16,11 +16,11 @@ type ChatRepositoryImpl struct {
 	chatStore database.ChatStore
 }
 
-func NewChatRepository(chatStore database.ChatStore) repository.Repository {
+func NewChatRepository(chatStore database.ChatStore) repository.ChatRepository {
 	return &ChatRepositoryImpl{chatStore: chatStore}
 }
 
-var _ repository.Repository = &ChatRepositoryImpl{}
+var _ repository.ChatRepository = &ChatRepositoryImpl{}
 
 func (r *ChatRepositoryImpl) Save(ctx context.Context, chat *entity.Chat) error {
 	if chat.IsDeleted() {

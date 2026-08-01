@@ -11,13 +11,12 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
-	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 
 const maxUserTipLength = 300
 
 func (s *Server) registerStudioRoutes(g *route.RouterGroup) {
-	artifactGroup := g.Group("/artifacts/:id", s.checkArtifactAccess)
+	artifactGroup := g.Group("/artifacts/:id")
 	{
 		// GET /api/v1/artifacts/:id
 		artifactGroup.GET("", s.GetStudioArtifact)
@@ -34,25 +33,6 @@ func (s *Server) registerStudioRoutes(g *route.RouterGroup) {
 		// POST /api/v1/artifacts/:id/convert
 		artifactGroup.POST("/convert", s.ConvertNoteToSource)
 	}
-}
-
-func (s *Server) checkArtifactAccess(ctx context.Context, c *app.RequestContext) {
-	taskId := c.Param("id")
-	tid, err := uuid.ParseString(taskId)
-	if err != nil {
-		http.ErrResp(c, errors.ErrParams.Msgf("invalid task_id"))
-		c.Abort()
-		return
-	}
-
-	err = s.getArtifactStatusHandler.CheckOwnership(ctx, tid)
-	if err != nil {
-		http.ErrResp(c, err)
-		c.Abort()
-		return
-	}
-
-	c.Next(ctx)
 }
 
 func (s *Server) GenerateStudioArtifact(ctx context.Context, c *app.RequestContext) {
@@ -216,7 +196,7 @@ func (s *Server) DeleteStudioArtifact(ctx context.Context, c *app.RequestContext
 		return
 	}
 
-	http.OkResp(c, nil)
+	http.OkRespNoContent(c)
 }
 
 func (s *Server) UpdateStudioArtifact(ctx context.Context, c *app.RequestContext) {

@@ -25,6 +25,10 @@ type ContextMessageRepository interface {
 	Destroy(ctx context.Context, chatId valobj.Id) error
 	BatchDestroy(ctx context.Context, chatIds []valobj.Id) error
 	ListAll(ctx context.Context, chatId valobj.Id) ([]*entity.ContextMessage, error)
+	// 从start开始获取limit条 start从0开始
+	List(ctx context.Context, chatId valobj.Id, start, limit int) ([]*entity.ContextMessage, error)
+	// 获取最近的limit条
+	ListRecent(ctx context.Context, chatId valobj.Id, limit int) ([]*entity.ContextMessage, error)
 
 	// override existing messages
 	Set(ctx context.Context, chatId valobj.Id, messages []*entity.ContextMessage) error

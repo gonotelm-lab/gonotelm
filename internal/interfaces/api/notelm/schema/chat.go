@@ -86,3 +86,13 @@ type ListChatMessagesResponse struct {
 type DeleteChatContextRequest struct {
 	Id uuid.UUID `path:"id,required"`
 }
+
+type GetChatSuggestionsRequest struct {
+	Id        uuid.UUID   `path:"id,required"`
+	SourceIds []uuid.UUID `query:"source_ids"`
+}
+
+type GetChatSuggestionsResponse struct {
+	Type      string   `json:"type"`
+	Questions []string `json:"questions"`
+}

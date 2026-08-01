@@ -64,6 +64,32 @@ func (r *ContextMessageRepositoryImpl) ListAll(
 	return mapper.ContextMessagesFromSchema(schemas)
 }
 
+func (r *ContextMessageRepositoryImpl) List(
+	ctx context.Context,
+	chatId valobj.Id,
+	start, limit int,
+) ([]*entity.ContextMessage, error) {
+	schemas, err := r.contextCache.List(ctx, chatId.String(), start, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	return mapper.ContextMessagesFromSchema(schemas)
+}
+
+func (r *ContextMessageRepositoryImpl) ListRecent(
+	ctx context.Context,
+	chatId valobj.Id,
+	limit int,
+) ([]*entity.ContextMessage, error) {
+	schemas, err := r.contextCache.ListRecent(ctx, chatId.String(), limit)
+	if err != nil {
+		return nil, err
+	}
+
+	return mapper.ContextMessagesFromSchema(schemas)
+}
+
 func (r *ContextMessageRepositoryImpl) Set(
 	ctx context.Context,
 	chatId valobj.Id,

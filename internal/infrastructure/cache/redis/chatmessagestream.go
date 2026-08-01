@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache"
+	cacheerrors "github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache/errors"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
@@ -70,7 +71,7 @@ func (c *ChatMessageStreamCacheImpl) GetTask(
 	encTask, err := c.rd.Get(ctx, taskCacheKey(taskId)).Result()
 	if err != nil {
 		if errors.Is(err, goredis.Nil) {
-			return nil, cache.ErrTaskNotFound
+			return nil, cacheerrors.ErrTaskNotFound
 		}
 
 		return nil, errors.Wrap(errors.ErrCache, err.Error())
@@ -164,7 +165,7 @@ func (c *ChatMessageStreamCacheImpl) PullEventStream(
 	}).Result()
 	if err != nil {
 		if errors.Is(err, goredis.Nil) {
-			return nil, cache.ErrStreamNoData
+			return nil, cacheerrors.ErrStreamNoData
 		}
 
 		if ctxErr := ctx.Err(); ctxErr != nil {

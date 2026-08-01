@@ -13,16 +13,8 @@ func buildWorkerInput(artifact *artifactentity.Artifact, payload json.RawMessage
 		ArtifactId: artifact.Id.String(),
 		NotebookId: artifact.NotebookId.String(),
 		UserId:     artifact.UserId,
-		SourceIds:  idsToStrings(artifact.Payload.GetSourceIds()),
+		SourceIds:  valobj.IdsToStrings(artifact.Payload.GetSourceIds()),
 		Kind:       string(artifact.Kind),
 		Payload:    payload,
 	}
-}
-
-func idsToStrings(ids []valobj.Id) []string {
-	out := make([]string, len(ids))
-	for i, id := range ids {
-		out[i] = id.String()
-	}
-	return out
 }

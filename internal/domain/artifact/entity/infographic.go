@@ -38,10 +38,10 @@ func InfoGraphicOrientationDefault() InfoGraphicOrientation {
 type InfoGraphicVisualStyle string
 
 const (
-	InfoGraphicVisualStyleDefault    InfoGraphicVisualStyle = "default"
-	InfoGraphicVisualStyleHandDrawn  InfoGraphicVisualStyle = "hand-drawn"
-	InfoGraphicVisualStyleAnime      InfoGraphicVisualStyle = "anime"
-	InfoGraphicVisualStyleCute       InfoGraphicVisualStyle = "cute"
+	InfoGraphicVisualStyleDefault     InfoGraphicVisualStyle = "default"
+	InfoGraphicVisualStyleHandDrawn   InfoGraphicVisualStyle = "hand-drawn"
+	InfoGraphicVisualStyleAnime       InfoGraphicVisualStyle = "anime"
+	InfoGraphicVisualStyleCute        InfoGraphicVisualStyle = "cute"
 	InfoGraphicVisualStyleEducational InfoGraphicVisualStyle = "educational"
 	InfoGraphicVisualStyleMinimal25D  InfoGraphicVisualStyle = "minimal-2.5d"
 )

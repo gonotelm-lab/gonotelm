@@ -51,7 +51,7 @@ func TestChatMessageStoreCreateListDeleteByChatId(t *testing.T) {
 		So(gotByIDAndChatID.Id, ShouldEqual, msgNew.Id)
 		So(gotByIDAndChatID.ChatId, ShouldEqual, chatID)
 
-		listed, err := store.ListByChatId(ctx, chatID, 10, 0)
+		listed, err := store.ListByChatId(ctx, chatID, 10, 0, 0)
 		So(err, ShouldBeNil)
 		So(len(listed), ShouldEqual, 2)
 		So(listed[0].SeqNo, ShouldEqual, msgNew.SeqNo)
@@ -127,17 +127,53 @@ func TestChatMessageStoreListByChatIdPagination(t *testing.T) {
 			_ = testDB.WithContext(ctx).Where("chat_id = ?", chatID).Delete(&schema.ChatMessage{}).Error
 		})
 
-		firstPage, err := store.ListByChatId(ctx, chatID, 1, 0)
+		firstPage, err := store.ListByChatId(ctx, chatID, 1, 0, 0)
 		So(err, ShouldBeNil)
 		So(len(firstPage), ShouldEqual, 1)
 		So(firstPage[0].SeqNo, ShouldEqual, msgNew.SeqNo)
 		So(firstPage[0].MsgRole, ShouldEqual, msgNew.MsgRole)
 
-		secondPage, err := store.ListByChatId(ctx, chatID, 1, 1)
+		secondPage, err := store.ListByChatId(ctx, chatID, 1, 1, 0)
 		So(err, ShouldBeNil)
 		So(len(secondPage), ShouldEqual, 1)
 		So(secondPage[0].SeqNo, ShouldEqual, msgOld.SeqNo)
 		So(secondPage[0].MsgRole, ShouldEqual, msgOld.MsgRole)
+	})
+}
+
+func TestChatMessageStoreListByChatIdOrderAsc(t *testing.T) {
+	Convey("ChatMessageStore list by chat id order asc", t, func() {
+		store := testChatMessageStore
+		ctx := t.Context()
+		chatID := createNotebookForSourceTest(t, testDB)
+		userID := "user_" + uuid.NewV7().String()
+
+		msgOld := &schema.ChatMessage{
+			ChatId:  chatID,
+			UserId:  userID,
+			MsgRole: int8(0),
+			Content: json.RawMessage(`{"text":"old"}`),
+			SeqNo:   1000,
+		}
+		msgNew := &schema.ChatMessage{
+			ChatId:  chatID,
+			UserId:  userID,
+			MsgRole: int8(1),
+			Content: json.RawMessage(`{"text":"new"}`),
+			SeqNo:   2000,
+		}
+
+		So(store.Create(ctx, msgOld), ShouldBeNil)
+		So(store.Create(ctx, msgNew), ShouldBeNil)
+		t.Cleanup(func() {
+			_ = testDB.WithContext(ctx).Where("chat_id = ?", chatID).Delete(&schema.ChatMessage{}).Error
+		})
+
+		rows, err := store.ListByChatId(ctx, chatID, 10, 0, 1)
+		So(err, ShouldBeNil)
+		So(len(rows), ShouldEqual, 2)
+		So(rows[0].SeqNo, ShouldEqual, msgOld.SeqNo)
+		So(rows[1].SeqNo, ShouldEqual, msgNew.SeqNo)
 	})
 }
 
@@ -193,11 +229,11 @@ func TestChatMessageStoreListByChatIdInvalidPagination(t *testing.T) {
 		ctx := t.Context()
 		chatID := uuid.NewV7()
 
-		_, err := store.ListByChatId(ctx, chatID, 0, 0)
+		_, err := store.ListByChatId(ctx, chatID, 0, 0, 0)
 		So(err, ShouldNotBeNil)
 		So(strings.Contains(err.Error(), "invalid pagination params"), ShouldBeTrue)
 
-		_, err = store.ListByChatId(ctx, chatID, 1, -1)
+		_, err = store.ListByChatId(ctx, chatID, 1, -1, 0)
 		So(err, ShouldNotBeNil)
 		So(strings.Contains(err.Error(), "invalid pagination params"), ShouldBeTrue)
 	})

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache"
+	cacheerrors "github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache/errors"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
@@ -132,7 +132,7 @@ func TestChatMessageStreamCache_PullEventStream_WithBlock(t *testing.T) {
 			},
 		)
 		if err != nil {
-			if errors.Is(err, cache.ErrStreamNoData) {
+			if errors.Is(err, cacheerrors.ErrStreamNoData) {
 				break
 			}
 

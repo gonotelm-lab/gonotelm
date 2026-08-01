@@ -53,7 +53,16 @@ func (r *MessageRepositoryImpl) ListByChatId(
 	chatId valobj.Id,
 	spec chatrepo.ListSpec,
 ) ([]*entity.Message, error) {
-	schemas, err := r.messageStore.ListByChatId(ctx, chatId, spec.Limit, spec.Offset)
+	if err := spec.Validate(); err != nil {
+		return nil, err
+	}
+
+	orderBy := 0
+	if spec.Order == chatrepo.ListSpecOrderSeqNoAsc {
+		orderBy = 1
+	}
+
+	schemas, err := r.messageStore.ListByChatId(ctx, chatId, spec.Limit, spec.Offset, orderBy)
 	if err != nil {
 		return nil, err
 	}

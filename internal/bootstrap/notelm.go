@@ -13,15 +13,14 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	flowcli "github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
-	apinotelm "github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm"
+	notelmapi "github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm"
 	eventnotelm "github.com/gonotelm-lab/gonotelm/internal/interfaces/event/notelm"
 )
 
 type Notelm struct {
 	closers []io.Closer
 	wg      *sync.WaitGroup
-	Server  *apinotelm.Server
+	Server  *notelmapi.Server
 }
 
 func (a *Notelm) Close() error {
@@ -39,7 +38,7 @@ func (a *Notelm) Close() error {
 	return nil
 }
 
-func NewNotelm(ctx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outErr error) {
+func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outErr error) {
 	var closers []io.Closer
 	addCloser := func(c io.Closer) { closers = append(closers, c) }
 	defer func() {
@@ -52,7 +51,7 @@ func NewNotelm(ctx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outErr e
 		}
 	}()
 
-	infra, err := bootshared.NewInfra(ctx, &cfg.InfraConfig)
+	infra, err := bootshared.NewInfra(rootCtx, &cfg.InfraConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +60,6 @@ func NewNotelm(ctx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outErr e
 	}
 
 	// ── 2. Repositories ──
-
 	notebookRepo := repository.NewNotebookRepository(infra.DB.NotebookStore, infra.DB.SourceStore)
 	sourceRepo := repository.NewSourceRepository(infra.DB.SourceStore)
 	sourceStorageRepo := repository.NewSourceStorageRepository(infra.Storage)
@@ -78,15 +76,14 @@ func NewNotelm(ctx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outErr e
 	contextMsgRepo := repository.NewContextMessageRepository(infra.Cache.ChatMessageContextCache)
 	artifactRepo := repository.NewArtifactRepository(infra.DB.ArtifactStore)
 	streamTaskRepo := repository.NewStreamTaskRepository(infra.Cache.ChatMessageStreamCache)
+	suggestionRepo := repository.NewSuggestionRepository(infra.Cache.ChatSuggestionCache)
 
 	// ── 3. Event Bus ──
-
 	innerBus := eventbus.NewInnerEventBus()
 	outerBus := eventbus.NewOuterEventBus(infra.MQ)
-	bus := eventbus.NewCompositeEventBus(innerBus, outerBus)
+	eventBus := eventbus.NewCompositeEventBus(innerBus, outerBus)
 
 	// ── 4. Adapters ──
-
 	titleMaker := adapter.NewTitleMaker(
 		infra.LLMGateway,
 		cfg.Source.ModelProvider,
@@ -94,7 +91,6 @@ func NewNotelm(ctx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outErr e
 	)
 
 	// ── 5. Flow task client ──
-
 	flowClient, err := flowcli.NewTaskClient(
 		cfg.Flow.Addr,
 		cfg.Flow.Namespace,
@@ -107,83 +103,71 @@ func NewNotelm(ctx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outErr e
 	addCloser(flowClient)
 
 	// ── 6. Storage gateway adapter ──
-
-	storageGateway := &storageAdapter{store: infra.Storage}
+	storageGateway := adapter.NewStorageGateway(infra.Storage)
 
 	// ── 7. Syncer ──
-
 	syncerCfg := syncerpkg.Config{
 		PerTaskInterval: cfg.Syncer.PerTaskInterval,
 		GlobalInterval:  cfg.Syncer.GlobalInterval,
 		GlobalBatchSize: cfg.Syncer.GlobalBatchSize,
 	}
-	syncerInst := syncerpkg.NewSyncer(artifactRepo, flowClient, syncerCfg, bus)
-	syncerInst.Start(ctx)
+	syncerInst := syncerpkg.NewSyncer(artifactRepo, flowClient, syncerCfg, eventBus)
+	syncerInst.Start(rootCtx)
 	addCloser(&syncerCloser{syncerInst})
 
-	// ── 8. Use cases ──
+	// ── 8. Event handler registration ──
+	eventnotelm.Init(rootCtx, &eventnotelm.EventDeps{
+		RootCtx: rootCtx,
 
-	// ── 9. Event handler registration ──
+		NotebookRepo: notebookRepo,
 
-	eventnotelm.Init(ctx, &eventnotelm.EventDeps{
-		NotebookRepo:       notebookRepo,
-		SourceRepo:         sourceRepo,
-		SourceStorageRepo:  sourceStorageRepo,
-		SourceDocRepo:      sourceDocRepo,
-		ChatRepo:           chatRepo,
-		MessageRepo:        messageRepo,
-		ContextMessageRepo: contextMsgRepo,
-		ArtifactTaskRepo:   artifactRepo,
-		EventBus:           bus,
+		SourceRepo:        sourceRepo,
+		SourceStorageRepo: sourceStorageRepo,
+		SourceDocRepo:     sourceDocRepo,
+
+		ChatRepo:               chatRepo,
+		ChatMessageRepo:        messageRepo,
+		ChatContextMessageRepo: contextMsgRepo,
+		ChatSuggestionRepo:     suggestionRepo,
+
+		ArtifactTaskRepo: artifactRepo,
+
+		EventBus:    eventBus,
+		ChatGateway: infra.LLMGateway,
 	})
 
-	// ── 10. HTTP Server ──
-
+	// ── 9. HTTP Server ──
 	wg := &sync.WaitGroup{}
-	svr := apinotelm.NewServer(apinotelm.ServerDeps{
-		NotebookRepo:       notebookRepo,
-		SourceRepo:         sourceRepo,
-		SourceStorageRepo:  sourceStorageRepo,
-		SourceDocRepo:      sourceDocRepo,
-		ChatRepo:           chatRepo,
-		MessageRepo:        messageRepo,
-		ContextMessageRepo: contextMsgRepo,
-		StreamTaskRepo:     streamTaskRepo,
-		EventBus:           bus,
-		WaitGroup:          wg,
-		LLMGateway:         infra.LLMGateway,
+	svr := notelmapi.NewServer(
+		notelmapi.ServerDeps{
+			RootCtx:                rootCtx,
+			NotebookRepo:           notebookRepo,
+			SourceRepo:             sourceRepo,
+			SourceStorageRepo:      sourceStorageRepo,
+			SourceDocRepo:          sourceDocRepo,
+			ChatRepo:               chatRepo,
+			ChatMessageRepo:        messageRepo,
+			ChatContextMessageRepo: contextMsgRepo,
+			ChatStreamTaskRepo:     streamTaskRepo,
+			ChatSuggestionRepo:     suggestionRepo,
+			ArtifactRepo:           artifactRepo,
 
-		ArtifactRepo:   artifactRepo,
-		FlowClient:     flowClient,
-		Poller:         syncerInst,
-		StorageGateway: storageGateway,
+			EventBus:   eventBus,
+			WaitGroup:  wg,
+			LLMGateway: infra.LLMGateway,
 
-		TitleMaker: titleMaker,
-	})
+			FlowClient:     flowClient,
+			Poller:         syncerInst,
+			StorageGateway: storageGateway,
+			TitleMaker:     titleMaker,
+		},
+	)
 
 	return &Notelm{
 		closers: closers,
 		wg:      wg,
 		Server:  svr,
 	}, nil
-}
-
-// ── bridge types ──
-
-type storageAdapter struct {
-	store storage.Storage
-}
-
-func (a *storageAdapter) DeleteObject(ctx context.Context, key string) error {
-	return a.store.DeleteObject(ctx, &storage.DeleteObjectRequest{Key: key})
-}
-
-func (a *storageAdapter) PresignGet(ctx context.Context, key string) (string, error) {
-	resp, err := a.store.PresignedGetObject(ctx, &storage.PresignedGetObjectRequest{Key: key})
-	if err != nil {
-		return "", err
-	}
-	return resp.Url, nil
 }
 
 type syncerCloser struct {

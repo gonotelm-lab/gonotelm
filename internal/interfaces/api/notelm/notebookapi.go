@@ -10,9 +10,7 @@ import (
 	sourceapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/source"
 	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/schema"
 	pkgctx "github.com/gonotelm-lab/gonotelm/pkg/context"
-	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
-	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 
 func (s *Server) registerNotebooksRoutes(g *route.RouterGroup) {
@@ -22,7 +20,6 @@ func (s *Server) registerNotebooksRoutes(g *route.RouterGroup) {
 	g.GET("/notebooks", s.ListNotebooks)
 
 	notebookIdGroup := g.Group("/notebooks/:id")
-	notebookIdGroup.Use(s.checkNotebookUserId)
 	{
 		// GET /api/v1/notebooks/:id
 		notebookIdGroup.GET("", s.GetNotebook)
@@ -41,23 +38,6 @@ func (s *Server) registerNotebooksRoutes(g *route.RouterGroup) {
 		// POST /api/v1/notebooks/:id/chats
 		notebookIdGroup.POST("/chats", s.GetOrCreateNotebookChat)
 	}
-}
-
-func (s *Server) checkNotebookUserId(ctx context.Context, c *app.RequestContext) {
-	notebookId := c.Param("id")
-	nid, err := uuid.ParseString(notebookId)
-	if err != nil {
-		http.ErrResp(c, errors.ErrParams.Msgf("invalid notebook_id: %s", notebookId))
-		return
-	}
-
-	err = s.checkNotebookAccessHandler.Handle(ctx, nid)
-	if err != nil {
-		http.ErrResp(c, err)
-		return
-	}
-
-	c.Next(ctx)
 }
 
 // Create new notebook
@@ -230,5 +210,5 @@ func (s *Server) DeleteNotebook(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	http.OkResp(c, nil)
+	http.OkRespNoContent(c)
 }

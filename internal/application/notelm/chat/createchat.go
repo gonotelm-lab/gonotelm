@@ -8,17 +8,18 @@ import (
 	chaterrors "github.com/gonotelm-lab/gonotelm/internal/domain/chat/errors"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type CreateChatHandler struct {
 	notebookRepo notebookrepo.Repository
-	chatRepo     chatrepo.Repository
+	chatRepo     chatrepo.ChatRepository
 }
 
 func NewCreateChatHandler(
 	notebookRepo notebookrepo.Repository,
-	chatRepo chatrepo.Repository,
+	chatRepo chatrepo.ChatRepository,
 ) *CreateChatHandler {
 	return &CreateChatHandler{
 		notebookRepo: notebookRepo,
@@ -32,9 +33,13 @@ type CreateChatCommand struct {
 }
 
 func (h *CreateChatHandler) Handle(ctx context.Context, cmd *CreateChatCommand) (*chatentity.Chat, error) {
-	_, err := h.notebookRepo.FindById(ctx, cmd.NotebookId)
+	userId := pkgcontext.GetUserId(ctx)
+	notebook, err := h.notebookRepo.FindById(ctx, cmd.NotebookId)
 	if err != nil {
-		return nil, errors.WithMessage(err, "find notebook by id failed")
+		return nil, errors.WithMessagef(err, "get notebook failed, notebook_id=%s", cmd.NotebookId)
+	}
+	if notebook.OwnerId != userId {
+		return nil, errors.ErrPermission.Msgf("notebook access denied, notebook_id=%s", cmd.NotebookId)
 	}
 
 	chat, err := h.chatRepo.FindByNotebookIdAndOwnerId(ctx, cmd.NotebookId, cmd.OwnerId)

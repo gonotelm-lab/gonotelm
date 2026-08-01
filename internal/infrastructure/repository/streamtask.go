@@ -12,6 +12,7 @@ import (
 	chaterrors "github.com/gonotelm-lab/gonotelm/internal/domain/chat/errors"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache"
+	cacheerrors "github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache/errors"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache/schema"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository/mapper"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -38,7 +39,7 @@ func (r *StreamTaskRepositoryImpl) Save(ctx context.Context, task *entity.Stream
 func (r *StreamTaskRepositoryImpl) FindById(ctx context.Context, taskId valobj.Id) (*entity.StreamTask, error) {
 	sch, err := r.streamCache.GetTask(ctx, taskId.String())
 	if err != nil {
-		if errors.Is(err, cache.ErrTaskNotFound) {
+		if errors.Is(err, cacheerrors.ErrTaskNotFound) {
 			return nil, chaterrors.ErrStreamTaskNotFound
 		}
 		return nil, err
@@ -88,7 +89,7 @@ func (r *StreamTaskRepositoryImpl) BlockOnStreamEvent(
 		Count:  opts.Count,
 	})
 	if err != nil {
-		if errors.Is(err, cache.ErrStreamNoData) {
+		if errors.Is(err, cacheerrors.ErrStreamNoData) {
 			return nil, nil
 		}
 		return nil, err

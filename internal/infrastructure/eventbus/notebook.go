@@ -7,7 +7,7 @@ import (
 	notebookevent "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/event"
 )
 
-func SubscribeNotebookDeleted(
+func SubscribeNotebookEvent(
 	ctx context.Context,
 	bus EventBus,
 	handler func(ctx context.Context, evt *notebookevent.Event) error,

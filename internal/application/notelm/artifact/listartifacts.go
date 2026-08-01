@@ -23,21 +23,21 @@ type ListResponse struct {
 }
 
 type ListArtifactsHandler struct {
-	repo     artifactrepo.Repository
-	notebook notebookrepo.Repository
+	notebookRepo notebookrepo.Repository
+	repo         artifactrepo.Repository
 }
 
-func NewListArtifactsHandler(repo artifactrepo.Repository, notebook notebookrepo.Repository) *ListArtifactsHandler {
-	return &ListArtifactsHandler{repo: repo, notebook: notebook}
+func NewListArtifactsHandler(notebookRepo notebookrepo.Repository, repo artifactrepo.Repository) *ListArtifactsHandler {
+	return &ListArtifactsHandler{notebookRepo: notebookRepo, repo: repo}
 }
 
 func (h *ListArtifactsHandler) Handle(ctx context.Context, cmd *ListRequest) (*ListResponse, error) {
 	userId := pkgcontext.GetUserId(ctx)
-	nb, err := h.notebook.FindById(ctx, cmd.NotebookId)
+	notebook, err := h.notebookRepo.FindById(ctx, cmd.NotebookId)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithMessagef(err, "get notebook failed, notebook_id=%s", cmd.NotebookId)
 	}
-	if nb.OwnerId != userId {
+	if notebook.OwnerId != userId {
 		return nil, errors.ErrPermission.Msgf("notebook access denied, notebook_id=%s", cmd.NotebookId)
 	}
 

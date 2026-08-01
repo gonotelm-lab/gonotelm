@@ -5,8 +5,6 @@ import (
 	"strings"
 )
 
-
-
 func CheckQuizContent(content QuizContent) bool {
 	return ValidateQuizContent(content) == nil
 }

@@ -9,12 +9,12 @@ import (
 )
 
 type UpdateSourceTitleHandler struct {
-	sourceRepo sourcerepo.Repository
+	*baseHandler
 }
 
 func NewUpdateSourceTitleHandler(sourceRepo sourcerepo.Repository) *UpdateSourceTitleHandler {
 	return &UpdateSourceTitleHandler{
-		sourceRepo: sourceRepo,
+		baseHandler: newBaseHandler(sourceRepo),
 	}
 }
 
@@ -23,9 +23,9 @@ func (h *UpdateSourceTitleHandler) Handle(
 	id valobj.Id,
 	title string,
 ) error {
-	targetSource, err := h.sourceRepo.FindById(ctx, id)
+	targetSource, err := h.handle(ctx, id)
 	if err != nil {
-		return errors.WithMessagef(err, "find source failed, source_id=%s", id)
+		return err
 	}
 
 	targetSource.UpdateTitle(title)

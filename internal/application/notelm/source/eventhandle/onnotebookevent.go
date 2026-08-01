@@ -14,25 +14,25 @@ import (
 
 const notebookSourcesPageSize = 50
 
-type DeleteNotebookSourcesHandler struct {
+type OnNotebookEventHandler struct {
 	sourceRepo        sourcerepo.Repository
 	sourceDocRepo     sourcerepo.SourceDocRepository
 	sourceStorageRepo sourcerepo.StorageRepository
 }
 
-func NewDeleteNotebookSourcesHandler(
+func NewOnNotebookEventHandler(
 	sourceRepo sourcerepo.Repository,
 	sourceDocRepo sourcerepo.SourceDocRepository,
 	sourceStorageRepo sourcerepo.StorageRepository,
-) *DeleteNotebookSourcesHandler {
-	return &DeleteNotebookSourcesHandler{
+) *OnNotebookEventHandler {
+	return &OnNotebookEventHandler{
 		sourceRepo:        sourceRepo,
 		sourceDocRepo:     sourceDocRepo,
 		sourceStorageRepo: sourceStorageRepo,
 	}
 }
 
-func (h *DeleteNotebookSourcesHandler) Handle(
+func (h *OnNotebookEventHandler) Handle(
 	ctx context.Context,
 	evt *notebookevent.Event,
 ) error {
@@ -43,16 +43,20 @@ func (h *DeleteNotebookSourcesHandler) Handle(
 	notebookId := evt.NotebookId()
 	sourceIds, objectKeys, err := h.collectNotebookSources(ctx, notebookId)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	if len(sourceIds) > 0 {
 		if err := h.sourceDocRepo.BatchDeleteBySourceId(ctx, notebookId, sourceIds); err != nil {
-			return errors.WithMessagef(err, "delete source docs failed, notebook_id=%s", notebookId)
+			slog.ErrorContext(ctx, "failed to delete source docs",
+				slog.Any("err", err), slog.String("notebook_id", notebookId.String()),
+			)
 		}
 
 		if err := h.sourceRepo.BatchDeleteByIds(ctx, sourceIds); err != nil {
-			return errors.WithMessagef(err, "batch delete sources failed, notebook_id=%s", notebookId)
+			slog.ErrorContext(ctx, "failed to batch delete sources",
+				slog.Any("err", err), slog.String("notebook_id", notebookId.String()),
+			)
 		}
 	}
 
@@ -67,7 +71,9 @@ func (h *DeleteNotebookSourcesHandler) Handle(
 	}
 
 	if err := h.sourceRepo.DeleteByNotebookId(ctx, notebookId); err != nil {
-		return errors.WithMessagef(err, "delete sources by notebook failed, notebook_id=%s", notebookId)
+		slog.ErrorContext(ctx, "failed to delete sources by notebook",
+			slog.Any("err", err), slog.String("notebook_id", notebookId.String()),
+		)
 	}
 
 	slog.InfoContext(ctx, "cleaned up sources for deleted notebook",
@@ -78,7 +84,7 @@ func (h *DeleteNotebookSourcesHandler) Handle(
 	return nil
 }
 
-func (h *DeleteNotebookSourcesHandler) collectNotebookSources(
+func (h *OnNotebookEventHandler) collectNotebookSources(
 	ctx context.Context,
 	notebookId valobj.Id,
 ) ([]valobj.Id, []string, error) {
@@ -110,10 +116,10 @@ func (h *DeleteNotebookSourcesHandler) collectNotebookSources(
 	return sourceIds, slices.Unique(objectKeys), nil
 }
 
-func RegisterNotebookDeletedConsumer(
+func RegisterNotebookEventConsumer(
 	ctx context.Context,
 	bus eventbus.EventBus,
-	handler *DeleteNotebookSourcesHandler,
+	handler *OnNotebookEventHandler,
 ) error {
-	return eventbus.SubscribeNotebookDeleted(ctx, bus, handler.Handle)
+	return eventbus.SubscribeNotebookEvent(ctx, bus, handler.Handle)
 }

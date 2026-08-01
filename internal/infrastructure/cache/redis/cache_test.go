@@ -13,6 +13,7 @@ var (
 	testRedis                   goredis.UniversalClient
 	testChatMessageContextCache cache.ChatContextMessageCache
 	testChatMessageStreamCache  cache.ChatMessageStreamCache
+	testChatSuggestionCache     cache.ChatSuggestionCache
 )
 
 func TestMain(m *testing.M) {
@@ -24,6 +25,7 @@ func TestMain(m *testing.M) {
 
 	testChatMessageContextCache = NewChatMessageContextCacheImpl(testRedis)
 	testChatMessageStreamCache = NewChatMessageStreamCacheImpl(testRedis)
+	testChatSuggestionCache = NewChatSuggestionCacheImpl(testRedis)
 
 	m.Run()
 }

@@ -9,12 +9,12 @@ import (
 )
 
 type UpdateNotebookNameHandler struct {
-	notebookRepo notebookrepo.Repository
+	*baseHandler
 }
 
 func NewUpdateNotebookNameHandler(notebookRepo notebookrepo.Repository) *UpdateNotebookNameHandler {
 	return &UpdateNotebookNameHandler{
-		notebookRepo: notebookRepo,
+		baseHandler: newBaseHandler(notebookRepo),
 	}
 }
 
@@ -23,9 +23,9 @@ func (h *UpdateNotebookNameHandler) Handle(
 	id valobj.Id,
 	name string,
 ) error {
-	n, err := h.notebookRepo.FindById(ctx, id)
+	n, err := h.handle(ctx, id)
 	if err != nil {
-		return errors.WithMessage(err, "get notebook failed")
+		return err
 	}
 
 	err = n.UpdateName(name)

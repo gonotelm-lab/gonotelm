@@ -6,6 +6,7 @@ import (
 
 	"github.com/bytedance/sonic"
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/infographic"
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -22,7 +23,7 @@ func (f *fakeStorage) PresignGet(ctx context.Context, key string) (string, error
 	return f.presigned, f.err
 }
 
-var _ StorageGateway = &fakeStorage{}
+var _ adapter.StorageGateway = &fakeStorage{}
 
 func TestMaterializeStorageResult_FromWorkerOutput(t *testing.T) {
 	sr := infographic.StorageResult{

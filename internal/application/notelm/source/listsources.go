@@ -8,6 +8,7 @@ import (
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	sourceservice "github.com/gonotelm-lab/gonotelm/internal/domain/source/service/source"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
@@ -44,9 +45,13 @@ type ListSourcesResult struct {
 }
 
 func (h *ListSourcesHandler) Handle(ctx context.Context, query *ListSourcesQuery) (*ListSourcesResult, error) {
-	_, err := h.notebookRepo.FindById(ctx, query.NotebookId)
+	userId := pkgcontext.GetUserId(ctx)
+	notebook, err := h.notebookRepo.FindById(ctx, query.NotebookId)
 	if err != nil {
-		return nil, errors.WithMessage(err, "find notebook by id failed")
+		return nil, errors.WithMessagef(err, "get notebook failed, notebook_id=%s", query.NotebookId)
+	}
+	if notebook.OwnerId != userId {
+		return nil, errors.ErrPermission.Msgf("notebook access denied, notebook_id=%s", query.NotebookId)
 	}
 
 	sources, err := h.sourceRepo.ListByNotebookId(ctx, query.NotebookId,

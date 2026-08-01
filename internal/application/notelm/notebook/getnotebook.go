@@ -6,16 +6,15 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
-	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type GetNotebookHandler struct {
-	notebookRepo notebookrepo.Repository
+	*baseHandler
 }
 
 func NewGetNotebookHandler(notebookRepo notebookrepo.Repository) *GetNotebookHandler {
 	return &GetNotebookHandler{
-		notebookRepo: notebookRepo,
+		baseHandler: newBaseHandler(notebookRepo),
 	}
 }
 
@@ -23,9 +22,9 @@ func (h *GetNotebookHandler) Handle(
 	ctx context.Context,
 	id valobj.Id,
 ) (*notebookentity.Notebook, error) {
-	notebook, err := h.notebookRepo.FindById(ctx, id)
+	notebook, err := h.handle(ctx, id)
 	if err != nil {
-		return nil, errors.WithMessage(err, "get notebook failed")
+		return nil, err
 	}
 
 	return notebook, nil

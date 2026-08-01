@@ -42,7 +42,7 @@ func NewRetryRoundTripper(maxRetries int, next http.RoundTripper, opts ...RetryO
 	for _, opt := range opts {
 		opt(r)
 	}
-	
+
 	return r
 }
 

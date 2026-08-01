@@ -15,14 +15,14 @@ import (
 // callOptions carries gateway-level request options. wrappedChatModel translates
 // them into provider-specific options for both Generate and Stream.
 type callOptions struct {
-	EnableThinking *bool
+	EnableThinking           *bool
+	ResponseFormatJSONObject bool
 }
 
 func WithThinking(
 	providerType llm.Provider,
 	enableThinking bool,
 ) einomodel.Option {
-	_ = providerType // provider is resolved by wrappedChatModel
 	enabled := enableThinking
 	return einomodel.WrapImplSpecificOptFn(func(o *callOptions) {
 		o.EnableThinking = &enabled
@@ -38,12 +38,9 @@ func WithModel(model string) einomodel.Option {
 }
 
 func WithResponseJsonObject(providerType llm.Provider) einomodel.Option {
-	switch providerType {
-	case llm.ProviderQwen, llm.ProviderDeepSeek, llm.ProviderOpenAI:
-		return qwen.WithExtraFields(openaiext.ResponseFormatJSONObject)
-	default:
-		return einomodel.Option{}
-	}
+	return einomodel.WrapImplSpecificOptFn(func(o *callOptions) {
+		o.ResponseFormatJSONObject = true
+	})
 }
 
 func BuildLLMOptions(opts ...einomodel.Option) []einomodel.Option {
@@ -72,28 +69,46 @@ func applyProviderCallOptions(
 			}
 			fields["thinking"] = map[string]string{"type": thinkingType}
 		}
+		if callOpts.ResponseFormatJSONObject {
+			fields = mergeExtraFields(fields, openaiext.ResponseFormatJSONObject)
+		}
 		if len(fields) > 0 {
 			// Append last so this map wins over any earlier deepseek.WithExtraFields.
 			opts = append(opts, deepseek.WithExtraFields(fields))
 		}
 	case llm.ProviderQwen:
+		fields := map[string]any{}
+		if streaming {
+			fields = mergeExtraFields(fields, streamOptionsIncludeUsage)
+		}
 		if callOpts.EnableThinking != nil {
 			opts = append(opts, qwen.WithEnableThinking(*callOpts.EnableThinking))
 		}
-		if streaming {
-			opts = append(opts, qwen.WithExtraFields(cloneExtraFields(streamOptionsIncludeUsage)))
+		if callOpts.ResponseFormatJSONObject {
+			fields = mergeExtraFields(fields, openaiext.ResponseFormatJSONObject)
+		}
+		if len(fields) > 0 {
+			opts = append(opts, qwen.WithExtraFields(fields))
 		}
 	case llm.ProviderAgnes:
+		chatTemplateKwargs := map[string]any{}
 		if callOpts.EnableThinking != nil {
+			chatTemplateKwargs["enable_thinking"] = *callOpts.EnableThinking
+		}
+		if callOpts.ResponseFormatJSONObject {
+			chatTemplateKwargs["response_format"] = map[string]string{"type": "json_object"}
+		}
+		if len(chatTemplateKwargs) > 0 {
 			opts = append(opts, agnes.WithExtraFields(map[string]any{
-				"chat_template_kwargs": map[string]any{
-					"enable_thinking": *callOpts.EnableThinking,
-				},
+				"chat_template_kwargs": chatTemplateKwargs,
 			}))
 		}
 	case llm.ProviderOpenAI:
 		if callOpts.EnableThinking != nil && *callOpts.EnableThinking {
 			opts = append(opts, openai.WithReasoningEffort(openai.ReasoningEffortLevelHigh))
+		}
+		if callOpts.ResponseFormatJSONObject {
+			opts = append(opts, openai.WithExtraFields(openaiext.ResponseFormatJSONObject))
 		}
 	}
 

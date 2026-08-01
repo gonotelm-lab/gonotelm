@@ -102,7 +102,7 @@ COMMENT ON COLUMN artifacts.notebook_id IS 'associated notebook id';
 COMMENT ON COLUMN artifacts.user_id IS 'artifact user id';
 COMMENT ON COLUMN artifacts.kind IS 'artifact kind';
 COMMENT ON COLUMN artifacts.status IS 'artifact processing state';
-COMMENT ON COLUMN artifacts.flow_task_id IS 'artifact flow task id; empty when no flow task (e.g. note)';
+COMMENT ON COLUMN artifacts.flow_task_id IS 'artifact flow task id, empty when no flow task (e.g. note)';
 COMMENT ON COLUMN artifacts.title IS 'artifact title';
 COMMENT ON COLUMN artifacts.result IS 'artifact result';
 COMMENT ON COLUMN artifacts.result_kind IS 'artifact result kind';

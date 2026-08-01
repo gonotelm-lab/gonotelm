@@ -11,35 +11,47 @@ import (
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
+	llmchat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 )
 
 type EventDeps struct {
-	NotebookRepo      notebookrepo.Repository
+	RootCtx context.Context
+
+	NotebookRepo notebookrepo.Repository
+
 	SourceRepo        sourcerepo.Repository
 	SourceStorageRepo sourcerepo.StorageRepository
 	SourceDocRepo     sourcerepo.SourceDocRepository
 
-	ChatRepo           chatrepo.Repository
-	MessageRepo        chatrepo.MessageRepository
-	ContextMessageRepo chatrepo.ContextMessageRepository
-	ArtifactTaskRepo   artifactrepo.Repository
+	ChatRepo               chatrepo.ChatRepository
+	ChatMessageRepo        chatrepo.MessageRepository
+	ChatContextMessageRepo chatrepo.ContextMessageRepository
+	ChatSuggestionRepo     chatrepo.SuggestionRepository
 
-	EventBus eventbus.EventBus
+	ArtifactTaskRepo artifactrepo.Repository
+
+	EventBus    eventbus.EventBus
+	ChatGateway *llmchat.Gateway
 }
 
 func Init(ctx context.Context, deps *EventDeps) {
-	if err := registerSourceInnerConsumers(ctx, deps); err != nil {
+	if err := initSourceEventConsumers(ctx, deps); err != nil {
 		panic(err)
 	}
-	if err := registerNotebookDeletedConsumers(ctx, deps); err != nil {
+
+	if err := initNotebookEventConsumers(ctx, deps); err != nil {
+		panic(err)
+	}
+
+	if err := initStreamTaskEventConsumers(ctx, deps); err != nil {
 		panic(err)
 	}
 }
 
-func registerSourceInnerConsumers(ctx context.Context, deps *EventDeps) error {
+func initSourceEventConsumers(ctx context.Context, deps *EventDeps) error {
 	if err := sourceeventhandle.RegisterSourceDeletedConsumer(ctx,
 		deps.EventBus,
-		sourceeventhandle.NewCleanupDeletedSourceHandler(
+		sourceeventhandle.NewOnSourceDeletedEventHandler(
 			deps.SourceDocRepo,
 			deps.SourceStorageRepo,
 		),
@@ -50,21 +62,21 @@ func registerSourceInnerConsumers(ctx context.Context, deps *EventDeps) error {
 	return nil
 }
 
-func registerNotebookDeletedConsumers(ctx context.Context, deps *EventDeps) error {
-	if err := chateventhandle.RegisterNotebookDeletedConsumer(ctx,
+func initNotebookEventConsumers(ctx context.Context, deps *EventDeps) error {
+	if err := chateventhandle.RegisterNotebookEventConsumer(ctx,
 		deps.EventBus,
-		chateventhandle.NewDeleteNotebookChatsHandler(
+		chateventhandle.NewOnNotebookEventHandler(
 			deps.ChatRepo,
-			deps.MessageRepo,
-			deps.ContextMessageRepo,
+			deps.ChatMessageRepo,
+			deps.ChatContextMessageRepo,
 		),
 	); err != nil {
 		return err
 	}
 
-	if err := sourceeventhandle.RegisterNotebookDeletedConsumer(ctx,
+	if err := sourceeventhandle.RegisterNotebookEventConsumer(ctx,
 		deps.EventBus,
-		sourceeventhandle.NewDeleteNotebookSourcesHandler(
+		sourceeventhandle.NewOnNotebookEventHandler(
 			deps.SourceRepo,
 			deps.SourceDocRepo,
 			deps.SourceStorageRepo,
@@ -73,8 +85,28 @@ func registerNotebookDeletedConsumers(ctx context.Context, deps *EventDeps) erro
 		return err
 	}
 
-	return artifacteventhandle.RegisterNotebookDeletedConsumer(ctx,
+	return artifacteventhandle.RegisterNotebookEventConsumer(ctx,
 		deps.EventBus,
-		artifacteventhandle.NewDeleteNotebookArtifactTasksHandler(deps.ArtifactTaskRepo),
+		artifacteventhandle.NewOnNotebookEventHandler(deps.ArtifactTaskRepo),
 	)
+}
+
+func initStreamTaskEventConsumers(ctx context.Context, deps *EventDeps) error {
+	if err := chateventhandle.RegisterStreamTaskEventConsumer(ctx,
+		deps.EventBus,
+		chateventhandle.NewOnStreamTaskEventHandler(
+			deps.RootCtx,
+			deps.ChatRepo,
+			deps.ChatMessageRepo,
+			deps.ChatContextMessageRepo,
+			deps.ChatSuggestionRepo,
+			deps.NotebookRepo,
+			deps.SourceRepo,
+			deps.ChatGateway,
+		),
+	); err != nil {
+		return err
+	}
+
+	return nil
 }

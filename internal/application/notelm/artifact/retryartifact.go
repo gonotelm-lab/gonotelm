@@ -13,7 +13,6 @@ import (
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
-	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
@@ -31,28 +30,25 @@ func isTaskTerminal(state flowschema.TaskState) bool {
 }
 
 type RetryArtifactHandler struct {
-	artifactRepo artifactrepo.Repository
-	flowc        flow.TaskClient
-	poller       Poller
-	eventBus     eventbus.EventBus
+	*baseHandler
+	flowc    flow.TaskClient
+	poller   Poller
+	eventBus eventbus.EventBus
 }
 
 func NewRetryArtifactHandler(repo artifactrepo.Repository, flowc flow.TaskClient, poller Poller, eventBus eventbus.EventBus) *RetryArtifactHandler {
 	return &RetryArtifactHandler{
-		artifactRepo: repo,
-		flowc:        flowc,
-		poller:       poller,
-		eventBus:     eventBus,
+		baseHandler: newBaseHandler(repo),
+		flowc:       flowc,
+		poller:      poller,
+		eventBus:    eventBus,
 	}
 }
 
 func (h *RetryArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error {
-	artifact, err := h.artifactRepo.FindById(ctx, cmd)
+	artifact, err := h.handle(ctx, cmd)
 	if err != nil {
 		return err
-	}
-	if !artifact.IsOwner(pkgcontext.GetUserId(ctx)) {
-		return artifacterrors.ErrArtifactNotOwnedByUser
 	}
 
 	if artifact.Status.Completed() {
@@ -95,7 +91,7 @@ func (h *RetryArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error 
 	if err := artifact.Retry(newFlowTaskId); err != nil {
 		return err
 	}
-	if err := h.artifactRepo.Save(ctx, artifact); err != nil {
+	if err := h.repo.Save(ctx, artifact); err != nil {
 		return errors.WithMessage(err, "save retried artifact failed")
 	}
 

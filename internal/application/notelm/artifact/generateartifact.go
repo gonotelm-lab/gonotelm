@@ -41,11 +41,11 @@ type GenerateResponse struct {
 }
 
 type GenerateArtifactHandler struct {
+	notebookRepo notebookrepo.Repository
 	wg           *sync.WaitGroup
 	artifactRepo artifactrepo.Repository
 	chatMsgRepo  chatrepo.MessageRepository
-	chatRepo     chatrepo.Repository
-	notebookRepo notebookrepo.Repository
+	chatRepo     chatrepo.ChatRepository
 	sourceRepo   sourcerepo.Repository
 	flow         flow.TaskClient
 	poller       Poller
@@ -58,7 +58,7 @@ func NewGenerateArtifactHandler(
 	artifactRepo artifactrepo.Repository,
 	notebookRepo notebookrepo.Repository,
 	sourceRepo sourcerepo.Repository,
-	chatRepo chatrepo.Repository,
+	chatRepo chatrepo.ChatRepository,
 	chatMsgRepo chatrepo.MessageRepository,
 	flowc flow.TaskClient,
 	poller Poller,
@@ -66,9 +66,9 @@ func NewGenerateArtifactHandler(
 	titleMaker adapter.TitleMaker,
 ) *GenerateArtifactHandler {
 	return &GenerateArtifactHandler{
+		notebookRepo: notebookRepo,
 		wg:           wg,
 		artifactRepo: artifactRepo,
-		notebookRepo: notebookRepo,
 		sourceRepo:   sourceRepo,
 		chatRepo:     chatRepo,
 		chatMsgRepo:  chatMsgRepo,
@@ -82,11 +82,11 @@ func NewGenerateArtifactHandler(
 func (h *GenerateArtifactHandler) Handle(ctx context.Context, cmd *GenerateRequest) (*GenerateResponse, error) {
 	userId := pkgcontext.GetUserId(ctx)
 
-	nb, err := h.notebookRepo.FindById(ctx, cmd.NotebookId)
+	notebook, err := h.notebookRepo.FindById(ctx, cmd.NotebookId)
 	if err != nil {
-		return nil, errors.WithMessagef(err, "find notebook by id=%s failed", cmd.NotebookId)
+		return nil, errors.WithMessagef(err, "get notebook failed, notebook_id=%s", cmd.NotebookId)
 	}
-	if nb.OwnerId != userId {
+	if notebook.OwnerId != userId {
 		return nil, errors.ErrPermission.Msgf("notebook access denied, notebook_id=%s", cmd.NotebookId)
 	}
 
@@ -339,11 +339,11 @@ func (h *GenerateArtifactHandler) saveAsNote(
 	}
 
 	targetContent := targetFragment.Response.Content
-	if targetContent == nil || targetContent.Text == nil || targetContent.Text.Content() == "" {
+	if targetContent == nil || targetContent.Text == nil || targetContent.Text.GetContent() == "" {
 		return nil, errors.ErrParams.Msgf("can not convert message to note")
 	}
 
-	textContent := targetContent.Text.Content()
+	textContent := targetContent.Text.GetContent()
 	newArtifact, err := artifactentity.NewArtifact(
 		req.NotebookId,
 		userId,

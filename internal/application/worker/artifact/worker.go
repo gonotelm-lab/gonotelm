@@ -24,15 +24,15 @@ func RegisterTypedWorker(client *flowworker.Client, deps *generatetypes.ServiceD
 			return paramErrorResult("unsupported artifact kind: %s", kind), nil
 		}
 
-		artifactId, err := parseId(in.ArtifactId)
+		artifactId, err := valobj.NewIdFromString(in.ArtifactId)
 		if err != nil {
 			return paramErrorResult("artifact_id: %v", err), nil
 		}
-		notebookId, err := parseId(in.NotebookId)
+		notebookId, err := valobj.NewIdFromString(in.NotebookId)
 		if err != nil {
 			return paramErrorResult("notebook_id: %v", err), nil
 		}
-		sourceIds, err := parseIds(in.SourceIds)
+		sourceIds, err := valobj.StringsToIds(in.SourceIds)
 		if err != nil {
 			return paramErrorResult("source_ids: %v", err), nil
 		}
@@ -146,20 +146,4 @@ func decodePayload(kind artifactentity.Kind, raw json.RawMessage) (artifactentit
 	default:
 		return nil, fmt.Errorf("unsupported kind: %s", kind)
 	}
-}
-
-func parseId(s string) (valobj.Id, error) {
-	return valobj.NewIdFromString(s)
-}
-
-func parseIds(ss []string) ([]valobj.Id, error) {
-	out := make([]valobj.Id, len(ss))
-	for i, s := range ss {
-		id, err := parseId(s)
-		if err != nil {
-			return nil, fmt.Errorf("index %d: %w", i, err)
-		}
-		out[i] = id
-	}
-	return out, nil
 }

@@ -1,6 +1,7 @@
 package entity
 
 import (
+	"fmt"
 	"unicode/utf8"
 
 	coreentity "github.com/gonotelm-lab/gonotelm/internal/core/entity"
@@ -45,7 +46,7 @@ func NewNotebook(
 		return nil, err
 	}
 
-	n.AddEvent(notebookevent.NewEvent(n.Id, notebookevent.EventActionCreate))
+	n.AddEvent(notebookevent.NewCreateEvent(n.Id))
 
 	return &n, nil
 }
@@ -68,7 +69,7 @@ func (n *Notebook) validate() error {
 
 func (n *Notebook) Delete() {
 	n.Base.Delete()
-	n.Base.AddEvent(notebookevent.NewEvent(n.Id, notebookevent.EventActionDelete))
+	n.Base.AddEvent(notebookevent.NewDeleteEvent(n.Id))
 }
 
 func (n *Notebook) UpdateName(name string) error {
@@ -88,4 +89,8 @@ func (n *Notebook) AllowedToCreateSource() error {
 	}
 
 	return nil
+}
+
+func (n *Notebook) NameAndDescription() string {
+	return fmt.Sprintf("Name: %s\nDescription: %s", n.Name, n.Description)
 }

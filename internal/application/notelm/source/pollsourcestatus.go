@@ -12,7 +12,7 @@ import (
 )
 
 type PollSourceStatusHandler struct {
-	sourceRepo  sourcerepo.Repository
+	*baseHandler
 	storageRepo sourcerepo.StorageRepository
 	eventBus    eventbus.EventBus
 }
@@ -23,7 +23,7 @@ func NewPollSourceStatusHandler(
 	eventBus eventbus.EventBus,
 ) *PollSourceStatusHandler {
 	return &PollSourceStatusHandler{
-		sourceRepo:  sourceRepo,
+		baseHandler: newBaseHandler(sourceRepo),
 		storageRepo: storageRepo,
 		eventBus:    eventBus,
 	}
@@ -33,9 +33,9 @@ func (h *PollSourceStatusHandler) Handle(
 	ctx context.Context,
 	sourceId valobj.Id,
 ) (sourcevo.SourceStatus, error) {
-	targetSource, err := h.sourceRepo.FindById(ctx, sourceId)
+	targetSource, err := h.handle(ctx, sourceId)
 	if err != nil {
-		return "", errors.WithMessagef(err, "find source failed, source_id=%s", sourceId)
+		return "", err
 	}
 
 	if targetSource.Status.IsReady() {

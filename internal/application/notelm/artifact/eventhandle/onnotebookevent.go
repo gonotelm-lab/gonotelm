@@ -10,19 +10,19 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
-type DeleteNotebookArtifactTasksHandler struct {
+type OnNotebookEventHandler struct {
 	artifactRepo artifactrepo.Repository
 }
 
-func NewDeleteNotebookArtifactTasksHandler(
+func NewOnNotebookEventHandler(
 	artifactRepo artifactrepo.Repository,
-) *DeleteNotebookArtifactTasksHandler {
-	return &DeleteNotebookArtifactTasksHandler{
+) *OnNotebookEventHandler {
+	return &OnNotebookEventHandler{
 		artifactRepo: artifactRepo,
 	}
 }
 
-func (h *DeleteNotebookArtifactTasksHandler) Handle(
+func (h *OnNotebookEventHandler) Handle(
 	ctx context.Context,
 	evt *notebookevent.Event,
 ) error {
@@ -42,10 +42,10 @@ func (h *DeleteNotebookArtifactTasksHandler) Handle(
 	return nil
 }
 
-func RegisterNotebookDeletedConsumer(
+func RegisterNotebookEventConsumer(
 	ctx context.Context,
 	bus eventbus.EventBus,
-	handler *DeleteNotebookArtifactTasksHandler,
+	handler *OnNotebookEventHandler,
 ) error {
-	return eventbus.SubscribeNotebookDeleted(ctx, bus, handler.Handle)
+	return eventbus.SubscribeNotebookEvent(ctx, bus, handler.Handle)
 }

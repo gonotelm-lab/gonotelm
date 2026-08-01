@@ -7,21 +7,17 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	chatentity "github.com/gonotelm-lab/gonotelm/internal/domain/chat/entity"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
-	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type ListMessagesHandler struct {
-	chatRepo        chatrepo.Repository
+	*baseHandler
 	chatMessageRepo chatrepo.MessageRepository
 }
 
-func NewListMessagesHandler(
-	chatRepo chatrepo.Repository,
-	chatMessageRepo chatrepo.MessageRepository,
-) *ListMessagesHandler {
+func NewListMessagesHandler(chatRepo chatrepo.ChatRepository, chatMessageRepo chatrepo.MessageRepository) *ListMessagesHandler {
 	return &ListMessagesHandler{
-		chatRepo:        chatRepo,
+		baseHandler:     newBaseHandler(chatRepo),
 		chatMessageRepo: chatMessageRepo,
 	}
 }
@@ -42,14 +38,8 @@ func (h *ListMessagesHandler) Handle(
 	ctx context.Context,
 	query *ListMessagesQuery,
 ) (*ListMessagesResult, error) {
-	targetChat, err := h.chatRepo.FindById(ctx, query.ChatId)
-	if err != nil {
-		return nil, errors.WithMessage(err, "find chat failed")
-	}
-
-	userId := pkgcontext.GetUserId(ctx)
-	if targetChat.OwnerId != userId {
-		return nil, errors.ErrParams.Msgf("chat not belong to user, chat_id=%s", query.ChatId)
+	if _, err := h.commonHandle(ctx, query.ChatId); err != nil {
+		return nil, err
 	}
 
 	cursor := query.Cursor

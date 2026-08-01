@@ -11,7 +11,7 @@ import (
 )
 
 type GetSourceHandler struct {
-	sourceRepo    sourcerepo.Repository
+	*baseHandler
 	storageRepo   sourcerepo.StorageRepository
 	sourceService sourceservice.Service
 }
@@ -21,7 +21,7 @@ func NewGetSourceHandler(
 	storageRepo sourcerepo.StorageRepository,
 ) *GetSourceHandler {
 	return &GetSourceHandler{
-		sourceRepo:    sourceRepo,
+		baseHandler:   newBaseHandler(sourceRepo),
 		sourceService: sourceservice.New(storageRepo),
 		storageRepo:   storageRepo,
 	}
@@ -31,9 +31,9 @@ func (h *GetSourceHandler) Handle(
 	ctx context.Context,
 	sourceId valobj.Id,
 ) (*sourceentity.SourceDetail, error) {
-	targetSource, err := h.sourceRepo.FindById(ctx, sourceId)
+	targetSource, err := h.handle(ctx, sourceId)
 	if err != nil {
-		return nil, errors.WithMessagef(err, "find source failed, source_id=%s", sourceId)
+		return nil, err
 	}
 
 	if !targetSource.Status.IsReady() {

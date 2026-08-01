@@ -1,6 +1,7 @@
 package notelm
 
 import (
+	stdcontext "context"
 	"sync"
 
 	"github.com/cloudwego/hertz/pkg/app/server"
@@ -22,22 +23,25 @@ import (
 )
 
 type ServerDeps struct {
-	NotebookRepo       notebookrepo.Repository
-	SourceRepo         sourcerepo.Repository
-	SourceStorageRepo  sourcerepo.StorageRepository
-	SourceDocRepo      sourcerepo.SourceDocRepository
-	ChatRepo           chatrepo.Repository
-	MessageRepo        chatrepo.MessageRepository
-	ContextMessageRepo chatrepo.ContextMessageRepository
-	StreamTaskRepo     chatrepo.StreamTaskRepository
-	EventBus           eventbus.EventBus
-	WaitGroup          *sync.WaitGroup
-	LLMGateway         *chat.Gateway
+	RootCtx stdcontext.Context
+
+	NotebookRepo           notebookrepo.Repository
+	SourceRepo             sourcerepo.Repository
+	SourceStorageRepo      sourcerepo.StorageRepository
+	SourceDocRepo          sourcerepo.SourceDocRepository
+	ChatRepo               chatrepo.ChatRepository
+	ChatMessageRepo        chatrepo.MessageRepository
+	ChatContextMessageRepo chatrepo.ContextMessageRepository
+	ChatStreamTaskRepo     chatrepo.StreamTaskRepository
+	ChatSuggestionRepo     chatrepo.SuggestionRepository
+	EventBus               eventbus.EventBus
+	WaitGroup              *sync.WaitGroup
+	LLMGateway             *chat.Gateway
 
 	ArtifactRepo   artifactrepo.Repository
 	FlowClient     flow.TaskClient
 	Poller         artifactapp.Poller
-	StorageGateway artifactapp.StorageGateway
+	StorageGateway adapter.StorageGateway
 
 	TitleMaker adapter.TitleMaker
 }
@@ -45,14 +49,12 @@ type ServerDeps struct {
 type Server struct {
 	h *server.Hertz
 
-	checkNotebookAccessHandler *notebookapp.CheckNotebookAccessHandler
-	getNotebookHandler         *notebookapp.GetNotebookHandler
-	createNotebookHandler      *notebookapp.CreateNotebookHandler
-	listNotebooksHandler       *notebookapp.ListNotebooksHandler
-	deleteNotebookHandler      *notebookapp.DeleteNotebookHandler
-	updateNotebookNameHandler  *notebookapp.UpdateNotebookNameHandler
+	getNotebookHandler        *notebookapp.GetNotebookHandler
+	createNotebookHandler     *notebookapp.CreateNotebookHandler
+	listNotebooksHandler      *notebookapp.ListNotebooksHandler
+	deleteNotebookHandler     *notebookapp.DeleteNotebookHandler
+	updateNotebookNameHandler *notebookapp.UpdateNotebookNameHandler
 
-	checkSourceAccessHandler      *sourceapp.CheckSourceAccessHandler
 	getSourceHandler              *sourceapp.GetSourceHandler
 	createSourceHandler           *sourceapp.CreateSourceHandler
 	deleteSourceHandler           *sourceapp.DeleteSourceHandler
@@ -67,11 +69,12 @@ type Server struct {
 	listSourcesHandler *sourceapp.ListSourcesHandler
 	createChatHandler  *chatapp.CreateChatHandler
 
-	chatCreateMessageHandler *chatapp.CreateMessageHandler
-	listMessagesHandler      *chatapp.ListMessagesHandler
-	getStreamHandler         *chatapp.GetStreamHandler
-	abortStreamHandler       *chatapp.AbortStreamHandler
-	deleteChatContextHandler *chatapp.DeleteChatContextHandler
+	createChatMessageHandler  *chatapp.CreateMessageHandler
+	listChatMessagesHandler   *chatapp.ListMessagesHandler
+	getChatStreamHandler      *chatapp.GetStreamHandler
+	abortChatStreamHandler    *chatapp.AbortStreamHandler
+	deleteChatContextHandler  *chatapp.DeleteChatContextHandler
+	getChatSuggestionsHandler *chatapp.ChatSuggestHandler
 
 	generateArtifactHandler      *artifactapp.GenerateArtifactHandler
 	getArtifactStatusHandler     *artifactapp.GetArtifactStatusHandler
@@ -97,15 +100,13 @@ func NewServer(
 	)
 
 	s := &Server{
-		h:                          hz,
-		checkNotebookAccessHandler: notebookapp.NewCheckNotebookAccessHandler(deps.NotebookRepo),
-		getNotebookHandler:         notebookapp.NewGetNotebookHandler(deps.NotebookRepo),
-		createNotebookHandler:      notebookapp.NewCreateNotebookHandler(deps.NotebookRepo, deps.EventBus),
-		listNotebooksHandler:       notebookapp.NewListNotebooksHandler(deps.NotebookRepo),
-		deleteNotebookHandler:      notebookapp.NewDeleteNotebookHandler(deps.NotebookRepo, deps.EventBus),
-		updateNotebookNameHandler:  notebookapp.NewUpdateNotebookNameHandler(deps.NotebookRepo),
+		h:                         hz,
+		getNotebookHandler:        notebookapp.NewGetNotebookHandler(deps.NotebookRepo),
+		createNotebookHandler:     notebookapp.NewCreateNotebookHandler(deps.NotebookRepo, deps.EventBus),
+		listNotebooksHandler:      notebookapp.NewListNotebooksHandler(deps.NotebookRepo),
+		deleteNotebookHandler:     notebookapp.NewDeleteNotebookHandler(deps.NotebookRepo, deps.EventBus),
+		updateNotebookNameHandler: notebookapp.NewUpdateNotebookNameHandler(deps.NotebookRepo),
 
-		checkSourceAccessHandler:      sourceapp.NewCheckSourceAccessHandler(deps.SourceRepo),
 		getSourceHandler:              sourceapp.NewGetSourceHandler(deps.SourceRepo, deps.SourceStorageRepo),
 		createSourceHandler:           sourceapp.NewCreateSourceHandler(deps.SourceRepo, deps.NotebookRepo, deps.EventBus),
 		deleteSourceHandler:           sourceapp.NewDeleteSourceHandler(deps.SourceRepo, deps.EventBus),
@@ -119,28 +120,39 @@ func NewServer(
 
 		createChatHandler:  chatapp.NewCreateChatHandler(deps.NotebookRepo, deps.ChatRepo),
 		listSourcesHandler: sourceapp.NewListSourcesHandler(deps.NotebookRepo, deps.SourceRepo, deps.SourceStorageRepo),
+		getChatSuggestionsHandler: chatapp.NewChatSuggestHandler(
+			deps.RootCtx,
+			deps.ChatRepo,
+			deps.ChatSuggestionRepo,
+			deps.ChatMessageRepo,
+			deps.ChatContextMessageRepo,
+			deps.NotebookRepo,
+			deps.SourceRepo,
+			deps.LLMGateway,
+		),
 
-		chatCreateMessageHandler: chatapp.NewCreateMessageHandler(
+		createChatMessageHandler: chatapp.NewCreateMessageHandler(
 			deps.WaitGroup,
 			deps.NotebookRepo,
 			deps.ChatRepo,
-			deps.MessageRepo,
-			deps.ContextMessageRepo,
-			deps.StreamTaskRepo,
+			deps.ChatMessageRepo,
+			deps.ChatContextMessageRepo,
+			deps.ChatStreamTaskRepo,
 			deps.SourceRepo,
 			deps.SourceStorageRepo,
 			deps.SourceDocRepo,
 			deps.LLMGateway,
+			deps.EventBus,
 		),
-		listMessagesHandler: chatapp.NewListMessagesHandler(
+		listChatMessagesHandler: chatapp.NewListMessagesHandler(
 			deps.ChatRepo,
-			deps.MessageRepo,
+			deps.ChatMessageRepo,
 		),
-		getStreamHandler:   chatapp.NewGetStreamHandler(deps.StreamTaskRepo),
-		abortStreamHandler: chatapp.NewAbortStreamHandler(deps.StreamTaskRepo),
+		getChatStreamHandler:   chatapp.NewGetStreamHandler(deps.ChatStreamTaskRepo),
+		abortChatStreamHandler: chatapp.NewAbortStreamHandler(deps.ChatStreamTaskRepo, deps.EventBus),
 		deleteChatContextHandler: chatapp.NewDeleteChatContextHandler(
 			deps.ChatRepo,
-			deps.ContextMessageRepo,
+			deps.ChatContextMessageRepo,
 		),
 
 		generateArtifactHandler: artifactapp.NewGenerateArtifactHandler(
@@ -149,14 +161,14 @@ func NewServer(
 			deps.NotebookRepo,
 			deps.SourceRepo,
 			deps.ChatRepo,
-			deps.MessageRepo,
+			deps.ChatMessageRepo,
 			deps.FlowClient,
 			deps.Poller,
 			deps.EventBus,
 			deps.TitleMaker,
 		),
 		getArtifactStatusHandler:     artifactapp.NewGetArtifactStatusHandler(deps.ArtifactRepo, deps.FlowClient, deps.StorageGateway),
-		listNotebookArtifactsHandler: artifactapp.NewListArtifactsHandler(deps.ArtifactRepo, deps.NotebookRepo),
+		listNotebookArtifactsHandler: artifactapp.NewListArtifactsHandler(deps.NotebookRepo, deps.ArtifactRepo),
 		cancelArtifactHandler:        artifactapp.NewCancelArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.EventBus),
 		deleteArtifactHandler:        artifactapp.NewDeleteArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.StorageGateway),
 		retryArtifactHandler:         artifactapp.NewRetryArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.Poller, deps.EventBus),

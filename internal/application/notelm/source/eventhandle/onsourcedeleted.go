@@ -12,22 +12,22 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
-type CleanupDeletedSourceHandler struct {
+type OnSourceDeletedEventHandler struct {
 	sourceDocRepo     sourcerepo.SourceDocRepository
 	sourceStorageRepo sourcerepo.StorageRepository
 }
 
-func NewCleanupDeletedSourceHandler(
+func NewOnSourceDeletedEventHandler(
 	sourceDocRepo sourcerepo.SourceDocRepository,
 	sourceStorageRepo sourcerepo.StorageRepository,
-) *CleanupDeletedSourceHandler {
-	return &CleanupDeletedSourceHandler{
+) *OnSourceDeletedEventHandler {
+	return &OnSourceDeletedEventHandler{
 		sourceDocRepo:     sourceDocRepo,
 		sourceStorageRepo: sourceStorageRepo,
 	}
 }
 
-func (h *CleanupDeletedSourceHandler) Handle(ctx context.Context, evt *sourceevent.DeleteEvent) error {
+func (h *OnSourceDeletedEventHandler) Handle(ctx context.Context, evt *sourceevent.DeleteEvent) error {
 	sourceId := evt.SourceId()
 	notebookId := evt.NotebookId()
 
@@ -56,7 +56,7 @@ func (h *CleanupDeletedSourceHandler) Handle(ctx context.Context, evt *sourceeve
 func RegisterSourceDeletedConsumer(
 	ctx context.Context,
 	bus eventbus.EventBus,
-	handler *CleanupDeletedSourceHandler,
+	handler *OnSourceDeletedEventHandler,
 ) error {
 	composite, err := eventbus.AsComposite(bus)
 	if err != nil {

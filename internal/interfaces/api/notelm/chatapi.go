@@ -7,10 +7,6 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/bytedance/sonic"
-	"github.com/cloudwego/hertz/pkg/app"
-	"github.com/cloudwego/hertz/pkg/protocol/sse"
-	"github.com/cloudwego/hertz/pkg/route"
 	chatapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat"
 	chatagent "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/agent"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
@@ -19,6 +15,11 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 	"github.com/gonotelm-lab/gonotelm/pkg/http/middleware"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
+
+	"github.com/bytedance/sonic"
+	"github.com/cloudwego/hertz/pkg/app"
+	"github.com/cloudwego/hertz/pkg/protocol/sse"
+	"github.com/cloudwego/hertz/pkg/route"
 )
 
 func (s *Server) registerChatRoutes(g *route.RouterGroup) {
@@ -31,9 +32,11 @@ func (s *Server) registerChatRoutes(g *route.RouterGroup) {
 		// POST /api/v1/chats/:id/stream/abort
 		chatIdGroup.POST("/stream/abort", s.ChatAbortStream)
 		// GET /api/v1/chats/:id/stream — SSE
-		chatIdGroup.GET("/stream", middleware.SlowRequestThreshold(60*time.Second), s.GetChatStream)
+		chatIdGroup.GET("/stream", middleware.SlowRequestThreshold(120*time.Second), s.GetChatStream)
 		// DELETE /api/v1/chats/:id/context
 		chatIdGroup.DELETE("/context", s.DeleteChatContext)
+		// GET /api/v1/chats/:id/suggestions
+		chatIdGroup.GET("/suggestions", s.GetChatSuggestions)
 	}
 }
 
@@ -50,7 +53,7 @@ func (s *Server) ChatCreateMessage(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	result, err := s.chatCreateMessageHandler.Handle(ctx,
+	result, err := s.createChatMessageHandler.Handle(ctx,
 		&chatapp.CreateMessageCommand{
 			ChatId:         req.Id,
 			Prompt:         req.Prompt,
@@ -97,7 +100,7 @@ func (s *Server) ChatAbortStream(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	if err := s.abortStreamHandler.Handle(ctx,
+	if err := s.abortChatStreamHandler.Handle(ctx,
 		&chatapp.AbortStreamCommand{
 			ChatId: req.Id,
 			TaskId: taskId,
@@ -128,7 +131,7 @@ func (s *Server) GetChatStream(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	result, err := s.getStreamHandler.Handle(ctx,
+	result, err := s.getChatStreamHandler.Handle(ctx,
 		&chatapp.GetStreamQuery{
 			ChatId:      req.Id,
 			TaskId:      taskId,
@@ -192,7 +195,7 @@ func (s *Server) ListChatMessages(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	result, err := s.listMessagesHandler.Handle(ctx,
+	result, err := s.listChatMessagesHandler.Handle(ctx,
 		&chatapp.ListMessagesQuery{
 			ChatId: req.Id,
 			Cursor: req.Cursor,
@@ -228,5 +231,29 @@ func (s *Server) DeleteChatContext(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	http.OkResp(c, nil)
+	http.OkRespNoContent(c)
+}
+
+func (s *Server) GetChatSuggestions(ctx context.Context, c *app.RequestContext) {
+	var req schema.GetChatSuggestionsRequest
+	err := c.BindAndValidate(&req)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	result, err := s.getChatSuggestionsHandler.Handle(ctx,
+		&chatapp.ChatSuggestCommand{
+			ChatId:    req.Id,
+			SourceIds: toValobjIds(req.SourceIds),
+		})
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	http.OkResp(c, schema.GetChatSuggestionsResponse{
+		Type:      string(result.Type),
+		Questions: result.Questions,
+	})
 }

@@ -84,7 +84,8 @@ func (i *Interceptor) OnEndWithStreamOutput(
 	info *callbacks.RunInfo,
 	output *schema.StreamReader[callbacks.CallbackOutput],
 ) context.Context {
-	safe.Go(ctx, func() {
+	// 流式触发 需要后台协程单独处理
+	safe.DetachGo(ctx, context.Background(), func(ctx context.Context) {
 		defer func() {
 			output.Close()
 			runSemRelease(ctx)

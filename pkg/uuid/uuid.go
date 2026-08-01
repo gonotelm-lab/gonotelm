@@ -19,6 +19,8 @@ type UUID struct {
 	googl.UUID
 }
 
+type UUIDArray []UUID
+
 var (
 	_ driver.Valuer          = UUID{}
 	_ encoding.TextMarshaler = UUID{}

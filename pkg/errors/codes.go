@@ -4,26 +4,32 @@ import "net/http"
 
 // Errors that should return 200 status code
 const (
-	CodeInvalidParams = 1000
-	CodeNoRecord      = 1001
-	CodeEmbedErr      = 1002
-	CodeLLMErr        = 1003
+	CodeInvalidParams   = 1000
+	CodeNoRecord        = 1001
+	CodeEmbedErr        = 1002
+	CodeLLMErr          = 1003
+	CodeLockNotAcquired = 1004
+	CodeLockTaken       = 1005
 )
 
 const (
-	MsgInvalidParams = "INVALID_PARAMETERS"
-	MsgNoRecord      = "NO_RECORD_FOUND"
-	MsgEmbedErr      = "EMBEDDING_ERROR"
-	MsgLLMErr        = "LLM_ERROR"
+	MsgInvalidParams   = "INVALID_PARAMETERS"
+	MsgNoRecord        = "NO_RECORD_FOUND"
+	MsgEmbedErr        = "EMBEDDING_ERROR"
+	MsgLLMErr          = "LLM_ERROR"
+	MsgLockNotAcquired = "LOCK_NOT_ACQUIRED"
+	MsgLockTaken       = "LOCK_TAKEN"
 )
 
 var (
 	statusOk = http.StatusOK
 
-	ErrParams   = NewInnerError(statusOk, CodeInvalidParams, MsgInvalidParams)
-	ErrNoRecord = NewInnerError(statusOk, CodeNoRecord, MsgNoRecord)
-	ErrEmbed    = NewInnerError(statusOk, CodeEmbedErr, MsgEmbedErr)
-	ErrLLM      = NewInnerError(statusOk, CodeLLMErr, MsgLLMErr)
+	ErrParams          = NewInnerError(statusOk, CodeInvalidParams, MsgInvalidParams)
+	ErrNoRecord        = NewInnerError(statusOk, CodeNoRecord, MsgNoRecord)
+	ErrEmbed           = NewInnerError(statusOk, CodeEmbedErr, MsgEmbedErr)
+	ErrLLM             = NewInnerError(statusOk, CodeLLMErr, MsgLLMErr)
+	ErrLockNotAcquired = NewInnerError(statusOk, CodeLockNotAcquired, MsgLockNotAcquired)
+	ErrLockTaken       = NewInnerError(statusOk, CodeLockTaken, MsgLockTaken)
 )
 
 const (

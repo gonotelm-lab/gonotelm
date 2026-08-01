@@ -7,6 +7,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/app/server"
 	artifactapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/artifact"
 	chatapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat"
+	chatsuggest "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/suggestion"
 	notebookapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/notebook"
 	sourceapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/source"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
@@ -34,6 +35,7 @@ type ServerDeps struct {
 	ChatContextMessageRepo chatrepo.ContextMessageRepository
 	ChatStreamTaskRepo     chatrepo.StreamTaskRepository
 	ChatSuggestionRepo     chatrepo.SuggestionRepository
+	ChatSuggestService     *chatsuggest.Service
 	EventBus               eventbus.EventBus
 	WaitGroup              *sync.WaitGroup
 	LLMGateway             *chat.Gateway
@@ -121,14 +123,8 @@ func NewServer(
 		createChatHandler:  chatapp.NewCreateChatHandler(deps.NotebookRepo, deps.ChatRepo),
 		listSourcesHandler: sourceapp.NewListSourcesHandler(deps.NotebookRepo, deps.SourceRepo, deps.SourceStorageRepo),
 		getChatSuggestionsHandler: chatapp.NewChatSuggestHandler(
-			deps.RootCtx,
 			deps.ChatRepo,
-			deps.ChatSuggestionRepo,
-			deps.ChatMessageRepo,
-			deps.ChatContextMessageRepo,
-			deps.NotebookRepo,
-			deps.SourceRepo,
-			deps.LLMGateway,
+			deps.ChatSuggestService,
 		),
 
 		createChatMessageHandler: chatapp.NewCreateMessageHandler(
@@ -153,6 +149,7 @@ func NewServer(
 		deleteChatContextHandler: chatapp.NewDeleteChatContextHandler(
 			deps.ChatRepo,
 			deps.ChatContextMessageRepo,
+			deps.ChatSuggestionRepo,
 		),
 
 		generateArtifactHandler: artifactapp.NewGenerateArtifactHandler(

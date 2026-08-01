@@ -7,9 +7,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/domain/chat/entity"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache"
-	cacheerrors "github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache/errors"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository/mapper"
-	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type SuggestionRepositoryImpl struct {
@@ -27,11 +25,10 @@ var _ chatrepo.SuggestionRepository = &SuggestionRepositoryImpl{}
 func (r *SuggestionRepositoryImpl) Get(ctx context.Context, chatId valobj.Id) (*entity.Suggestion, error) {
 	sch, err := r.suggestionCache.Get(ctx, chatId.String())
 	if err != nil {
-		if errors.Is(err, cacheerrors.ErrSuggestionNotFound) {
-			return entity.NewSuggestion(entity.SuggestionTypeFollowUp, []string{}), nil // 找不到也无所谓
-		}
-
 		return nil, err
+	}
+	if sch == nil {
+		return entity.NewSuggestion(entity.SuggestionTypeNone, []string{}), nil // 不存在也无所谓
 	}
 
 	return mapper.SuggestionFromSchema(sch), nil

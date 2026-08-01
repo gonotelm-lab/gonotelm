@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache"
-	cacheerrors "github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache/errors"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 
@@ -57,7 +56,7 @@ func (c *ChatSuggestionCacheImpl) Get(
 	encSuggestion, err := c.rd.Get(ctx, suggestionCacheKey(chatId)).Result()
 	if err != nil {
 		if errors.Is(err, goredis.Nil) {
-			return nil, cacheerrors.ErrSuggestionNotFound
+			return nil, nil // 不存在，非错误
 		}
 
 		return nil, errors.Wrap(errors.ErrCache, err.Error())

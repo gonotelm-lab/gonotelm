@@ -88,8 +88,8 @@ type DeleteChatContextRequest struct {
 }
 
 type GetChatSuggestionsRequest struct {
-	Id        uuid.UUID   `path:"id,required"`
-	SourceIds []uuid.UUID `query:"source_ids"`
+	Id        uuid.UUID      `path:"id,required"`
+	SourceIds uuid.UUIDArray `query:"source_ids"`
 }
 
 type GetChatSuggestionsResponse struct {

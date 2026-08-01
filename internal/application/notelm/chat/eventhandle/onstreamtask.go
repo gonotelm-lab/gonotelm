@@ -7,10 +7,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/suggestion"
 	chatevent "github.com/gonotelm-lab/gonotelm/internal/domain/chat/event"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
-	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
-	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
-	llmchat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/safe"
 )
@@ -26,25 +23,12 @@ type OnStreamTaskEventHandler struct {
 func NewOnStreamTaskEventHandler(
 	rootCtx context.Context,
 	chatRepo chatrepo.ChatRepository,
-	messageRepo chatrepo.MessageRepository,
-	contextMessageRepo chatrepo.ContextMessageRepository,
-	suggestionRepo chatrepo.SuggestionRepository,
-	notebookRepo notebookrepo.Repository,
-	sourceRepo sourcerepo.Repository,
-	chatGateway *llmchat.Gateway,
+	suggestionService *suggestion.Service,
 ) *OnStreamTaskEventHandler {
 	return &OnStreamTaskEventHandler{
-		rootCtx:  rootCtx,
-		chatRepo: chatRepo,
-		suggestionService: suggestion.NewService(
-			rootCtx,
-			suggestionRepo,
-			messageRepo,
-			contextMessageRepo,
-			notebookRepo,
-			sourceRepo,
-			chatGateway,
-		),
+		rootCtx:           rootCtx,
+		chatRepo:          chatRepo,
+		suggestionService: suggestionService,
 	}
 }
 

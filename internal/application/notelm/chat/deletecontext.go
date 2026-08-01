@@ -11,12 +11,18 @@ import (
 type DeleteChatContextHandler struct {
 	*baseHandler
 	chatContextMessageRepo chatrepo.ContextMessageRepository
+	suggestionRepo         chatrepo.SuggestionRepository
 }
 
-func NewDeleteChatContextHandler(chatRepo chatrepo.ChatRepository, chatContextMessageRepo chatrepo.ContextMessageRepository) *DeleteChatContextHandler {
+func NewDeleteChatContextHandler(
+	chatRepo chatrepo.ChatRepository,
+	chatContextMessageRepo chatrepo.ContextMessageRepository,
+	suggestionRepo chatrepo.SuggestionRepository,
+) *DeleteChatContextHandler {
 	return &DeleteChatContextHandler{
 		baseHandler:            newBaseHandler(chatRepo),
 		chatContextMessageRepo: chatContextMessageRepo,
+		suggestionRepo:        suggestionRepo,
 	}
 }
 
@@ -31,6 +37,10 @@ func (h *DeleteChatContextHandler) Handle(ctx context.Context, cmd *DeleteChatCo
 
 	if err := h.chatContextMessageRepo.Destroy(ctx, cmd.ChatId); err != nil {
 		return errors.WithMessage(err, "clear chat context failed")
+	}
+
+	if err := h.suggestionRepo.Delete(ctx, cmd.ChatId); err != nil {
+		return errors.WithMessage(err, "clear chat suggestions failed")
 	}
 
 	return nil

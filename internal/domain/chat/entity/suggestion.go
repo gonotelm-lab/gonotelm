@@ -3,6 +3,7 @@ package entity
 type SuggestionType string
 
 const (
+	SuggestionTypeNone     SuggestionType = "none"
 	SuggestionTypeFollowUp SuggestionType = "follow_up"
 	SuggestionTypeOpener   SuggestionType = "opener"
 )

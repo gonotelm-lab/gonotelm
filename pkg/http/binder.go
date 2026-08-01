@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"strings"
 
 	"github.com/cloudwego/hertz/pkg/app/server/binding"
 	"github.com/cloudwego/hertz/pkg/protocol"
@@ -31,6 +32,20 @@ func uuidUnmarshaler(req *protocol.Request, params param.Params, text string) (r
 	return reflect.ValueOf(parsed), nil
 }
 
+func uuidArrayUnmarshaler(req *protocol.Request, params param.Params, text string) (reflect.Value, error) {
+	ids := strings.Split(text, ",")
+	var uuids []uuid.UUID
+	for _, id := range ids {
+		parsed, err := uuid.ParseString(id)
+		if err != nil {
+			return reflect.Value{}, err
+		}
+		uuids = append(uuids, parsed)
+	}
+
+	return reflect.ValueOf(uuids), nil
+}
+
 func urlUnmarshaler(req *protocol.Request, params param.Params, text string) (reflect.Value, error) {
 	parsed, err := url.ParseRequestURI(text)
 	if err != nil {
@@ -42,6 +57,7 @@ func urlUnmarshaler(req *protocol.Request, params param.Params, text string) (re
 func registerTypeUnmarshalers(cfg *binding.BindConfig) {
 	cfg.MustRegTypeUnmarshal(reflect.TypeFor[uuid.UUID](), uuidUnmarshaler)
 	cfg.MustRegTypeUnmarshal(reflect.TypeFor[url.URL](), urlUnmarshaler)
+	cfg.MustRegTypeUnmarshal(reflect.TypeFor[uuid.UUIDArray](), uuidArrayUnmarshaler)
 }
 
 func initValidator() *validator.Validate {

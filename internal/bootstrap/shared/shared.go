@@ -7,7 +7,9 @@ import (
 	"log/slog"
 
 	confshared "github.com/gonotelm-lab/gonotelm/internal/conf/shared"
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/service/agentize"
+	infraadapter "github.com/gonotelm-lab/gonotelm/internal/infrastructure/adapter"
 	infracache "github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache/redis"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
@@ -44,6 +46,7 @@ type Infra struct {
 	Text2Image       *text2image.Text2ImageGateway
 	Text2Audio       *text2audio.Text2AudioGateway
 	AgentizeService  *agentize.Service
+	DistLock         adapter.DistributedLock
 
 	closers []io.Closer
 }
@@ -86,6 +89,7 @@ func NewInfra(ctx context.Context, cfg *confshared.InfraConfig) (_ *Infra, outEr
 		addCloser(contextCloser(func(ctx context.Context) error { return redisClient.Close() }))
 		infra.Redis = redisClient
 		infra.Cache = redis.NewCache(redisClient)
+		infra.DistLock = infraadapter.NewRedisDistributedLock(redisClient)
 	}
 
 	if cfg.MsgQueue.Type != "" {

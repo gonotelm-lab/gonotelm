@@ -5,6 +5,7 @@ import (
 
 	artifacteventhandle "github.com/gonotelm-lab/gonotelm/internal/application/notelm/artifact/eventhandle"
 	chateventhandle "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/eventhandle"
+	chatsuggest "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/suggestion"
 	sourceeventhandle "github.com/gonotelm-lab/gonotelm/internal/application/notelm/source/eventhandle"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
@@ -27,6 +28,7 @@ type EventDeps struct {
 	ChatMessageRepo        chatrepo.MessageRepository
 	ChatContextMessageRepo chatrepo.ContextMessageRepository
 	ChatSuggestionRepo     chatrepo.SuggestionRepository
+	ChatSuggestService     *chatsuggest.Service
 
 	ArtifactTaskRepo artifactrepo.Repository
 
@@ -97,12 +99,7 @@ func initStreamTaskEventConsumers(ctx context.Context, deps *EventDeps) error {
 		chateventhandle.NewOnStreamTaskEventHandler(
 			deps.RootCtx,
 			deps.ChatRepo,
-			deps.ChatMessageRepo,
-			deps.ChatContextMessageRepo,
-			deps.ChatSuggestionRepo,
-			deps.NotebookRepo,
-			deps.SourceRepo,
-			deps.ChatGateway,
+			deps.ChatSuggestService,
 		),
 	); err != nil {
 		return err

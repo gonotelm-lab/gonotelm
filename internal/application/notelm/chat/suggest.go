@@ -8,9 +8,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/chat/entity"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
-	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
-	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
-	llmchat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
@@ -18,35 +15,17 @@ import (
 // 获取对话聊天中的会话建议
 type ChatSuggestHandler struct {
 	*baseHandler
-	rootCtx context.Context
 
-	service        *suggestion.Service
-	suggestionRepo chatrepo.SuggestionRepository
+	service *suggestion.Service
 }
 
 func NewChatSuggestHandler(
-	rootCtx context.Context,
 	chatRepo chatrepo.ChatRepository,
-	suggestionRepo chatrepo.SuggestionRepository,
-	messageRepo chatrepo.MessageRepository,
-	messageContextRepo chatrepo.ContextMessageRepository,
-	notebookRepo notebookrepo.Repository,
-	sourceRepo sourcerepo.Repository,
-	chatGateway *llmchat.Gateway,
+	service *suggestion.Service,
 ) *ChatSuggestHandler {
 	return &ChatSuggestHandler{
-		baseHandler:    newBaseHandler(chatRepo),
-		rootCtx:        rootCtx,
-		suggestionRepo: suggestionRepo,
-		service: suggestion.NewService(
-			rootCtx,
-			suggestionRepo,
-			messageRepo,
-			messageContextRepo,
-			notebookRepo,
-			sourceRepo,
-			chatGateway,
-		),
+		baseHandler: newBaseHandler(chatRepo),
+		service:     service,
 	}
 }
 
@@ -61,23 +40,28 @@ type ChatSuggestResult struct {
 }
 
 func (h *ChatSuggestHandler) Handle(ctx context.Context, cmd *ChatSuggestCommand) (*ChatSuggestResult, error) {
+	if len(cmd.SourceIds) == 0 {
+		return &ChatSuggestResult{
+			Type:      entity.SuggestionTypeNone,
+			Questions: []string{},
+		}, nil
+	}
+
 	targetChat, err := h.commonHandle(ctx, cmd.ChatId)
 	if err != nil {
 		return nil, err
 	}
 
 	// if we already have suggestions for this chat just return
-	suggestions, err := h.suggestionRepo.Get(ctx, cmd.ChatId)
+	cached, err := h.service.Get(ctx, cmd.ChatId)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to get suggestions",
-			slog.Any("err", err), slog.String("chat_id", cmd.ChatId.String()),
-		)
+		return nil, err
 	}
 
-	if suggestions != nil && len(suggestions.Questions) > 0 {
+	if len(cached.Questions) > 0 {
 		return &ChatSuggestResult{
-			Questions: suggestions.Questions,
-			Type:      suggestions.Type,
+			Questions: cached.Questions,
+			Type:      cached.SuggestionType,
 		}, nil
 	}
 
@@ -107,7 +91,7 @@ func (h *ChatSuggestHandler) Delete(ctx context.Context, chatId valobj.Id) {
 		return
 	}
 
-	if err := h.suggestionRepo.Delete(ctx, chatId); err != nil {
+	if err := h.service.Delete(ctx, chatId); err != nil {
 		slog.ErrorContext(ctx, "failed to delete suggestions",
 			slog.Any("err", err), slog.String("chat_id", chatId.String()),
 		)

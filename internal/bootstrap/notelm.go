@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	syncerpkg "github.com/gonotelm-lab/gonotelm/internal/application/notelm/artifact/syncer"
+	chatsuggest "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/suggestion"
 	bootshared "github.com/gonotelm-lab/gonotelm/internal/bootstrap/shared"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/adapter"
@@ -90,6 +91,18 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 		cfg.Source.Model,
 	)
 
+	// ── 4.1 Suggestion service (单例) ──
+	suggestionService := chatsuggest.NewService(
+		rootCtx,
+		infra.DistLock,
+		suggestionRepo,
+		messageRepo,
+		contextMsgRepo,
+		notebookRepo,
+		sourceRepo,
+		infra.LLMGateway,
+	)
+
 	// ── 5. Flow task client ──
 	flowClient, err := flowcli.NewTaskClient(
 		cfg.Flow.Addr,
@@ -129,6 +142,7 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 		ChatMessageRepo:        messageRepo,
 		ChatContextMessageRepo: contextMsgRepo,
 		ChatSuggestionRepo:     suggestionRepo,
+		ChatSuggestService:     suggestionService,
 
 		ArtifactTaskRepo: artifactRepo,
 
@@ -150,6 +164,7 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 			ChatContextMessageRepo: contextMsgRepo,
 			ChatStreamTaskRepo:     streamTaskRepo,
 			ChatSuggestionRepo:     suggestionRepo,
+			ChatSuggestService:     suggestionService,
 			ArtifactRepo:           artifactRepo,
 
 			EventBus:   eventBus,

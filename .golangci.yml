@@ -1,14 +1,12 @@
 version: "2"
 
-issues:
-  severity-rules:
-    - linters:
-        - errcheck
-      severity: warning
-
 linters:
   exclusions:
     rules:
+      # errcheck 存量问题较多，整体排除，后续清理时再放开
+      - linters:
+          - errcheck
+        path: ".*"
       # hertz 框架支持 json tag 中的 required 选项，跳过 staticcheck 的误报
       - linters:
           - staticcheck

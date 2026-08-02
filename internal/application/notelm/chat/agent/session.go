@@ -22,7 +22,6 @@ type SessionState struct {
 
 	accumulatedId int64
 	cancel        context.CancelFunc
-	taskAborted   bool
 }
 
 func (s *SessionState) ChatId() valobj.Id {

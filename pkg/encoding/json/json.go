@@ -128,17 +128,18 @@ func fixUnescapedQuotes(data []byte) []byte {
 			}
 
 		case stateInStr:
-			if ch == '\\' {
+			switch ch {
+			case '\\':
 				state = stateEscNext
 				result = append(result, ch)
-			} else if ch == '"' {
+			case '"':
 				if isClosingQuote(data, i) {
 					result = append(result, ch)
 					state = stateNormal
 				} else {
 					result = append(result, '\\', '"')
 				}
-			} else {
+			default:
 				result = append(result, ch)
 			}
 
@@ -191,7 +192,7 @@ func allowedJSONFields(v any) (map[string]struct{}, bool) {
 		return nil, false
 	}
 
-	for t.Kind() == reflect.Ptr {
+	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 		if t == nil {
 			return nil, false

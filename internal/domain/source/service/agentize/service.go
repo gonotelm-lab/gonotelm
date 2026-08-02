@@ -262,7 +262,7 @@ func (s *Service) selectContent(
 	start = max(start, 0)
 	if start >= totalLines {
 		return nil, fmt.Errorf(
-			"source content has only %d lines, but offset %d is requested.",
+			"source content has only %d lines, but offset %d is requested",
 			totalLines, offset,
 		)
 	}

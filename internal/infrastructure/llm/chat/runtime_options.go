@@ -1,8 +1,6 @@
 package chat
 
 import (
-	"strings"
-
 	"github.com/cloudwego/eino-ext/components/model/deepseek"
 	"github.com/cloudwego/eino-ext/components/model/openai"
 	"github.com/cloudwego/eino-ext/components/model/qwen"
@@ -113,19 +111,4 @@ func applyProviderCallOptions(
 	}
 
 	return opts
-}
-
-func normalizeOpenAIReasoningEffort(
-	reasoningEffort string,
-) openai.ReasoningEffortLevel {
-	switch strings.ToLower(strings.TrimSpace(reasoningEffort)) {
-	case string(openai.ReasoningEffortLevelLow):
-		return openai.ReasoningEffortLevelLow
-	case string(openai.ReasoningEffortLevelHigh):
-		return openai.ReasoningEffortLevelHigh
-	case string(openai.ReasoningEffortLevelMedium):
-		fallthrough
-	default:
-		return openai.ReasoningEffortLevelMedium
-	}
 }

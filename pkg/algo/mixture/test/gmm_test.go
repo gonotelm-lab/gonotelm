@@ -483,28 +483,6 @@ func scaleTolerance(reference, relative, absolute float64) float64 {
 	return math.Abs(reference)*relative + absolute
 }
 
-func assertCloseMatrix(t *testing.T, name string, got, want [][]float64, tolerance float64) {
-	t.Helper()
-
-	if len(got) != len(want) {
-		t.Fatalf("%s row count mismatch: got=%d want=%d", name, len(got), len(want))
-	}
-	for rowIdx := range got {
-		assertCloseVector(t, fmt.Sprintf("%s[%d]", name, rowIdx), got[rowIdx], want[rowIdx], tolerance)
-	}
-}
-
-func assertCloseVector(t *testing.T, name string, got, want []float64, tolerance float64) {
-	t.Helper()
-
-	if len(got) != len(want) {
-		t.Fatalf("%s length mismatch: got=%d want=%d", name, len(got), len(want))
-	}
-	for idx := range got {
-		assertCloseFloat(t, fmt.Sprintf("%s[%d]", name, idx), got[idx], want[idx], tolerance)
-	}
-}
-
 func assertCloseFloat(t *testing.T, name string, got, want, tolerance float64) {
 	t.Helper()
 

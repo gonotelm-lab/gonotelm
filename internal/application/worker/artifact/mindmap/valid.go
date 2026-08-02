@@ -59,9 +59,5 @@ func CheckStudioMindmapResult(content string) bool {
 			rootCount++
 		}
 	}
-	if rootCount != 1 {
-		return false
-	}
-
-	return true
+	return rootCount == 1
 }

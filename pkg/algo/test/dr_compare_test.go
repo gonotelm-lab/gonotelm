@@ -37,12 +37,6 @@ type drMethodResult struct {
 	DistanceCorrelation float64     `json:"distance_correlation"`
 }
 
-type drPlotPayload struct {
-	DatasetName string           `json:"dataset_name"`
-	Methods     []drMethodResult `json:"methods"`
-	OutputFile  string           `json:"output_file,omitempty"`
-}
-
 type drGoVsPythonPlotPayload struct {
 	DatasetName   string           `json:"dataset_name"`
 	GoMethods     []drMethodResult `json:"go_methods"`
@@ -388,43 +382,6 @@ func loadPythonMethodsViaUV(
 		return nil, stderr.String(), fmt.Errorf("decode python dr snapshot failed: %w", err)
 	}
 	return response.Methods, stderr.String(), nil
-}
-
-func renderComparisonPlotViaUV(t *testing.T, payload drPlotPayload) {
-	t.Helper()
-
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		t.Fatalf("marshal dr plot payload failed: %v", err)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
-	defer cancel()
-
-	cmd := exec.CommandContext(
-		ctx,
-		"uv",
-		"run",
-		"--python",
-		drCompareUVPythonPath,
-		"python",
-		"dr_compare.py",
-		"--plot-stdin",
-	)
-	cmd.Dir = "."
-	cmd.Stdin = bytes.NewReader(raw)
-
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		t.Fatalf("render dr comparison plot failed: %v\nstderr:\n%s", err, stderr.String())
-	}
-	if output := strings.TrimSpace(stdout.String()); output != "" {
-		t.Logf("python plot output: %s", output)
-	}
 }
 
 func renderGoVsPythonPlotViaUV(t *testing.T, payload drGoVsPythonPlotPayload) {

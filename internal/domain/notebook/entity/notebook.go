@@ -69,7 +69,7 @@ func (n *Notebook) validate() error {
 
 func (n *Notebook) Delete() {
 	n.Base.Delete()
-	n.Base.AddEvent(notebookevent.NewDeleteEvent(n.Id))
+	n.AddEvent(notebookevent.NewDeleteEvent(n.Id))
 }
 
 func (n *Notebook) UpdateName(name string) error {

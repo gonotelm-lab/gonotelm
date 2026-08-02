@@ -169,13 +169,6 @@ func (a *Generator) ensureTranscript(
 	return transcript, ckpt, false, nil
 }
 
-func (a *Generator) cleanupCheckpoint(ctx context.Context, req *types.Request) {
-	if err := a.deps.CheckpointRepository.DeleteByArtifactId(ctx, req.ArtifactId); err != nil {
-		slog.ErrorContext(ctx, "delete checkpoint failed",
-			slog.String("artifact_id", req.ArtifactId.String()), slog.Any("err", err))
-	}
-}
-
 func (a *Generator) buildAudioResponse(
 	transcript *podcastTranscriptExpectation,
 	audioResult *AudioStorageResult,

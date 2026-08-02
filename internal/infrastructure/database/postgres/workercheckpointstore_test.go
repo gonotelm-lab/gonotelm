@@ -68,6 +68,8 @@ func TestWorkerCheckpointStore_Update(t *testing.T) {
 	require.NoError(t, store.Update(ctx, &schema.WorkerCheckpoint{
 		ArtifactId: aId,
 		Field1:     []byte("updated1"),
+		Field2:     []byte("initial2"),
+		UpdatedAt:  now,
 	}))
 
 	got, err := store.GetByArtifactId(ctx, aId)

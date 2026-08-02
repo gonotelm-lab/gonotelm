@@ -302,7 +302,7 @@ func (s *Source) Delete() {
 }
 
 func (s *Source) addDeleteEvent() {
-	s.Base.AddEvent(sourceevent.NewDeleteEvent(s.Id, s.NotebookId, s.objectStoreKeys()))
+	s.AddEvent(sourceevent.NewDeleteEvent(s.Id, s.NotebookId, s.objectStoreKeys()))
 }
 
 func (s *Source) ObjectStoreKeys() []string {
@@ -321,7 +321,7 @@ func (s *Source) objectStoreKeys() []string {
 }
 
 func (s *Source) addPreparationEvent(isRetry bool) {
-	s.Base.AddEvent(
+	s.AddEvent(
 		sourceevent.NewPreparationEvent(
 			s.Id,
 			s.NotebookId,
@@ -334,5 +334,5 @@ func (s *Source) addPreparationEvent(isRetry bool) {
 }
 
 func (s *Source) addIndexEvent() {
-	s.Base.AddEvent(sourceevent.NewIndexEvent(s.Id, s.NotebookId))
+	s.AddEvent(sourceevent.NewIndexEvent(s.Id, s.NotebookId))
 }

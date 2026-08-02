@@ -84,7 +84,7 @@ func (h *ChatSuggestHandler) Handle(ctx context.Context, cmd *ChatSuggestCommand
 }
 
 func (h *ChatSuggestHandler) Delete(ctx context.Context, chatId valobj.Id) {
-	if _, err := h.baseHandler.commonHandle(ctx, chatId); err != nil {
+	if _, err := h.commonHandle(ctx, chatId); err != nil {
 		slog.WarnContext(ctx, "delete suggestions due to chat common handle failure",
 			slog.Any("err", err), slog.String("chat_id", chatId.String()),
 		)

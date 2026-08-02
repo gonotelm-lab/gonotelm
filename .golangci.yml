@@ -1,0 +1,19 @@
+version: "2"
+
+issues:
+  severity-rules:
+    - linters:
+        - errcheck
+      severity: warning
+
+linters:
+  exclusions:
+    rules:
+      # hertz 框架支持 json tag 中的 required 选项，跳过 staticcheck 的误报
+      - linters:
+          - staticcheck
+        text: "SA5008"
+      # grpc.WithTimeout 已弃用但项目仍在使用（milvus 客户端 dial options）
+      - linters:
+          - staticcheck
+        text: "grpc.WithTimeout"

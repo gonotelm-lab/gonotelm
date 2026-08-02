@@ -131,10 +131,10 @@ func (h *Service) Generate(ctx context.Context, cmd *GenerateSuggestionsCommand)
 	*GenerateSuggestionsResult, error,
 ) {
 	var (
-		chatId     valobj.Id   = cmd.Chat.Id
-		notebookId valobj.Id   = cmd.Chat.NotebookId
-		sourceIds  []valobj.Id = cmd.SourceIds
-		userId     string      = cmd.UserId
+		chatId     = cmd.Chat.Id
+		notebookId = cmd.Chat.NotebookId
+		sourceIds  = cmd.SourceIds
+		userId     = cmd.UserId
 	)
 
 	// 先锁住 可能此时客户端请求上来 可能导致同一段上下文被重复生成

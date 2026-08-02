@@ -23,5 +23,5 @@ func TestRenderMindmap(t *testing.T) {
 }
 
 func TestGenerator_ImplementsGenerator(t *testing.T) {
-	var _ Generator = *New(nil)
+	var _ = *New(nil)
 }

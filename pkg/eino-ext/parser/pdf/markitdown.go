@@ -1057,10 +1057,7 @@ func isLikelyTableData(table [][]string) bool {
 			stableColumns++
 		}
 	}
-	if stableColumns < 3 {
-		return false
-	}
-	return true
+	return stableColumns >= 3
 }
 
 func isCodeLikeTableData(table [][]string) bool {

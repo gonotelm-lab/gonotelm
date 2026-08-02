@@ -23,7 +23,6 @@ import (
 	mqkafka "github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq/kafka"
 	infrarepo "github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
-	infrastorage "github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage/minio"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb/milvus"
@@ -260,9 +259,9 @@ func newMQ(cfg *mq.Config) (*mq.MQ, error) {
 	}
 }
 
-func newStorage(cfg *infrastorage.StorageTypeConfig) (storage.Storage, error) {
+func newStorage(cfg *storage.StorageTypeConfig) (storage.Storage, error) {
 	switch cfg.Type {
-	case infrastorage.Minio:
+	case storage.Minio:
 		mc := cfg.Minio
 		return minio.New(&storage.Config{
 			Endpoint:      mc.Endpoint,

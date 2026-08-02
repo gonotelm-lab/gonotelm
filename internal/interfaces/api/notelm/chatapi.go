@@ -79,11 +79,7 @@ func toValobjIds(ids []uuid.UUID) []valobj.Id {
 	}
 
 	result := make([]valobj.Id, 0, len(ids))
-	for _, id := range ids {
-		result = append(result, id)
-	}
-
-	return result
+	return append(result, ids...)
 }
 
 func (s *Server) ChatAbortStream(ctx context.Context, c *app.RequestContext) {

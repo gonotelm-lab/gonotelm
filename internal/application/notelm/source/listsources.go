@@ -16,7 +16,6 @@ type ListSourcesHandler struct {
 	notebookRepo  notebookrepo.Repository
 	sourceRepo    sourcerepo.Repository
 	sourceService sourceservice.Service
-	storageRepo   sourcerepo.StorageRepository
 }
 
 func NewListSourcesHandler(

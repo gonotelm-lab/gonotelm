@@ -112,7 +112,7 @@ func (h *UrlHandler) defaultUrlFetcher(ctx context.Context, url *url.URL) ([]byt
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= http.StatusBadRequest {
-		var buf []byte = make([]byte, 1024)
+		buf := make([]byte, 1024)
 		_, err = io.ReadAtLeast(resp.Body, buf, 1024)
 		if err != nil {
 			slog.Error("read response body failed", slog.Any("error", err))

@@ -174,7 +174,7 @@ func LoadWorkerConfig(path string) (*WorkerConfig, error) {
 }
 
 func (c *WorkerConfig) applyDefaults() {
-	c.InfraConfig.ApplyDefaults()
+	c.ApplyDefaults()
 	c.Logging.ApplyDefaults()
 	c.Flow.ApplyDefaults()
 

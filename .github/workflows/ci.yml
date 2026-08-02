@@ -68,4 +68,10 @@ jobs:
           cache: true
 
       - name: Run db unit tests
-        run: go test ./internal/infrastructure/database/postgres/... ./internal/infrastructure/repository/...
+        run: go test -coverprofile=coverage.out ./internal/infrastructure/database/postgres/... ./internal/infrastructure/repository/...
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v7
+        with:
+          files: coverage.out
+          token: ${{ secrets.CODECOV_TOKEN }}

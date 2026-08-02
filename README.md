@@ -11,6 +11,7 @@
 
 [![GoReportCard](https://goreportcard.com/badge/gonotelm-lab/gonotelm)](https://goreportcard.com/report/github.com/gonotelm-lab/gonotelm)
 [![CI](https://github.com/gonotelm-lab/gonotelm/actions/workflows/ci.yml/badge.svg)](https://github.com/gonotelm-lab/gonotelm/actions/workflows/ci.yml)
+[![codecov](https://img.shields.io/codecov/c/github/gonotelm-lab/gonotelm)](https://codecov.io/gh/gonotelm-lab/gonotelm)
 
 ## GoNoteLM
 

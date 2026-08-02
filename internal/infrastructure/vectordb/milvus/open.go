@@ -7,21 +7,19 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
 	"github.com/gonotelm-lab/gonotelm/pkg/misc"
 	"github.com/milvus-io/milvus/client/v2/milvusclient"
-
-	"google.golang.org/grpc"
 )
 
 func Open(cfg *vectordb.Config) (*vectordb.DAL, error) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.Milvus.DialTimeout)
+	defer cancel()
 
-	grpcOpts := append(milvusclient.DefaultGrpcOpts, grpc.WithTimeout(cfg.Milvus.DialTimeout))
 	cli, err := milvusclient.New(ctx,
 		&milvusclient.ClientConfig{
 			Address:     cfg.Milvus.Addr,
 			Username:    cfg.Milvus.Username,
 			Password:    cfg.Milvus.Password,
 			DBName:      cfg.Milvus.DBName,
-			DialOptions: grpcOpts,
+			DialOptions: milvusclient.DefaultGrpcOpts,
 		})
 	if err != nil {
 		return nil, fmt.Errorf("init milvus client failed: %w", err)

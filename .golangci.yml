@@ -11,7 +11,3 @@ linters:
       - linters:
           - staticcheck
         text: "SA5008"
-      # grpc.WithTimeout 已弃用但项目仍在使用（milvus 客户端 dial options）
-      - linters:
-          - staticcheck
-        text: "grpc.WithTimeout"

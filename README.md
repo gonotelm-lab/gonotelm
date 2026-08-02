@@ -10,6 +10,7 @@
 <br />
 
 [![GoReportCard](https://goreportcard.com/badge/gonotelm-lab/gonotelm)](https://goreportcard.com/report/github.com/gonotelm-lab/gonotelm)
+[![CI](https://github.com/gonotelm-lab/gonotelm/actions/workflows/ci.yml)](https://github.com/gonotelm-lab/gonotelm/actions/workflows/ci.yml)
 
 ## GoNoteLM
 

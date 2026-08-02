@@ -26,7 +26,9 @@ func init() {
 	)
 }
 
-type Interceptor struct{}
+type Interceptor struct {
+	rootCtx context.Context
+}
 
 var _ callbacks.Handler = &Interceptor{}
 
@@ -85,7 +87,7 @@ func (i *Interceptor) OnEndWithStreamOutput(
 	output *schema.StreamReader[callbacks.CallbackOutput],
 ) context.Context {
 	// 流式触发 需要后台协程单独处理
-	safe.DetachGo(ctx, context.Background(), func(ctx context.Context) {
+	safe.DetachGo(ctx, i.rootCtx, func(ctx context.Context) {
 		defer func() {
 			output.Close()
 			runSemRelease(ctx)

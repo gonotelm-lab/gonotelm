@@ -21,12 +21,13 @@ const (
 )
 
 type Gateway struct {
-	mu sync.RWMutex
+	rootCtx context.Context
+	mu      sync.RWMutex
 
 	providers map[llm.Provider]einomodel.ToolCallingChatModel
 }
 
-func New(cfg *llm.ProviderConfig) (*Gateway, error) {
+func New(ctx context.Context, cfg *llm.ProviderConfig) (*Gateway, error) {
 	gw := &Gateway{
 		providers: make(map[llm.Provider]einomodel.ToolCallingChatModel),
 	}
@@ -40,30 +41,29 @@ func New(cfg *llm.ProviderConfig) (*Gateway, error) {
 }
 
 func (g *Gateway) initProviders(cfg *llm.ProviderConfig) error {
-	ctx := context.Background()
-	deepseekModel, err := NewChatModel(ctx, llm.ProviderDeepSeek, cfg)
+	deepseekModel, err := NewChatModel(g.rootCtx, llm.ProviderDeepSeek, cfg)
 	if err != nil {
 		return err
 	}
-	g.providers[llm.ProviderDeepSeek] = newWrappedChatModel(deepseekModel, llm.ProviderDeepSeek, cfg.DeepSeek.MaxConcurrency)
+	g.providers[llm.ProviderDeepSeek] = newWrappedChatModel(g.rootCtx, deepseekModel, llm.ProviderDeepSeek, cfg.DeepSeek.MaxConcurrency)
 
-	openaiModel, err := NewChatModel(ctx, llm.ProviderOpenAI, cfg)
+	openaiModel, err := NewChatModel(g.rootCtx, llm.ProviderOpenAI, cfg)
 	if err != nil {
 		return err
 	}
-	g.providers[llm.ProviderOpenAI] = newWrappedChatModel(openaiModel, llm.ProviderOpenAI, cfg.OpenAI.MaxConcurrency)
+	g.providers[llm.ProviderOpenAI] = newWrappedChatModel(g.rootCtx, openaiModel, llm.ProviderOpenAI, cfg.OpenAI.MaxConcurrency)
 
-	qwenModel, err := NewChatModel(ctx, llm.ProviderQwen, cfg)
+	qwenModel, err := NewChatModel(g.rootCtx, llm.ProviderQwen, cfg)
 	if err != nil {
 		return err
 	}
-	g.providers[llm.ProviderQwen] = newWrappedChatModel(qwenModel, llm.ProviderQwen, cfg.Qwen.MaxConcurrency)
+	g.providers[llm.ProviderQwen] = newWrappedChatModel(g.rootCtx, qwenModel, llm.ProviderQwen, cfg.Qwen.MaxConcurrency)
 
-	agnesModel, err := NewChatModel(ctx, llm.ProviderAgnes, cfg)
+	agnesModel, err := NewChatModel(g.rootCtx, llm.ProviderAgnes, cfg)
 	if err != nil {
 		return err
 	}
-	g.providers[llm.ProviderAgnes] = newWrappedChatModel(agnesModel, llm.ProviderAgnes, cfg.Agnes.MaxConcurrency)
+	g.providers[llm.ProviderAgnes] = newWrappedChatModel(g.rootCtx, agnesModel, llm.ProviderAgnes, cfg.Agnes.MaxConcurrency)
 
 	return nil
 }
@@ -81,6 +81,7 @@ func (g *Gateway) GetProvider(providerType llm.Provider) (einomodel.ToolCallingC
 }
 
 type wrappedChatModel struct {
+	rootCtx        context.Context
 	typ            string
 	provider       llm.Provider
 	impl           einomodel.ToolCallingChatModel
@@ -89,6 +90,7 @@ type wrappedChatModel struct {
 }
 
 func newWrappedChatModel(
+	ctx context.Context,
 	impl einomodel.ToolCallingChatModel,
 	provider llm.Provider,
 	maxConcurrency int,
@@ -105,6 +107,7 @@ func newWrappedChatModel(
 	sem := semaphore.NewWeighted(int64(maxConcurrency))
 
 	return &wrappedChatModel{
+		rootCtx:        ctx,
 		typ:            typ,
 		provider:       provider,
 		impl:           impl,
@@ -126,7 +129,7 @@ func (g *wrappedChatModel) Generate(
 		Name:      wrappedChatModelRunName,
 		Type:      g.typ,
 		Component: components.ComponentOfChatModel,
-	}, &Interceptor{})
+	}, &Interceptor{rootCtx: g.rootCtx})
 
 	opts = applyProviderCallOptions(g.provider, false, opts)
 
@@ -151,7 +154,7 @@ func (g *wrappedChatModel) Stream(
 		Name:      wrappedChatModelRunName,
 		Type:      g.typ,
 		Component: components.ComponentOfChatModel,
-	}, &Interceptor{})
+	}, &Interceptor{rootCtx: g.rootCtx})
 
 	opts = applyProviderCallOptions(g.provider, true, opts)
 
@@ -181,7 +184,7 @@ func (g *wrappedChatModel) WithTools(
 		return nil, err
 	}
 
-	return newWrappedChatModel(impl, g.provider, g.maxConcurrency), nil
+	return newWrappedChatModel(g.rootCtx, impl, g.provider, g.maxConcurrency), nil
 }
 
 func extractOptionModelName(opts ...einomodel.Option) string {

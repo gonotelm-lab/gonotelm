@@ -22,17 +22,16 @@ var infoGraphicTpl = prompt.FromMessages(einoschema.Jinja2, einoschema.SystemMes
 type TemplateVars struct {
 	SourceIds    []string
 	TextLanguage string
-	ExtraPrompt  string
 	Orientation  artifactentity.InfoGraphicOrientation
 	DetailLevel  artifactentity.InfoGraphicDetailLevel
 	VisualStyle  artifactentity.InfoGraphicVisualStyle
+	ExtraPrompt  string
 }
 
 func (v TemplateVars) promptVars() map[string]any {
 	return map[string]any{
 		"SourceIds":    types.NormalizeStrings(v.SourceIds),
 		"TextLanguage": strings.TrimSpace(v.TextLanguage),
-		"ExtraPrompt":  strings.TrimSpace(v.ExtraPrompt),
 		"Orientation":  v.Orientation.String(),
 		"DetailLevel":  v.DetailLevel.String(),
 		"VisualStyle":  v.VisualStyle.String(),
@@ -44,5 +43,9 @@ func RenderInfographic(ctx context.Context, vars TemplateVars) ([]*einoschema.Me
 	if err != nil {
 		return nil, fmt.Errorf("render infographic prompt: %w", err)
 	}
+	if tipMsg := types.BuildTipMessage(vars.ExtraPrompt); tipMsg != nil {
+		msgs = append(msgs, tipMsg)
+	}
+	
 	return msgs, nil
 }

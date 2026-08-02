@@ -106,7 +106,7 @@ func NewInfra(ctx context.Context, cfg *confshared.InfraConfig) (_ *Infra, outEr
 	}
 	infra.Storage = oss
 
-	llmGateway, err := newLLMGateway(&cfg.Provider)
+	llmGateway, err := newLLMGateway(ctx, &cfg.Provider)
 	if err != nil {
 		return nil, fmt.Errorf("llm gateway: %w", err)
 	}
@@ -167,7 +167,7 @@ func (s *Infra) Close(ctx context.Context) error {
 	return nil
 }
 
-func newLLMGateway(cfg *infrallm.ProviderConfig) (*chat.Gateway, error) {
+func newLLMGateway(ctx context.Context, cfg *infrallm.ProviderConfig) (*chat.Gateway, error) {
 	llmCfg := &infrallm.ProviderConfig{
 		OpenAI: infrallm.OpenAIChatConfig{
 			ApiKey:           cfg.OpenAI.ApiKey,
@@ -227,7 +227,8 @@ func newLLMGateway(cfg *infrallm.ProviderConfig) (*chat.Gateway, error) {
 			MaxConcurrency:   cfg.Agnes.MaxConcurrency,
 		},
 	}
-	return chat.New(llmCfg)
+
+	return chat.New(ctx, llmCfg)
 }
 
 func newMQ(cfg *mq.Config) (*mq.MQ, error) {

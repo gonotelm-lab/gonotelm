@@ -18,20 +18,21 @@ var dataTableTpl = prompt.FromMessages(einoschema.Jinja2, einoschema.SystemMessa
 
 type RenderVars struct {
 	SourceIds []string
-	Tip       string
 }
 
 func (v RenderVars) promptVars() map[string]any {
 	return map[string]any{
 		"SourceIds": types.NormalizeStrings(v.SourceIds),
-		"Tip":       v.Tip,
 	}
 }
 
 func RenderDataTable(ctx context.Context, sourceIds []string, tip string) ([]*einoschema.Message, error) {
-	msgs, err := dataTableTpl.Format(ctx, RenderVars{SourceIds: sourceIds, Tip: tip}.promptVars())
+	msgs, err := dataTableTpl.Format(ctx, RenderVars{SourceIds: sourceIds}.promptVars())
 	if err != nil {
 		return nil, fmt.Errorf("render datatable prompt: %w", err)
+	}
+	if tipMsg := types.BuildTipMessage(tip); tipMsg != nil {
+		msgs = append(msgs, tipMsg)
 	}
 	return msgs, nil
 }

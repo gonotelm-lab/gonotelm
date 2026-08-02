@@ -20,6 +20,21 @@ func NormalizeStrings(sources []string) []string {
 	return normalized
 }
 
+// BuildTipMessage constructs an optional user message carrying the user-provided
+// custom tip. It returns nil when the tip is empty, so callers can append it
+// conditionally to the rendered system messages.
+func BuildTipMessage(tip string) *einoschema.Message {
+	tip = strings.TrimSpace(tip)
+	if tip == "" {
+		return nil
+	}
+
+	return &einoschema.Message{
+		Role:    einoschema.User,
+		Content: "用户附加要求：\n<user_extra_input>\n" + tip + "\n</user_extra_input>",
+	}
+}
+
 // BuildCompensateMessage constructs a user message that asks the LLM to re-output
 // its result as strict JSON when the previous output failed parsing.
 // fieldRules specifies the expected JSON fields and format constraints

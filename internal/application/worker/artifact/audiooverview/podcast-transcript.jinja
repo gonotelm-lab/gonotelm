@@ -65,11 +65,6 @@
 9) 将工具检索到的具体素材融入对话，让讨论言之有物，而非空泛议论。对话中避免出现工具名称，来源id等系统内部的信息。
 10) 脚本语言使用 {{ Language }}。
 
-{% if Tips and Tips|trim %}
-# 用户额外提示
-{{ Tips }}
-{% endif %}
-
 # 输入（仅来源 id）
 
 {% if SourceIds and SourceIds|length > 0 %}

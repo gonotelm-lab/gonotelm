@@ -38,7 +38,6 @@ func RenderPodcastOutline(
 	vars := StudioPodcastOutlineTemplateVars{
 		SourceIds:     sourceIds,
 		Language:      lang,
-		Tips:          tips,
 		Style:         ep.Style,
 		StyleDesc:     ep.Description,
 		Speakers:      ep.Speakers,
@@ -48,6 +47,9 @@ func RenderPodcastOutline(
 	msgs, err := podcastOutlineTpl.Format(ctx, vars.PromptVars())
 	if err != nil {
 		return nil, fmt.Errorf("render podcast outline prompt: %w", err)
+	}
+	if tipMsg := types.BuildTipMessage(tips); tipMsg != nil {
+		msgs = append(msgs, tipMsg)
 	}
 	return msgs, nil
 }
@@ -76,7 +78,6 @@ func RenderPodcastTranscript(
 	vars := StudioPodcastTranscriptTemplateVars{
 		SourceIds:    sourceIds,
 		Language:     lang,
-		Tips:         tips,
 		Style:        ep.Style,
 		StyleDesc:    ep.Description,
 		Speakers:     ep.Speakers,
@@ -92,13 +93,16 @@ func RenderPodcastTranscript(
 	if err != nil {
 		return nil, fmt.Errorf("render podcast transcript prompt: %w", err)
 	}
+	if tipMsg := types.BuildTipMessage(tips); tipMsg != nil {
+		msgs = append(msgs, tipMsg)
+	}
+	
 	return msgs, nil
 }
 
 type StudioPodcastOutlineTemplateVars struct {
 	SourceIds     []string
 	Speakers      []artifactentity.AudioSpeaker
-	Tips          string
 	NumOfSegments int
 	Language      artifactentity.Language
 	Style         artifactentity.AudioOverviewStyle
@@ -109,7 +113,6 @@ func (v StudioPodcastOutlineTemplateVars) PromptVars() map[string]any {
 	return map[string]any{
 		"SourceIds":     types.NormalizeStrings(v.SourceIds),
 		"Speakers":      v.Speakers,
-		"Tips":          v.Tips,
 		"NumOfSegments": v.NumOfSegments,
 		"Language":      v.Language.DisplayName(),
 		"StyleInfo": map[string]any{
@@ -124,7 +127,6 @@ type StudioPodcastTranscriptTemplateVars struct {
 	Speakers     []artifactentity.AudioSpeaker
 	SpeakerRoles map[string]string
 	SegmentFlow  []string
-	Tips         string
 	Language     artifactentity.Language
 	Style        artifactentity.AudioOverviewStyle
 	StyleDesc    string
@@ -137,7 +139,6 @@ func (v StudioPodcastTranscriptTemplateVars) PromptVars() map[string]any {
 		"Speakers":     v.Speakers,
 		"SpeakerRoles": v.SpeakerRoles,
 		"SegmentFlow":  v.SegmentFlow,
-		"Tips":         v.Tips,
 		"Language":     v.Language.DisplayName(),
 		"StyleInfo": map[string]any{
 			"Style":       v.Style,

@@ -57,11 +57,6 @@
 输出语言为 **{{ Language }}**
 {% endif %}
 
-{% if Tip and Tip|trim %}
-# 用户附加要求
-{{ Tip }}
-{% endif %}
-
 # 工具使用策略
 
 1) **覆盖要求**：必须覆盖每个 `source_id`，且只允许访问输入中的 `source_ids`。

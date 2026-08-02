@@ -42,20 +42,42 @@ func (s *WorkerCheckpointStoreImpl) GetByArtifactId(
 }
 
 func (s *WorkerCheckpointStoreImpl) Update(ctx context.Context, cp *schema.WorkerCheckpoint) error {
+	updates := make(map[string]any, 9)
+	if cp.Field1 != nil {
+		updates["field1"] = cp.Field1
+	}
+	if cp.Field2 != nil {
+		updates["field2"] = cp.Field2
+	}
+	if cp.Field3 != nil {
+		updates["field3"] = cp.Field3
+	}
+	if cp.Field4 != nil {
+		updates["field4"] = cp.Field4
+	}
+	if cp.Field5 != nil {
+		updates["field5"] = cp.Field5
+	}
+	if cp.Field6 != nil {
+		updates["field6"] = cp.Field6
+	}
+	if cp.Field7 != nil {
+		updates["field7"] = cp.Field7
+	}
+	if cp.Field8 != nil {
+		updates["field8"] = cp.Field8
+	}
+	if cp.UpdatedAt > 0 {
+		updates["updated_at"] = cp.UpdatedAt
+	}
+	if len(updates) == 0 {
+		return nil
+	}
+
 	err := s.db.WithContext(ctx).
 		Model(&schema.WorkerCheckpoint{}).
 		Where("artifact_id = ?", cp.ArtifactId).
-		Updates(map[string]any{
-			"field1":     cp.Field1,
-			"field2":     cp.Field2,
-			"field3":     cp.Field3,
-			"field4":     cp.Field4,
-			"field5":     cp.Field5,
-			"field6":     cp.Field6,
-			"field7":     cp.Field7,
-			"field8":     cp.Field8,
-			"updated_at": cp.UpdatedAt,
-		}).Error
+		Updates(updates).Error
 	if err != nil {
 		return sql.WrapErr(err)
 	}

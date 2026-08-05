@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"sync"
@@ -16,9 +17,11 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository"
 	notelmapi "github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm"
 	eventnotelm "github.com/gonotelm-lab/gonotelm/internal/interfaces/event/notelm"
+	"github.com/gonotelm-lab/gonotelm/pkg/trace"
 )
 
 type Notelm struct {
+	rootCtx context.Context
 	closers []io.Closer
 	wg      *sync.WaitGroup
 	Server  *notelmapi.Server
@@ -36,6 +39,8 @@ func (a *Notelm) Close() error {
 		}
 	}
 
+	trace.Shutdown(a.rootCtx)
+
 	return nil
 }
 
@@ -51,6 +56,10 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 			}
 		}
 	}()
+
+	if err := trace.Init(rootCtx, cfg.OtelTrace); err != nil {
+		slog.ErrorContext(rootCtx, fmt.Sprintf("[notelm.bootstrap] can not init trace: %v", err))
+	}
 
 	infra, err := bootshared.NewInfra(rootCtx, &cfg.InfraConfig)
 	if err != nil {
@@ -182,6 +191,7 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 		closers: closers,
 		wg:      wg,
 		Server:  svr,
+		rootCtx: rootCtx,
 	}, nil
 }
 

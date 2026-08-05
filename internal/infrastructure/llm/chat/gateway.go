@@ -29,6 +29,7 @@ type Gateway struct {
 
 func New(ctx context.Context, cfg *llm.ProviderConfig) (*Gateway, error) {
 	gw := &Gateway{
+		rootCtx:   ctx,
 		providers: make(map[llm.Provider]einomodel.ToolCallingChatModel),
 	}
 

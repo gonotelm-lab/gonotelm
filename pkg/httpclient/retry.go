@@ -3,6 +3,7 @@ package httpclient
 import (
 	"context"
 	"errors"
+	"io"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -62,6 +63,15 @@ func (r *RetryRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 
 		if attempt > r.maxRetries || !r.shouldRetry(err, resp) {
 			return resp, err
+		}
+
+		// 重试前必须 drain 并关闭失败响应的 body：
+		// 1. 连接才能复用，否则每次重试都新建连接
+		// 2. otelhttp 等包装层依赖 body 关闭/读完来结束 span，
+		//    不关闭会导致 span 永不结束
+		if resp != nil && resp.Body != nil {
+			_, _ = io.Copy(io.Discard, resp.Body)
+			_ = resp.Body.Close()
 		}
 
 		if err := r.backoffSleep(req.Context(), attempt); err != nil {

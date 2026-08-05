@@ -160,3 +160,8 @@ timeout = "${GONOTELM_AGNES_TIMEOUT:-5m}"
 maxTokens = ${GONOTELM_AGNES_MAX_TOKENS:-16384}
 temperature = ${GONOTELM_AGNES_TEMPERATURE:-1.0}
 topP = ${GONOTELM_AGNES_TOP_P:-1.0}
+
+[otelTrace]
+name = "sourcejob"
+endpoint = "${OTEL_TRACE_ENDPOINT:-127.0.0.1:4317}"
+exporter = "grpc"

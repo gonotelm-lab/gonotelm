@@ -454,7 +454,7 @@ func (h *Service) saveSuggestions(
 	st entity.SuggestionType,
 	questions []string,
 ) {
-	safe.DetachGo(ctx, h.rootCtx, func(ctx context.Context) {
+	safe.DetachGo(ctx, h.rootCtx, "chat.save_suggestions", func(ctx context.Context) {
 		if err := h.suggestionRepo.Save(ctx, chatId, entity.NewSuggestion(st, questions)); err != nil {
 			slog.ErrorContext(ctx, "failed to save suggestions",
 				slog.Any("err", err),

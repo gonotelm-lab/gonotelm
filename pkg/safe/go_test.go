@@ -112,7 +112,7 @@ func TestDetachGo_KeepsValue_IgnoresWithoutCancelParent_CancelsByRoot(t *testing
 	started := make(chan context.Context, 1)
 	done := make(chan struct{})
 
-	DetachGo(reqCtx, rootCtx, func(ctx context.Context) {
+	DetachGo(reqCtx, rootCtx, "test-detach", func(ctx context.Context) {
 		started <- ctx
 		<-ctx.Done()
 		close(done)
@@ -156,7 +156,7 @@ func TestDetachGo2_KeepsValue_IgnoresWithoutCancelParent_CancelsByRoot(t *testin
 	started := make(chan context.Context, 1)
 	var wg sync.WaitGroup
 
-	DetachGo2(reqCtx, rootCtx, &wg, func(ctx context.Context) {
+	DetachGo2(reqCtx, rootCtx, "test-detach2", &wg, func(ctx context.Context) {
 		started <- ctx
 		<-ctx.Done()
 	})

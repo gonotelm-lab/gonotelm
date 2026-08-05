@@ -155,3 +155,8 @@ dialTimeout = "${GONOTELM_FLOW_DIAL_TIMEOUT:-5s}"
 [worker]
 maxConcurrency  = ${GONOTELM_WORKER_MAX_CONCURRENCY:-4}
 heartbeat       = "${GONOTELM_WORKER_HEARTBEAT:-5s}"
+
+[otelTrace]
+name = "worker"
+endpoint = "${OTEL_TRACE_ENDPOINT:-127.0.0.1:4317}"
+exporter = "grpc"

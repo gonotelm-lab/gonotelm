@@ -1,15 +1,33 @@
 package context
 
-import "context"
+import (
+	"context"
+
+	"github.com/gonotelm-lab/gonotelm/pkg/requestid"
+)
 
 type contextKey string
 
 const (
+	ContextKeyReqId     = contextKey("_req_id")
 	ContextKeyUserId    = contextKey("_user_id")
 	ContextKeySceneType = contextKey("_scene_type")
 	ContextLang         = contextKey("_lang")
 	ContextOperatorType = contextKey("_operator_type")
 )
+
+func WithReqId(ctx context.Context, reqId requestid.ID) context.Context {
+	return context.WithValue(ctx, ContextKeyReqId, reqId)
+}
+
+func GetReqId(ctx context.Context) requestid.ID {
+	reqId, ok := ctx.Value(ContextKeyReqId).(requestid.ID)
+	if !ok {
+		return requestid.ID{}
+	}
+
+	return reqId
+}
 
 func WithUserId(ctx context.Context, userId string) context.Context {
 	return context.WithValue(ctx, ContextKeyUserId, userId)

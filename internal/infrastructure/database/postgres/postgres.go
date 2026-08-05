@@ -2,11 +2,14 @@ package postgres
 
 import (
 	"context"
+	"strings"
 
 	"github.com/gonotelm-lab/gonotelm/internal/conf/shared"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
 	"github.com/gonotelm-lab/gonotelm/pkg/misc"
 	"github.com/gonotelm-lab/gonotelm/pkg/sql"
+
+	"gorm.io/plugin/opentelemetry/tracing"
 )
 
 func Open(cfg shared.DatabaseConfig) (*database.Dao, error) {
@@ -18,6 +21,15 @@ func Open(cfg shared.DatabaseConfig) (*database.Dao, error) {
 		DbName:   cfg.DBName,
 	})
 	if err != nil {
+		return nil, err
+	}
+
+	// add opentelemetry tracing
+	// 需要和pkgtrace.Init配合处理 因为pkgtrace.Init中注入了全局的Provider等内容
+	if err := db.Use(tracing.NewPlugin(
+		tracing.WithoutQueryVariables(),
+		tracing.WithQueryFormatter(strings.TrimSpace),
+	)); err != nil {
 		return nil, err
 	}
 

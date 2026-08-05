@@ -3,6 +3,7 @@ package conf
 import (
 	"github.com/gonotelm-lab/gonotelm/internal/conf/shared"
 	mqimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
+	"github.com/gonotelm-lab/gonotelm/pkg/trace"
 )
 
 var sourceJobGlobal *SourceJobConfig
@@ -15,6 +16,7 @@ type SourceJobConfig struct {
 	Source    SourceConfig         `toml:"source"`
 	Logging   shared.LoggingConfig `toml:"logging"`
 	Chunking  ChunkingConfig       `toml:"chunking"`
+	OtelTrace trace.Config         `toml:"otelTrace"`
 }
 
 func (c *SourceJobConfig) IsDev() bool {

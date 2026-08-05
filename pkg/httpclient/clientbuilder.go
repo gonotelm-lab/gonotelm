@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 type Builder struct {
@@ -51,6 +52,7 @@ func (b *Builder) Build() *http.Client {
 		baseTransport = http.DefaultTransport
 	}
 
+	baseTransport = otelhttp.NewTransport(baseTransport)
 	baseTransport = NewRetryRoundTripper(
 		b.maxRetries,
 		baseTransport,

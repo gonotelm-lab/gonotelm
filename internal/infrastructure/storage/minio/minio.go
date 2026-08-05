@@ -13,12 +13,12 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgtrace "github.com/gonotelm-lab/gonotelm/pkg/trace"
+	"github.com/gonotelm-lab/gonotelm/pkg/trace/instrumentation/s3conv"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	semconv "go.opentelemetry.io/otel/semconv/v1.41.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
@@ -61,34 +61,13 @@ func (s *Storage) Name() string {
 	return "minio"
 }
 
-// rpcMethodName 将 S3 操作名转换为 rpc.method 属性值，与 AWS SDK instrumentation 一致。
-func rpcMethodName(op string) string {
-	if i := strings.IndexByte(op, '.'); i >= 0 {
-		return op[:i] + "/" + op[i+1:]
-	}
-	return op
-}
-
-// awsRegionKey 对应 aws.region 属性（otelaws 自定义 key，semconv v1.41.0 未内置）。
-const awsRegionKey = attribute.Key("aws.region")
-
 // startSpan 为一次存储操作创建 S3 风格 client span，
-// 属性对齐 AWS SDK v2 的 otelaws instrumentation（rpc.system/rpc.method/aws.region）。
+// 属性由 s3conv 生成，对齐 AWS SDK v2 的 otelaws instrumentation。
 func (s *Storage) startSpan(ctx context.Context, op, key string, extra ...attribute.KeyValue) (context.Context, oteltrace.Span) {
-	attrs := []attribute.KeyValue{
-		semconv.AWSS3BucketKey.String(s.bucket),
-		semconv.RPCSystemNameKey.String("aws-api"),
-		semconv.RPCMethod(rpcMethodName(op)),
-	}
-	if s.region != "" {
-		attrs = append(attrs, awsRegionKey.String(s.region))
-	}
-	if key != "" {
-		attrs = append(attrs, semconv.AWSS3KeyKey.String(key))
-	}
+	attrs := s3conv.Attributes(op, s.bucket, s.region, key)
 	attrs = append(attrs, extra...)
 
-	return pkgtrace.GetOtelTracer().Start(ctx, op,
+	return pkgtrace.GetOtelTracer().Start(ctx, s3conv.SpanName(op),
 		oteltrace.WithSpanKind(oteltrace.SpanKindClient),
 		oteltrace.WithAttributes(attrs...),
 	)
@@ -113,7 +92,7 @@ func (s *Storage) StatObject(
 		return nil, errors.ErrParams.Msg("stat object request key is empty")
 	}
 
-	ctx, span := s.startSpan(ctx, "S3.StatObject", req.Key)
+	ctx, span := s.startSpan(ctx, "StatObject", req.Key)
 	defer span.End()
 
 	objInfo, err := s.client.StatObject(ctx, s.bucket, req.Key, minio.StatObjectOptions{})
@@ -149,7 +128,7 @@ func (s *Storage) GetObject(
 		return nil, errors.ErrParams.Msg("get object request key is empty")
 	}
 
-	ctx, span := s.startSpan(ctx, "S3.GetObject", req.Key)
+	ctx, span := s.startSpan(ctx, "GetObject", req.Key)
 	defer span.End()
 
 	object, err := s.client.GetObject(ctx, s.bucket, req.Key, minio.GetObjectOptions{})
@@ -197,7 +176,7 @@ func (s *Storage) DeleteObject(
 		return errors.ErrParams.Msg("delete object request key is empty")
 	}
 
-	ctx, span := s.startSpan(ctx, "S3.DeleteObject", req.Key)
+	ctx, span := s.startSpan(ctx, "DeleteObject", req.Key)
 	defer span.End()
 
 	err := s.client.RemoveObject(ctx, s.bucket, req.Key, minio.RemoveObjectOptions{})
@@ -221,7 +200,7 @@ func (s *Storage) BatchDeleteObject(
 		return nil
 	}
 
-	ctx, span := s.startSpan(ctx, "S3.DeleteObjects", "", attribute.Int("s3.object_count", len(req.Keys)))
+	ctx, span := s.startSpan(ctx, "DeleteObjects", "", attribute.Int("s3.object_count", len(req.Keys)))
 	defer span.End()
 
 	objectCh := make(chan minio.ObjectInfo)
@@ -263,7 +242,7 @@ func (s *Storage) UploadObject(
 		return errors.ErrParams.Msg("upload object request key is empty")
 	}
 
-	ctx, span := s.startSpan(ctx, "S3.PutObject", req.Key)
+	ctx, span := s.startSpan(ctx, "PutObject", req.Key)
 	defer span.End()
 
 	var reader io.Reader
@@ -302,7 +281,7 @@ func (s *Storage) PresignedPostPolicy(
 		return nil, errors.ErrParams.Msg("presigned post policy request key is empty")
 	}
 
-	ctx, span := s.startSpan(ctx, "S3.PresignedPostPolicy", req.Key)
+	ctx, span := s.startSpan(ctx, "PresignedPostPolicy", req.Key)
 	defer span.End()
 
 	policy := minio.NewPostPolicy()
@@ -386,7 +365,7 @@ func (s *Storage) PresignedGetObject(
 		return nil, errors.New("presigned get object request key is empty")
 	}
 
-	ctx, span := s.startSpan(ctx, "S3.PresignedGetObject", req.Key)
+	ctx, span := s.startSpan(ctx, "PresignedGetObject", req.Key)
 	defer span.End()
 
 	params := url.Values{}

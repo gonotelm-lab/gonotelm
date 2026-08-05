@@ -7,6 +7,8 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
 	"github.com/gonotelm-lab/gonotelm/pkg/misc"
 	"github.com/milvus-io/milvus/client/v2/milvusclient"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"google.golang.org/grpc"
 )
 
 func Open(cfg *vectordb.Config) (*vectordb.DAL, error) {
@@ -15,11 +17,14 @@ func Open(cfg *vectordb.Config) (*vectordb.DAL, error) {
 
 	cli, err := milvusclient.New(ctx,
 		&milvusclient.ClientConfig{
-			Address:     cfg.Milvus.Addr,
-			Username:    cfg.Milvus.Username,
-			Password:    cfg.Milvus.Password,
-			DBName:      cfg.Milvus.DBName,
-			DialOptions: milvusclient.DefaultGrpcOpts,
+			Address:  cfg.Milvus.Addr,
+			Username: cfg.Milvus.Username,
+			Password: cfg.Milvus.Password,
+			DBName:   cfg.Milvus.DBName,
+			DialOptions: append(
+				milvusclient.DefaultGrpcOpts,
+				grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
+			),
 		})
 	if err != nil {
 		return nil, fmt.Errorf("init milvus client failed: %w", err)

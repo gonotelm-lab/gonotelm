@@ -32,8 +32,8 @@ require (
 	github.com/go-redsync/redsync/v4 v4.16.0
 	github.com/golang/snappy v1.0.0
 	github.com/gomlx/gomlx v0.27.3
-	github.com/gonotelm-lab/flow/api v0.1.1-0.20260803144311-f6637800d838
-	github.com/gonotelm-lab/flow/client v0.1.1-0.20260803152603-f8f3eb0dd217
+	github.com/gonotelm-lab/flow/api v0.2.0
+	github.com/gonotelm-lab/flow/client v0.2.0
 	github.com/gonotelm-lab/multimodal v0.2.2
 	github.com/google/uuid v1.6.0
 	github.com/hertz-contrib/logger/slog v1.0.0

@@ -1,11 +1,35 @@
 package httpclient
 
 import (
+	"net"
 	"net/http"
 	"time"
 
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+)
+
+var (
+	maxIdleConns          = 200
+	idleConnTimeout       = 120 * time.Second
+	expectContinueTimeout = 1 * time.Second
+	responseHeaderTimeout = 10 * time.Second
+	tlsHandshakeTimeout   = 10 * time.Second
+
+	DefaultDialer = &net.Dialer{
+		Timeout:   10 * time.Second,
+		KeepAlive: 15 * time.Second,
+	}
+	DefaultTransport http.RoundTripper = &http.Transport{
+		Proxy:                 http.ProxyFromEnvironment,
+		DialContext:           DefaultDialer.DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          maxIdleConns,
+		IdleConnTimeout:       idleConnTimeout,
+		ExpectContinueTimeout: expectContinueTimeout,
+		ResponseHeaderTimeout: responseHeaderTimeout,
+		TLSHandshakeTimeout:   tlsHandshakeTimeout,
+	}
 )
 
 type Builder struct {
@@ -26,6 +50,7 @@ func NewBuilder(baseRoundTripper http.RoundTripper) *Builder {
 	}
 }
 
+// 整个请求的超时时间
 func (b *Builder) WithTimeout(timeout time.Duration) *Builder {
 	b.timeout = timeout
 	return b
@@ -49,10 +74,16 @@ func (b *Builder) WithRetryOptions(opts ...RetryOption) *Builder {
 func (b *Builder) Build() *http.Client {
 	baseTransport := b.baseTransport
 	if baseTransport == nil {
-		baseTransport = http.DefaultTransport
+		baseTransport = DefaultTransport
 	}
 
+	// 重试计数 需要放在链路追踪包住
+	baseTransport = retryAttemptInjectRoundTrip(baseTransport)
+
+	// 链路追踪
 	baseTransport = otelhttp.NewTransport(baseTransport)
+
+	// 重试
 	baseTransport = NewRetryRoundTripper(
 		b.maxRetries,
 		baseTransport,
@@ -60,13 +91,17 @@ func (b *Builder) Build() *http.Client {
 	)
 
 	return &http.Client{
-		Timeout: b.timeout,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= b.maxRedirects {
-				return errors.ErrParams.Msgf("max redirects reached, url=%s", req.URL.String())
-			}
-			return nil
-		},
-		Transport: baseTransport,
+		Timeout:       b.timeout,
+		CheckRedirect: defaultRedirectCheck(b.maxRedirects),
+		Transport:     baseTransport,
+	}
+}
+
+func defaultRedirectCheck(maxRedirects int) func(req *http.Request, via []*http.Request) error {
+	return func(req *http.Request, via []*http.Request) error {
+		if len(via) >= maxRedirects {
+			return errors.ErrParams.Msgf("max redirects reached, url=%s", req.URL.String())
+		}
+		return nil
 	}
 }

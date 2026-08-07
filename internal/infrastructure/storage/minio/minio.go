@@ -12,11 +12,12 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/httpclient"
 	pkgtrace "github.com/gonotelm-lab/gonotelm/pkg/trace"
+	"github.com/gonotelm-lab/gonotelm/pkg/trace/attributes"
 	"github.com/gonotelm-lab/gonotelm/pkg/trace/instrumentation/s3conv"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	oteltrace "go.opentelemetry.io/otel/trace"
@@ -39,11 +40,14 @@ func New(cfg *storage.Config) (*Storage, error) {
 		return nil, errors.Wrap(err, "validate storage config failed")
 	}
 
+	// 自带重试+链路追踪的httpclient
+	transport := httpclient.NewBuilder(nil).Build().Transport
 	client, err := minio.New(cfg.Endpoint, &minio.Options{
-		Creds:     credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
-		Secure:    cfg.Secure,
-		Region:    cfg.Region,
-		Transport: otelhttp.NewTransport(http.DefaultTransport),
+		Creds:      credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
+		Secure:     cfg.Secure,
+		Region:     cfg.Region,
+		Transport:  transport,
+		MaxRetries: 1,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "create minio client failed")
@@ -200,7 +204,7 @@ func (s *Storage) BatchDeleteObject(
 		return nil
 	}
 
-	ctx, span := s.startSpan(ctx, "DeleteObjects", "", attribute.Int("s3.object_count", len(req.Keys)))
+	ctx, span := s.startSpan(ctx, "DeleteObjects", "", attributes.S3ObjectCount.Int(len(req.Keys)))
 	defer span.End()
 
 	objectCh := make(chan minio.ObjectInfo)

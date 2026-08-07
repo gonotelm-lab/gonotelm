@@ -8,7 +8,35 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"go.opentelemetry.io/otel/semconv/v1.41.0"
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
+
+type retryAttemptKey struct{}
+
+func withRetryAttempt(ctx context.Context, attempt int) context.Context {
+	return context.WithValue(ctx, retryAttemptKey{}, attempt)
+}
+
+func getRetryAttempt(ctx context.Context) int {
+	a, _ := ctx.Value(retryAttemptKey{}).(int)
+	return a
+}
+
+// 给每次重试的span attribute都打上标记
+func retryAttemptInjectRoundTrip(next http.RoundTripper) http.RoundTripper {
+	return RoundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		// 如果是重试
+		if cnt := getRetryAttempt(req.Context()); cnt > 0 {
+			span := oteltrace.SpanFromContext(req.Context())
+			// See: https://opentelemetry.io/docs/specs/semconv/http/http-spans/#http-request-retries-and-redirects
+			span.SetAttributes(semconv.HTTPRequestResendCountKey.Int(cnt))
+		}
+
+		return next.RoundTrip(req)
+	})
+}
 
 type RetryRoundTripper struct {
 	maxRetries int
@@ -55,6 +83,10 @@ func (r *RetryRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 	)
 
 	for {
+		if attempt > 0 {
+			// 已经是重试进来了 链路上打上重试 attribute
+			req = req.WithContext(withRetryAttempt(req.Context(), attempt))
+		}
 		resp, err = r.next.RoundTrip(req)
 		attempt++
 		if err == nil && !r.shouldRetryStatus(resp.StatusCode) {
@@ -89,7 +121,7 @@ func (r *RetryRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 }
 
 func (r *RetryRoundTripper) shouldRetryStatus(code int) bool {
-	return code == 0 || code >= 500
+	return code == 0 || code >= http.StatusInternalServerError
 }
 
 func (r *RetryRoundTripper) shouldRetry(err error, resp *http.Response) bool {
@@ -104,7 +136,7 @@ func (r *RetryRoundTripper) shouldRetry(err error, resp *http.Response) bool {
 		return true
 	}
 
-	if resp != nil && resp.StatusCode >= 500 {
+	if resp != nil && resp.StatusCode >= http.StatusInternalServerError {
 		return true
 	}
 

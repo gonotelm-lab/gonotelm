@@ -2,6 +2,8 @@ package bootstrap
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 	"strings"
 
 	flowworker "github.com/gonotelm-lab/flow/client/worker"
@@ -10,6 +12,9 @@ import (
 	bootshared "github.com/gonotelm-lab/gonotelm/internal/bootstrap/shared"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	infrarepo "github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository"
+	"github.com/gonotelm-lab/gonotelm/pkg/trace"
+
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -38,9 +43,14 @@ func NewWorker(ctx context.Context, cfg *conf.WorkerConfig) (*Worker, error) {
 		return nil, err
 	}
 
+	if err := trace.Init(ctx, cfg.OtelTrace); err != nil {
+		slog.ErrorContext(ctx, fmt.Sprintf("[sourcejob.bootstrap] can not init trace: %v", err))
+	}
+
 	conn, err := grpc.NewClient(
 		cfg.Flow.Addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
 	)
 	if err != nil {
 		shared.Close(ctx)

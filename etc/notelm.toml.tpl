@@ -61,7 +61,6 @@ rerankProvider = "${GONOTELM_RERANK_PROVIDER:-dashscope}"
 rerankTopN = ${GONOTELM_CHAT_RERANK_TOP_N:-30}
 rerankModel = "${GONOTELM_CHAT_RERANK_MODEL:-qwen3-rerank}"
 
-
 [source]
 modelProvider = "${GONOTELM_SOURCE_PROVIDER:-qwen}"
 model = "${GONOTELM_SOURCE_MODEL:-qwen3.5-27b}"
@@ -196,3 +195,8 @@ dialTimeout = "${GONOTELM_FLOW_DIAL_TIMEOUT:-5s}"
 perTaskInterval = "${GONOTELM_SYNCER_PER_TASK_INTERVAL:-2s}"
 globalInterval   = "${GONOTELM_SYNCER_GLOBAL_INTERVAL:-5s}"
 globalBatchSize  = ${GONOTELM_SYNCER_GLOBAL_BATCH_SIZE:-100}
+
+[otelTrace]
+name = "notelm"
+endpoint = "${OTEL_TRACE_ENDPOINT:-127.0.0.1:4317}"
+exporter = "grpc"

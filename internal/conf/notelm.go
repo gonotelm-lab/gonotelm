@@ -8,6 +8,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/conf/shared"
 	rerank "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/rerank"
 	mqimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
+	"github.com/gonotelm-lab/gonotelm/pkg/trace"
 
 	"github.com/BurntSushi/toml"
 	"github.com/a8m/envsubst"
@@ -20,14 +21,15 @@ type NotelmConfig struct {
 
 	DeployEnv string `toml:"deployEnv"`
 
-	Api      ApiConfig            `toml:"api"`
-	Chat     ChatConfig           `toml:"chat"`
-	Source   SourceConfig         `toml:"source"`
-	Rerank   rerank.RerankConfig  `toml:"rerank"`
-	Logging  shared.LoggingConfig `toml:"logging"`
-	Chunking ChunkingConfig       `toml:"chunking"`
-	Flow     shared.FlowConfig    `toml:"flow"`
-	Syncer   SyncerConfig         `toml:"syncer"`
+	Api       ApiConfig            `toml:"api"`
+	Chat      ChatConfig           `toml:"chat"`
+	Source    SourceConfig         `toml:"source"`
+	Rerank    rerank.RerankConfig  `toml:"rerank"`
+	Logging   shared.LoggingConfig `toml:"logging"`
+	Chunking  ChunkingConfig       `toml:"chunking"`
+	Flow      shared.FlowConfig    `toml:"flow"`
+	Syncer    SyncerConfig         `toml:"syncer"`
+	OtelTrace trace.Config         `toml:"otelTrace"`
 }
 
 type SyncerConfig struct {

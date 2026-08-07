@@ -53,7 +53,7 @@ func (h *OnStreamTaskEventHandler) handleFinish(ctx context.Context, evt *chatev
 		slog.String("task_id", evt.TaskId().String()),
 	)
 
-	safe.DetachGo(ctx, h.rootCtx, func(ctx context.Context) {
+	safe.DetachGo(ctx, h.rootCtx, "chat.suggest_next", func(ctx context.Context) {
 		h.generateSuggestions(ctx, evt)
 	})
 

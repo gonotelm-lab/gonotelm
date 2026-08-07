@@ -10,6 +10,7 @@ import (
 	rerank "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/rerank"
 	text2audio "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio"
 	text2image "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image"
+	"github.com/gonotelm-lab/gonotelm/pkg/trace"
 )
 
 var workerGlobal *WorkerConfig
@@ -30,6 +31,7 @@ type WorkerConfig struct {
 	Logging   shared.LoggingConfig `toml:"logging"`
 	Flow      shared.FlowConfig    `toml:"flow"`
 	Worker    WorkerPoolConfig     `toml:"worker"`
+	OtelTrace trace.Config         `toml:"otelTrace"`
 }
 
 type WorkerPoolConfig struct {

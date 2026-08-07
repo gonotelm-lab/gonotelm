@@ -2,6 +2,7 @@ package text2image
 
 import (
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/gonotelm-lab/multimodal/image"
@@ -11,7 +12,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/httpclient"
 )
 
-const defaultGenerateTimeout = 30 * time.Minute
+const defaultGenerateTimeout = 15 * time.Minute
 
 func newText2ImageGenerator(
 	provider Text2ImageProvider,
@@ -36,7 +37,17 @@ func withImageHTTPClient(opts []image.ClientOption, timeout time.Duration) []ima
 	if timeout <= 0 {
 		timeout = defaultGenerateTimeout
 	}
-	builder := httpclient.NewBuilder(nil)
+
+	var base http.RoundTripper = &http.Transport{
+		ForceAttemptHTTP2:     true,
+		DialContext:           httpclient.DefaultDialer.DialContext,
+		MaxIdleConns:          200,
+		IdleConnTimeout:       120 * time.Second,
+		ResponseHeaderTimeout: time.Minute,
+		TLSHandshakeTimeout:   time.Minute,
+	}
+
+	builder := httpclient.NewBuilder(base)
 	client := builder.WithTimeout(timeout).Build()
 
 	newOpts := []image.ClientOption{}

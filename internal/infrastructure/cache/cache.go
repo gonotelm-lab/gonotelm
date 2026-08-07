@@ -8,7 +8,9 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache/schema"
 
+	"github.com/redis/go-redis/extra/redisotel/v9"
 	"github.com/redis/go-redis/v9"
+	"github.com/redis/go-redis/v9/maintnotifications"
 )
 
 type ChatContextMessageCache interface {
@@ -64,6 +66,7 @@ type RedisCacheConfig struct {
 }
 
 func Init(cfg *RedisCacheConfig) error {
+	var err error
 	once.Do(func() {
 		gRedis = redis.NewUniversalClient(&redis.UniversalOptions{
 			Addrs:                 cfg.Addrs,
@@ -71,14 +74,22 @@ func Init(cfg *RedisCacheConfig) error {
 			ClientName:            "gonotelm-redis-v9",
 			Username:              cfg.Username,
 			Password:              cfg.Password,
+			// CLIENT MAINT_NOTIFICATIONS (Redis 8.0 feature) is not supported
+			// by Redis 7.x servers; disable it to avoid handshake errors.
+			MaintNotificationsConfig: &maintnotifications.Config{
+				Mode: maintnotifications.ModeDisabled,
+			},
 			OnConnect: func(ctx context.Context, cn *redis.Conn) error {
 				slog.InfoContext(ctx, "created new redis connection", "addr", cfg.Addrs)
 				return nil
 			},
 		})
+
+		// equipped with opentelemetry
+		err = redisotel.InstrumentTracing(gRedis)
 	})
 
-	return nil
+	return err
 }
 
 func GetRedis() redis.UniversalClient {

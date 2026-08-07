@@ -12,13 +12,21 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/httpclient"
+	pkgtrace "github.com/gonotelm-lab/gonotelm/pkg/trace"
+	"github.com/gonotelm-lab/gonotelm/pkg/trace/attributes"
+	"github.com/gonotelm-lab/gonotelm/pkg/trace/instrumentation/s3conv"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 type Storage struct {
 	client        *minio.Client
 	bucket        string
+	region        string
 	presignExpiry time.Duration
 }
 
@@ -32,10 +40,14 @@ func New(cfg *storage.Config) (*Storage, error) {
 		return nil, errors.Wrap(err, "validate storage config failed")
 	}
 
+	// 自带重试+链路追踪的httpclient
+	transport := httpclient.NewBuilder(nil).Build().Transport
 	client, err := minio.New(cfg.Endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
-		Secure: cfg.Secure,
-		Region: cfg.Region,
+		Creds:      credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
+		Secure:     cfg.Secure,
+		Region:     cfg.Region,
+		Transport:  transport,
+		MaxRetries: 1,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "create minio client failed")
@@ -44,12 +56,33 @@ func New(cfg *storage.Config) (*Storage, error) {
 	return &Storage{
 		client:        client,
 		bucket:        cfg.Bucket,
+		region:        cfg.Region,
 		presignExpiry: cfg.PresignExpiry,
 	}, nil
 }
 
 func (s *Storage) Name() string {
 	return "minio"
+}
+
+// startSpan 为一次存储操作创建 S3 风格 client span，
+// 属性由 s3conv 生成，对齐 AWS SDK v2 的 otelaws instrumentation。
+func (s *Storage) startSpan(ctx context.Context, op, key string, extra ...attribute.KeyValue) (context.Context, oteltrace.Span) {
+	attrs := s3conv.Attributes(op, s.bucket, s.region, key)
+	attrs = append(attrs, extra...)
+
+	return pkgtrace.GetOtelTracer().Start(ctx, s3conv.SpanName(op),
+		oteltrace.WithSpanKind(oteltrace.SpanKindClient),
+		oteltrace.WithAttributes(attrs...),
+	)
+}
+
+// finishSpan 在操作失败时记录错误并标记 span 状态。
+func finishSpan(span oteltrace.Span, err error) {
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+	}
 }
 
 func (s *Storage) StatObject(
@@ -63,12 +96,18 @@ func (s *Storage) StatObject(
 		return nil, errors.ErrParams.Msg("stat object request key is empty")
 	}
 
+	ctx, span := s.startSpan(ctx, "StatObject", req.Key)
+	defer span.End()
+
 	objInfo, err := s.client.StatObject(ctx, s.bucket, req.Key, minio.StatObjectOptions{})
 	if err != nil {
 		if isNotFoundErr(err) {
-			return nil, storage.ErrObjectNotFound
+			err = storage.ErrObjectNotFound
+		} else {
+			err = errors.Wrapf(err, "minio stat object failed, key=%s", req.Key)
 		}
-		return nil, errors.Wrapf(err, "minio stat object failed, key=%s", req.Key)
+		finishSpan(span, err)
+		return nil, err
 	}
 
 	return &storage.StatObjectResponse{
@@ -93,19 +132,28 @@ func (s *Storage) GetObject(
 		return nil, errors.ErrParams.Msg("get object request key is empty")
 	}
 
+	ctx, span := s.startSpan(ctx, "GetObject", req.Key)
+	defer span.End()
+
 	object, err := s.client.GetObject(ctx, s.bucket, req.Key, minio.GetObjectOptions{})
 	if err != nil {
-		return nil, errors.Wrap(err, "get object failed")
+		err = errors.Wrap(err, "get object failed")
+		finishSpan(span, err)
+		return nil, err
 	}
 
 	objInfo, err := object.Stat()
 	if err != nil {
-		return nil, errors.Wrap(err, "get stat object failed")
+		err = errors.Wrap(err, "get stat object failed")
+		finishSpan(span, err)
+		return nil, err
 	}
 
 	body, err := io.ReadAll(object)
 	if err != nil {
-		return nil, errors.Wrap(err, "read object body failed")
+		err = errors.Wrap(err, "read object body failed")
+		finishSpan(span, err)
+		return nil, err
 	}
 	defer object.Close()
 
@@ -132,9 +180,14 @@ func (s *Storage) DeleteObject(
 		return errors.ErrParams.Msg("delete object request key is empty")
 	}
 
+	ctx, span := s.startSpan(ctx, "DeleteObject", req.Key)
+	defer span.End()
+
 	err := s.client.RemoveObject(ctx, s.bucket, req.Key, minio.RemoveObjectOptions{})
 	if err != nil {
-		return errors.Wrapf(err, "minio delete object failed, key=%s", req.Key)
+		err = errors.Wrapf(err, "minio delete object failed, key=%s", req.Key)
+		finishSpan(span, err)
+		return err
 	}
 
 	return nil
@@ -150,6 +203,9 @@ func (s *Storage) BatchDeleteObject(
 	if len(req.Keys) == 0 {
 		return nil
 	}
+
+	ctx, span := s.startSpan(ctx, "DeleteObjects", "", attributes.S3ObjectCount.Int(len(req.Keys)))
+	defer span.End()
 
 	objectCh := make(chan minio.ObjectInfo)
 	go func() {
@@ -170,7 +226,9 @@ func (s *Storage) BatchDeleteObject(
 	errCh := s.client.RemoveObjects(ctx, s.bucket, objectCh, minio.RemoveObjectsOptions{})
 	for rmErr := range errCh {
 		if rmErr.Err != nil {
-			return errors.Wrapf(rmErr.Err, "minio batch delete object failed, key=%s", rmErr.ObjectName)
+			err := errors.Wrapf(rmErr.Err, "minio batch delete object failed, key=%s", rmErr.ObjectName)
+			finishSpan(span, err)
+			return err
 		}
 	}
 
@@ -187,6 +245,9 @@ func (s *Storage) UploadObject(
 	if req.Key == "" {
 		return errors.ErrParams.Msg("upload object request key is empty")
 	}
+
+	ctx, span := s.startSpan(ctx, "PutObject", req.Key)
+	defer span.End()
 
 	var reader io.Reader
 	if req.Body != nil {
@@ -205,7 +266,9 @@ func (s *Storage) UploadObject(
 			UserMetadata: req.Metadata,
 		})
 	if err != nil {
-		return errors.Wrapf(err, "minio upload object failed, key=%s", req.Key)
+		err = errors.Wrapf(err, "minio upload object failed, key=%s", req.Key)
+		finishSpan(span, err)
+		return err
 	}
 
 	return nil
@@ -222,34 +285,51 @@ func (s *Storage) PresignedPostPolicy(
 		return nil, errors.ErrParams.Msg("presigned post policy request key is empty")
 	}
 
+	ctx, span := s.startSpan(ctx, "PresignedPostPolicy", req.Key)
+	defer span.End()
+
 	policy := minio.NewPostPolicy()
 	if err := policy.SetBucket(s.bucket); err != nil {
-		return nil, errors.Wrapf(err, "set post policy bucket failed, bucket=%s", s.bucket)
+		err = errors.Wrapf(err, "set post policy bucket failed, bucket=%s", s.bucket)
+		finishSpan(span, err)
+		return nil, err
 	}
 	if err := policy.SetKey(req.Key); err != nil {
-		return nil, errors.Wrapf(err, "set post policy key failed, key=%s", req.Key)
+		err = errors.Wrapf(err, "set post policy key failed, key=%s", req.Key)
+		finishSpan(span, err)
+		return nil, err
 	}
 	if err := policy.SetExpires(time.Now().UTC().Add(s.presignExpiry)); err != nil {
-		return nil, errors.Wrapf(err, "set post policy expiry failed, expiry=%s", s.presignExpiry)
+		err = errors.Wrapf(err, "set post policy expiry failed, expiry=%s", s.presignExpiry)
+		finishSpan(span, err)
+		return nil, err
 	}
 	if req.ContentType != "" {
 		if err := policy.SetContentType(req.ContentType); err != nil {
-			return nil, errors.Wrapf(err, "set post policy content type failed, content_type=%s", req.ContentType)
+			err = errors.Wrapf(err, "set post policy content type failed, content_type=%s", req.ContentType)
+			finishSpan(span, err)
+			return nil, err
 		}
 	}
 	if req.ContentLength > 0 {
 		if err := policy.SetContentLengthRange(req.ContentLength, req.ContentLength); err != nil {
-			return nil, errors.Wrapf(err, "set post policy content length failed, content_length=%d", req.ContentLength)
+			err = errors.Wrapf(err, "set post policy content length failed, content_length=%d", req.ContentLength)
+			finishSpan(span, err)
+			return nil, err
 		}
 	}
 	if req.Filename != "" {
 		if err := policy.SetUserMetadata("filename", req.Filename); err != nil {
-			return nil, errors.Wrapf(err, "set post policy filename metadata failed, filename=%s", req.Filename)
+			err = errors.Wrapf(err, "set post policy filename metadata failed, filename=%s", req.Filename)
+			finishSpan(span, err)
+			return nil, err
 		}
 	}
 	if req.Md5 != "" {
 		if err := policy.SetUserMetadata("md5", req.Md5); err != nil {
-			return nil, errors.Wrapf(err, "set post policy md5 metadata failed, md5=%s", req.Md5)
+			err = errors.Wrapf(err, "set post policy md5 metadata failed, md5=%s", req.Md5)
+			finishSpan(span, err)
+			return nil, err
 		}
 	}
 
@@ -258,13 +338,17 @@ func (s *Storage) PresignedPostPolicy(
 			continue
 		}
 		if err := policy.SetUserMetadata(k, v); err != nil {
-			return nil, errors.Wrapf(err, "set post policy metadata failed, key=%s, value=%s", k, v)
+			err = errors.Wrapf(err, "set post policy metadata failed, key=%s, value=%s", k, v)
+			finishSpan(span, err)
+			return nil, err
 		}
 	}
 
 	presignedURL, formData, err := s.client.PresignedPostPolicy(ctx, policy)
 	if err != nil {
-		return nil, errors.Wrap(err, "generate minio presigned post policy failed")
+		err = errors.Wrap(err, "generate minio presigned post policy failed")
+		finishSpan(span, err)
+		return nil, err
 	}
 
 	return &storage.PresignedPostPolicyResponse{
@@ -285,6 +369,9 @@ func (s *Storage) PresignedGetObject(
 		return nil, errors.New("presigned get object request key is empty")
 	}
 
+	ctx, span := s.startSpan(ctx, "PresignedGetObject", req.Key)
+	defer span.End()
+
 	params := url.Values{}
 	if req.Inline {
 		params.Set("response-content-disposition", "inline")
@@ -303,7 +390,9 @@ func (s *Storage) PresignedGetObject(
 
 	presignedURL, err := s.client.PresignedGetObject(ctx, s.bucket, req.Key, s.presignExpiry, params)
 	if err != nil {
-		return nil, errors.Wrapf(err, "generate minio presigned get object failed, key=%s", req.Key)
+		err = errors.Wrapf(err, "generate minio presigned get object failed, key=%s", req.Key)
+		finishSpan(span, err)
+		return nil, err
 	}
 
 	return &storage.PresignedGetObjectResponse{

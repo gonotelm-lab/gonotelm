@@ -11,12 +11,22 @@ import (
 	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkglog "github.com/gonotelm-lab/gonotelm/pkg/log"
+	"github.com/gonotelm-lab/gonotelm/pkg/requestid"
+	pkgtrace "github.com/gonotelm-lab/gonotelm/pkg/trace"
+	"github.com/gonotelm-lab/gonotelm/pkg/trace/instrumentation/messagingconv"
+	"github.com/gonotelm-lab/gonotelm/pkg/trace/propagation"
 
 	"github.com/segmentio/kafka-go"
 	"github.com/segmentio/kafka-go/sasl/plain"
+	"go.opentelemetry.io/otel/codes"
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
+
+// userIdHeaderKey 是随消息传递的用户 id header。
+const userIdHeaderKey = "X-User-Id"
 
 type ProducerConfig struct {
 	Brokers  []string
@@ -24,8 +34,13 @@ type ProducerConfig struct {
 	Password string
 }
 
+type messageWriter interface {
+	WriteMessages(ctx context.Context, msgs ...kafka.Message) error
+	Close() error
+}
+
 type Producer struct {
-	w *kafka.Writer
+	w messageWriter
 }
 
 var _ mq.Producer = (*Producer)(nil)
@@ -48,17 +63,68 @@ func NewProducer(c ProducerConfig) *Producer {
 }
 
 func (p *Producer) Send(ctx context.Context, req *mq.ProducerSendRequest) error {
-	err := p.w.WriteMessages(ctx, kafka.Message{
-		Topic:   req.Topic,
-		Key:     req.Key,
-		Value:   req.Value,
-		Headers: toKafkaHeaders(req.Headers),
-	})
+	tracer := pkgtrace.GetOtelTracer()
+	ctx, span := tracer.Start(ctx,
+		messagingconv.SendSpanName(req.Topic),
+		oteltrace.WithSpanKind(oteltrace.SpanKindProducer),
+		oteltrace.WithAttributes(messagingconv.SendAttributes(req.Topic, req.Key,
+			messagingconv.SendOptions{Tombstone: len(req.Value) == 0},
+		)...),
+	)
+	defer span.End()
+
+	hds := buildMessageHeaders(ctx, req.Headers)
+
+	msg := prepareMessage(req, hds)
+
+	err := p.w.WriteMessages(ctx, msg)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return errors.Wrap(err, "write messages failed")
 	}
 
 	return nil
+}
+
+// buildMessageHeaders 注入 trace 上下文及请求上下文（req id / user id）到消息 header。
+func buildMessageHeaders(ctx context.Context, headers []mq.MessageHeader) []kafka.Header {
+	hds := toKafkaHeaders(headers)
+	if reqId := pkgcontext.GetReqId(ctx); !reqId.IsZero() {
+		hds = append(hds, kafka.Header{Key: requestid.HeaderKey, Value: []byte(reqId.String())})
+	}
+	if userId := pkgcontext.GetUserId(ctx); userId != "" {
+		hds = append(hds, kafka.Header{Key: userIdHeaderKey, Value: []byte(userId)})
+	}
+
+	carrier := propagation.NewKafkaHeaderCarrier(hds)
+	pkgtrace.GetTextMapPropagator().Inject(ctx, carrier)
+
+	return carrier.Headers()
+}
+
+func prepareMessage(req *mq.ProducerSendRequest, headers []kafka.Header) kafka.Message {
+	return kafka.Message{
+		Topic:   req.Topic,
+		Key:     req.Key,
+		Value:   req.Value,
+		Headers: headers,
+	}
+}
+
+// restoreRequestContext 从 kafka header 中还原请求上下文（req id / user id）。
+func restoreRequestContext(ctx context.Context, headers []kafka.Header) context.Context {
+	carrier := propagation.NewKafkaHeaderCarrier(headers)
+	if v := carrier.Get(requestid.HeaderKey); v != "" {
+		if id, err := requestid.ParseString(v); err == nil {
+			ctx = pkgcontext.WithReqId(ctx, id)
+		}
+	}
+	if v := carrier.Get(userIdHeaderKey); v != "" {
+		ctx = pkgcontext.WithUserId(ctx, v)
+	}
+
+	return ctx
 }
 
 func (p *Producer) Close(ctx context.Context) error {
@@ -77,6 +143,8 @@ type ConsumerConfig struct {
 
 type Consumer struct {
 	r *kafka.Reader
+
+	groupID string
 
 	mu        sync.RWMutex
 	done      chan struct{}
@@ -102,7 +170,7 @@ func NewConsumer(c ConsumerConfig) *Consumer {
 			},
 		},
 	})
-	return &Consumer{r: r}
+	return &Consumer{r: r, groupID: c.GroupID}
 }
 
 func (c *Consumer) Subscribe(ctx context.Context, topic string, handler mq.MessageHandler) error {
@@ -183,15 +251,38 @@ func (c *Consumer) Subscribe(ctx context.Context, topic string, handler mq.Messa
 			}
 
 			unknownErrAttempts = 0
-			// TODO new ctx with header metadata
+
+			// 从 kafka header 中提取 trace 上下文，并创建 consumer span
+			carrier := propagation.NewKafkaHeaderCarrier(msg.Headers)
+			propCtx := pkgtrace.GetTextMapPropagator().Extract(ctx, carrier)
+
+			tracer := pkgtrace.GetOtelTracer()
+			spanCtx, span := tracer.Start(propCtx, messagingconv.ProcessSpanName(msg.Topic),
+				oteltrace.WithSpanKind(oteltrace.SpanKindConsumer),
+				oteltrace.WithAttributes(messagingconv.ProcessAttributes(msg.Topic, msg.Key,
+					messagingconv.ProcessOptions{
+						GroupName: c.groupID,
+						Partition: msg.Partition,
+						Offset:    msg.Offset,
+						Tombstone: len(msg.Value) == 0,
+					},
+				)...),
+			)
+
+			// 从 kafka header 中还原请求上下文
+			spanCtx = restoreRequestContext(spanCtx, msg.Headers)
+
 			kafkaMsg := &KafkaMessage{
 				topic:   msg.Topic,
 				key:     msg.Key,
 				value:   msg.Value,
 				headers: msg.Headers,
 			}
-			err = handler(ctx, kafkaMsg)
+			err = handler(spanCtx, kafkaMsg)
 			if err != nil {
+				span.RecordError(err)
+				span.SetStatus(codes.Error, err.Error())
+				span.End()
 				slog.ErrorContext(ctx, "kafka message handler failed",
 					slog.Any("err", err),
 					slog.String("topic", msg.Topic),
@@ -200,6 +291,7 @@ func (c *Consumer) Subscribe(ctx context.Context, topic string, handler mq.Messa
 				)
 				continue
 			}
+			span.End()
 
 			// handler success, commit offset
 			err = c.r.CommitMessages(ctx, msg)

@@ -120,31 +120,31 @@ enableThinking = ${GONOTELM_QWEN_ENABLE_THINKING:-false}
 apiKey = "${GONOTELM_DASHSCOPE_API_KEY:-}"
 baseUrl = "${GONOTELM_TEXT2IMAGE_DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation}"
 model = "${GONOTELM_TEXT2IMAGE_DASHSCOPE_MODEL:-qwen-image-2.0-pro}"
-timeout = "${GONOTELM_TEXT2IMAGE_DASHSCOPE_TIMEOUT:-1h}"
+timeout = "${GONOTELM_TEXT2IMAGE_DASHSCOPE_TIMEOUT:-10m}"
 
 [text2image.agnes]
 apiKey = "${GONOTELM_AGNES_API_KEY:-}"
 baseUrl = "${GONOTELM_TEXT2IMAGE_AGNES_BASE_URL:-https://apihub.agnes-ai.com/v1/images/generations}"
 model = "${GONOTELM_TEXT2IMAGE_AGNES_MODEL:-agnes-image-2.1-flash}"
-timeout = "${GONOTELM_TEXT2IMAGE_AGNES_TIMEOUT:-1h}"
+timeout = "${GONOTELM_TEXT2IMAGE_AGNES_TIMEOUT:-10m}"
 
 [text2audio.dashscope]
 apiKey = "${GONOTELM_DASHSCOPE_API_KEY:-}"
 baseUrl = "${GONOTELM_TEXT2AUDIO_DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation}"
 model = "${GONOTELM_TEXT2AUDIO_DASHSCOPE_MODEL:-qwen3-tts-flash}"
-timeout = "${GONOTELM_TEXT2AUDIO_DASHSCOPE_TIMEOUT:-1h}"
+timeout = "${GONOTELM_TEXT2AUDIO_DASHSCOPE_TIMEOUT:-10m}"
 
 [text2audio.mimo]
 apiKey = "${GONOTELM_MIMO_API_KEY:-}"
 baseUrl = "${GONOTELM_TEXT2AUDIO_MIMO_BASE_URL:-https://api.xiaomimimo.com/v1/chat/completions}"
 model = "${GONOTELM_TEXT2AUDIO_MIMO_MODEL:-}"
-timeout = "${GONOTELM_TEXT2AUDIO_MIMO_TIMEOUT:-1h}"
+timeout = "${GONOTELM_TEXT2AUDIO_MIMO_TIMEOUT:-10m}"
 
 [text2audio.minimax]
 apiKey = "${GONOTELM_MINIMAX_API_KEY:-}"
 baseUrl = "${GONOTELM_TEXT2AUDIO_MINIMAX_BASE_URL:-https://api.minimaxi.com/v1/t2a_v2}"
 model = "${GONOTELM_TEXT2AUDIO_MINIMAX_MODEL:-}"
-timeout = "${GONOTELM_TEXT2AUDIO_MINIMAX_TIMEOUT:-1h}"
+timeout = "${GONOTELM_TEXT2AUDIO_MINIMAX_TIMEOUT:-10m}"
 
 [flow]
 addr        = "${GONOTELM_FLOW_ADDR:-localhost:7091}"
@@ -155,3 +155,8 @@ dialTimeout = "${GONOTELM_FLOW_DIAL_TIMEOUT:-5s}"
 [worker]
 maxConcurrency  = ${GONOTELM_WORKER_MAX_CONCURRENCY:-4}
 heartbeat       = "${GONOTELM_WORKER_HEARTBEAT:-5s}"
+
+[otelTrace]
+name = "worker"
+endpoint = "${OTEL_TRACE_ENDPOINT:-127.0.0.1:4317}"
+exporter = "grpc"

@@ -3,11 +3,40 @@ package httpclient
 import (
 	"context"
 	"errors"
+	"io"
 	"math/rand"
 	"net/http"
 	"net/url"
 	"time"
+
+	"go.opentelemetry.io/otel/semconv/v1.41.0"
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
+
+type retryAttemptKey struct{}
+
+func withRetryAttempt(ctx context.Context, attempt int) context.Context {
+	return context.WithValue(ctx, retryAttemptKey{}, attempt)
+}
+
+func getRetryAttempt(ctx context.Context) int {
+	a, _ := ctx.Value(retryAttemptKey{}).(int)
+	return a
+}
+
+// 给每次重试的span attribute都打上标记
+func retryAttemptInjectRoundTrip(next http.RoundTripper) http.RoundTripper {
+	return RoundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		// 如果是重试
+		if cnt := getRetryAttempt(req.Context()); cnt > 0 {
+			span := oteltrace.SpanFromContext(req.Context())
+			// See: https://opentelemetry.io/docs/specs/semconv/http/http-spans/#http-request-retries-and-redirects
+			span.SetAttributes(semconv.HTTPRequestResendCountKey.Int(cnt))
+		}
+
+		return next.RoundTrip(req)
+	})
+}
 
 type RetryRoundTripper struct {
 	maxRetries int
@@ -54,6 +83,10 @@ func (r *RetryRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 	)
 
 	for {
+		if attempt > 0 {
+			// 已经是重试进来了 链路上打上重试 attribute
+			req = req.WithContext(withRetryAttempt(req.Context(), attempt))
+		}
 		resp, err = r.next.RoundTrip(req)
 		attempt++
 		if err == nil && !r.shouldRetryStatus(resp.StatusCode) {
@@ -62,6 +95,15 @@ func (r *RetryRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 
 		if attempt > r.maxRetries || !r.shouldRetry(err, resp) {
 			return resp, err
+		}
+
+		// 重试前必须 drain 并关闭失败响应的 body：
+		// 1. 连接才能复用，否则每次重试都新建连接
+		// 2. otelhttp 等包装层依赖 body 关闭/读完来结束 span，
+		//    不关闭会导致 span 永不结束
+		if resp != nil && resp.Body != nil {
+			_, _ = io.Copy(io.Discard, resp.Body)
+			_ = resp.Body.Close()
 		}
 
 		if err := r.backoffSleep(req.Context(), attempt); err != nil {
@@ -79,7 +121,7 @@ func (r *RetryRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 }
 
 func (r *RetryRoundTripper) shouldRetryStatus(code int) bool {
-	return code == 0 || code >= 500
+	return code == 0 || code >= http.StatusInternalServerError
 }
 
 func (r *RetryRoundTripper) shouldRetry(err error, resp *http.Response) bool {
@@ -94,7 +136,7 @@ func (r *RetryRoundTripper) shouldRetry(err error, resp *http.Response) bool {
 		return true
 	}
 
-	if resp != nil && resp.StatusCode >= 500 {
+	if resp != nil && resp.StatusCode >= http.StatusInternalServerError {
 		return true
 	}
 

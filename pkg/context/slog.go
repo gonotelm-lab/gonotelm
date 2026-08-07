@@ -6,10 +6,21 @@ import (
 )
 
 const (
+	AttrReqId           = "req_id"
 	AttrKeyUserID       = "user_id"
 	AttrKeySceneType    = "scene"
 	AttrKeyOperatorType = "operator"
 )
+
+func getReqIdSlogAttr(ctx context.Context) (slog.Attr, bool) {
+	reqId := GetReqId(ctx)
+	if reqId.IsZero() {
+		return slog.Attr{}, false
+	}
+
+	attr := slog.String(AttrReqId, reqId.String())
+	return attr, true
+}
 
 func getUserIdSlogAttr(ctx context.Context) (slog.Attr, bool) {
 	userId := GetUserId(ctx)
@@ -42,6 +53,7 @@ func getOperatorSlogAttr(ctx context.Context) (slog.Attr, bool) {
 }
 
 var defaultSlogAttrsExtractors = []SlogAttrExtractor{
+	getReqIdSlogAttr,
 	getUserIdSlogAttr,
 	getSceneSlogAttr,
 	getOperatorSlogAttr,

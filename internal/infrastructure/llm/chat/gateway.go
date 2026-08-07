@@ -2,15 +2,22 @@ package chat
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"sync"
 
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
+	"github.com/gonotelm-lab/gonotelm/pkg/safe"
+	pkgtrace "github.com/gonotelm-lab/gonotelm/pkg/trace"
+	"github.com/gonotelm-lab/gonotelm/pkg/trace/instrumentation/genaiconv"
 
 	"github.com/cloudwego/eino/callbacks"
 	"github.com/cloudwego/eino/components"
 	einomodel "github.com/cloudwego/eino/components/model"
 	einoschema "github.com/cloudwego/eino/schema"
+	"go.opentelemetry.io/otel/codes"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -29,6 +36,7 @@ type Gateway struct {
 
 func New(ctx context.Context, cfg *llm.ProviderConfig) (*Gateway, error) {
 	gw := &Gateway{
+		rootCtx:   ctx,
 		providers: make(map[llm.Provider]einomodel.ToolCallingChatModel),
 	}
 
@@ -139,7 +147,15 @@ func (g *wrappedChatModel) Generate(
 	}
 	defer g.sem.Release(1)
 
-	return g.impl.Generate(ctx, input, opts...)
+	ctx, span := startChatSpan(ctx, g.provider, modelName)
+	defer span.End()
+
+	resp, err := g.impl.Generate(ctx, input, opts...)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+	}
+	return resp, err
 }
 
 func (g *wrappedChatModel) Stream(
@@ -167,13 +183,50 @@ func (g *wrappedChatModel) Stream(
 	})
 	ctx = withSemReleaseFunc(ctx, releaseSem)
 
+	ctx, span := startChatSpan(ctx, g.provider, modelName)
+
 	stream, err := g.impl.Stream(ctx, input, opts...)
 	if err != nil {
 		releaseSem()
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		span.End()
 		return nil, err
 	}
 
-	return stream, nil
+	// span 在流式输出消费完（EOF/错误/Close）时结束：
+	// 通过 pipe 转发，后台 goroutine 在流结束时结束 span。
+	reader, writer := einoschema.Pipe[*einoschema.Message](0)
+	safe.DetachGo(ctx, g.rootCtx, "chat.stream_trace", func(ctx context.Context) {
+		defer writer.Close()
+		defer span.End()
+
+		for {
+			msg, err := stream.Recv()
+			if errors.Is(err, io.EOF) {
+				return
+			}
+			if err != nil {
+				span.RecordError(err)
+				span.SetStatus(codes.Error, err.Error())
+				return
+			}
+			if closed := writer.Send(msg, nil); closed {
+				// 消费者提前关闭，正常结束，不标记错误
+				return
+			}
+		}
+	})
+
+	return reader, nil
+}
+
+// startChatSpan 为一次 chat 调用创建 gen_ai client span。
+func startChatSpan(ctx context.Context, provider llm.Provider, modelName string) (context.Context, oteltrace.Span) {
+	return pkgtrace.GetOtelTracer().Start(ctx, genaiconv.SpanName("chat"),
+		oteltrace.WithSpanKind(oteltrace.SpanKindClient),
+		oteltrace.WithAttributes(genaiconv.Attributes(string(provider), "chat", modelName)...),
+	)
 }
 
 func (g *wrappedChatModel) WithTools(

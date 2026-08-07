@@ -228,6 +228,52 @@ func TestRetryRoundTripper_WithOptions(t *testing.T) {
 	}
 }
 
+func TestRetryRoundTripper_ClosesBodyBeforeRetry(t *testing.T) {
+	var calls int
+	var closedAt []int
+	rt := NewRetryRoundTripper(2, &mockRoundTripper{
+		fn: func(req *http.Request) (*http.Response, error) {
+			calls++
+			body := &closeTrackingBody{Reader: strings.NewReader("error body")}
+			closedAt = append(closedAt, 0)
+			body.onClose = func() {
+				closedAt[len(closedAt)-1] = calls
+			}
+			return &http.Response{StatusCode: http.StatusServiceUnavailable, Body: body}, nil
+		},
+	})
+
+	_, err := rt.RoundTrip(&http.Request{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls != 3 {
+		t.Fatalf("expected 3 calls, got %d", calls)
+	}
+	// 前两次的失败响应 body 必须在各自调用结束后被关闭
+	for i := 0; i < 2; i++ {
+		if closedAt[i] != i+1 {
+			t.Fatalf("body of attempt %d closed at call %d, want %d", i+1, closedAt[i], i+1)
+		}
+	}
+}
+
+type closeTrackingBody struct {
+	io.Reader
+	onClose func()
+	closed  bool
+}
+
+func (b *closeTrackingBody) Close() error {
+	if !b.closed {
+		b.closed = true
+		if b.onClose != nil {
+			b.onClose()
+		}
+	}
+	return nil
+}
+
 func TestRetryRoundTripper_RetryThenSuccess(t *testing.T) {
 	var calls int
 	rt := NewRetryRoundTripper(2, &mockRoundTripper{

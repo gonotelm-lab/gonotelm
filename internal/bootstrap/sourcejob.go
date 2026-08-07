@@ -11,6 +11,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository"
 	eventsourcejob "github.com/gonotelm-lab/gonotelm/internal/interfaces/event/sourcejob"
+	"github.com/gonotelm-lab/gonotelm/pkg/trace"
 )
 
 type SourceJob struct {
@@ -22,6 +23,10 @@ type SourceJob struct {
 func NewSourceJob(ctx context.Context, cfg *conf.SourceJobConfig) (*SourceJob, error) {
 	if cfg.MsgQueue.Type == "" {
 		return nil, fmt.Errorf("sourcejob requires msgQueue")
+	}
+
+		if err := trace.Init(ctx, cfg.OtelTrace); err != nil {
+		slog.ErrorContext(ctx, fmt.Sprintf("[worker.bootstrap] can not init trace: %v", err))
 	}
 
 	infra, err := bootshared.NewInfra(ctx, &cfg.InfraConfig)

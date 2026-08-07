@@ -12,34 +12,34 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 )
 
-type logRequestOption struct {
+type loggingOption struct {
 	logAllError   bool
 	slowThreshold time.Duration
 }
 
-type LogRequestOption func(*logRequestOption)
+type LoggingOption func(*loggingOption)
 
-func WithLogAllError(logAllError bool) LogRequestOption {
-	return func(o *logRequestOption) {
+func WithLogAllError(logAllError bool) LoggingOption {
+	return func(o *loggingOption) {
 		o.logAllError = logAllError
 	}
 }
 
-func WithSlowThreshold(slowThreshold time.Duration) LogRequestOption {
-	return func(o *logRequestOption) {
+func WithSlowThreshold(slowThreshold time.Duration) LoggingOption {
+	return func(o *loggingOption) {
 		o.slowThreshold = slowThreshold
 	}
 }
 
-func defaultLogRequestOption() *logRequestOption {
-	return &logRequestOption{
+func defaultLoggingOption() *loggingOption {
+	return &loggingOption{
 		logAllError:   false,
 		slowThreshold: 500 * time.Millisecond,
 	}
 }
 
-func LogRequest(opts ...LogRequestOption) app.HandlerFunc {
-	o := defaultLogRequestOption()
+func Logging(opts ...LoggingOption) app.HandlerFunc {
+	o := defaultLoggingOption()
 	for _, opt := range opts {
 		opt(o)
 	}

@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/cloudwego/hertz/pkg/app/server"
+	"github.com/cloudwego/hertz/pkg/common/config"
 	artifactapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/artifact"
 	chatapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat"
 	chatsuggest "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/suggestion"
@@ -91,14 +92,17 @@ type Server struct {
 func NewServer(
 	deps ServerDeps,
 ) *Server {
-	hz := server.Default(
+	hzOpts := []config.Option{
 		server.WithCustomBinder(http.NewCanonicalBinder()),
 		server.WithHostPorts(conf.NotelmGlobal().Api.HostPort()),
 		server.WithExitWaitTime(conf.NotelmGlobal().Api.ExitWaitTimeout),
 		server.WithDisablePrintRoute(true),
-	)
+	}
+	hz := server.New(hzOpts...)
 	hz.Use(
-		middleware.LogRequest(middleware.WithLogAllError(conf.NotelmGlobal().IsDev())),
+		middleware.Tracing("notelm"),
+		middleware.Recovery(),
+		middleware.Logging(middleware.WithLogAllError(conf.NotelmGlobal().IsDev())),
 	)
 
 	s := &Server{

@@ -3,6 +3,7 @@ package chat
 import (
 	"context"
 	"log/slog"
+	"runtime/debug"
 	"sync"
 
 	chatagent "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/agent"
@@ -205,7 +206,8 @@ func (h *CreateMessageHandler) beginStreamTask(
 
 	defer func() {
 		if p := recover(); p != nil {
-			err = errors.ErrInner.Msgf("stream task panic: %v", p)
+			stacks := debug.Stack()
+			err = errors.ErrInner.Msgf("stream task panic: %v, stack: %s", p, stacks)
 		}
 
 		if err != nil {

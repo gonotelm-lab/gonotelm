@@ -64,12 +64,13 @@ func (g *EmbeddingGateway) initProvider(providerType EmbeddingType) (einoembed.E
 
 	cfgCopy := *g.cfg
 	cfgCopy.Type = providerType
-	provider, err := newEmbedder(
+	impl, err := newEmbedder(
 		context.Background(), &cfgCopy, g.cacher,
 	)
 	if err != nil {
 		return nil, err
 	}
+	provider = &tracingEmbedder{system: string(providerType), impl: impl}
 
 	g.providers[providerType] = provider
 	return provider, nil

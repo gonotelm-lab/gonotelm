@@ -42,7 +42,8 @@ func ResolveChunkSplitMethodByMime(mimeType string) string {
 	case entity.MimeTypePDF,
 		entity.MimeTypeWord,
 		entity.MimeTypeEPUB,
-		entity.MimeTypeXLSX:
+		entity.MimeTypeXLSX,
+		entity.MimeTypePPTX:
 		return ChunkMarkdownSplitMethod
 	default:
 		return ChunkRecursiveSplitMethod

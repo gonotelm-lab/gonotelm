@@ -33,6 +33,7 @@ const (
 	MimeTypeEPUB     = "application/epub+zip"
 	MimeTypeWord     = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 	MimeTypeXLSX     = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+	MimeTypePPTX     = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 )
 
 func SupportedFileMimeType(mimeType string) bool {
@@ -43,7 +44,8 @@ func SupportedFileMimeType(mimeType string) bool {
 		MimeTypeCSV,
 		MimeTypeEPUB,
 		MimeTypeWord,
-		MimeTypeXLSX:
+		MimeTypeXLSX,
+		MimeTypePPTX:
 		return true
 	}
 	return false

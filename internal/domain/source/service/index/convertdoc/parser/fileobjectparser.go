@@ -11,6 +11,7 @@ import (
 	"github.com/cloudwego/eino/schema"
 	epubparser "github.com/gonotelm-lab/gonotelm/pkg/eino-ext/parser/epub"
 	pdfparser "github.com/gonotelm-lab/gonotelm/pkg/eino-ext/parser/pdf"
+	pptxparser "github.com/gonotelm-lab/gonotelm/pkg/eino-ext/parser/pptx"
 	xlsxparser "github.com/gonotelm-lab/gonotelm/pkg/eino-ext/parser/xlsx"
 )
 
@@ -79,6 +80,13 @@ func (p *FileObjectParser) parseByMime(
 			ctx,
 			r,
 			xlsxparser.NewXLSXParser(nil),
+			opts...,
+		)
+	case entity.MimeTypePPTX:
+		return parseByDocParser(
+			ctx,
+			r,
+			pptxparser.NewPptxParser(nil), // 只保留语义内容（标题/列表/表格/备注/图片alt）
 			opts...,
 		)
 	}

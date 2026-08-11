@@ -27,16 +27,16 @@ func init() {
 
 type CiteSourceDocTool struct {
 	checker   SourceDocPermissionChecker
-	citations CitationCollector
+	collector CitationCollector
 }
 
 func NewCiteSourceDocTool(
 	checker SourceDocPermissionChecker,
-	citations CitationCollector,
+	collector CitationCollector,
 ) *CiteSourceDocTool {
 	return &CiteSourceDocTool{
 		checker:   checker,
-		citations: citations,
+		collector: collector,
 	}
 }
 
@@ -97,8 +97,8 @@ func (t *CiteSourceDocTool) InvokableRun(
 		return "", err
 	}
 
-	if t.citations != nil {
-		t.citations.Set(sourceDocIds)
+	if t.collector != nil {
+		t.collector.Set(sourceDocIds)
 	}
 
 	return OkToolCallResult, nil

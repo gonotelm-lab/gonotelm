@@ -4,7 +4,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 
 	"github.com/bytedance/sonic"
-	"github.com/cloudwego/eino/schema"
+	einoschema "github.com/cloudwego/eino/schema"
 )
 
 // 上下文消息 包含工具调用等信息
@@ -15,8 +15,8 @@ type ChatContextMessage struct {
 	Extra     []byte `json:"d,omitempty" msgpack:"d,omitempty"`
 }
 
-func (c *ChatContextMessage) ToEino() (*schema.Message, error) {
-	var einoMsg schema.Message
+func (c *ChatContextMessage) ToEino() (*einoschema.Message, error) {
+	var einoMsg einoschema.Message
 	err := sonic.Unmarshal(c.Message, &einoMsg)
 	if err != nil {
 		return nil, errors.Wrap(errors.ErrSerde, err.Error())

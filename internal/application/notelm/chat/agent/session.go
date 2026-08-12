@@ -20,8 +20,9 @@ type SessionState struct {
 	// sourceDoc
 	sourceDocCitations []valobj.Id
 
-	accumulatedId int64
-	cancel        context.CancelFunc
+	accumulatedId    int64
+	cancel           context.CancelFunc
+	finalPhaseMarked bool
 }
 
 func (s *SessionState) ChatId() valobj.Id {

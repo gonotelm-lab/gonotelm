@@ -57,6 +57,7 @@ type (
 	BeforeChatHook[T any]     func(ctx context.Context, state T, msgs []*EinoMessage) ([]*EinoMessage, error)
 	BeforeRoundHook[T any]    func(ctx context.Context, round int, state T, msgs []*EinoMessage) ([]*EinoMessage, error)
 	BeforeToolCallHook[T any] func(ctx context.Context, state T, toolCalls []ToolCall)
+	AfterRoundHook[T any]     func(ctx context.Context, round int, state T, roundMsg *EinoMessage) (bool, error) // 返回 true 时结束循环，最终消息为本轮最后一条
 	MsgAppender[T any]        func(ctx context.Context, state T, newMsgs []*EinoMessage)
 	AfterToolCallHook[T any]  func(ctx context.Context, state T, results []*ToolCallResult)
 )
@@ -93,6 +94,9 @@ type Agent[State any] struct {
 	// 一般可以在此hook中注入系统提示词等操作 如果超过上下文还可以进行上下文压缩等操作
 	beforeChat  BeforeChatHook[State]
 	beforeRound BeforeRoundHook[State]
+
+	// 每轮响应处理完毕后回调，用于外部自定义结束条件
+	afterRound AfterRoundHook[State]
 }
 
 func New[State any](cfg Config[State], state State) *Agent[State] {
@@ -146,6 +150,10 @@ func (a *Agent[State]) OnBeforeChat(hook BeforeChatHook[State]) {
 
 func (a *Agent[State]) OnBeforeRound(hook BeforeRoundHook[State]) {
 	a.beforeRound = hook
+}
+
+func (a *Agent[State]) OnAfterRound(hook AfterRoundHook[State]) {
+	a.afterRound = hook
 }
 
 func (a *Agent[State]) OnBeforeToolCall(hook BeforeToolCallHook[State]) {
@@ -227,12 +235,13 @@ func (a *Agent[State]) appendAccumulatedMessages(msgs ...*EinoMessage) {
 // 与模型交互 并返回最终的回答
 //
 // 多次调用 React/ReactStream 时，传入的 msgs 会追加到已有上下文之后，
-// 实现 agent 跨阶段复用。调用 Clear() 可清空上下文。
+// 实现 agent 跨阶段复用。msgs 传空表示没有新增消息，直接从已有上下文继续。
+// 调用 Clear() 可清空上下文。
 func (a *Agent[State]) ReactStream(
 	ctx context.Context,
 	msgs []*EinoMessage,
 ) (*einoschema.Message, error) {
-	if len(msgs) == 0 {
+	if len(msgs) == 0 && len(a.accMsgs) == 0 {
 		return nil, errors.ErrParams.Msg("no messages to chat")
 	}
 
@@ -248,6 +257,13 @@ func (a *Agent[State]) ReactStream(
 	workingMsgs := append([]*EinoMessage{}, a.accMsgs...)
 
 	for round := range a.cfg.MaxRound {
+		var (
+			finishErr   error
+			finished    bool
+			finishedMsg *EinoMessage
+			roundMsg    *EinoMessage
+		)
+
 		roundMsgs, err := a.handleBeforeRound(ctx, round, workingMsgs)
 		if err != nil {
 			return nil, errors.WithMessagef(err, "before round %d failed", round)
@@ -260,12 +276,6 @@ func (a *Agent[State]) ReactStream(
 			return nil, errors.WithMessage(err, "stream chat failed")
 		}
 		defer stream.Close()
-
-		var (
-			finishErr   error
-			finished    bool
-			finishedMsg *EinoMessage
-		)
 
 		// 处理流式消息
 		chatstream.HandleStreamWithCallback(ctx, stream, &chatstream.Callbacks{
@@ -304,6 +314,7 @@ func (a *Agent[State]) ReactStream(
 			},
 			OnDone: func(msg *EinoMessage) {
 				a.updateTokenUsage(msg.ResponseMeta.Usage)
+				roundMsg = msg
 				if msg.ResponseMeta.FinishReason == llm.FinishReasonToolCalls {
 					// 需要处理工具调用
 					toolMsgs := a.handleToolCalls(ctx, msg.ToolCalls)
@@ -332,6 +343,18 @@ func (a *Agent[State]) ReactStream(
 			return nil, finishErr
 		}
 
+		// afterRound hook：基于本轮模型的回答判断是否提前结束
+		if a.afterRound != nil {
+			roundFinished, err := a.afterRound(ctx, round, a.state, roundMsg)
+			if err != nil {
+				return nil, errors.WithMessagef(err, "after round %d failed", round)
+			}
+			if roundFinished {
+				// 提前结束：最终消息为本轮最后一条
+				return workingMsgs[len(workingMsgs)-1], nil
+			}
+		}
+
 		if finished {
 			// 已经得到结果了
 			return finishedMsg, nil
@@ -344,12 +367,13 @@ func (a *Agent[State]) ReactStream(
 // 非流式输出
 //
 // 多次调用 React/ReactStream 时，传入的 msgs 会追加到已有上下文之后，
-// 实现 agent 跨阶段复用。调用 Clear() 可清空上下文。
+// 实现 agent 跨阶段复用。msgs 传空表示没有新增消息，直接从已有上下文继续。
+// 调用 Clear() 可清空上下文。
 func (a *Agent[State]) React(
 	ctx context.Context,
 	msgs []*EinoMessage,
 ) (*EinoMessage, error) {
-	if len(msgs) == 0 {
+	if len(msgs) == 0 && len(a.accMsgs) == 0 {
 		return nil, errors.ErrParams.Msg("no messages to chat")
 	}
 
@@ -388,11 +412,27 @@ func (a *Agent[State]) React(
 				a.msgAppender(ctx, a.state, roundMsgs)
 			}
 		} else {
-			// 没有工具调用任务 认为已经结束
+			// 本轮模型直接给出回答，无工具调用
 			a.appendAccumulatedMessages(responseMsg)
 			if a.msgAppender != nil {
 				a.msgAppender(ctx, a.state, []*EinoMessage{responseMsg})
 			}
+		}
+
+		// afterRound hook：基于本轮模型的回答判断是否提前结束
+		if a.afterRound != nil {
+			roundFinished, err := a.afterRound(ctx, round, a.state, responseMsg)
+			if err != nil {
+				return nil, errors.WithMessagef(err, "after round %d failed", round)
+			}
+			if roundFinished {
+				// 提前结束：最终消息为本轮最后一条
+				return workingMsgs[len(workingMsgs)-1], nil
+			}
+		}
+
+		if responseMsg.ResponseMeta.FinishReason != llm.FinishReasonToolCalls {
+			// 没有工具调用任务 认为已经结束
 			return responseMsg, nil
 		}
 	}

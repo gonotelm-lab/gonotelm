@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"log/slog"
 	"slices"
 	"strings"
 
@@ -106,6 +107,7 @@ type (
 	Phase struct {
 		Summary     string
 		Description string
+		IsFinal     bool
 	}
 
 	Citation struct {
@@ -136,10 +138,12 @@ type (
 	}
 )
 
-func (a *Agent) Run(ctx context.Context, req *RunRequest) (*RunResponse, error) {
+type ChatAgent = domainagent.Agent[*SessionState]
+
+func (a *Agent) prepareRun(req *RunRequest) (*ChatAgent, *SessionState, error) {
 	toolCallingChatModel, err := a.gateway.GetProvider(llm.Provider(req.ModelProvider))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	options := chat.BuildLLMOptions(
@@ -181,16 +185,20 @@ func (a *Agent) Run(ctx context.Context, req *RunRequest) (*RunResponse, error) 
 		),
 	})
 	if err != nil {
-		return nil, errors.WithMessage(err, "bind tools failed")
+		return nil, nil, errors.WithMessage(err, "bind tools failed")
 	}
 
+	return domainAgent, session, nil
+}
+
+func (a *Agent) preparePrompt(ctx context.Context, domainAgent *ChatAgent, req *RunRequest) error {
 	promptVars, err := a.buildPromptVars(req)
 	if err != nil {
-		return nil, errors.WithMessage(err, "build prompt vars failed")
+		return errors.WithMessage(err, "build prompt vars failed")
 	}
 	systemPrompt, err := renderSystemPrompt(ctx, promptVars)
 	if err != nil {
-		return nil, errors.WithMessage(err, "render system prompt failed")
+		return errors.WithMessage(err, "render system prompt failed")
 	}
 
 	// set callbacks
@@ -204,6 +212,21 @@ func (a *Agent) Run(ctx context.Context, req *RunRequest) (*RunResponse, error) 
 		newMsgs = append(newMsgs, msgs...)
 		return newMsgs, nil
 	})
+
+	return nil
+}
+
+// Run 是底层大模型为纯流式输出 大模型的每个输出都直接反映到设置的回调函数上
+func (a *Agent) Run(ctx context.Context, req *RunRequest) (*RunResponse, error) {
+	domainAgent, session, err := a.prepareRun(req)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "prepare run agent failed")
+	}
+
+	err = a.preparePrompt(ctx, domainAgent, req)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "prepare prompt failed")
+	}
 	a.bindHooks(domainAgent, req)
 
 	ctxMsgs := make([]*einoschema.Message, 0, len(req.ContextMessages))
@@ -221,7 +244,44 @@ func (a *Agent) Run(ctx context.Context, req *RunRequest) (*RunResponse, error) 
 	}, nil
 }
 
-func (a *Agent) bindHooks(domainAgent *domainagent.Agent[*SessionState], req *RunRequest) {
+// RunV2 底层不再完全使用大模型流式输出 只在最后的关键节点输出才使用流式输出 其它都是非流式
+// 即RunV2先非流式 再流式
+func (a *Agent) RunV2(ctx context.Context, req *RunRequest) (*RunResponse, error) {
+	domainAgent, session, err := a.prepareRun(req)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "prepare run agent failed")
+	}
+
+	err = a.preparePrompt(ctx, domainAgent, req)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "prepare prompt failed")
+	}
+	a.bindHooksV2(domainAgent, req)
+
+	ctxMsgs := make([]*einoschema.Message, 0, len(req.ContextMessages))
+	for _, msg := range req.ContextMessages {
+		ctxMsgs = append(ctxMsgs, msg.Message)
+	}
+	_, err = domainAgent.React(ctx, ctxMsgs) // 此时只是中间结果
+	if err != nil {
+		return nil, errors.WithMessage(err, "intermediate agent react failed")
+	}
+
+	slog.DebugContext(ctx, "runV2 after react, now reactStream")
+
+	// 第二个阶段开始流式输出
+	finalMsg, err := domainAgent.ReactStream(ctx, nil)
+	if err != nil {
+		return nil, errors.WithMessage(err, "final agent react stream failed")
+	}
+
+	return &RunResponse{
+		FinalMessage:       finalMsg,
+		SourceDocCitations: session.sourceDocCitations,
+	}, nil
+}
+
+func (a *Agent) bindBasicHooks(domainAgent *ChatAgent, req *RunRequest) {
 	domainAgent.OnBeforeRound(domainagent.NewFinalRoundHook(domainAgent, conf.NotelmGlobal().Chat.GetMaxRound()))
 
 	if req.Hooks.RoundFinishedHook != nil {
@@ -275,13 +335,33 @@ func (a *Agent) bindHooks(domainAgent *domainagent.Agent[*SessionState], req *Ru
 			case tools.MarkPhaseToolName:
 				var input tools.MarkPhaseToolInput
 				if err := sonic.Unmarshal([]byte(result.Arguments), &input); err == nil {
-					req.Hooks.PhaseMarkHook(ctx, Phase{
-						Summary:     input.Summary,
-						Description: input.Description,
-					})
+					if req.Hooks.PhaseMarkHook != nil {
+						state.finalPhaseMarked = input.IsFinal
+						req.Hooks.PhaseMarkHook(ctx, Phase{
+							Summary:     input.Summary,
+							Description: input.Description,
+							IsFinal:     input.IsFinal,
+						})
+					}
 				}
 			}
 		}
+	})
+}
+
+func (a *Agent) bindHooks(domainAgent *ChatAgent, req *RunRequest) {
+	a.bindBasicHooks(domainAgent, req)
+}
+
+func (a *Agent) bindHooksV2(domainAgent *ChatAgent, req *RunRequest) {
+	a.bindBasicHooks(domainAgent, req)
+
+	domainAgent.OnAfterRound(func(ctx context.Context, round int, state *SessionState, roundMsg *domainagent.EinoMessage) (bool, error) {
+		// 工具调用中出现了最后一个就Phase提前结束
+		if state.finalPhaseMarked {
+			return true, nil
+		}
+		return false, nil
 	})
 }
 

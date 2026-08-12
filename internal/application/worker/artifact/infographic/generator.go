@@ -233,10 +233,14 @@ func (ig *Generator) parseAgentOutput(
 			slog.DebugContext(ctx,
 				"infographic direct unmarshal did not match, fallback to json extraction",
 				slog.Any("err", err),
+				slog.String("raw_content", content),
 			)
 		},
 	}
 	if err := decoder.Unmarshal(pkgstring.AsBytes(content), &expect); err != nil {
+		slog.WarnContext(ctx, "infographic output unmarshal failed after compatibility fallback",
+			slog.Any("err", err),
+			slog.String("raw_content", content))
 		return nil, err
 	}
 

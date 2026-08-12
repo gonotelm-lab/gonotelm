@@ -172,12 +172,14 @@ func parseAgentOutput(ctx context.Context, content string) (*flashcardExpectatio
 		DisallowUnknownFields: true,
 		LogOnDirectFailure: func(err error, _ []byte) {
 			slog.DebugContext(ctx, "flashcard direct unmarshal did not match, fallback to json extraction",
-				slog.Any("err", err))
+				slog.Any("err", err),
+				slog.String("raw_content", content))
 		},
 	}
 	if err := decoder.Unmarshal(pkgstring.AsBytes(content), &expect); err != nil {
 		slog.WarnContext(ctx, "flashcard output unmarshal failed after compatibility fallback",
-			slog.Any("err", err))
+			slog.Any("err", err),
+			slog.String("raw_content", content))
 		return nil, err
 	}
 

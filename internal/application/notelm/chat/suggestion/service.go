@@ -239,6 +239,7 @@ The questions must:
 - match the language of the conversation (if the conversation is in Chinese, output Chinese)
 - be concise (ideally under 30 characters), diverse, and directly relevant to the conversation topic
 - be phrased as natural user questions, as if the user asks them in the next turn
+- be answerable based only on the conversation history, notebook and sources above; do NOT generate questions that cannot be answered from the given material
 
 Notebook name:
 %s
@@ -267,6 +268,7 @@ The questions must:
 - match the language of the notebook/sources content
 - be concise (ideally under 30 characters), diverse, and useful starting points (e.g. overall summary, key conclusions, specific topics covered by the sources)
 - be phrased as natural user questions
+- be answerable based only on the notebook and sources above; do NOT generate questions that cannot be answered from the given material
 
 Notebook name:
 %s

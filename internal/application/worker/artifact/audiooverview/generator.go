@@ -418,12 +418,14 @@ func (a *Generator) parseOutlineOutput(ctx context.Context, content string) (*po
 			slog.DebugContext(ctx,
 				"podcast outline direct unmarshal did not match, fallback to json extraction",
 				slog.Any("err", err),
+				slog.String("raw_content", content),
 			)
 		},
 	}
 	if err := decoder.Unmarshal(pkgstring.AsBytes(content), &expect); err != nil {
 		slog.WarnContext(ctx, "podcast outline output unmarshal failed after compatibility fallback",
-			slog.Any("err", err))
+			slog.Any("err", err),
+			slog.String("raw_content", content))
 		return nil, err
 	}
 
@@ -467,12 +469,14 @@ func (a *Generator) parseTranscriptOutput(
 			slog.DebugContext(ctx,
 				"podcast transcript direct unmarshal did not match, fallback to json extraction",
 				slog.Any("err", err),
+				slog.String("raw_content", content),
 			)
 		},
 	}
 	if err := decoder.Unmarshal(pkgstring.AsBytes(content), &expect); err != nil {
 		slog.WarnContext(ctx, "podcast transcript output unmarshal failed after compatibility fallback",
-			slog.Any("err", err))
+			slog.Any("err", err),
+			slog.String("raw_content", content))
 		return nil, err
 	}
 

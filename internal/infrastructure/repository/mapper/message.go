@@ -26,9 +26,12 @@ func MessageToSchema(msg *chatdomain.Message) (*schema.ChatMessage, error) {
 		}
 	}
 
-	extraBytes, err := sonic.Marshal(extra)
-	if err != nil {
-		return nil, errors.Wrap(errors.ErrSerde, err.Error())
+	var extraBytes []byte
+	if extra != nil {
+		extraBytes, err = sonic.Marshal(extra)
+		if err != nil {
+			return nil, errors.Wrap(errors.ErrSerde, err.Error())
+		}
 	}
 
 	return &schema.ChatMessage{

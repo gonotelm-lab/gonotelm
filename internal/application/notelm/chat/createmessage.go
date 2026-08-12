@@ -255,28 +255,30 @@ func (h *CreateMessageHandler) beginStreamTask(
 		slog.Any("chat_id", bundle.chatId), slog.Any("task_id", taskId), slog.Any("msg_id", msgId),
 	)
 	chatCfg := conf.NotelmGlobal().Chat
-	runResponse, err := agt.Run(ctx, &chatagent.RunRequest{
-		UserId:          pkgcontext.GetUserId(ctx),
-		Notebook:        bundle.targetNotebook,
-		Chat:            bundle.targetChat,
-		Sources:         bundle.targetSources,
-		ContextMessages: userMsgs,
-		Style:           cmd.Style,
-		AnswerLength:    cmd.AnswerLength,
-		EnableThinking:  cmd.EnableThinking,
-		Model:           chatCfg.Model,
-		ModelProvider:   chatCfg.ModelProvider.String(),
-		Hooks: chatagent.Hooks{
-			RoundFinishedHook: h.onAgentRoundFinished(bundle),
-			ThinkStart:        h.onAgentThinkStart(bundle),
-			ThinkEnd:          h.onAgentThinkEnd(bundle),
-			ThinkDelta:        h.onAgentThinkDelta(bundle),
-			ResponseStart:     h.onAgentResponseStart(bundle),
-			ResponseEnd:       h.onAgentResponseEnd(bundle),
-			ResponseDelta:     h.onAgentResponseDelta(bundle),
-			PhaseMarkHook:     h.onAgentMarkPhase(bundle),
-		},
-	})
+	// block here
+	runResponse, err := agt.RunV2(ctx,
+		&chatagent.RunRequest{
+			UserId:          pkgcontext.GetUserId(ctx),
+			Notebook:        bundle.targetNotebook,
+			Chat:            bundle.targetChat,
+			Sources:         bundle.targetSources,
+			ContextMessages: userMsgs,
+			Style:           cmd.Style,
+			AnswerLength:    cmd.AnswerLength,
+			EnableThinking:  cmd.EnableThinking,
+			Model:           chatCfg.Model,
+			ModelProvider:   chatCfg.ModelProvider.String(),
+			Hooks: chatagent.Hooks{
+				RoundFinishedHook: h.onAgentRoundFinished(bundle),
+				ThinkStart:        h.onAgentThinkStart(bundle),
+				ThinkEnd:          h.onAgentThinkEnd(bundle),
+				ThinkDelta:        h.onAgentThinkDelta(bundle),
+				ResponseStart:     h.onAgentResponseStart(bundle),
+				ResponseEnd:       h.onAgentResponseEnd(bundle),
+				ResponseDelta:     h.onAgentResponseDelta(bundle),
+				PhaseMarkHook:     h.onAgentMarkPhase(bundle),
+			},
+		})
 	if err != nil {
 		err = errors.WithMessagef(err, "failed to run agent, chat_id=%s", bundle.chatId)
 		return

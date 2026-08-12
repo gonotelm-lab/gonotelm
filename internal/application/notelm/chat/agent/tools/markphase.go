@@ -31,6 +31,7 @@ func NewMarkPhaseTool() *MarkPhaseTool {
 type MarkPhaseToolInput struct {
 	Summary     string `json:"summary"     jsonschema:"title=summary,description=The summary of the phase in a single sentence."`
 	Description string `json:"description" jsonschema:"title=description,description=The description of the phase, describe what you are going to do in 50-100 words."`
+	IsFinal     bool   `json:"is_final"    jsonschema:"title=is_final,description=Whether the phase being marked is the final phase of the task. Set to true only when this phase is the last one."`
 }
 
 type MarkPhaseTool struct{}

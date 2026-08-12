@@ -108,11 +108,19 @@ func (m *Message) lastFragment() *MessageFragment {
 }
 
 func (m *Message) GetFragmentBytes() ([]byte, error) {
-	return sonic.Marshal(m.Fragments)
+	if m.Fragments == nil {
+		return nil, nil
+	}
+
+	return sonic.Marshal(m.Fragments) // 如果为nil序列化得到的json字符串为null 可以安全反序列化
 }
 
 func (m *Message) SetFragmentsFromBytes(data []byte) error {
-	return sonic.Unmarshal(data, &m.Fragments)
+	if len(data) > 0 {
+		return sonic.Unmarshal(data, &m.Fragments)
+	}
+
+	return nil
 }
 
 func (m *Message) BeginThinkFragment() {

@@ -4,6 +4,10 @@ import (
 	"context"
 )
 
+type Summarizer interface {
+	Summarize(ctx context.Context, text string, opts ...SummarizeOption) (string, error)
+}
+
 type SummarizeOptionImpl struct {
 	Provider string
 	Prompt   string
@@ -42,8 +46,4 @@ func WithPrompt(prompt string) SummarizeOption {
 	return func(o *SummarizeOptionImpl) {
 		o.Prompt = prompt
 	}
-}
-
-type Summarizer interface {
-	Summarize(ctx context.Context, text string, opts ...SummarizeOption) (string, error)
 }

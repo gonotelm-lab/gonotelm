@@ -152,6 +152,11 @@ namespace   = "${GONOTELM_FLOW_NAMESPACE:-gonotelm}"
 maxRetry    = ${GONOTELM_FLOW_MAX_RETRY:-3}
 dialTimeout = "${GONOTELM_FLOW_DIAL_TIMEOUT:-5s}"
 
+[sandbox.opensandbox]
+endpoint = "${GONOTELM_SANDBOX_ENDPOINT:-http://localhost:23080}"
+apiKey = "${GONOTELM_SANDBOX_API_KEY:-123456}"
+timeout = "${GONOTELM_SANDBOX_TIMEOUT:-30s}"
+
 [worker]
 maxConcurrency  = ${GONOTELM_WORKER_MAX_CONCURRENCY:-4}
 heartbeat       = "${GONOTELM_WORKER_HEARTBEAT:-5s}"

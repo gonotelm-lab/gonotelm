@@ -4,6 +4,10 @@ import (
 	"context"
 )
 
+type TitleMaker interface {
+	MakeTitle(ctx context.Context, text string, opts ...MakeTitleOption) (string, error)
+}
+
 type MakeTitleOptionImpl struct {
 	Provider string
 	Prompt   string
@@ -42,8 +46,4 @@ func WithTitlePrompt(prompt string) MakeTitleOption {
 	return func(o *MakeTitleOptionImpl) {
 		o.Prompt = prompt
 	}
-}
-
-type TitleMaker interface {
-	MakeTitle(ctx context.Context, text string, opts ...MakeTitleOption) (string, error)
 }

@@ -6,6 +6,7 @@ require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.2
 	github.com/a8m/envsubst v1.4.2
+	github.com/alibaba/OpenSandbox/sdks/sandbox/go v1.0.5
 	github.com/allegro/bigcache/v3 v3.1.0
 	github.com/bytedance/sonic v1.15.0
 	github.com/cloudwego/eino v0.9.13
@@ -31,7 +32,6 @@ require (
 	github.com/go-playground/validator/v10 v10.30.2
 	github.com/go-redsync/redsync/v4 v4.16.0
 	github.com/golang/snappy v1.0.0
-	github.com/gomlx/gomlx v0.27.3
 	github.com/gonotelm-lab/flow/api v0.2.0
 	github.com/gonotelm-lab/flow/client v0.2.0
 	github.com/gonotelm-lab/multimodal v0.2.2
@@ -42,7 +42,6 @@ require (
 	github.com/milvus-io/milvus/client/v2 v2.6.3
 	github.com/minio/minio-go/v7 v7.0.100
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/nozzle/umap v0.0.0-20260130174432-f6085fb2514d
 	github.com/panjf2000/ants/v2 v2.11.3
 	github.com/pkg/errors v0.9.1
 	github.com/redis/go-redis/extra/redisotel/v9 v9.21.0
@@ -64,7 +63,6 @@ require (
 	golang.org/x/exp v0.0.0-20260312153236-7ab1446f8b90
 	golang.org/x/net v0.57.0
 	golang.org/x/sync v0.22.0
-	gonum.org/v1/gonum v0.17.0
 	google.golang.org/genai v1.54.0
 	google.golang.org/grpc v1.81.1
 	gopkg.in/yaml.v3 v3.0.1
@@ -126,11 +124,9 @@ require (
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-sql-driver/mysql v1.7.0 // indirect
 	github.com/godbus/dbus/v5 v5.0.4 // indirect
-	github.com/gofrs/flock v0.13.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
-	github.com/gomlx/go-xla v0.2.2 // indirect
 	github.com/google/btree v1.1.2 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
@@ -255,10 +251,8 @@ require (
 	golang.org/x/arch v0.15.0 // indirect
 	golang.org/x/crypto v0.54.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/term v0.45.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
 	golang.org/x/time v0.10.0 // indirect
-	golang.org/x/tools v0.47.0 // indirect
 	google.golang.org/genproto v0.0.0-20250303144028-a0af3efb3deb // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260615183401-62b3387ff324 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260618152121-87f3d3e198d3 // indirect
@@ -270,6 +264,5 @@ require (
 	gorm.io/driver/clickhouse v0.7.0 // indirect
 	gorm.io/driver/mysql v1.5.7 // indirect
 	k8s.io/apimachinery v0.32.3 // indirect
-	k8s.io/klog/v2 v2.140.0 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )

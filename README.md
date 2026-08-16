@@ -63,7 +63,10 @@ GoNoteLM is an AI-powered learning and knowledge-management platform. Create not
         <img src="docs/readme/studio-datatable.png" alt="Studio Data Table" width="320" /><br />
         <sub>Data Table</sub>
       </td>
-      <td></td>
+      <td align="center" valign="top">
+        <img src="docs/readme/studio-slides.png" alt="Studio Slides" width="320" /><br />
+        <sub>Slides</sub>
+      </td>
       <td></td>
     </tr>
   </tbody>

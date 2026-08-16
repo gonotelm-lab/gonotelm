@@ -9,6 +9,7 @@ func (t Provider) String() string {
 }
 
 const (
+	ProviderLocal       Provider = "local"
 	ProviderOpenSandbox Provider = "opensandbox"
 )
 
@@ -20,4 +21,5 @@ type OpenSandboxConfig struct {
 	Endpoint string        `toml:"endpoint"`
 	ApiKey   string        `toml:"apiKey"`
 	Timeout  time.Duration `toml:"timeout"`
+	Image    string        `toml:"image"`
 }

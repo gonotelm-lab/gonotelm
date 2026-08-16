@@ -83,17 +83,14 @@ func (g *Generator) generate(
 	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioFlashcardScene)
 	llmOptions := g.llmOptions()
 
+	p := artifactentity.PayloadAs[*artifactentity.FlashcardPayload](req.Payload)
 	count := artifactentity.FlashcardCountDefaultValue()
+	if p.Count.Supported() {
+		count = p.Count
+	}
 	difficulty := artifactentity.FlashcardDifficultyDefault()
-	tip := ""
-	if p, ok := req.Payload.(*artifactentity.FlashcardPayload); ok {
-		if p.Count.Supported() {
-			count = p.Count
-		}
-		if p.Difficulty.Supported() {
-			difficulty = p.Difficulty
-		}
-		tip = p.Tip
+	if p.Difficulty.Supported() {
+		difficulty = p.Difficulty
 	}
 
 	ag, err := types.BuildSourceExploreAgent(
@@ -111,7 +108,7 @@ func (g *Generator) generate(
 	}
 
 	sourceIds := types.SourceIDsToStrings(req.SourceIds)
-	msgs, err := RenderFlashcard(ctx, sourceIds, count, difficulty, tip)
+	msgs, err := RenderFlashcard(ctx, sourceIds, count, difficulty, p.GetTip())
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "generate flashcard message failed, err=%v", err)
 	}

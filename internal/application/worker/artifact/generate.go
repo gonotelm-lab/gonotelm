@@ -10,6 +10,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/mindmap"
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/quiz"
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/report"
+	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/slides"
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -39,6 +40,8 @@ func newGenerator(kind artifactentity.Kind, deps *types.ServiceDeps) (types.Gene
 		return quiz.New(deps), nil
 	case artifactentity.KindDataTable:
 		return datatable.New(deps), nil
+	case artifactentity.KindSlides:
+		return slides.New(deps), nil
 	}
 	return nil, errors.ErrParams.Msgf("unsupported kind: %s", kind)
 }

@@ -9,4 +9,6 @@ type Config struct {
 	ApiKey string
 
 	HttpClient *http.Client
+
+	Image string
 }

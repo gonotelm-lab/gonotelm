@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/sandbox/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/sandbox/repository"
 	"github.com/stretchr/testify/assert"
@@ -28,12 +29,12 @@ func testConfig() Config {
 func TestNewInvalidEndpoint(t *testing.T) {
 	cfg := testConfig()
 	cfg.Endpoint = "://bad-endpoint"
-	_, err := New(cfg)
+	_, err := NewManager(t.Context(), cfg)
 	require.Error(t, err)
 }
 
 func TestManagerLifecycle(t *testing.T) {
-	m, err := New(testConfig())
+	m, err := NewManager(t.Context(), testConfig())
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
@@ -41,7 +42,10 @@ func TestManagerLifecycle(t *testing.T) {
 
 	var manager repository.Manager = m
 
-	sbx, err := manager.CreateSandbox(ctx, entity.Spec{
+	sbx, err := manager.CreateSandbox(ctx, entity.SandboxKey{
+		UserId:     "test-user",
+		NotebookId: valobj.NewId(),
+	}, entity.Spec{
 		TTL: 2 * time.Minute,
 		Env: map[string]string{"FOO": "bar"},
 	})
@@ -110,7 +114,7 @@ func TestManagerLifecycle(t *testing.T) {
 }
 
 func TestManagerGetNotExist(t *testing.T) {
-	m, err := New(testConfig())
+	m, err := NewManager(t.Context(), testConfig())
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

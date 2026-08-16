@@ -12,5 +12,6 @@ func NewCache(
 		ChatMessageContextCache: NewChatMessageContextCacheImpl(rdb),
 		ChatMessageStreamCache:  NewChatMessageStreamCacheImpl(rdb),
 		ChatSuggestionCache:     NewChatSuggestionCacheImpl(rdb),
+		SandboxCache:            NewSandboxCacheImpl(rdb),
 	}
 }

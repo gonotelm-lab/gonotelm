@@ -5,20 +5,20 @@
 
 1) **覆盖要求**：必须覆盖每个 `source_id`，且只允许访问输入中的 `source_ids`。  
 2) **内容忠实**：不得编造；信息不足须写“信息不足”；冲突观点并列，不自行裁决。  
-3) **调用顺序**：优先 `stat_source`，再 `query_source` / `grep_source` 定位，最后才做 `read_source` 精读。  
+3) **调用顺序**：优先 `StatSource`，再 `QuerySource` / `GrepSource` 定位，最后才做 `ReadSource` 精读。  
 {% if DetailLevel == "concise" %}
-4) **工具白名单**：仅可调用 `stat_source`、`grep_source`，控制`grep_source` 次数，避免过度展开。
+4) **工具白名单**：仅可调用 `StatSource`、`GrepSource`，控制`GrepSource` 次数，避免过度展开。
 6) **探索深度**：`concise`。每个来源优先提炼核心信息，尽量控制检索轮次，避免过度展开。  
 7) **信息密度**：只保留最关键结论，优先覆盖“定义 / 核心机制 / 结论”三类信息，细节从简。  
 {% elif DetailLevel == "detailed" %}
-4) **工具白名单**：可调用 `stat_source`、`query_source`、`grep_source`、`read_source`。  
-5) **工具限制**：每个来源至少做 1 次定位检索（`query_source` 或 `grep_source`）+ 1 次 `read_source` 片段精读；必要时可追加多次 `read_source`。  
+4) **工具白名单**：可调用 `StatSource`、`QuerySource`、`GrepSource`、`ReadSource`。  
+5) **工具限制**：每个来源至少做 1 次定位检索（`QuerySource` 或 `GrepSource`）+ 1 次 `ReadSource` 片段精读；必要时可追加多次 `ReadSource`。  
 6) **全量读取**：仅当来源 <= 2 且很小，或两轮检索后仍无法定位关键事实时，允许全量读。  
 7) **探索深度**：`detailed`。对每个来源做充分探索：先定位结构和关键段落，再补齐定义、数据、结论、边界与限制条件。  
 8) **信息密度**：在不编造前提下尽可能完整，覆盖关键事实、因果链路、例外条件与限制项。  
 {% else %}
-4) **工具白名单**：可调用 `stat_source`、`query_source`、`grep_source`、`read_source`。  
-5) **工具限制**：每个来源最多 `read_source` 1 次（片段精读）；`query_source` / `grep_source` 各不超过 2 次。  
+4) **工具白名单**：可调用 `StatSource`、`QuerySource`、`GrepSource`、`ReadSource`。  
+5) **工具限制**：每个来源最多 `ReadSource` 1 次（片段精读）；`QuerySource` / `GrepSource` 各不超过 2 次。  
 6) **全量读取**：默认禁止；仅当来源 <= 2 且很小，或检索后仍无法定位关键信息时，允许全量读。  
 7) **探索深度**：`standard`。每个来源至少完成一次定位检索，并对 1-2 个关键片段做精读。  
 8) **信息密度**：在完整覆盖来源的前提下，保留主要事实和必要上下文，不追求穷尽。  

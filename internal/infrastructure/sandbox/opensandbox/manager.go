@@ -3,139 +3,256 @@ package opensandbox
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/url"
+	"strconv"
 	"sync"
 
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/sandbox/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/sandbox/repository"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/sandbox/workspace"
 	pkgerr "github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/safe"
 
-	osb "github.com/alibaba/OpenSandbox/sdks/sandbox/go"
+	aliosb "github.com/alibaba/OpenSandbox/sdks/sandbox/go"
 )
 
+const (
+	MetadataUserIdKey     = "x-meta-user-id"
+	MetadataNotebookIdKey = "x-meta-notebook-id"
+	MetadataServiceKey    = "x-meta-service"
+	MetadataServiceValue  = "gonotelm"
+)
+
+var sandboxDefaultResourceLimit = aliosb.ResourceLimits{
+	"cpu":    "500m",
+	"memory": "128Mi",
+}
+
+// sandboxEntry 本地缓存的沙箱及其绑定 key
+type sandboxEntry struct {
+	osb *aliosb.Sandbox
+	key entity.SandboxKey
+}
+
 type Manager struct {
-	lc *osb.LifecycleClient
+	rootCtx   context.Context
+	lifecycle *aliosb.LifecycleClient
 
-	osbConfig osb.ConnectionConfig
+	osbConfig aliosb.ConnectionConfig
 
-	mu  sync.RWMutex
-	sbs map[string]*osb.Sandbox
+	mu      sync.RWMutex
+	entries map[string]*sandboxEntry
+
+	c Config
 }
 
-func (m *Manager) setSandbox(id string, sb *osb.Sandbox) {
-	m.mu.Lock()
-	m.sbs[id] = sb
-	m.mu.Unlock()
-}
+var _ repository.Manager = &Manager{}
 
-func (m *Manager) getSandbox(id string) *osb.Sandbox {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return m.sbs[id]
-}
-
-func (m *Manager) deleteSandbox(id string) *osb.Sandbox {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	c, ok := m.sbs[id]
-	if ok {
-		delete(m.sbs, id)
-		return c
-	}
-
-	return nil
-}
-
-// alpineManager 创建 alpine 镜像沙箱的 manager。
-type alpineManager struct {
-	*Manager
-}
-
-var _ repository.Manager = &alpineManager{}
-
-func New(c Config) (*alpineManager, error) {
+func NewManager(ctx context.Context, c Config) (*Manager, error) {
 	u, err := url.Parse(c.Endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("opensandbox invalid endpoint %s, %w", c.Endpoint, err)
 	}
 
-	osbCfg := osb.ConnectionConfig{
+	osbCfg := aliosb.ConnectionConfig{
 		Domain:     u.Host,
 		Protocol:   u.Scheme,
 		APIKey:     c.ApiKey,
 		HTTPClient: c.HttpClient,
 	}
 
-	lc := osb.NewLifecycleClientWithCache(
-		c.Endpoint+"/"+osb.APIVersion,
+	lc := aliosb.NewLifecycleClientWithCache(
+		c.Endpoint+"/"+aliosb.APIVersion,
 		c.ApiKey,
-		osb.NewEndpointCache(osb.DefaultEndpointCacheSize, osb.DefaultEndpointCacheTTL),
-		osb.WithHTTPClient(c.HttpClient),
+		aliosb.NewEndpointCache(aliosb.DefaultEndpointCacheSize, aliosb.DefaultEndpointCacheTTL),
+		aliosb.WithHTTPClient(c.HttpClient),
 	)
 
-	return &alpineManager{
-		Manager: &Manager{
-			lc:        lc,
-			osbConfig: osbCfg,
-			sbs:       make(map[string]*osb.Sandbox),
-		},
+	return &Manager{
+		c:         c,
+		lifecycle: lc,
+		osbConfig: osbCfg,
+		entries:   make(map[string]*sandboxEntry),
 	}, nil
 }
 
-func (m *alpineManager) CreateSandbox(ctx context.Context, spec entity.Spec) (entity.Sandbox, error) {
+func (m *Manager) setOpenSandbox(id string, key entity.SandboxKey, sb *aliosb.Sandbox) {
+	m.mu.Lock()
+	m.entries[id] = &sandboxEntry{osb: sb, key: key}
+	m.mu.Unlock()
+}
+
+func (m *Manager) getOpenSandbox(id string) *sandboxEntry {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.entries[id]
+}
+
+func (m *Manager) deleteOpenSandbox(id string) *sandboxEntry {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	old, ok := m.entries[id]
+	if ok {
+		delete(m.entries, id)
+		return old
+	}
+
+	return nil
+}
+
+func (m *Manager) CreateSandbox(ctx context.Context, key entity.SandboxKey, spec entity.Spec) (entity.Sandbox, error) {
 	var ttl *int
 	if ttlSec := int(spec.TTL.Seconds()); ttlSec > 0 {
 		ttl = &ttlSec
 	}
 
-	newSandbox, err := osb.CreateSandbox(ctx, m.osbConfig,
-		osb.SandboxCreateOptions{
-			Image: "alpine:3.23.5",
-			ResourceLimits: osb.ResourceLimits{
-				"cpu":    "500m",
-				"memory": "32Mi",
-			},
+	openSandbox, err := aliosb.CreateSandbox(ctx, m.osbConfig,
+		aliosb.SandboxCreateOptions{
+			Image:          m.c.Image,
+			ResourceLimits: sandboxDefaultResourceLimit,
 			TimeoutSeconds: ttl,
 			Env:            spec.Env,
+			Metadata: map[string]string{
+				MetadataUserIdKey:     key.UserId,
+				MetadataNotebookIdKey: key.NotebookId.String(),
+				MetadataServiceKey:    MetadataServiceValue,
+			},
 		})
 	if err != nil {
-		return nil, pkgerr.Wrapf(err, "opensandbox create failed")
+		return nil, pkgerr.Wrapf(err, "opensandbox create failed: %s", key)
 	}
 
-	m.setSandbox(newSandbox.ID(), newSandbox)
+	m.setOpenSandbox(openSandbox.ID(), key, openSandbox)
 
-	return newAlpineSandbox(newSandbox), nil
+	if err := m.prepareSandbox(ctx, key, openSandbox); err != nil {
+		// 初始化失败就认为创建失败 同时删掉已经创建的沙箱
+		defer func() {
+			safe.DetachGo(ctx, m.rootCtx, "opensandbox.manager.prepare.after_failure", func(ctx context.Context) {
+				if e2 := m.DeleteSandbox(ctx, openSandbox.ID()); e2 != nil {
+					slog.WarnContext(ctx, "opensandbox manager failed to delete sandbox after prepare failure", slog.Any("err", e2))
+				}
+			})
+		}()
+
+		return nil, pkgerr.Wrapf(err, "manager failed to prepare sandbox %s", openSandbox.ID())
+	}
+
+	runtime := getOpenSandboxRuntime(ctx, key, openSandbox)
+
+	return NewCustomSandbox(openSandbox, key, runtime), nil
+}
+
+// 初始化沙箱workspace环境
+func (m *Manager) prepareSandbox(ctx context.Context, key entity.SandboxKey, openSandbox *aliosb.Sandbox) error {
+	// 1. mkdir -p /tmp/{userId}/{notebookId}/vendor
+	vendorDir := key.WorkspaceDir() + "/vendor"
+	err := openSandbox.CreateDirectory(ctx, vendorDir, 755) // 这里用十进制表示八进制
+	if err != nil {
+		return pkgerr.Wrapf(err, "opensandbox create directory failed: %s", key)
+	}
+
+	// 2. upload vendors
+	vendors := workspace.Vendors()
+	uploadEntries := make([]aliosb.UploadFileEntry, 0, len(vendors))
+	for fileName, file := range vendors {
+		uploadEntries = append(uploadEntries, aliosb.UploadFileEntry{
+			File: file,
+			Options: aliosb.UploadFileOptions{
+				FileName: fileName,
+				Metadata: aliosb.FileMetadata{
+					Path: vendorDir + "/" + fileName,
+					Mode: 755,
+				},
+			},
+		})
+	}
+	err = openSandbox.UploadFiles(ctx, uploadEntries)
+	if err != nil {
+		return pkgerr.Wrapf(err, "opensandbox upload files failed: %s", key)
+	}
+
+	return nil
 }
 
 func (m *Manager) GetSandbox(ctx context.Context, sandboxId string) (entity.Sandbox, error) {
-	target := m.getSandbox(sandboxId)
+	target := m.getOpenSandbox(sandboxId)
 	if target != nil {
-		return newAlpineSandbox(target), nil
+		return NewCustomSandbox(target.osb, target.key, ""), nil
 	}
 
 	// try remote
-	target, err := osb.ConnectSandbox(ctx, m.osbConfig, sandboxId)
+	targetSb, err := aliosb.ConnectSandbox(ctx, m.osbConfig, sandboxId)
 	if err != nil {
 		return nil, pkgerr.Wrapf(err, "opensandbox can not connect to %s", sandboxId)
 	}
 
-	m.setSandbox(target.ID(), target)
+	key := entity.SandboxKey{}
+	runtime := ""
+	if info, err := targetSb.GetInfo(ctx); err == nil {
+		key = keyFromMetadata(info.Metadata)
+		if info.Image != nil {
+			runtime = info.Image.URI
+		}
+	}
 
-	return newAlpineSandbox(target), nil
+	m.setOpenSandbox(targetSb.ID(), key, targetSb)
+
+	return NewCustomSandbox(targetSb, key, runtime), nil
+}
+
+// keyFromMetadata 从沙箱元信息中还原绑定的 key
+func keyFromMetadata(meta map[string]string) entity.SandboxKey {
+	key := entity.SandboxKey{UserId: meta[MetadataUserIdKey]}
+	if nbId, ok := meta[MetadataNotebookIdKey]; ok {
+		if id, err := valobj.NewIdFromString(nbId); err == nil {
+			key.NotebookId = id
+		}
+	}
+
+	return key
 }
 
 func (m *Manager) DeleteSandbox(ctx context.Context, sandboxId string) error {
-	target := m.deleteSandbox(sandboxId)
+	target := m.deleteOpenSandbox(sandboxId)
 	if target != nil {
-		if err := target.Kill(ctx); err != nil {
+		if err := target.osb.Kill(ctx); err != nil {
 			return pkgerr.Wrapf(err, "opensandbox kill %s failed", sandboxId)
 		}
 	} else {
-		err := m.lc.DeleteSandbox(ctx, sandboxId)
+		err := m.lifecycle.DeleteSandbox(ctx, sandboxId)
 		if err != nil {
 			return pkgerr.Wrapf(err, "opensandbox delete %s failed", sandboxId)
 		}
 	}
 
 	return nil
+}
+
+func getOpenSandboxRuntime(ctx context.Context, key entity.SandboxKey, openSandbox *aliosb.Sandbox) string {
+	output, err := openSandbox.RunCommand(ctx,
+		"(echo 'uname -a:' && uname -a && echo 'os-release:' && cat /etc/os-release) || true",
+		nil,
+	)
+	if err != nil {
+		slog.ErrorContext(ctx, "opensandbox run command failed",
+			slog.Any("err", err), slog.String("sanbox_key", key.String()),
+		)
+		return "unable to run sandbox command"
+	}
+
+	if output.ExitCode == nil || *output.ExitCode != 0 {
+		getCode := func() string {
+			if output.ExitCode != nil {
+				return strconv.Itoa(*output.ExitCode)
+			}
+
+			return "no exit code provided"
+		}
+		slog.ErrorContext(ctx, "opensandbox run command to get runtime exit code not 0", slog.String("exit_code", getCode()))
+		return "unable to get sandbox runtime"
+	}
+
+	return output.Text()
 }

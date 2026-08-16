@@ -55,16 +55,14 @@ func (r *Generator) generate(
 		maxRound            = conf.WorkerGlobal().Studio.Report.MaxRound
 		style               = artifactentity.ReportStyleDefaultStyle()
 		language            = artifactentity.LanguageAuto
-		tip                 = ""
 	)
 
-	if p, ok := req.Payload.(*artifactentity.ReportPayload); ok {
-		if p.Style.Supported() {
-			style = p.Style
-		}
-		language = p.Language
-		tip = p.Tip
+	p := artifactentity.PayloadAs[*artifactentity.ReportPayload](req.Payload)
+	if p.Style.Supported() {
+		style = p.Style
 	}
+	language = p.Language
+	tip := p.GetTip()
 
 	ag, err := types.BuildSourceExploreAgent(
 		r.deps,

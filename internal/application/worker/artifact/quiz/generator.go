@@ -106,18 +106,16 @@ func (g *Generator) generate(
 	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioQuizScene)
 	llmOptions := g.llmOptions()
 
+	p := artifactentity.PayloadAs[*artifactentity.QuizPayload](req.Payload)
 	count := artifactentity.QuizCountDefaultValue()
-	difficulty := artifactentity.QuizDifficultyDefault()
-	tip := ""
-	if p, ok := req.Payload.(*artifactentity.QuizPayload); ok {
-		if p.Count.Supported() {
-			count = p.Count
-		}
-		if p.Difficulty.Supported() {
-			difficulty = p.Difficulty
-		}
-		tip = p.Tip
+	if p.Count.Supported() {
+		count = p.Count
 	}
+	difficulty := artifactentity.QuizDifficultyDefault()
+	if p.Difficulty.Supported() {
+		difficulty = p.Difficulty
+	}
+	tip := p.GetTip()
 
 	ag, err := types.BuildSourceExploreAgent(
 		g.deps,

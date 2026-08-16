@@ -163,12 +163,13 @@ type StudioConfig struct {
 		NumWorkersPerGroup int           `toml:"numWorkersPerGroup"`
 	} `toml:"taskConfig"`
 
-	Slices struct {
-		MaxRound        int              `toml:"maxRound"`
-		ModelProvider   llm.Provider     `toml:"modelProvider"`
-		Model           string           `toml:"model"`
-		SandboxProvider sandbox.Provider `toml:"sandboxProvider"`
-	}
+	Slides struct {
+		MaxRound         int              `toml:"maxRound"`
+		ModelProvider    llm.Provider     `toml:"modelProvider"`
+		GenerateMaxRound int              `toml:"generateMaxRound"`
+		Model            string           `toml:"model"`
+		SandboxProvider  sandbox.Provider `toml:"sandboxProvider"`
+	} `toml:"slides"`
 }
 
 func LoadWorkerConfig(path string) (*WorkerConfig, error) {

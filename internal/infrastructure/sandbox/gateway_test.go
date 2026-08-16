@@ -39,20 +39,29 @@ func TestGatewayGetProvider(t *testing.T) {
 	gw, err := NewGateway(context.Background(), testGatewayConfig())
 	require.NoError(t, err)
 
-	manager, err := gw.GetProvider(ProviderOpenSandbox)
+	manager, err := gw.GetManager(ProviderOpenSandbox)
 	require.NoError(t, err)
 	assert.NotNil(t, manager)
 
-	manager2, err := gw.GetProvider(ProviderOpenSandbox)
+	manager2, err := gw.GetManager(ProviderOpenSandbox)
 	require.NoError(t, err)
 	assert.NotNil(t, manager2)
+}
+
+func TestGatewayGetLocalProvider(t *testing.T) {
+	gw, err := NewGateway(context.Background(), testGatewayConfig())
+	require.NoError(t, err)
+
+	manager, err := gw.GetManager(ProviderLocal)
+	require.NoError(t, err)
+	assert.NotNil(t, manager)
 }
 
 func TestGatewayGetProviderNotExist(t *testing.T) {
 	gw, err := NewGateway(context.Background(), testGatewayConfig())
 	require.NoError(t, err)
 
-	manager, err := gw.GetProvider("no-such-provider")
+	manager, err := gw.GetManager("no-such-provider")
 	require.Error(t, err)
 	assert.Nil(t, manager)
 }
@@ -61,7 +70,7 @@ func TestGatewayGetProviderEmpty(t *testing.T) {
 	gw, err := NewGateway(context.Background(), testGatewayConfig())
 	require.NoError(t, err)
 
-	manager, err := gw.GetProvider("")
+	manager, err := gw.GetManager("")
 	require.Error(t, err)
 	assert.Nil(t, manager)
 }

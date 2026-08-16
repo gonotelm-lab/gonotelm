@@ -29,6 +29,7 @@ var buildinTaskTypes = []string{
 	"artifact.flashcard",
 	"artifact.quiz",
 	"artifact.data_table",
+	"artifact.slides",
 }
 
 type Worker struct {
@@ -62,6 +63,8 @@ func NewWorker(ctx context.Context, cfg *conf.WorkerConfig) (*Worker, error) {
 		LLMGateway:           shared.LLMGateway,
 		Text2Image:           shared.Text2Image,
 		Text2Audio:           shared.Text2Audio,
+		Sandbox:              shared.SandboxGateway,
+		SandboxRepository:    infrarepo.NewSandboxRepository(shared.Cache.SandboxCache),
 		ObjectStorage:        shared.Storage,
 		CheckpointRepository: infrarepo.NewCheckpointRepository(shared.DB.WorkerCheckpointStore),
 	}

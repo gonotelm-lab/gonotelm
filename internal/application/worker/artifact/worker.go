@@ -143,6 +143,12 @@ func decodePayload(kind artifactentity.Kind, raw json.RawMessage) (artifactentit
 			return nil, err
 		}
 		return &p, nil
+	case artifactentity.KindSlides:
+		var p artifactentity.SlidesPayload
+		if err := sonic.Unmarshal(raw, &p); err != nil {
+			return nil, err
+		}
+		return &p, nil
 	default:
 		return nil, fmt.Errorf("unsupported kind: %s", kind)
 	}

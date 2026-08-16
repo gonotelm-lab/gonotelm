@@ -8,6 +8,11 @@ user = "${GONOTELM_DB_USER:-postgres}"
 password = "${GONOTELM_DB_PASSWORD:-postgres}"
 dbName = "${GONOTELM_DB_NAME:-gonotelm}"
 
+[redis]
+addrs = ${GONOTELM_REDIS_ADDRS:-['127.0.0.1:7542']}
+username = "${GONOTELM_REDIS_USERNAME:-}"
+password = "${GONOTELM_REDIS_PASSWORD:-}"
+
 [vectorDb]
 type = "milvus"
 
@@ -73,6 +78,13 @@ model = "${GONOTELM_STUDIO_QUIZ_MODEL:-deepseek-v4-flash}"
 maxRound = ${GONOTELM_STUDIO_DATATABLE_MAX_ROUND:-50}
 modelProvider = "${GONOTELM_STUDIO_DATATABLE_PROVIDER:-deepseek}"
 model = "${GONOTELM_STUDIO_DATATABLE_MODEL:-deepseek-v4-flash}"
+
+[studio.slides]
+maxRound = ${GONOTELM_STUDIO_SLIDES_MAX_ROUND:-50}
+modelProvider = "${GONOTELM_STUDIO_SLIDES_PROVIDER:-deepseek}"
+generateMaxRound = ${GONOTELM_STUDIO_SLIDES_GENERATE_MAX_ROUND:-100}
+model = "${GONOTELM_STUDIO_SLIDES_MODEL:-deepseek-v4-flash}"
+sandboxProvider = "${GONOTELM_STUDIO_SLIDES_SANDBOX_PROVIDER:-opensandbox}"
 
 [embedding]
 type = "${GONOTELM_EMBEDDING_TYPE:-dashscope}"
@@ -156,6 +168,7 @@ dialTimeout = "${GONOTELM_FLOW_DIAL_TIMEOUT:-5s}"
 endpoint = "${GONOTELM_SANDBOX_ENDPOINT:-http://localhost:23080}"
 apiKey = "${GONOTELM_SANDBOX_API_KEY:-123456}"
 timeout = "${GONOTELM_SANDBOX_TIMEOUT:-30s}"
+image = "${GONOTELM_SANDBOX_IMAGE:opensandbox/code-interpreter-base}"
 
 [worker]
 maxConcurrency  = ${GONOTELM_WORKER_MAX_CONCURRENCY:-4}

@@ -56,3 +56,10 @@ type FlashcardPayload struct {
 
 func (p *FlashcardPayload) Kind() Kind                { return KindFlashcard }
 func (p *FlashcardPayload) GetSourceIds() []valobj.Id { return p.SourceIds }
+
+func (p *FlashcardPayload) GetTip() string {
+	if p == nil {
+		return ""
+	}
+	return p.Tip
+}

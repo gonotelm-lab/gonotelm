@@ -86,7 +86,7 @@ func (p *FileObjectParser) parseByMime(
 		return parseByDocParser(
 			ctx,
 			r,
-			pptxparser.NewPptxParser(nil), // 只保留语义内容（标题/列表/表格/备注/图片alt）
+			pptxparser.NewParser(nil), // 只保留语义内容（标题/列表/表格/备注/图片alt）
 			opts...,
 		)
 	}

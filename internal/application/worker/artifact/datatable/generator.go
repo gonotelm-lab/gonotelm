@@ -57,12 +57,8 @@ func (g *Generator) generate(
 		modelProvider = conf.WorkerGlobal().Studio.DataTable.ModelProvider
 		modelOption   = chat.WithModel(model)
 		maxRound      = conf.WorkerGlobal().Studio.DataTable.MaxRound
-		tip           = ""
+		tip           = artifactentity.PayloadAs[*artifactentity.DataTablePayload](req.Payload).GetTip()
 	)
-
-	if p, ok := req.Payload.(*artifactentity.DataTablePayload); ok {
-		tip = p.Tip
-	}
 
 	ag, err := types.BuildSourceExploreAgent(
 		g.deps,

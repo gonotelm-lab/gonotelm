@@ -34,6 +34,17 @@ func TestOpenSandbox(t *testing.T) {
 	}
 	defer sbx.Kill(ctx) // 关闭/删除沙箱
 
+	info, err := sbx.GetInfo(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("%+v\n", info)
+
+	exe, err := sbx.RunCommand(ctx, "(echo 'uname -a:' && uname -a && echo 'os-release:' && cat /etc/os-release) || true", nil)
+	t.Log(err)
+	t.Log(exe.Text())
+
 	// 2) 执行一个 bash 命令
 	exec, err := sbx.RunCommand(ctx, "echo 'Hello from sandbox!' && ls -la / && pwd && cat /etc/os-release", nil)
 	if err != nil {
@@ -50,6 +61,7 @@ func TestOpenSandbox(t *testing.T) {
 		opensandbox.UploadFileOptions{
 			Metadata: opensandbox.FileMetadata{
 				Path: "/tmp/youarehere",
+				Mode: 644,
 			},
 		})
 	if err != nil {
@@ -78,5 +90,13 @@ func TestOpenSandbox(t *testing.T) {
 	}
 	fmt.Printf("file data = %s\n", data)
 
-	
+	err = sbx.CreateDirectory(ctx, "/tmp/a/b", 755)
+	t.Log(err)
+	dirs, err := sbx.ListDirectory(ctx, "/tmp")
+	t.Log(err)
+	for _, dir := range dirs {
+		t.Logf("%+v", dir)
+	}
+	err = sbx.CreateDirectory(ctx, "/tmp/a/b", 755)
+	t.Log(err)
 }

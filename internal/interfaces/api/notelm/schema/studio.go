@@ -29,6 +29,7 @@ type GenerateArtifactRequest struct {
 	Flashcard     *GenerateFlashcardParameters     `json:"flashcard,omitempty"`
 	Quiz          *GenerateQuizParameters          `json:"quiz,omitempty"`
 	DataTable     *GenerateDataTableParameters     `json:"data_table,omitempty"`
+	Slides        *GenerateSlidesParameters        `json:"slides,omitempty"`
 
 	// 保存为笔记
 	Note *GenerateNoteParameters `json:"note,omitempty"`
@@ -44,6 +45,7 @@ func (r *GenerateArtifactRequest) Validate() error {
 		artifactentity.KindFlashcard:     func() any { return r.Flashcard },
 		artifactentity.KindQuiz:          func() any { return r.Quiz },
 		artifactentity.KindDataTable:     func() any { return r.DataTable },
+		artifactentity.KindSlides:        func() any { return r.Slides },
 		artifactentity.KindNote:          func() any { return r.Note },
 	}
 
@@ -154,6 +156,10 @@ type GenerateDataTableParameters struct {
 	Tip string `json:"tip,omitempty"`
 }
 
+type GenerateSlidesParameters struct {
+	Tip string `json:"tip,omitempty"`
+}
+
 // 将对话内容保存为笔记
 type GenerateNoteParameters struct {
 	ChatId uuid.UUID `json:"chat_id,required"`
@@ -225,6 +231,10 @@ type DataTableExtras struct {
 	Tip string `json:"tip"`
 }
 
+type SlidesExtras struct {
+	Tip string `json:"tip"`
+}
+
 type NoteExtras struct {
 	ChatId uuid.UUID `json:"chat_id"`
 	MsgId  uuid.UUID `json:"msg_id"`
@@ -287,6 +297,11 @@ func ToArtifactItem(a *artifactentity.Artifact) *ArtifactItem {
 	case *artifactentity.DataTablePayload:
 		r.SourceIds = p.SourceIds
 		r.Extras = &DataTableExtras{
+			Tip: p.Tip,
+		}
+	case *artifactentity.SlidesPayload:
+		r.SourceIds = p.SourceIds
+		r.Extras = &SlidesExtras{
 			Tip: p.Tip,
 		}
 	case *artifactentity.NotePayload:
@@ -419,6 +434,16 @@ func (r *GenerateDataTableParameters) ToPayload() *artifactentity.DataTablePaylo
 	}
 
 	return &artifactentity.DataTablePayload{
+		Tip: r.Tip,
+	}
+}
+
+func (r *GenerateSlidesParameters) ToPayload() *artifactentity.SlidesPayload {
+	if r == nil {
+		return nil
+	}
+
+	return &artifactentity.SlidesPayload{
 		Tip: r.Tip,
 	}
 }

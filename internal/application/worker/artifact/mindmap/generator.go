@@ -68,10 +68,7 @@ func (m *Generator) generate(
 ) (*mindmapExpectation, error) {
 	llmOptions := m.llmOptions()
 
-	tip := ""
-	if p, ok := req.Payload.(*artifactentity.MindmapPayload); ok {
-		tip = p.Tip
-	}
+	tip := artifactentity.PayloadAs[*artifactentity.MindmapPayload](req.Payload).GetTip()
 
 	ag, err := types.BuildSourceExploreAgent(
 		m.deps,

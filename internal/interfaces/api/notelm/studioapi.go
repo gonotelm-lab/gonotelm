@@ -91,6 +91,7 @@ func (s *Server) GenerateStudioArtifact(ctx context.Context, c *app.RequestConte
 			Flashcard:     req.Flashcard.ToPayload(),
 			Quiz:          req.Quiz.ToPayload(),
 			DataTable:     req.DataTable.ToPayload(),
+			Slides:        req.Slides.ToPayload(),
 			Note:          req.Note.ToPayload(),
 		})
 	if err != nil {
@@ -128,6 +129,10 @@ func validateStudioUserTips(req *schema.GenerateArtifactRequest) error {
 
 	if req.DataTable != nil && utf8.RuneCountInString(req.DataTable.Tip) > maxUserTipLength {
 		return errors.ErrParams.Msgf("data_table tip exceeds %d characters", maxUserTipLength)
+	}
+
+	if req.Slides != nil && utf8.RuneCountInString(req.Slides.Tip) > maxUserTipLength {
+		return errors.ErrParams.Msgf("slides tip exceeds %d characters", maxUserTipLength)
 	}
 
 	return nil

@@ -29,7 +29,7 @@ func NewGateway(ctx context.Context, cfg *ProviderConfig) (*Gateway, error) {
 		providers: make(map[Provider]repository.Manager),
 	}
 
-	openSandbox, err := newOpenSandboxManager(cfg.OpenSandbox)
+	openSandbox, err := newOpenSandboxManager(ctx, cfg.OpenSandbox)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +38,7 @@ func NewGateway(ctx context.Context, cfg *ProviderConfig) (*Gateway, error) {
 	return gw, nil
 }
 
-func (g *Gateway) GetProvider(providerType Provider) (repository.Manager, error) {
+func (g *Gateway) GetManager(providerType Provider) (repository.Manager, error) {
 	if providerType == "" {
 		return nil, fmt.Errorf("sandbox provider type must not be empty")
 	}
@@ -60,11 +60,12 @@ func (g *Gateway) GetProvider(providerType Provider) (repository.Manager, error)
 	return nil, fmt.Errorf("sandbox provider %s not found", providerType)
 }
 
-func newOpenSandboxManager(cfg OpenSandboxConfig) (repository.Manager, error) {
-	return opensandbox.New(opensandbox.Config{
+func newOpenSandboxManager(ctx context.Context, cfg OpenSandboxConfig) (repository.Manager, error) {
+	return opensandbox.NewManager(ctx, opensandbox.Config{
 		Endpoint:   cfg.Endpoint,
 		ApiKey:     cfg.ApiKey,
 		HttpClient: newHttpClient(cfg.Timeout),
+		Image:      cfg.Image,
 	})
 }
 

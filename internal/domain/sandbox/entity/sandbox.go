@@ -3,6 +3,10 @@ package entity
 import (
 	"context"
 	"io"
+	"path"
+	"time"
+
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 )
 
 // 通用化沙箱抽象
@@ -17,4 +21,52 @@ type Sandbox interface {
 
 	// ReadFile 读取文件全部内容
 	ReadFile(ctx context.Context, path string) ([]byte, error)
+
+	// ReadFile2 读取文件全部内容 但是返回值不同
+	ReadFile2(ctx context.Context, path string) (io.ReadCloser, error)
+
+	// 列出目录情况
+	ListDir(ctx context.Context, path string) ([]ListDirItem, error)
+
+	// 编辑文件
+	EditFile(ctx context.Context, path, old, new string) error
+
+	// 每个沙箱的metadata描述 包含Runtime等
+	Description() SandboxDescription
+}
+
+type ListDirItem struct {
+	Path       string
+	Type       string // dir or regular file
+	Size       int64
+	ModifiedAt time.Time
+	CreatedAt  time.Time
+}
+
+// 描述沙箱的元信息
+type SandboxDescription struct {
+	Id      string
+	Key     SandboxKey
+	Runtime string // os runtime
+}
+
+type SandboxKey struct {
+	UserId     string
+	NotebookId valobj.Id
+}
+
+func (k *SandboxKey) WorkspaceDir() string {
+	return path.Join("/tmp", k.UserId, k.NotebookId.String())
+}
+
+func (k *SandboxKey) String() string {
+	if k == nil {
+		return ""
+	}
+	return "uid:" + k.UserId + ", notebookId:" + k.NotebookId.String()
+}
+
+type Spec struct {
+	TTL time.Duration
+	Env map[string]string
 }

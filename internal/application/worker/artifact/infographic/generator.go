@@ -56,10 +56,7 @@ type infoGraphicExpectation struct {
 }
 
 func (ig *Generator) Generate(ctx context.Context, req *types.Request) (*types.Response, error) {
-	payload, ok := req.Payload.(*artifactentity.InfoGraphicPayload)
-	if !ok {
-		return nil, errors.ErrParams.Msgf("infographic generator expects InfoGraphicPayload")
-	}
+	payload := artifactentity.PayloadAs[*artifactentity.InfoGraphicPayload](req.Payload)
 
 	expect, storageResult, err := ig.generate(ctx, req.ArtifactId, payload)
 	if err != nil {
@@ -85,22 +82,22 @@ func (ig *Generator) Generate(ctx context.Context, req *types.Request) (*types.R
 
 func (ig *Generator) generate(
 	ctx context.Context,
-	taskId valobj.Id,
+	artifactId valobj.Id,
 	payload *artifactentity.InfoGraphicPayload,
 ) (*infoGraphicExpectation, *StorageResult, error) {
 	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioInfographicScene)
 
-	ckpt, err := ig.deps.CheckpointRepository.FindByArtifactId(ctx, taskId)
+	ckpt, err := ig.deps.CheckpointRepository.FindByArtifactId(ctx, artifactId)
 	if err != nil {
 		if !errors.Is(err, workererrors.ErrCheckpointNotFound) {
-			slog.ErrorContext(ctx, "find checkpoint failed", slog.String("artifact_id", taskId.String()), slog.Any("err", err))
+			slog.ErrorContext(ctx, "find checkpoint failed", slog.String("artifact_id", artifactId.String()), slog.Any("err", err))
 		}
 	}
 
 	var expect *infoGraphicExpectation
 	if ckpt != nil && ckpt.Field1 != nil {
 		if err := sonic.Unmarshal(ckpt.Field1, &expect); err != nil {
-			slog.WarnContext(ctx, "unmarshal checkpoint prompt failed", slog.String("artifact_id", taskId.String()), slog.Any("err", err))
+			slog.WarnContext(ctx, "unmarshal checkpoint prompt failed", slog.String("artifact_id", artifactId.String()), slog.Any("err", err))
 		}
 	}
 
@@ -112,20 +109,20 @@ func (ig *Generator) generate(
 
 		promptBytes, _ := sonic.Marshal(expect)
 		if ckpt == nil {
-			ckpt = workerentity.NewCheckpoint(taskId)
+			ckpt = workerentity.NewCheckpoint(artifactId)
 		}
 		ckpt.UpdateField1(promptBytes)
 		if err := ig.deps.CheckpointRepository.Save(ctx, ckpt); err != nil {
-			slog.WarnContext(ctx, "save checkpoint failed", slog.String("artifact_id", taskId.String()), slog.Any("err", err))
+			slog.WarnContext(ctx, "save checkpoint failed", slog.String("artifact_id", artifactId.String()), slog.Any("err", err))
 		}
 	}
 
 	slog.DebugContext(ctx, "generate infographic expectation done, now generate image",
-		slog.String("task_id", taskId.String()),
+		slog.String("task_id", artifactId.String()),
 		slog.String("title", expect.Title),
 	)
 
-	storageResult, err := ig.generateAndStoreImage(ctx, taskId, payload, expect.ImagePrompt)
+	storageResult, err := ig.generateAndStoreImage(ctx, artifactId, payload, expect.ImagePrompt)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -255,7 +252,7 @@ func (ig *Generator) parseAgentOutput(
 
 func (ig *Generator) generateAndStoreImage(
 	ctx context.Context,
-	taskId valobj.Id,
+	artifactId valobj.Id,
 	payload *artifactentity.InfoGraphicPayload,
 	imagePrompt string,
 ) (*StorageResult, error) {
@@ -294,7 +291,7 @@ func (ig *Generator) generateAndStoreImage(
 	mimeType := mimetype.Detect(imageData)
 	ext := mimeType.Extension()
 	contentType := mimeType.String()
-	storeKey := formatArtifactStoreKey(payload.NotebookId, taskId, ext)
+	storeKey := formatArtifactStoreKey(payload.NotebookId, artifactId, ext)
 	err = ig.deps.ObjectStorage.UploadObject(ctx, &storage.UploadObjectRequest{
 		Key:         storeKey,
 		Body:        imageData,
@@ -316,12 +313,12 @@ func (ig *Generator) generateAndStoreImage(
 	}, nil
 }
 
-func formatArtifactStoreKey(notebookId, taskId valobj.Id, ext string) string {
+func formatArtifactStoreKey(notebookId, artifactId valobj.Id, ext string) string {
 	if !strings.HasPrefix(ext, ".") {
 		ext = "." + ext
 	}
 
-	return fmt.Sprintf("artifact/%s/%s%s", notebookId.String(), taskId.String(), ext)
+	return fmt.Sprintf("artifact/%s/%s%s", notebookId.String(), artifactId.String(), ext)
 }
 
 func decodeImageConfigOrIgnore(imageData []byte) (width, height int) {

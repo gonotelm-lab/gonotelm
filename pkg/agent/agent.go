@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"maps"
 	"context"
 	"fmt"
 	"log/slog"
@@ -186,6 +187,35 @@ func (a *Agent[State]) BindTools(tools map[string]einotool.InvokableTool) error 
 	tooledLLM, err := a.cfg.BaseLLM.WithTools(toolInfos)
 	if err != nil {
 		return errors.Wrapf(errors.ErrInner, "bind tools failed: %v", err)
+	}
+	a.tooledLLM = tooledLLM
+
+	return nil
+}
+
+// AppendTools 追加绑定工具，已存在的工具名会被覆盖，其余保持原绑定。
+func (a *Agent[State]) AppendTools(newTools map[string]einotool.InvokableTool) error {
+	if len(newTools) == 0 {
+		return nil
+	}
+
+	merged := make(map[string]einotool.InvokableTool, len(a.tools)+len(newTools))
+	maps.Copy(merged, a.tools)
+	maps.Copy(merged, newTools)
+
+	a.tools = merged
+	toolInfos := make([]*einoschema.ToolInfo, 0, len(merged))
+	for _, tool := range merged {
+		toolInfo, err := tool.Info(context.Background())
+		if err != nil {
+			continue
+		}
+		toolInfos = append(toolInfos, toolInfo)
+	}
+
+	tooledLLM, err := a.cfg.BaseLLM.WithTools(toolInfos)
+	if err != nil {
+		return errors.Wrapf(errors.ErrInner, "append tools failed: %v", err)
 	}
 	a.tooledLLM = tooledLLM
 

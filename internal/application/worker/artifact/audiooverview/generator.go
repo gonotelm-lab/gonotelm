@@ -69,10 +69,7 @@ type podcastTranscriptExpectation struct {
 }
 
 func (a *Generator) Generate(ctx context.Context, req *types.Request) (*types.Response, error) {
-	payload, ok := req.Payload.(*artifactentity.AudioOverviewPayload)
-	if !ok {
-		return nil, errors.ErrParams.Msgf("audio overview generator expects AudioOverviewPayload")
-	}
+	payload := artifactentity.PayloadAs[*artifactentity.AudioOverviewPayload](req.Payload)
 
 	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioAudioOverviewScene)
 	llmOptions := a.llmOptions()
@@ -283,7 +280,7 @@ func (a *Generator) generateOutline(
 	}
 
 	sourceIds := types.SourceIDsToStrings(req.SourceIds)
-	msgs, err := RenderPodcastOutline(ctx, sourceIds, payload.Language, payload.Tip, payload.Style)
+	msgs, err := RenderPodcastOutline(ctx, sourceIds, payload.Language, payload.GetTip(), payload.Style)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "render podcast outline prompt failed, err=%v", err)
 	}

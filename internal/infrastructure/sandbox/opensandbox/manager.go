@@ -153,7 +153,7 @@ func (m *Manager) prepareSandbox(ctx context.Context, key entity.SandboxKey, ope
 		return pkgerr.Wrapf(err, "opensandbox create directory failed: %s", key)
 	}
 
-	// 2. upload vendors
+	// 2. upload vendors（每次 Open 新句柄；读完后关闭）
 	vendors := workspace.Vendors()
 	uploadEntries := make([]aliosb.UploadFileEntry, 0, len(vendors))
 	for fileName, file := range vendors {
@@ -169,6 +169,9 @@ func (m *Manager) prepareSandbox(ctx context.Context, key entity.SandboxKey, ope
 		})
 	}
 	err = openSandbox.UploadFiles(ctx, uploadEntries)
+	for _, file := range vendors {
+		_ = file.Close()
+	}
 	if err != nil {
 		return pkgerr.Wrapf(err, "opensandbox upload files failed: %s", key)
 	}

@@ -1,10 +1,10 @@
 package agent
 
 import (
-	"maps"
 	"context"
 	"fmt"
 	"log/slog"
+	"maps"
 	"runtime/debug"
 	"sync"
 
@@ -587,11 +587,23 @@ func (a *Agent[State]) handleToolCalls(
 			resultForCallback[idx].Result = result
 
 			if a.cfg.Verbose {
+				runes := []rune(result)
+				debugResult := result
+				if len(runes) > 50 {
+					debugResult = string(runes[:50]) + "(... truncated)"
+				}
+
+				argRunes := []rune(toolCall.Function.Arguments)
+				debugArgs := toolCall.Function.Arguments
+				if len(argRunes) > 50 {
+					debugArgs = string(argRunes[:50]) + "(... truncated)"
+				}
+
 				slog.DebugContext(ctx, "tool call finished",
 					slog.String("tool_name", toolCall.Function.Name),
 					slog.String("tool_call_id", toolCall.ID),
-					slog.String("tool_call_arguments", string(toolCall.Function.Arguments)),
-					slog.String("tool_call_result", result),
+					slog.String("tool_call_arguments", debugArgs),
+					slog.String("tool_call_result", debugResult),
 				)
 			}
 		})

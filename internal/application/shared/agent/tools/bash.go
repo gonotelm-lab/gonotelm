@@ -57,7 +57,7 @@ func (t *BashTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 		Desc: "Execute a shell command inside the sandbox and return its exit code, stdout and stderr.\n\n" +
 			"Guidelines:\n" +
 			"- Quote file paths containing spaces with double quotes.\n" +
-			"- Combine multiple commands with ';' or '&&' instead of newlines. Prefer absolute paths over cd.\n" +
+			"- Combine multiple commands with ';' or '&&' instead of newlines. Prefer workspace-relative or absolute paths over cd.\n" +
 			"- timeout is optional, in milliseconds (max 180000ms / 3 minutes). If not specified, defaults to 3 minutes.\n" +
 			"- If the output exceeds 30000 characters, it will be truncated.",
 		ParamsOneOf: bashToolParams,
@@ -98,7 +98,9 @@ func (t *BashTool) InvokableRun(
 	var builder strings.Builder
 	builder.Grow(512)
 	fmt.Fprintf(&builder, "exit_code: %d\n", exec.ExitCode)
-	fmt.Fprintf(&builder, "<stdout>\n%s\n</stdout>", exec.Stdout)
+	if len(exec.Stdout) > 0 {
+		fmt.Fprintf(&builder, "<stdout>\n%s\n</stdout>", exec.Stdout)
+	}
 	if len(exec.Stderr) > 0 {
 		fmt.Fprintf(&builder, "\n<stderr>\n%s\n</stderr>", exec.Stderr)
 	}

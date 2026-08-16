@@ -4,10 +4,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/gonotelm-lab/gonotelm/internal/domain/sandbox/entity"
 	"github.com/gonotelm-lab/gonotelm/pkg/eino-ext/parser/pptx"
 )
+
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
 
 // 检查agent生成的pptx的产物是否和格式正确的pptx文件
 func (g *Generator) checkPPTXArtifactValid(ctx context.Context, sandbox entity.Sandbox, path string) (string, error) {

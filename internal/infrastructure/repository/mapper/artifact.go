@@ -112,6 +112,12 @@ func decodePayload(kind artifactentity.Kind, b []byte) (artifactentity.Payload, 
 			return nil, err
 		}
 		return &p, nil
+	case artifactentity.KindSlides:
+		var p artifactentity.SlidesPayload
+		if err := sonic.Unmarshal(b, &p); err != nil {
+			return nil, err
+		}
+		return &p, nil
 	}
 
 	return nil, nil

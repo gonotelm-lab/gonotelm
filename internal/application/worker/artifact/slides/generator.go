@@ -50,20 +50,34 @@ type slidesOutlineExpectation struct {
 }
 
 func (g *Generator) Generate(ctx context.Context, req *types.Request) (*types.Response, error) {
-	outlineExp, err := g.ensureOutline(ctx, req)
+	sources, err := g.loadOutlineSources(ctx, req.SourceIds)
+	if err != nil {
+		return nil, errors.WithMessage(err, "load outline sources failed")
+	}
+
+	outlineExp, err := g.ensureOutline(ctx, req, sources)
 	if err != nil {
 		return nil, errors.WithMessage(err, "ensure outline failed")
 	}
 
+	slog.DebugContext(ctx, "slides outline generated", slog.String("notebook_id", req.NotebookId.String()),
+		slog.String("artifact_id", req.ArtifactId.String()),
+	)
+
+	// 保留沙箱等待自然过期
 	sandbox, err := g.ensureSandbox(ctx, req)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "ensure sandbox failed")
 	}
 
-	result, err := g.generatePPTX(ctx, req, outlineExp, sandbox)
+	slog.DebugContext(ctx, "slides generation ensure sandbox done")
+
+	result, err := g.generatePPTX(ctx, req, outlineExp, sandbox, sources)
 	if err != nil {
 		return nil, errors.WithMessage(err, "generate slides failed")
 	}
+
+	slog.DebugContext(ctx, "slides generation pptx done")
 
 	resultBytes, err := sonic.Marshal(result)
 	if err != nil {
@@ -77,19 +91,22 @@ func (g *Generator) Generate(ctx context.Context, req *types.Request) (*types.Re
 	}, nil
 }
 
-func (g *Generator) llmOptions() []einomodel.Option {
+func (g *Generator) llmOptions(jsonObject bool) []einomodel.Option {
 	var (
 		provider = conf.WorkerGlobal().Studio.Slides.ModelProvider
 		model    = conf.WorkerGlobal().Studio.Slides.Model
 	)
-	return []einomodel.Option{
+	opts := []einomodel.Option{
 		chat.WithModel(model),
-		chat.WithResponseJsonObject(provider),
 		chat.WithThinking(provider, false),
 	}
+	if jsonObject {
+		opts = append(opts, chat.WithResponseJsonObject(provider))
+	}
+	return opts
 }
 
-func (g *Generator) buildAgent(req *types.Request, maxRound int) (*types.Agent, error) {
+func (g *Generator) buildAgent(req *types.Request, maxRound int, jsonObject bool) (*types.Agent, error) {
 	round := conf.WorkerGlobal().Studio.Slides.MaxRound
 	if maxRound > 0 {
 		round = maxRound
@@ -100,7 +117,7 @@ func (g *Generator) buildAgent(req *types.Request, maxRound int) (*types.Agent, 
 		conf.WorkerGlobal().Studio.Slides.ModelProvider,
 		conf.WorkerGlobal().Studio.Slides.Model,
 		round,
-		g.llmOptions(),
+		g.llmOptions(jsonObject),
 		req.NotebookId,
 		req.SourceIds,
 		true,
@@ -108,13 +125,14 @@ func (g *Generator) buildAgent(req *types.Request, maxRound int) (*types.Agent, 
 }
 
 // ensureOutline 先尝试从 checkpoint 恢复大纲，否则生成并写入 checkpoint。
-func (g *Generator) ensureOutline(ctx context.Context, req *types.Request) (*slidesOutlineExpectation, error) {
+func (g *Generator) ensureOutline(ctx context.Context, req *types.Request, sources []OutlineSource) (*slidesOutlineExpectation, error) {
 	ckpt := g.loadCheckpoint(ctx, req)
 	if outline := restoreOutline(ctx, req.ArtifactId, ckpt); outline != nil {
+		slog.InfoContext(ctx, "slides generator restore from checkpoint 1", slog.String("artifact_id", req.ArtifactId.String()))
 		return outline, nil
 	}
 
-	outline, err := g.generateOutline(ctx, req)
+	outline, err := g.generateOutline(ctx, req, sources)
 	if err != nil {
 		return nil, err
 	}
@@ -138,17 +156,33 @@ func (g *Generator) loadCheckpoint(ctx context.Context, req *types.Request) *wor
 	return ckpt
 }
 
+func (g *Generator) loadOutlineSources(ctx context.Context, sourceIds []valobj.Id) ([]OutlineSource, error) {
+	sources := make([]OutlineSource, 0, len(sourceIds))
+	for _, id := range sourceIds {
+		entry := OutlineSource{Id: id.String()}
+		stat, err := g.deps.Agentize.StatSource(ctx, id)
+		if err != nil {
+			slog.WarnContext(ctx, "slides outline load source abstract failed",
+				slog.String("source_id", id.String()), slog.Any("err", err))
+		} else if stat != nil {
+			entry.Abstract = stat.Abstract
+		}
+		sources = append(sources, entry)
+	}
+	return sources, nil
+}
+
 // 探索生成幻灯片大纲
-func (g *Generator) generateOutline(ctx context.Context, req *types.Request) (*slidesOutlineExpectation, error) {
+func (g *Generator) generateOutline(ctx context.Context, req *types.Request, sources []OutlineSource) (*slidesOutlineExpectation, error) {
 	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioSlidesScene)
 
-	agent, err := g.buildAgent(req, 0)
+	agent, err := g.buildAgent(req, 0, true)
 	if err != nil {
 		return nil, errors.Wrapf(err, "build source explore agent for slides outline failed, err=%v", err)
 	}
 
 	tip := artifactentity.PayloadAs[*artifactentity.SlidesPayload](req.Payload).GetTip()
-	msgs, err := RenderSlidesOutline(ctx, types.SourceIDsToStrings(req.SourceIds), tip)
+	msgs, err := RenderSlidesOutline(ctx, sources, tip)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "generate slides outline message failed, err=%v", err)
 	}
@@ -182,7 +216,7 @@ func (g *Generator) generateOutline(ctx context.Context, req *types.Request) (*s
 		compensateMsgs := append([]*einoschema.Message{}, msgs...)
 		compensateMsgs = append(compensateMsgs, types.BuildCompensateMessage(lastContent, slidesOutlineCompensateRules(lastErr)))
 
-		llmResp, genErr := agent.BaseLLM().Generate(ctx, compensateMsgs, g.llmOptions()...)
+		llmResp, genErr := agent.BaseLLM().Generate(ctx, compensateMsgs, g.llmOptions(true)...)
 		if genErr != nil {
 			return nil, errors.Wrapf(errors.ErrLLM,
 				"slides outline compensate generate failed on attempt %d, err=%v",
@@ -313,6 +347,41 @@ func (g *Generator) ensureSandbox(ctx context.Context, req *types.Request) (sand
 	return sandbox, nil
 }
 
+// ensureSlidesWorkspace 在沙箱 notebook 目录下创建 artifact 子目录，并挂上 vendor 软链。
+//
+// sandbox 工作目录结构如下：
+//
+//	/tmp/{userId}/{notebookId}/           ← 沙箱 WorkspaceDir（Bash 默认 cwd、真实 vendor）
+//	├── vendor/                           ← opensandbox 上传的 pptxgenjs
+//	└── {artifactId}/                     ← slides 逻辑工作区（prompt WorkspaceDir）
+//	    ├── vendor -> ../vendor           ← 软链，兼容 slides/../vendor 的 require
+//	    └── slides/
+//	        ├── slide-01.js
+//	        ├── compile.js
+//	        └── output/presentation.pptx
+func ensureSlidesWorkspace(ctx context.Context, sandbox sandboxent.Sandbox, workspaceDir string) error {
+	vendorLink := path.Join(workspaceDir, "vendor")
+	slidesOut := path.Join(workspaceDir, "slides", "output")
+	// 建工作区 + vendor 软链；并校验 notebook 级 vendor/standalone.cjs 非空（0 字节会导致 agent 全盘找库）
+	cmd := fmt.Sprintf(
+		"mkdir -p %s && ln -sfn ../vendor %s && test -s %s/standalone.cjs",
+		shellQuote(slidesOut),
+		shellQuote(vendorLink),
+		shellQuote(vendorLink),
+	)
+	exec, err := sandbox.Run(ctx, sandboxent.Command{Command: cmd})
+	if err != nil {
+		return errors.WithMessagef(err, "mkdir slides workspace failed: %s", workspaceDir)
+	}
+	if !exec.Success() {
+		return errors.Errorf(
+			"slides workspace not ready (vendor/standalone.cjs missing or empty?): exit=%d stderr=%s",
+			exec.ExitCode, string(exec.Stderr),
+		)
+	}
+	return nil
+}
+
 func (g *Generator) getSandboxSerivce() (*sandboxservice.Service, error) {
 	mgr, err := g.deps.Sandbox.GetManager(conf.WorkerGlobal().Studio.Slides.SandboxProvider)
 	if err != nil {
@@ -332,8 +401,9 @@ func (g *Generator) generatePPTX(
 	req *types.Request,
 	outlineExp *slidesOutlineExpectation,
 	sandbox sandboxent.Sandbox,
+	sources []OutlineSource,
 ) (*SlidesStorageResult, error) {
-	agent, err := g.buildAgent(req, conf.WorkerGlobal().Studio.Slides.GenerateMaxRound)
+	agent, err := g.buildAgent(req, conf.WorkerGlobal().Studio.Slides.GenerateMaxRound, false)
 	if err != nil {
 		return nil, errors.WithMessage(err, "build generate pptx agent failed")
 	}
@@ -367,11 +437,16 @@ func (g *Generator) generatePPTX(
 	}
 
 	sandboxDesc := sandbox.Description()
-	outputLocation := path.Join(sandboxDesc.Key.WorkspaceDir(), "slides", "output", "presentation.pptx")
+	// slides 工作区在沙箱 Workspace 下多一层 artifactId，隔离同 notebook 多 artifact
+	workspaceDir := path.Join(sandboxDesc.Key.WorkspaceDir(), req.ArtifactId.String())
+	if err := ensureSlidesWorkspace(ctx, sandbox, workspaceDir); err != nil {
+		return nil, err
+	}
+	outputLocation := path.Join(workspaceDir, "slides", "output", "presentation.pptx")
 	msgs, err := RenderSlides(ctx,
 		outlineExp.Title, outlineExp.Outline,
-		types.SourceIDsToStrings(req.SourceIds),
-		sandboxDesc.Runtime, sandboxDesc.Key.WorkspaceDir(),
+		sources,
+		sandboxDesc.Runtime, workspaceDir,
 		outputLocation,
 		artifactentity.PayloadAs[*artifactentity.SlidesPayload](req.Payload).GetTip(),
 	)
@@ -389,14 +464,17 @@ func (g *Generator) generatePPTX(
 	// 前往沙箱检查
 	pptxReader, err := sandbox.ReadFile2(ctx, outputLocation)
 	if err == nil {
-		// pptxReader -> pw -->->-> pr (BodyReader)
+		// pptxReader -> pw ---> pr (BodyReader)
 		pr, pw := io.Pipe()
 		errChan := make(chan error, 1)
 		go func() {
 			defer pw.Close()
 
-			_, err := io.Copy(pw, pptxReader) //
-			errChan <- err
+			_, err := io.Copy(pw, pptxReader)
+			select {
+			case errChan <- err:
+			case <-ctx.Done():
+			}
 		}()
 
 		// 确认存在了 存到Storage中
@@ -406,14 +484,26 @@ func (g *Generator) generatePPTX(
 			BodyReader:  pr,
 			ContentType: sourceentitiy.MimeTypePPTX,
 		})
-		if copyErr := <-errChan; copyErr != nil {
+
+		var copyErr error
+		select {
+		case copyErr = <-errChan:
+		case <-ctx.Done():
+			if errCtx := ctx.Err(); errCtx != nil {
+				return nil, errors.WithStack(errCtx)
+			}
+		}
+
+		if copyErr != nil {
 			return nil, errors.Wrapf(copyErr, "copy err during uploading object, artifact_id=%s", req.ArtifactId)
 		}
 
 		if err != nil {
 			return nil, errors.Wrapf(err, "upload obejct failed, key=%s", storeKey)
 		}
-		pptxReader.Close()
+		if err := pptxReader.Close(); err != nil {
+			slog.WarnContext(ctx, "slides generator pptx reader close failed", slog.Any("err", err))
+		}
 
 		return &SlidesStorageResult{StoreKey: storeKey, ContentType: sourceentitiy.MimeTypePPTX}, nil
 	}

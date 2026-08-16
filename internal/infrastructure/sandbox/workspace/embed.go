@@ -2,27 +2,20 @@ package workspace
 
 import (
 	"embed"
-	_ "embed"
 	"io/fs"
 )
 
-var (
-	//go:embed vendor/**
-	vendor embed.FS
+//go:embed vendor/**
+var vendor embed.FS
 
-	vendorMaps map[string]fs.File = make(map[string]fs.File)
-)
-
-func init() {
-	var err error
-	standaloneCjsFile, err := vendor.Open("vendor/standalone.cjs")
+// Vendors 每次返回新打开的 fs.File。
+// embed.FS 的 File 读完后 offset 停在 EOF，若复用同一句柄则后续上传会得到 0 字节文件。
+func Vendors() map[string]fs.File {
+	standalone, err := vendor.Open("vendor/standalone.cjs")
 	if err != nil {
 		panic(err)
 	}
-
-	vendorMaps["standalone.cjs"] = standaloneCjsFile
-}
-
-func Vendors() map[string]fs.File {
-	return vendorMaps
+	return map[string]fs.File{
+		"standalone.cjs": standalone,
+	}
 }

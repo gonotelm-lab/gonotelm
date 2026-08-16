@@ -388,7 +388,7 @@ func (g *Generator) getSandboxSerivce() (*sandboxservice.Service, error) {
 		return nil, errors.WithMessage(err, "slides worker get provider failed")
 	}
 
-	service := sandboxservice.New(g.deps.SandboxRepository, mgr)
+	service := sandboxservice.New(g.deps.SandboxRepository, mgr, g.deps.DistLock)
 	return service, nil
 }
 

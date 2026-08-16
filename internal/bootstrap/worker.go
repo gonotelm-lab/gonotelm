@@ -65,6 +65,7 @@ func NewWorker(ctx context.Context, cfg *conf.WorkerConfig) (*Worker, error) {
 		Text2Audio:           shared.Text2Audio,
 		Sandbox:              shared.SandboxGateway,
 		SandboxRepository:    infrarepo.NewSandboxRepository(shared.Cache.SandboxCache),
+		DistLock:             shared.DistLock,
 		ObjectStorage:        shared.Storage,
 		CheckpointRepository: infrarepo.NewCheckpointRepository(shared.DB.WorkerCheckpointStore),
 	}

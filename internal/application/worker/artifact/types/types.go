@@ -3,6 +3,7 @@ package types
 import (
 	"context"
 
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	sandboxrepo "github.com/gonotelm-lab/gonotelm/internal/domain/sandbox/repository"
@@ -37,6 +38,7 @@ type ServiceDeps struct {
 	Text2Audio           *text2audio.Text2AudioGateway
 	Sandbox              *infrasandbox.Gateway
 	SandboxRepository    sandboxrepo.Repository
+	DistLock             adapter.DistributedLock
 	ObjectStorage        storage.Storage
 	CheckpointRepository workerrepo.CheckpointRepository
 }

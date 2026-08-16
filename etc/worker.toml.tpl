@@ -128,6 +128,15 @@ temperature = ${GONOTELM_QWEN_TEMPERATURE:-1.0}
 topP = ${GONOTELM_QWEN_TOP_P:-1.0}
 enableThinking = ${GONOTELM_QWEN_ENABLE_THINKING:-false}
 
+[provider.agnes]
+apiKey = "${GONOTELM_AGNES_API_KEY:-}"
+baseUrl = "${GONOTELM_AGNES_BASE_URL:-https://apihub.agnes-ai.com/v1}"
+model = "${GONOTELM_AGNES_MODEL:-agnes-2.5-pro}"
+timeout = "${GONOTELM_AGNES_TIMEOUT:-5m}"
+maxTokens = ${GONOTELM_AGNES_MAX_TOKENS:-16384}
+temperature = ${GONOTELM_AGNES_TEMPERATURE:-1.0}
+topP = ${GONOTELM_AGNES_TOP_P:-1.0}
+
 [text2image.dashscope]
 apiKey = "${GONOTELM_DASHSCOPE_API_KEY:-}"
 baseUrl = "${GONOTELM_TEXT2IMAGE_DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation}"

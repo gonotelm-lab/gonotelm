@@ -120,6 +120,13 @@ func (s *Service) tryGetAlive(ctx context.Context, key entity.SandboxKey) (entit
 		slog.String("sandbox_key", key.String()),
 		slog.String("sandbox_id", desc.Id),
 	)
+	// 清掉失效绑定，避免快路径 miss 后锁内 double-check 再连一次死沙箱
+	if delErr := s.repo.DeleteSandbox(ctx, key); delErr != nil {
+		slog.WarnContext(ctx, "delete stale sandbox binding failed",
+			slog.Any("err", delErr),
+			slog.String("sandbox_key", key.String()),
+		)
+	}
 	return nil, false, nil
 }
 

@@ -3,7 +3,6 @@ package slides
 import (
 	"context"
 	"fmt"
-	"io"
 	"log/slog"
 	"path"
 
@@ -12,7 +11,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -463,52 +461,24 @@ func (g *Generator) generatePPTX(
 
 	// 前往沙箱检查
 	pptxReader, err := sandbox.ReadFile2(ctx, outputLocation)
-	if err == nil {
-		// pptxReader -> pw ---> pr (BodyReader)
-		pr, pw := io.Pipe()
-		errChan := make(chan error, 1)
-		go func() {
-			defer pw.Close()
-
-			_, err := io.Copy(pw, pptxReader)
-			select {
-			case errChan <- err:
-			case <-ctx.Done():
-			}
-		}()
-
-		// 确认存在了 存到Storage中
-		storeKey := formatSlidesStoreKey(req.NotebookId, req.ArtifactId)
-		err = g.deps.ObjectStorage.UploadObject(ctx, &storage.UploadObjectRequest{
-			Key:         storeKey,
-			BodyReader:  pr,
-			ContentType: sourceentitiy.MimeTypePPTX,
-		})
-
-		var copyErr error
-		select {
-		case copyErr = <-errChan:
-		case <-ctx.Done():
-			if errCtx := ctx.Err(); errCtx != nil {
-				return nil, errors.WithStack(errCtx)
-			}
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if cerr := pptxReader.Close(); cerr != nil {
+			slog.WarnContext(ctx, "slides generator pptx reader close failed", slog.Any("err", cerr))
 		}
+	}()
 
-		if copyErr != nil {
-			return nil, errors.Wrapf(copyErr, "copy err during uploading object, artifact_id=%s", req.ArtifactId)
-		}
-
-		if err != nil {
-			return nil, errors.Wrapf(err, "upload obejct failed, key=%s", storeKey)
-		}
-		if err := pptxReader.Close(); err != nil {
-			slog.WarnContext(ctx, "slides generator pptx reader close failed", slog.Any("err", err))
-		}
-
-		return &SlidesStorageResult{StoreKey: storeKey, ContentType: sourceentitiy.MimeTypePPTX}, nil
+	storeKey := formatSlidesStoreKey(req.NotebookId, req.ArtifactId)
+	if err := types.UploadReader(ctx, g.deps.ObjectStorage, storeKey, sourceentitiy.MimeTypePPTX, pptxReader); err != nil {
+		return nil, errors.Wrapf(err, "upload slides object failed, artifact_id=%s", req.ArtifactId)
 	}
 
-	return nil, err
+	return &SlidesStorageResult{
+		StoreKey:    storeKey,
+		ContentType: sourceentitiy.MimeTypePPTX,
+	}, nil
 }
 
 func formatSlidesStoreKey(notebookId, artifactId valobj.Id) string {

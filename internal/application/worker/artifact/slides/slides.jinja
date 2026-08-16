@@ -35,7 +35,7 @@ const pptxgen = require(path.join(__dirname, "..", "vendor", "standalone.cjs"));
 - `EditFile`：**仅**在 `node` 或 `CheckPPTX` **失败后**修已有 `.js`。
 
 # 目标
-产出设计统一、无占位符、可打开的 PPTX，路径固定：`{{ OutputLocation }}`。
+产出设计统一、无占位符、可打开的 PPTX，路径固定：`{{ OutputLocation }}`。保证工具调用的效率和准确性。
 
 # 输入
 
@@ -67,6 +67,7 @@ const pptxgen = require(path.join(__dirname, "..", "vendor", "standalone.cjs"));
 | `node {{ WorkspaceDir }}/slides/compile.js` | `npm` / `npx` / `yarn` / `pnpm` / 下载安装任何包 |
 | 失败后 `EditFile`/`WriteFile` 修对应 `.js` 再编译 | `find` / `locate` / 全盘搜 `pptxgen*` / 扫 `/opt` `/usr` `/root` |
 | `CheckPPTX` 校验产物 | `curl` / `wget` / 访问 registry.npmjs.org 等外网 |
+| 能合并的 shell 尽量放进同一次 `Bash` | 明知可合并仍拆成多轮细粒度 `Bash` 往返 |
 | | 为找库而 `ls`/`readlink`/`wc` 探测 Workspace **以外**的路径 |
 | | 改 `require` 路径、复制/重装 vendor、用其它库替代 |
 | | Bash heredoc / `echo`/`cat <<EOF` 拼整段 JS |
@@ -79,6 +80,7 @@ vendor / require 报错时：**不要排查环境**。确认 `compile.js` 使用
 3. 每页一次写完整（含 `module.exports`）；靠覆盖纠错。
 4. `pres.writeFile` **必须 await**（用下方模板）。
 5. `CheckPPTX` 通过后立刻结束；禁止再 `ls`/`find`/通读文件；未失败勿为「更好看」反复改。
+6. 必要时可**Bash 合并**
 
 # 工作流程
 
@@ -382,6 +384,8 @@ slide.addChart(pres.charts.BAR, [{ name: "Sales", labels: ["Q1", "Q2", "Q3", "Q4
 9. 禁止纯文字页；正文勿加粗、勿居中；低对比禁止。
 10. 文字对齐形状时 `margin: 0`。
 11. `node` 首次 exit≠0 时：看 stderr 再修源码重跑；**不要**换命令试探环境。
+12. `fill`/`color` 必须是 **hex 字符串**（如 `"023047"`），禁止把整对象当 color（会触发 `(colorStr || "").replace`）。
+13. 失败恢复优先「改源码 → 再 compile」；能合并的探测不要拆成无信息增量的多轮细粒度 `Bash`。
 
 # QA（未通过不得结束）
 

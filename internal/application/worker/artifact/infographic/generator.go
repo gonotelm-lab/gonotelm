@@ -18,7 +18,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -283,25 +282,23 @@ func (ig *Generator) generateAndStoreImage(
 	}
 	defer imageReader.Close()
 
-	imageData, err := io.ReadAll(imageReader)
+	var header bytes.Buffer
+	// imageReader中消费的前缀同时加载到header上
+	mimeType, err := mimetype.DetectReader(io.TeeReader(imageReader, &header))
 	if err != nil {
-		return nil, errors.WithMessagef(err, "read generated image failed")
+		return nil, errors.WithMessagef(err, "detect generated image mime failed")
 	}
+	stream := io.MultiReader(bytes.NewReader(header.Bytes()), imageReader) // 剩余的imageReader
 
-	mimeType := mimetype.Detect(imageData)
 	ext := mimeType.Extension()
 	contentType := mimeType.String()
 	storeKey := formatArtifactStoreKey(payload.NotebookId, artifactId, ext)
-	err = ig.deps.ObjectStorage.UploadObject(ctx, &storage.UploadObjectRequest{
-		Key:         storeKey,
-		Body:        imageData,
-		ContentType: contentType,
-	})
-	if err != nil {
+
+	if err := types.UploadReader(ctx, ig.deps.ObjectStorage, storeKey, contentType, stream); err != nil {
 		return nil, errors.WithMessagef(err, "upload infographic image failed")
 	}
 
-	width, height := decodeImageConfigOrIgnore(imageData)
+	width, height := decodeImageConfigOrIgnore(header.Bytes())
 
 	return &StorageResult{
 		StoreKey:    storeKey,

@@ -408,13 +408,15 @@ func (g *Generator) generatePPTX(
 
 	checkPPTXTool, err := einotoolutils.InferTool(
 		"CheckPPTX",
-		"Use this tool to check a target file is a valid pptx format file. Input is the target filename",
+		"Validate a PPTX file. Input is the filename of the PPTX you just generated. "+
+			"Always call this on your output file before finishing the task. "+
+			"Returns 'OK' if the file is a valid PPTX; otherwise it returns an error message describing what is wrong, "+
+			"and you must fix the file and validate again.",
 		func(ctx context.Context, input *checkPPTXToolInput) (output string, err error) {
 			if err := g.checkPPTXArtifactValid(ctx, sandbox, input.Filename); err != nil {
 				return "", err
-			} else {
-				return "OK", nil
 			}
+			return "OK", nil
 		},
 	)
 	if err != nil {

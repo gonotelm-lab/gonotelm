@@ -8,6 +8,7 @@ import (
 
 	"github.com/cloudwego/eino/components/prompt"
 	einoschema "github.com/cloudwego/eino/schema"
+	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 )
 
 //go:embed title-maker.jinja
@@ -36,5 +37,6 @@ func RenderTitleMaker(ctx context.Context, text string) ([]*einoschema.Message, 
 	if err != nil {
 		return nil, fmt.Errorf("render title maker prompt: %w", err)
 	}
+	msgs = append(msgs, types.BuildTipMessage(""))
 	return msgs, nil
 }

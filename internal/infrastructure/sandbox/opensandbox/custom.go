@@ -2,6 +2,7 @@ package opensandbox
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"strings"
 	"time"
@@ -86,8 +87,8 @@ func (a *CustomSandbox) WriteFile(ctx context.Context, path string, data io.Read
 }
 
 // ReadFile 读取文件全部内容
-func (a *CustomSandbox) ReadFile(ctx context.Context, path string) ([]byte, error) {
-	rc, err := a.ReadFile2(ctx, path)
+func (a *CustomSandbox) ReadFile(ctx context.Context, path string, opts ...entity.SandboxOption) ([]byte, error) {
+	rc, err := a.ReadFile2(ctx, path, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -102,8 +103,13 @@ func (a *CustomSandbox) ReadFile(ctx context.Context, path string) ([]byte, erro
 }
 
 // ReadFile2 读取文件全部内容，返回流式读取器，调用方负责关闭
-func (a *CustomSandbox) ReadFile2(ctx context.Context, path string) (io.ReadCloser, error) {
-	rc, err := a.s.DownloadFile(ctx, path, "") // 指定下载文件全部内容 这个返回的是http.Response.Body
+func (a *CustomSandbox) ReadFile2(ctx context.Context, path string, opts ...entity.SandboxOption) (io.ReadCloser, error) {
+	option := entity.GetSandboxOption(opts...)
+	rangeHeader := ""
+	if option.Bytes > 0 {
+		rangeHeader = fmt.Sprintf("bytes=0-%d", option.Bytes) // 0-N字节
+	}
+	rc, err := a.s.DownloadFile(ctx, path, rangeHeader) // http.header的Range
 	if err != nil {
 		return nil, pkgerr.Wrapf(err, "custom sandbox download file (%s) failed", path)
 	}

@@ -20,13 +20,17 @@ func NormalizeStrings(sources []string) []string {
 	return normalized
 }
 
-// BuildTipMessage constructs an optional user message carrying the user-provided
-// custom tip. It returns nil when the tip is empty, so callers can append it
-// conditionally to the rendered system messages.
+// BuildTipMessage constructs a user message for the rendered prompts.
+// When tip is non-empty it carries the user extra requirement; when tip is empty
+// it still returns a short user message so providers that require a user query
+// (e.g. Agnes) accept the request, and the message stays in agent history.
 func BuildTipMessage(tip string) *einoschema.Message {
 	tip = strings.TrimSpace(tip)
 	if tip == "" {
-		return nil
+		return &einoschema.Message{
+			Role:    einoschema.User,
+			Content: "Please follow the system instructions and proceed.",
+		}
 	}
 
 	return &einoschema.Message{

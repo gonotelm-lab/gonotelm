@@ -13,7 +13,7 @@ import (
 	pkgerr "github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
-const sandboxBindingTTL = 30 * time.Minute
+const sandboxBindingTTL = 60 * time.Minute
 
 func sandboxBindingExpire(spec entity.Spec) time.Duration {
 	if spec.TTL > 0 {

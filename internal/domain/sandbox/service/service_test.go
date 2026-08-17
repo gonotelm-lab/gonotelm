@@ -24,14 +24,18 @@ func (s *stubSandbox) Id() string { return s.id }
 func (s *stubSandbox) Description() entity.SandboxDescription {
 	return entity.SandboxDescription{Id: s.id, Key: s.key, Runtime: "test"}
 }
+
 func (s *stubSandbox) Run(context.Context, entity.Command) (entity.Execution, error) {
 	return entity.Execution{}, nil
 }
 func (s *stubSandbox) WriteFile(context.Context, string, io.Reader) error { return nil }
-func (s *stubSandbox) ReadFile(context.Context, string) ([]byte, error)   { return nil, nil }
-func (s *stubSandbox) ReadFile2(context.Context, string) (io.ReadCloser, error) {
+func (s *stubSandbox) ReadFile(context.Context, string, ...entity.SandboxOption) ([]byte, error) {
 	return nil, nil
 }
+func (s *stubSandbox) ReadFile2(context.Context, string, ...entity.SandboxOption) (io.ReadCloser, error) {
+	return nil, nil
+}
+
 func (s *stubSandbox) ListDir(context.Context, string) ([]entity.ListDirItem, error) {
 	return nil, nil
 }
@@ -161,10 +165,10 @@ func TestGetOrCreateSandbox_DefaultTTLAligned(t *testing.T) {
 	require.NotNil(t, sb)
 
 	require.Equal(t, 1, mgr.createCount)
-	require.Equal(t, 30*time.Minute, mgr.createSpecs[0].TTL)
+	require.Equal(t, 60*time.Minute, mgr.createSpecs[0].TTL)
 
 	key := testKey(t)
-	require.Equal(t, 30*time.Minute, repo.ttls[repo.cacheKey(key)])
+	require.Equal(t, 60*time.Minute, repo.ttls[repo.cacheKey(key)])
 }
 
 func TestGetOrCreateSandbox_ExplicitTTLPropagated(t *testing.T) {

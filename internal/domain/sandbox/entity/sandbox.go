@@ -9,6 +9,27 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 )
 
+type sandBoxOption struct {
+	Bytes int64 // 最多读取的字节数
+}
+
+type SandboxOption func(o *sandBoxOption)
+
+func WithReadMaxBytes(bytes int64) SandboxOption {
+	return func(o *sandBoxOption) {
+		o.Bytes = bytes
+	}
+}
+
+func GetSandboxOption(opts ...SandboxOption) sandBoxOption {
+	o := sandBoxOption{}
+	for _, opt := range opts {
+		opt(&o)
+	}
+
+	return o
+}
+
 // 通用化沙箱抽象
 type Sandbox interface {
 	Id() string
@@ -20,10 +41,10 @@ type Sandbox interface {
 	WriteFile(ctx context.Context, path string, data io.Reader) error
 
 	// ReadFile 读取文件全部内容
-	ReadFile(ctx context.Context, path string) ([]byte, error)
+	ReadFile(ctx context.Context, path string, opts ...SandboxOption) ([]byte, error)
 
-	// ReadFile2 读取文件全部内容 但是返回值不同
-	ReadFile2(ctx context.Context, path string) (io.ReadCloser, error)
+	// ReadFile2 读取全部内容 但是返回值不同
+	ReadFile2(ctx context.Context, path string, opts ...SandboxOption) (io.ReadCloser, error)
 
 	// 列出目录情况
 	ListDir(ctx context.Context, path string) ([]ListDirItem, error)

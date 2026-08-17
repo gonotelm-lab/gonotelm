@@ -410,10 +410,10 @@ func (g *Generator) generatePPTX(
 		"CheckPPTX",
 		"Use this tool to check a target file is a valid pptx format file. Input is the target filename",
 		func(ctx context.Context, input *checkPPTXToolInput) (output string, err error) {
-			if content, err := g.checkPPTXArtifactValid(ctx, sandbox, input.Filename); err != nil {
+			if err := g.checkPPTXArtifactValid(ctx, sandbox, input.Filename); err != nil {
 				return "", err
 			} else {
-				return content, nil
+				return "OK", nil
 			}
 		},
 	)

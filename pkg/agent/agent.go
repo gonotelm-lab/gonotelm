@@ -587,16 +587,17 @@ func (a *Agent[State]) handleToolCalls(
 			resultForCallback[idx].Result = result
 
 			if a.cfg.Verbose {
+				const maxVerboseRune = 150
 				runes := []rune(result)
 				debugResult := result
-				if len(runes) > 50 {
-					debugResult = string(runes[:50]) + "(... truncated)"
+				if len(runes) > maxVerboseRune {
+					debugResult = string(runes[:maxVerboseRune]) + "(... truncated)"
 				}
 
 				argRunes := []rune(toolCall.Function.Arguments)
 				debugArgs := toolCall.Function.Arguments
-				if len(argRunes) > 50 {
-					debugArgs = string(argRunes[:50]) + "(... truncated)"
+				if len(argRunes) > maxVerboseRune {
+					debugArgs = string(argRunes[:maxVerboseRune]) + "(... truncated)"
 				}
 
 				slog.DebugContext(ctx, "tool call finished",

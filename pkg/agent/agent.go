@@ -543,9 +543,9 @@ func (a *Agent[State]) handleToolCalls(
 
 			if a.cfg.Verbose {
 				slog.DebugContext(ctx, "handling tool call",
-					slog.String("tool_name", toolCall.Function.Name),
-					slog.String("tool_call_id", toolCall.ID),
-					slog.String("tool_call_arguments", string(toolCall.Function.Arguments)),
+					slog.String("name", toolCall.Function.Name),
+					slog.String("call_id", toolCall.ID),
+					slog.String("call_args", truncateVerbose(toolCall.Function.Arguments)),
 				)
 			}
 
@@ -554,10 +554,10 @@ func (a *Agent[State]) handleToolCalls(
 					panicErr := fmt.Errorf("tool call panic: %v", e)
 					resultForCallback[idx].Error = panicErr
 					slog.ErrorContext(ctx,
-						"handle tool call panic",
+						"handling tool call panic",
 						slog.Any("err", e),
-						slog.String("tool_name", toolCall.Function.Name),
-						slog.String("tool_call_id", toolCall.ID),
+						slog.String("name", toolCall.Function.Name),
+						slog.String("call_id", toolCall.ID),
 						slog.String("stack", string(debug.Stack())),
 					)
 					results[idx].Content = panicErr.Error()
@@ -587,24 +587,11 @@ func (a *Agent[State]) handleToolCalls(
 			resultForCallback[idx].Result = result
 
 			if a.cfg.Verbose {
-				const maxVerboseRune = 150
-				runes := []rune(result)
-				debugResult := result
-				if len(runes) > maxVerboseRune {
-					debugResult = string(runes[:maxVerboseRune]) + "(... truncated)"
-				}
-
-				argRunes := []rune(toolCall.Function.Arguments)
-				debugArgs := toolCall.Function.Arguments
-				if len(argRunes) > maxVerboseRune {
-					debugArgs = string(argRunes[:maxVerboseRune]) + "(... truncated)"
-				}
-
 				slog.DebugContext(ctx, "tool call finished",
-					slog.String("tool_name", toolCall.Function.Name),
-					slog.String("tool_call_id", toolCall.ID),
-					slog.String("tool_call_arguments", debugArgs),
-					slog.String("tool_call_result", debugResult),
+					slog.String("name", toolCall.Function.Name),
+					slog.String("call_id", toolCall.ID),
+					slog.String("call_args", truncateVerbose(toolCall.Function.Arguments)),
+					slog.String("call_result", truncateVerbose(result)),
 				)
 			}
 		})

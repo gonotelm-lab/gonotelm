@@ -108,9 +108,9 @@ func (m *Generator) generate(
 
 	msgs = append([]*einoschema.Message{}, ag.AccumulatedMessages()...)
 	msgs = append(msgs, types.BuildCompensateMessage(output.Content, []string{
-		"JSON 字段必须且仅能包含 title 和 mindmap",
-		"title 长度必须为 10-30 字",
-		"mindmap 必须是完整 mermaid mindmap 代码块字符串",
+		"JSON must contain only `title` and `mindmap`",
+		"`title` length must be 10-30 characters",
+		"`mindmap` must be a complete mermaid mindmap code-block string",
 	}))
 
 	llmResp, genErr := ag.BaseLLM().Generate(ctx, msgs, llmOptions...)

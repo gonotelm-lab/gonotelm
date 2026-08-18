@@ -68,11 +68,11 @@ func formatNotebookInfo(name, description string) string {
 
 	switch {
 	case name != "" && description != "":
-		return fmt.Sprintf("名称：%s\n描述：%s", name, description)
+		return fmt.Sprintf("Name：%s\nDescription：%s", name, description)
 	case name != "":
-		return fmt.Sprintf("名称：%s", name)
+		return fmt.Sprintf("Name：%s", name)
 	case description != "":
-		return fmt.Sprintf("描述：%s", description)
+		return fmt.Sprintf("Description：%s", description)
 	default:
 		return ""
 	}

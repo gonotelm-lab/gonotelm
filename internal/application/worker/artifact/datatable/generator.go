@@ -126,13 +126,13 @@ func (g *Generator) generate(
 
 func dataTableCompensateRules(validateErr error) []string {
 	rules := []string{
-		"只输出一张 GFM Markdown pipe table，不要任何解释文字",
-		"不要使用 ``` 代码围栏包裹",
-		"必须包含表头行、分隔行（---|---）和至少一行数据",
-		"各行列数必须一致，且不得包含表格以外的段落/标题/列表",
+		"Output only one GFM Markdown pipe table, with no explanatory text",
+		"Do not wrap the table in ``` code fences",
+		"Must include a header row, a separator row (---|---), and at least one data row",
+		"All rows must have the same column count; no paragraphs/headings/lists outside the table",
 	}
 	if validateErr != nil {
-		rules = append(rules, "上次失败原因："+validateErr.Error())
+		rules = append(rules, "Previous failure reason: "+validateErr.Error())
 	}
 	return rules
 }

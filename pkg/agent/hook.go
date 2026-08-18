@@ -6,7 +6,7 @@ import (
 	einoschema "github.com/cloudwego/eino/schema"
 )
 
-const FinalRoundInstruction = "IMPORTANT: 这轮输出是你最后一轮输出，请直接输出最终结果，**不需要再进行工具调用**，按照你已有的信息输出最终结果"
+const FinalRoundInstruction = "IMPORTANT: This is your final round. Output the final result directly based on what you already have. **Do not make any more tool calls.**"
 
 func NewFinalRoundHook[T any](
 	ag *Agent[T],

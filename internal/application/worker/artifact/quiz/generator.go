@@ -85,16 +85,16 @@ func (g *Generator) llmOptions() []einomodel.Option {
 
 func quizCompensateRules(validateErr error) []string {
 	rules := []string{
-		"JSON 字段必须且仅能包含 title 和 quiz",
-		"quiz 必须包含 questions、themes、follow_up_hint",
-		"每题 options 必须恰好 4 个，且每个选项非空",
-		"answer_index 不得为空，元素必须为 0-3 的整数且不重复、不越界",
-		"每题必须包含非空 explanation（答案解析，说明为何正确/为何干扰项错误）",
-		"必须先单选（answer_index 长度 1）再多选（长度 >= 2）",
-		"title 长度建议为 10-30 字",
+		"JSON must contain only `title` and `quiz`",
+		"`quiz` must include `questions`, `themes`, and `follow_up_hint`",
+		"each question must have exactly 4 non-empty `options`",
+		"`answer_index` must be non-empty; values must be unique integers in 0-3",
+		"each question must include a non-empty `explanation` (why correct / why distractors are wrong)",
+		"single-choice first (`answer_index` length 1), then multi-choice (length >= 2)",
+		"`title` length preferably 10-30 characters",
 	}
 	if validateErr != nil {
-		rules = append(rules, "上次校验失败原因："+validateErr.Error())
+		rules = append(rules, "Previous validation error: "+validateErr.Error())
 	}
 	return rules
 }

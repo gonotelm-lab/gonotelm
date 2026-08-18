@@ -187,9 +187,9 @@ func (ig *Generator) generateImagePrompt(
 
 	msgs = append([]*einoschema.Message{}, ag.AccumulatedMessages()...)
 	msgs = append(msgs, types.BuildCompensateMessage(output.Content, []string{
-		"JSON 字段必须且仅能包含 title 和 image_prompt",
-		"title 长度必须为 10-30 字",
-		"image_prompt 必须为完整文生图 prompt 字符串",
+		"JSON must contain only `title` and `image_prompt`",
+		"`title` length must be 10-30 characters",
+		"`image_prompt` must be a complete text-to-image prompt string",
 	}))
 
 	llmResp, genErr := ag.BaseLLM().Generate(ctx, msgs, modelOption)

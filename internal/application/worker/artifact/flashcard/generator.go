@@ -131,10 +131,10 @@ func (g *Generator) generate(
 
 	msgs = append([]*einoschema.Message{}, ag.AccumulatedMessages()...)
 	msgs = append(msgs, types.BuildCompensateMessage(output.Content, []string{
-		"JSON 字段必须且仅能包含 title 和 flashcard",
-		"flashcard 必须仅包含 cards 数组",
-		"每张卡必须包含 front、back、hint；front 与 back 不能为空",
-		"title 长度建议为 10-30 字",
+		"JSON must contain only `title` and `flashcard`",
+		"`flashcard` must contain only a `cards` array",
+		"each card must include `front`, `back`, and `hint`; `front` and `back` must be non-empty",
+		"`title` length preferably 10-30 characters",
 	}))
 
 	llmResp, genErr := ag.BaseLLM().Generate(ctx, msgs, llmOptions...)

@@ -246,9 +246,9 @@ func (g *Generator) generateOutline(ctx context.Context, req *types.Request, sou
 
 func slidesOutlineCompensateRules(validateErr error) []string {
 	rules := []string{
-		"JSON 字段必须且仅能包含 title 和 outline",
-		"title 为 PPT 标题，长度建议 10-30 字",
-		"outline 为 Markdown 格式大纲字符串",
+		"JSON must contain only `title` and `outline`",
+		"`title` is the PPT title, preferably 10-30 characters",
+		"`outline` is a Markdown outline string",
 	}
 	if validateErr != nil {
 		rules = append(rules, "Error: "+validateErr.Error())

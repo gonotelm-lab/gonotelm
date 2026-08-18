@@ -54,15 +54,12 @@ func (r *Generator) generate(
 		modelOption         = chat.WithModel(reportModel)
 		maxRound            = conf.WorkerGlobal().Studio.Report.MaxRound
 		style               = artifactentity.ReportStyleDefaultStyle()
-		language            = artifactentity.LanguageAuto
 	)
 
 	p := artifactentity.PayloadAs[*artifactentity.ReportPayload](req.Payload)
 	if p.Style.Supported() {
 		style = p.Style
 	}
-	language = p.Language
-	tip := p.GetTip()
 
 	ag, err := types.BuildSourceExploreAgent(
 		r.deps,
@@ -79,7 +76,7 @@ func (r *Generator) generate(
 	}
 
 	sourceIds := types.SourceIDsToStrings(req.SourceIds)
-	msgs, err := RenderReport(ctx, sourceIds, style, language, tip)
+	msgs, err := RenderReport(ctx, sourceIds, style, p.Language, p.GetTip())
 	if err != nil {
 		return "", errors.Wrapf(errors.ErrInner, "generate report message failed, err=%v", err)
 	}
@@ -98,18 +95,18 @@ func (r *Generator) generateTitle(ctx context.Context, report string, req *types
 	title := ""
 	titleMakerMsgs, err := RenderTitleMaker(ctx, report)
 	if err != nil {
-		slog.ErrorContext(ctx, "generate title maker message failed", slog.Any("err", err))
+		slog.ErrorContext(ctx, "generate title maker message failed", slog.String("artifact_id", req.ArtifactId.String()), slog.Any("err", err))
 	} else {
 		modelOption := chat.WithModel(conf.WorkerGlobal().Studio.Report.Model)
-		llmModel, llmErr := r.deps.LLMGateway.GetProvider(conf.WorkerGlobal().Studio.Report.ModelProvider)
-		if llmErr != nil {
-			slog.ErrorContext(ctx, "get llm provider for title generation failed", slog.Any("err", llmErr))
+		llmModel, err := r.deps.LLMGateway.GetProvider(conf.WorkerGlobal().Studio.Report.ModelProvider)
+		if err != nil {
+			slog.ErrorContext(ctx, "get llm provider for title generation failed", slog.Any("err", err))
 		} else {
-			result, genErr := llmModel.Generate(ctx, titleMakerMsgs, modelOption)
-			if genErr == nil {
+			result, err := llmModel.Generate(ctx, titleMakerMsgs, modelOption)
+			if err == nil {
 				title = strings.TrimSpace(result.Content)
 			} else {
-				slog.ErrorContext(ctx, "generate title failed", slog.Any("err", genErr))
+				slog.ErrorContext(ctx, "generate title failed", slog.Any("err", err))
 			}
 		}
 		if title == "" {

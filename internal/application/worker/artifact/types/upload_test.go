@@ -62,28 +62,6 @@ func TestUploadReader_DoesNotCloseSource(t *testing.T) {
 	require.Equal(t, []byte("x"), up.body)
 }
 
-func TestPeekPrefix_ReassemblesFullStream(t *testing.T) {
-	src := strings.NewReader("abcdefghij")
-	prefix, full, err := PeekPrefix(src, 4)
-	require.NoError(t, err)
-	require.Equal(t, []byte("abcd"), prefix)
-
-	all, err := io.ReadAll(full)
-	require.NoError(t, err)
-	require.Equal(t, []byte("abcdefghij"), all)
-}
-
-func TestPeekPrefix_ShortSource(t *testing.T) {
-	src := strings.NewReader("hi")
-	prefix, full, err := PeekPrefix(src, 8)
-	require.NoError(t, err)
-	require.Equal(t, []byte("hi"), prefix)
-
-	all, err := io.ReadAll(full)
-	require.NoError(t, err)
-	require.Equal(t, []byte("hi"), all)
-}
-
 // discardUploader 只消费上传体，不把整份对象留在内存，避免上传侧掩盖对比结果。
 type discardUploader struct{}
 

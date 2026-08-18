@@ -1,7 +1,6 @@
 package types
 
 import (
-	"bytes"
 	"context"
 	"io"
 
@@ -51,25 +50,4 @@ func UploadReader(
 		return errors.Wrapf(uploadErr, "upload object failed, key=%s", key)
 	}
 	return nil
-}
-
-// PeekPrefix 预读最多 n 字节，并返回可再次读出「完整原文」的 Reader（prefix + 剩余流）。
-// 若原文不足 n 字节，full 仅包含已读内容。
-func PeekPrefix(r io.Reader, n int) (prefix []byte, full io.Reader, err error) {
-	if n <= 0 {
-		return nil, r, nil
-	}
-
-	buf := make([]byte, n)
-	nr, readErr := io.ReadFull(r, buf)
-	prefix = buf[:nr]
-
-	switch {
-	case readErr == nil:
-		return prefix, io.MultiReader(bytes.NewReader(prefix), r), nil
-	case readErr == io.EOF || readErr == io.ErrUnexpectedEOF:
-		return prefix, bytes.NewReader(prefix), nil
-	default:
-		return nil, nil, readErr
-	}
 }

@@ -24,7 +24,7 @@ GoNoteLM is an AI-powered learning and knowledge-management platform. Create not
 - **Notebooks** — Organize study materials into notebooks.
 - **Source Ingestion** — Add text, URLs, or upload files (PDF, Markdown, EPUB, Word, CSV, XLSX) for AI processing.
 - **Agentic RAG Chat** — Multi-turn conversations with AI that can search, read, cite, and analyze your sources in real-time. Supports streaming responses, thinking mode, and multiple chat styles.
-- **AI Studio** — Generate learning artifacts from your sources: Mindmap, Report, Infographic, Audio Overview, Flashcard, Quiz, and DataTable. You can also save an assistant chat reply as a Note artifact.
+- **AI Studio** — Generate learning artifacts from your sources: Mindmap, Report, Infographic, Audio Overview, Flashcard, Quiz, DataTable, and Slides. You can also save an assistant chat reply as a Note artifact.
 
 ## Studio Showcase
 

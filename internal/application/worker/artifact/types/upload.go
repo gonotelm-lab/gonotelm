@@ -10,6 +10,7 @@ import (
 
 // UploadReader 将 src 流式上传到对象存储（pipe 边读边写，不整包进内存）。
 // 不关闭 src，所有权仍在调用方。
+// 对于需要将大量数据从一个reader搬移到另一个reader的的场景较为有效
 func UploadReader(
 	ctx context.Context,
 	sto storage.ObjectUploader,

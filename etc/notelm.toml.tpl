@@ -154,7 +154,6 @@ apiKey = "${GONOTELM_DEEPSEEK_API_KEY}"
 timeout = "${GONOTELM_DEEPSEEK_TIMEOUT:-5m}"
 baseUrl = "${GONOTELM_DEEPSEEK_BASE_URL:-https://api.deepseek.com}"
 model = "${GONOTELM_DEEPSEEK_MODEL:-deepseek-v4-flash}"
-maxTokens = ${GONOTELM_DEEPSEEK_MAX_TOKENS:-16384}
 thinkingEnabled = false
 
 [provider.openai]
@@ -162,7 +161,6 @@ apiKey = "${GONOTELM_OPENAI_API_KEY:-}"
 baseUrl = "${GONOTELM_OPENAI_BASE_URL:-https://api.openai.com/v1}"
 model = "${GONOTELM_OPENAI_MODEL:-gpt-4o-mini}"
 timeout = "${GONOTELM_OPENAI_TIMEOUT:-5m}"
-maxTokens = ${GONOTELM_OPENAI_MAX_TOKENS:-16384}
 temperature = ${GONOTELM_OPENAI_TEMPERATURE:-1.0}
 reasoningEffort = "${GONOTELM_OPENAI_REASONING_EFFORT:-}"
 
@@ -171,7 +169,6 @@ apiKey = "${GONOTELM_DASHSCOPE_API_KEY:-}"
 baseUrl = "${GONOTELM_QWEN_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}"
 model = "${GONOTELM_QWEN_MODEL:-glm-5.1}"
 timeout = "${GONOTELM_QWEN_TIMEOUT:-5m}"
-maxTokens = ${GONOTELM_QWEN_MAX_TOKENS:-16384}
 temperature = ${GONOTELM_QWEN_TEMPERATURE:-1.0}
 topP = ${GONOTELM_QWEN_TOP_P:-1.0}
 enableThinking = ${GONOTELM_QWEN_ENABLE_THINKING:-false}
@@ -181,7 +178,6 @@ apiKey = "${GONOTELM_AGNES_API_KEY:-}"
 baseUrl = "${GONOTELM_AGNES_BASE_URL:-https://apihub.agnes-ai.com/v1}"
 model = "${GONOTELM_AGNES_MODEL:-agnes-2.0-flash}"
 timeout = "${GONOTELM_AGNES_TIMEOUT:-5m}"
-maxTokens = ${GONOTELM_AGNES_MAX_TOKENS:-16384}
 temperature = ${GONOTELM_AGNES_TEMPERATURE:-1.0}
 topP = ${GONOTELM_AGNES_TOP_P:-1.0}
 

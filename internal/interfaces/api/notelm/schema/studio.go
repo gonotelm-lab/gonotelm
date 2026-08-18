@@ -157,7 +157,9 @@ type GenerateDataTableParameters struct {
 }
 
 type GenerateSlidesParameters struct {
-	Tip string `json:"tip,omitempty"`
+	Tip         string                           `json:"tip,omitempty"`
+	VisualStyle artifactentity.SlidesVisualStyle `json:"visual_style,omitempty"`
+	Language    artifactentity.Language          `json:"language,omitempty"`
 }
 
 // 将对话内容保存为笔记
@@ -232,7 +234,9 @@ type DataTableExtras struct {
 }
 
 type SlidesExtras struct {
-	Tip string `json:"tip"`
+	Tip         string `json:"tip"`
+	VisualStyle string `json:"visual_style"`
+	Language    string `json:"language"`
 }
 
 type NoteExtras struct {
@@ -302,7 +306,9 @@ func ToArtifactItem(a *artifactentity.Artifact) *ArtifactItem {
 	case *artifactentity.SlidesPayload:
 		r.SourceIds = p.SourceIds
 		r.Extras = &SlidesExtras{
-			Tip: p.Tip,
+			Tip:         p.Tip,
+			VisualStyle: p.GetVisualStyle().String(),
+			Language:    string(p.GetLanguage()),
 		}
 	case *artifactentity.NotePayload:
 		r.Extras = &NoteExtras{
@@ -444,7 +450,9 @@ func (r *GenerateSlidesParameters) ToPayload() *artifactentity.SlidesPayload {
 	}
 
 	return &artifactentity.SlidesPayload{
-		Tip: r.Tip,
+		Tip:         r.Tip,
+		VisualStyle: r.VisualStyle,
+		Language:    r.Language,
 	}
 }
 

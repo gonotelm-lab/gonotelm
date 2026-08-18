@@ -89,14 +89,14 @@ func (g *Generator) Generate(ctx context.Context, req *types.Request) (*types.Re
 	}, nil
 }
 
-func (g *Generator) llmOptions(jsonObject bool) []einomodel.Option {
+func (g *Generator) llmOptions(jsonObject bool, thinking bool) []einomodel.Option {
 	var (
 		provider = conf.WorkerGlobal().Studio.Slides.ModelProvider
 		model    = conf.WorkerGlobal().Studio.Slides.Model
 	)
 	opts := []einomodel.Option{
 		chat.WithModel(model),
-		chat.WithThinking(provider, false),
+		chat.WithThinking(provider, thinking),
 	}
 	if jsonObject {
 		opts = append(opts, chat.WithResponseJsonObject(provider))
@@ -104,7 +104,7 @@ func (g *Generator) llmOptions(jsonObject bool) []einomodel.Option {
 	return opts
 }
 
-func (g *Generator) buildAgent(req *types.Request, maxRound int, jsonObject bool) (*types.Agent, error) {
+func (g *Generator) buildAgent(req *types.Request, maxRound int, jsonObject bool, thinking bool) (*types.Agent, error) {
 	round := conf.WorkerGlobal().Studio.Slides.MaxRound
 	if maxRound > 0 {
 		round = maxRound
@@ -115,7 +115,7 @@ func (g *Generator) buildAgent(req *types.Request, maxRound int, jsonObject bool
 		conf.WorkerGlobal().Studio.Slides.ModelProvider,
 		conf.WorkerGlobal().Studio.Slides.Model,
 		round,
-		g.llmOptions(jsonObject),
+		g.llmOptions(jsonObject, thinking),
 		req.NotebookId,
 		req.SourceIds,
 		true,
@@ -174,13 +174,13 @@ func (g *Generator) loadOutlineSources(ctx context.Context, sourceIds []valobj.I
 func (g *Generator) generateOutline(ctx context.Context, req *types.Request, sources []OutlineSource) (*slidesOutlineExpectation, error) {
 	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioSlidesScene)
 
-	agent, err := g.buildAgent(req, 0, true)
+	agent, err := g.buildAgent(req, 0, true, false) // 大纲：关 thinking
 	if err != nil {
 		return nil, errors.Wrapf(err, "build source explore agent for slides outline failed, err=%v", err)
 	}
 
-	tip := artifactentity.PayloadAs[*artifactentity.SlidesPayload](req.Payload).GetTip()
-	msgs, err := RenderSlidesOutline(ctx, sources, tip)
+	payload := artifactentity.PayloadAs[*artifactentity.SlidesPayload](req.Payload)
+	msgs, err := RenderSlidesOutline(ctx, sources, payload.GetLanguage(), payload.GetTip())
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "generate slides outline message failed, err=%v", err)
 	}
@@ -214,7 +214,7 @@ func (g *Generator) generateOutline(ctx context.Context, req *types.Request, sou
 		compensateMsgs := append([]*einoschema.Message{}, msgs...)
 		compensateMsgs = append(compensateMsgs, types.BuildCompensateMessage(lastContent, slidesOutlineCompensateRules(lastErr)))
 
-		llmResp, genErr := agent.BaseLLM().Generate(ctx, compensateMsgs, g.llmOptions(true)...)
+		llmResp, genErr := agent.BaseLLM().Generate(ctx, compensateMsgs, g.llmOptions(true, false)...)
 		if genErr != nil {
 			return nil, errors.Wrapf(errors.ErrLLM,
 				"slides outline compensate generate failed on attempt %d, err=%v",
@@ -237,9 +237,8 @@ func (g *Generator) generateOutline(ctx context.Context, req *types.Request, sou
 	}
 
 	return nil, errors.Wrapf(errors.ErrLLM,
-		"slides outline agent output invalid after %d retries, last_output=%q, err=%v",
+		"slides outline agent output invalid after %d retries, err=%v",
 		slidesMaxCompensateRetry,
-		lastContent,
 		lastErr,
 	)
 }
@@ -268,13 +267,13 @@ func parseAgentOutput(ctx context.Context, content string) (*slidesOutlineExpect
 		LogOnDirectFailure: func(err error, _ []byte) {
 			slog.DebugContext(ctx, "slides outline direct unmarshal did not match, fallback to json extraction",
 				slog.Any("err", err),
-				slog.String("raw_content", content))
+				slog.String("raw_content", types.TruncateForLog(content)))
 		},
 	}
 	if err := decoder.Unmarshal(pkgstring.AsBytes(content), &expect); err != nil {
 		slog.WarnContext(ctx, "slides outline output unmarshal failed after compatibility fallback",
 			slog.Any("err", err),
-			slog.String("raw_content", content))
+			slog.String("raw_content", types.TruncateForLog(content)))
 		return nil, err
 	}
 
@@ -401,7 +400,8 @@ func (g *Generator) generatePPTX(
 	sandbox sandboxent.Sandbox,
 	sources []OutlineSource,
 ) (*SlidesStorageResult, error) {
-	agent, err := g.buildAgent(req, conf.WorkerGlobal().Studio.Slides.GenerateMaxRound, false)
+	// use thinking in pptx generation, it will take much longer
+	agent, err := g.buildAgent(req, conf.WorkerGlobal().Studio.Slides.GenerateMaxRound, false, true) 
 	if err != nil {
 		return nil, errors.WithMessage(err, "build generate pptx agent failed")
 	}
@@ -443,12 +443,15 @@ func (g *Generator) generatePPTX(
 		return nil, err
 	}
 	outputLocation := path.Join(workspaceDir, "slides", "output", "presentation.pptx")
+	payload := artifactentity.PayloadAs[*artifactentity.SlidesPayload](req.Payload)
 	msgs, err := RenderSlides(ctx,
 		outlineExp.Title, outlineExp.Outline,
 		sources,
 		sandboxDesc.Runtime, workspaceDir,
 		outputLocation,
-		artifactentity.PayloadAs[*artifactentity.SlidesPayload](req.Payload).GetTip(),
+		payload.GetVisualStyle(),
+		payload.GetLanguage(),
+		payload.GetTip(),
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "gen pptx render prompts failed")

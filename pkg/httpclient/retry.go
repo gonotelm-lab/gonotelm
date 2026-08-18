@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log/slog"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -64,7 +65,7 @@ func WithRetryMaxDelay(d time.Duration) RetryOption {
 func NewRetryRoundTripper(maxRetries int, next http.RoundTripper, opts ...RetryOption) *RetryRoundTripper {
 	r := &RetryRoundTripper{
 		maxRetries: maxRetries,
-		baseDelay:  1 * time.Millisecond,
+		baseDelay:  500 * time.Millisecond,
 		maxDelay:   10 * time.Second,
 		next:       next,
 	}
@@ -106,7 +107,10 @@ func (r *RetryRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 			_ = resp.Body.Close()
 		}
 
-		if err := r.backoffSleep(req.Context(), attempt); err != nil {
+		delay := r.computeBackoff(attempt)
+		r.logRetry(req, attempt, delay, err, resp)
+
+		if err := r.backoffSleep(req.Context(), delay); err != nil {
 			return nil, err
 		}
 
@@ -120,13 +124,45 @@ func (r *RetryRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 	}
 }
 
+func (r *RetryRoundTripper) logRetry(
+	req *http.Request,
+	attempt int,
+	delay time.Duration,
+	err error,
+	resp *http.Response,
+) {
+	attrs := []any{
+		slog.Int("attempt", attempt),
+		slog.Int("max_retries", r.maxRetries),
+		slog.Duration("backoff", delay),
+	}
+	if req != nil {
+		attrs = append(attrs, slog.String("method", req.Method))
+		if req.URL != nil {
+			attrs = append(attrs, slog.String("url", req.URL.String()))
+		}
+	}
+	if err != nil {
+		attrs = append(attrs, slog.Any("err", err))
+	}
+	if resp != nil {
+		attrs = append(attrs, slog.Int("status", resp.StatusCode))
+	}
+
+	ctx := context.Background()
+	if req != nil {
+		ctx = req.Context()
+	}
+	slog.WarnContext(ctx, "http client retrying request", attrs...)
+}
+
 func (r *RetryRoundTripper) shouldRetryStatus(code int) bool {
 	return code == 0 || code >= http.StatusInternalServerError
 }
 
 func (r *RetryRoundTripper) shouldRetry(err error, resp *http.Response) bool {
 	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) { // ctx此时已经Done了，同一个ctx重试无意义
 			return false
 		}
 		var urlErr *url.Error
@@ -136,21 +172,32 @@ func (r *RetryRoundTripper) shouldRetry(err error, resp *http.Response) bool {
 		return true
 	}
 
-	if resp != nil && resp.StatusCode >= http.StatusInternalServerError {
+	if resp != nil && (resp.StatusCode >= http.StatusInternalServerError ||
+		resp.StatusCode == http.StatusTooManyRequests ||
+		resp.StatusCode == http.StatusRequestTimeout) {
 		return true
 	}
 
 	return false
 }
 
-func (r *RetryRoundTripper) backoffSleep(ctx context.Context, attempt int) error {
-	delay := r.baseDelay * (1 << (attempt - 1))
-	if delay > r.maxDelay {
-		delay = r.maxDelay
+func (r *RetryRoundTripper) computeBackoff(attempt int) time.Duration {
+	delay := min(r.baseDelay*(1<<(attempt-1)), r.maxDelay)
+	if delay <= 0 {
+		return 0
 	}
+	half := delay / 2
+	if half <= 0 {
+		return delay
+	}
+	jitter := time.Duration(rand.Int63n(int64(half)))
+	return half + jitter
+}
 
-	jitter := time.Duration(rand.Int63n(int64(delay) / 2))
-	delay = delay/2 + jitter
+func (r *RetryRoundTripper) backoffSleep(ctx context.Context, delay time.Duration) error {
+	if delay <= 0 {
+		return nil
+	}
 
 	timer := time.NewTimer(delay)
 	defer timer.Stop()

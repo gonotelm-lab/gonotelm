@@ -55,12 +55,13 @@ func NewManager(ctx context.Context, c Config) (*Manager, error) {
 	if err != nil {
 		return nil, fmt.Errorf("opensandbox invalid endpoint %s, %w", c.Endpoint, err)
 	}
-
+	retryConfig := aliosb.DefaultRetryConfig()
 	osbCfg := aliosb.ConnectionConfig{
 		Domain:     u.Host,
 		Protocol:   u.Scheme,
 		APIKey:     c.ApiKey,
 		HTTPClient: c.HttpClient,
+		Retry:      &retryConfig,
 	}
 
 	lc := aliosb.NewLifecycleClientWithCache(

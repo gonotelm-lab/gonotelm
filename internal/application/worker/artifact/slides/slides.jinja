@@ -37,6 +37,9 @@ const pptxgen = require(path.join(__dirname, "..", "vendor", "standalone.cjs"));
 # 目标
 产出设计统一、无占位符、可打开的 PPTX，路径固定：`{{ OutputLocation }}`。保证工具调用的效率和准确性。
 
+# 输出语言
+幻灯片内所有可见文字须使用 **{{ Language }}**（标题、正文、页脚等）；勿混用其它语言。
+
 # 输入
 
 {% if Title and Title|length > 0 %}
@@ -85,216 +88,202 @@ vendor / require 报错时：**不要排查环境**。确认 `compile.js` 使用
 # 工作流程
 
 1. **预检**：`ListDir` 一次 `{{ WorkspaceDir }}/slides/`，从已有最大编号继续。
-2. **定调**：通读大纲 → 定 N、调色板、风格、页类型（相邻内容页布局勿重复）。
-3. **写页**：`WriteFile` 写缺页（可并行）。
+2. **定调**：通读大纲 → 定 N、调色板、风格、页类型（相邻内容页布局勿重复）；大纲过长处先压缩成板书要点；写页前在脑中过一遍「先算后画」预算。
+3. **写页**：每页 `createSlide` 内先写布局常量与预算，门闩通过后再 `WriteFile`（可并行）。
 4. **编译**：`WriteFile` `compile.js` → `node {{ WorkspaceDir }}/slides/compile.js`。
-5. **QA**：写页时按「布局预算」自检 → `CheckPPTX`（仅验文件格式）；仅失败/硬伤再修再跑；通过即停。
+5. **QA**：核对每页是否先算后画、有无越界 → `CheckPPTX`（仅验文件格式）；仅失败/硬伤再修再跑；通过即停。
 
 # 硬性规范
 
-- **尺寸**：`pres.layout = 'LAYOUT_16x9'`（10" x 5.625"，坐标单位英寸）。
+- **画布**：`pres.layout = 'LAYOUT_16x9'`。从 layout 读取/使用与之对应的 `PAGE_W`、`PAGE_H`（单位随 pptxgen，**禁止**在 prompt 记忆或抄写散落的绝对坐标）。
 - **颜色**：6 位 hex、**无 `#`**（`"FF0000"`）。只用所选调色板；透明度用 `transparency`（0–100），禁止 8 位 hex 编码透明度。
 - **禁止**：渐变、动画、过渡。
 - **字体**：中文 Microsoft YaHei；英文 Arial（或 Georgia / Calibri / Cambria / Trebuchet MS）。**正文/注释禁止加粗**；加粗仅标题/章节头。
-- **页码**（封面除外）：右下角，只显示当前页（`3` 或 `03`，不要 `3/12`）。二选一：
-
-```javascript
-// 圆点
-slide.addShape(pres.shapes.OVAL, { x: 9.3, y: 5.1, w: 0.4, h: 0.4, fill: { color: theme.accent } });
-slide.addText("3", { x: 9.3, y: 5.1, w: 0.4, h: 0.4, fontSize: 12, fontFace: "Arial", color: "FFFFFF", bold: true, align: "center", valign: "middle" });
-
-// 胶囊
-slide.addShape(pres.shapes.ROUNDED_RECTANGLE, { x: 9.1, y: 5.15, w: 0.6, h: 0.35, fill: { color: theme.accent }, rectRadius: 0.15 });
-slide.addText("03", { x: 9.1, y: 5.15, w: 0.6, h: 0.35, fontSize: 11, fontFace: "Arial", color: "FFFFFF", bold: true, align: "center", valign: "middle" });
-```
+- **页码**（封面除外）：放在**页脚带右下**，只显示当前页（`3` 或 `03`，不要 `3/12`）。圆点或胶囊均可；**位置与尺寸必须由本页布局常量推导**（见下），禁止抄写示例里的绝对数。
 
 - **Theme 键（仅此 5 个）**：
 
-| 键 | 用途 | 示例 |
-|----|------|------|
-| `primary` | 标题/最深 | `"22223b"` |
-| `secondary` | 正文 | `"4a4e69"` |
-| `accent` | 强调 | `"9a8c98"` |
-| `light` | 浅强调 | `"c9ada7"` |
-| `bg` | 背景 | `"f2e9e4"` |
+| 键 | 用途 |
+|----|------|
+| `primary` | 标题/最深文字 |
+| `secondary` | 正文/次级文字 |
+| `accent` | 强调色（页码、短条、高亮） |
+| `light` | 浅强调/卡片浅底 |
+| `bg` | 页面背景 |
 
 禁止自造键名（如 `background`、`text`、`muted`）。
 
-# 配色方案
+# 配色方案（仅三套；由请求参数 `visual_style` 选定，当前为 `{{ VisualStyle }}`）
 
-| # | 名称 | 颜色 | 适用 |
-|---|------|------|------|
-| 1 | Modern & Wellness | `006d77` `83c5be` `edf6f9` `ffddd2` `e29578` | 医疗、护肤、瑜伽 |
-| 2 | Business & Authority | `2b2d42` `8d99ae` `edf2f4` `ef233c` `d90429` | 年报、企业、政府 |
-| 3 | Nature & Outdoors | `606c38` `283618` `fefae0` `dda15e` `bc6c25` | 户外、环保、农业 |
-| 4 | Vintage & Academic | `780000` `c1121f` `fdf0d5` `003049` `669bbc` | 学术、历史、博物馆 |
-| 5 | Soft & Creative | `cdb4db` `ffc8dd` `ffafcc` `bde0fe` `a2d2ff` | 母婴、甜点（配深灰字） |
-| 6 | Bohemian | `ccd5ae` `e9edc9` `fefae0` `faedcd` `d4a373` | 婚礼、家装、有机 |
-| 7 | Vibrant & Tech | `8ecae6` `219ebc` `023047` `ffb703` `fb8500` | 运动、路演、青年教育 |
-| 8 | Craft & Artisan | `7f5539` `a68a64` `ede0d4` `656d4a` `414833` | 咖啡、手作、烘焙 |
-| 9 | Tech & Night | `000814` `001d3d` `003566` `ffc300` `ffd60a` | 科技发布（须深色模式） |
-| 10 | Education & Charts | `264653` `2a9d8f` `e9c46a` `f4a261` `e76f51` | 统计、教育、市场 |
-| 11 | Forest & Eco | `dad7cd` `a3b18a` `588157` `3a5a40` `344e41` | 景观、ESG |
-| 12 | Elegant & Fashion | `edafb8` `f7e1d7` `dedbd2` `b0c4b1` `4a5759` | 高定、美妆、杂志 |
-| 13 | Art & Food | `335c67` `fff3b0` `e09f3e` `9e2a2b` `540b0e` | 美食、艺术展 |
-| 14 | Luxury & Mysterious | `22223b` `4a4e69` `9a8c98` `c9ada7` `f2e9e4` | 珠宝、酒店、咨询 |
-| 15 | Pure Tech Blue | `03045e` `0077b6` `00b4d8` `90e0ef` `caf0f8` | 云/AI、医疗、清洁能源 |
-| 16 | Coastal Coral | `0081a7` `00afb9` `fdfcdc` `fed9b7` `f07167` | 旅行、夏日、饮品 |
-| 17 | Vibrant Orange Mint | `ff9f1c` `ffbf69` `ffffff` `cbf3f0` `2ec4b6` | 儿童、促销、快消 |
-| 18 | Platinum White Gold | `0a0a0a` `0070F3` `D4AF37` `f5f5f5` `ffffff` | Agent、企官网、金融科技 |
+键顺序固定为：`primary` `secondary` `accent` `light` `bg`（无 `#` 前缀的 hex）。
 
-选色：勿默认蓝色；深色背景方案须深色模式；文字与背景高对比。
+| 名称 | 颜色 | 气质 |
+|------|------|------|
+| **default**（默认） | `3d405b` `6d6a5f` `e07a5f` `f2cc8f` `faf6ec` | 扁平手绘感、米色/奶油纸张底、温暖教育向 |
+| **educational** | `1e293b` `475569` `0d9488` `e2e8f0` `f8fafc` | 教科书科普：高对比、几何分区清晰、冷静易读 |
+| **cute** | `5b4b6e` `8b7aa0` `f4a4b8` `b8e0d2` `fff8f5` | 粉嫩柔和（粉/薄荷绿/奶油底），治愈轻松 |
 
-# 设计风格
+选色规则：
+- `compile.js` **必须**使用下方按 `visual_style` 注入的 theme，禁止改成其它盘或自造第四套。
+- 文字与 `bg` 须高对比；`cute` 的标题色用 `primary`，勿用过浅粉当正文。
 
-| 风格 | 圆角 | 页边距 | 适用 |
-|------|------|--------|------|
-| Sharp & Compact | 0 ~ 0.05" | 0.3" | 数据密、表格、报告 |
-| Soft & Balanced | 0.08" ~ 0.12" | 0.4" | 企业通用 |
-| Rounded & Spacious | 0.15" ~ 0.25" | 0.5" | 产品、营销 |
-| Pill & Airy | 0.3" ~ 0.5" | 0.6" | 品牌发布 |
+# 设计风格（与 `visual_style={{ VisualStyle }}` 绑定；整份 PPT 只用本风格，禁止混用其它档）
 
-- 外容器圆角 ≥ 内层；Pill：`rectRadius = 高度/2`。
+边距、圆角、间距一律用 **相对 `PAGE_W` / `PAGE_H`（或相对卡片短边）的比例** 在代码里算出，再用于绘制。全文比例选定后保持一致。
+
+{% if VisualStyle == "educational" %}
+**本套：Sharp & Compact（教科书科普）**
+- 页边距：偏紧（约为短边一小份）；元素间距与边距同量级
+- 圆角：直角或相对卡片短边极小比例（可用 `RECTANGLE`）
+- 气质：高对比、几何分区清晰、信息偏密、冷静易读；少装饰圆/气泡
+{% elif VisualStyle == "cute" %}
+**本套：Rounded & Spacious（治愈轻松）**
+- 页边距：偏松；元素间距与边距同量级
+- 圆角：相对卡片短边明显偏大；胶囊页码可用 Pill（`rectRadius = 高度/2`）
+- 气质：圆润柔和、留白充足、轻装饰，勿做成尖锐报表风
+{% else %}
+**本套：Soft & Balanced（默认，温暖教育向）**
+- 页边距与间距取中等；选定比例后全程一致
+- 圆角适中（外容器 ≥ 内层）
+- 气质：扁平手绘感、均衡留白、温和清晰
+{% endif %}
+
 - 圆角仅 `ROUNDED_RECTANGLE`；圆角容器勿叠矩形色条作顶边（对齐分隔用独立 `RECTANGLE` 短条即可）。
-- 元素间距选定 0.3" 或 0.5" 后全程统一。
 
-# 画布几何（由 LAYOUT_16x9 推导，勿死记散落坐标）
+# 先算后画（强制；违反即失败）
+
+每个 `createSlide` **必须**分三段，**算完再 `addShape`/`addText`**。禁止凭感觉写死散落坐标。
 
 ```text
-PAGE_W = 10.0
-PAGE_H = 5.625
-FOOTER_H ≈ 0.55          → 页脚保留带（页码 / 极短来源）
-contentBottom = PAGE_H - FOOTER_H ≈ 5.07   （实现取 ≤ 4.95 更稳）
-contentTop    ≈ 页边距 + 标题区高度后的首块 y
+① 画布与边距
+   PAGE_W, PAGE_H          ← 与 LAYOUT_16x9 一致
+   marginX, marginY        ← 按本套风格用 PAGE 比例自定
+   footerH                 ← 页脚带高度（PAGE_H 的一小份）
+   contentLeft  = marginX
+   contentRight = PAGE_W - marginX
+   contentWidth = contentRight - contentLeft
+   contentBottom = PAGE_H - footerH
+   // 任意内容元素：x≥contentLeft, x+w≤contentRight, y+h≤contentBottom
+   // 页脚带仅页码（及可选极短来源）；任意元素 y+h ≤ PAGE_H
+
+② 本页结构预算（**优先用游标 / 剩余高度**，不要用互不相关的百分比硬叠）
+   titleY, titleH
+   let cursorY = titleY + titleH + gapAfterTitle
+   contentBottom 固定后：每一水平带只吃「当前剩余」
+     remaining = contentBottom - cursorY
+     画完一带：cursorY += bandH + gapY
+   // 单带内纵向 N 项：
+   step = remaining / N; cardH = step - gapY
+   // 横向 K 列：
+   colW = (contentWidth - (K-1)*gapX) / K
+   // 页码：仅用页脚带推导，不占用 cursorY
+
+   **嵌套规则（高频事故，必须遵守）**
+   父容器确定后先定 inner：
+     innerTop = parentY + pad
+     innerBottom = parentY + parentH - pad
+     innerH = innerBottom - innerTop
+   子列表 / 子卡只能在 [innerTop, innerBottom] 内分配：
+     childStep = innerH / n  （或先扣掉标题带高度再除）
+   禁止：子项起点已在 parent 中部，却仍用「整段 parentH - pad」当 usable → 必溢出。
+   禁止：外卡 height = 整段 usableH，同时又在卡内下部叠一条「底栏 strip」且未先从 usableH 扣掉 stripH。
+   多水平带（上卡+中条+下区）：先按剩余依次切 bandH，最后一带 = contentBottom - cursorY。
+
+③ 可行性门闩（不通过则禁止开画）
+   任一元素：x≥contentLeft, x+w≤contentRight, y≥0, y+h≤contentBottom（页码可在页脚带）
+   子元素完全在父 inner 内；内容框互不重叠（底衬叠字除外）
+   放不下 → 减 N/K、删字、拆页；禁止压 gap、禁止画进页脚带
 ```
 
 | 带 | 含义 | 谁能放 |
 |----|------|--------|
-| 内容区 | `y ∈ [contentTop, contentBottom]`，`x` 落在页边距内 | 标题下的全部正文/卡片/图表 |
-| 页脚带 | `y ∈ [contentBottom, PAGE_H]` | **仅**页码；可选一行极短来源（勿与页码抢同一矩形） |
-| 页码锚点 | 右下角小胶囊/圆点（见上方模板） | 页码专用 |
+| 内容区 | 标题下至 `contentBottom`，`x` 在左右边距内 | 正文/卡片/图表 |
+| 页脚带 | `contentBottom`～`PAGE_H` | **仅**页码；可选一行极短来源 |
+| 页码 | 由 `PAGE_*` / `footerH` / `contentRight` 推导 | 页码专用 |
 
-封面/章节分隔可略放宽边距，但仍须 `任意元素 y+h ≤ PAGE_H`，且装饰圆不得压住文字。
+## 循环不变量
 
-# 布局预算（写页前必算，普适任意 N）
-
-每个 shape/text 视为轴对齐矩形。内容框 **禁止相交**（装饰底圆可例外，但不得压字）。  
-仅允许「底衬 → 其上文字/图标」叠放；子元素须完全在父容器 `inner` 内：
-
-```text
-card(x=C,y=R,w=W,h=H), pad=P → inner(x=C+P, y=R+P, w=W-2P, h=H-2P)
-```
-
-## 纵向堆叠（N 项卡片/列表行）
-
-```text
-gap ≥ 0.15"（推荐 0.2"–0.3"）
-usableH = contentBottom - y0
-step    = usableH / N          // 含卡高+间隙的步进
-cardH   = step - gap
-约束: cardH ≥ 最小可读高（单行≈0.45，双行≈0.7，三行≈1.0）
-若 cardH 不够 → 减 N / 缩短文案 / 降字号 / 拆页；禁止缩小 gap 到重叠，禁止把最后一项画进页脚带
-最后一项: y0 + (N-1)*step + cardH ≤ contentBottom
-```
-
-## 横向分列（K 列）
-
-```text
-gap ≥ 0.25"
-usableW = PAGE_W - 左右页边距合计
-colW    = (usableW - (K-1)*gap) / K
-第 i 列: x_i = x0 + i * (colW + gap)    // i=0..K-1
-```
-
-## 循环布局不变量（高频事故）
-
-`forEach` / `for` **每一轮必须推进坐标**（改 `x` 或改 `y`，或按索引用公式算）：
+`forEach` / `for` **每一轮用公式推进**（`y_i` / `x_i` / `cursorY`），禁止循环内写死同一坐标。
 
 ```javascript
-// ✅ 竖排
-items.forEach((it, i) => {
-  const y = y0 + i * step;
-  // ... shapes/texts at y ...
+// 纵向：用游标或 step
+let y = y0;
+items.forEach((it) => {
+  // draw at y with height cardH
+  y += step;
 });
-
-// ✅ 横排 / 双列
+// 横向
 items.forEach((it, i) => {
-  const x = x0 + i * (colW + gap);
-  // ... shapes/texts at x ...
+  const x = contentLeft + i * (colW + gapX);
 });
-
-// ❌ 禁止：循环体内坐标写死、或只赋值未参与绘制
-// items.forEach((it) => { addShape({ x: 0.6, y: 3.5, ... }); /* 每轮同一位置 → 叠卡 */ });
 ```
 
-小节标题与其下首块：`首块.y ≥ 标题.y + 标题.h + 0.15`（禁止标题框与首卡共用同一起始 y）。
+小节标题与其下首块：首块起点 ≥ 标题底边 + 间隙。
 
-## 间距下限
+## 反模式（实装中已出现，看到就改）
 
-| 规则 | 下限 |
-|------|------|
-| 列/卡片间隙 | ≥ 0.25" |
-| 标题与下方首块 | ≥ 0.2" |
-| 任意两内容框 | ≥ 0.15" |
-| 容器 padding 左/右 | ≥ 0.2"（紧凑 ≥ 0.15"） |
-| 容器 padding 上/下 | ≥ 0.15"（多行 ≥ 0.2"） |
+1. **先画后算**：未写布局常量就 `addText`/`addShape`。
+2. **魔法坐标**：抄绝对 `x/y/w/h`，或循环内坐标不递增。
+3. **嵌套双重计价**：子栈起点在父中部，usable 却按整段父高计算 → 末项越出 `contentBottom`。
+4. **满高卡 + 底 strip**：`rowH = usableH` 后再画 `stripY = y0 + 0.72*rowH`，与卡内列表重叠/顶出。
+5. **百分比区域互撞**：多个 `* 0.14 / 0.18 / 0.72` 区域未保证之和 ≤ 1，也未扣 pad。
+6. **标题吃首卡 / 双底栏**：标题与首块同 y；或总结条与页码抢页脚。
 
-放不下：减字、降字号或拆页；**禁止**压 padding / 叠框硬塞 / 用 `y: expr` 把块塞进页脚。
+# 文案密度（板书原则，最高优先级之一）
 
-## 反模式（看到就改）
+幻灯片是**演讲提纲**，不是文章摘录。可见文字必须精炼、可一眼扫完。
 
-1. **堆叠溢出**：上面 N-1 项还行，最后一项 `y+h` 越过 `contentBottom` 或与底部总结条相交。
-2. **循环叠卡**：多列意图却每轮同一 `(x,y)`，两张卡完全重合。
-3. **标题吃首卡**：`y0` 与小节标题重叠。
-4. **双底栏**：正文总结条 + 来源 + 页码挤在同一水平带。
-5. **先画后算**：按「感觉」写死 y，再补底部横幅 → 必撞车。正确顺序：定 `contentBottom` → 算 `step/cardH` → 再写坐标。
+| 做 | 不做（严禁） |
+|----|------|
+| 把大纲压缩成短标题 + 少量要点短语 | 把大纲段落 / 长句 / `> 备注` **原样** `addText` 上板 |
+| 一条要点只表达一个意思；能删则删 | 大段说明文、多从句、材料原文粘贴 |
+| 信息过多时：**压缩措辞或拆页** | 靠缩小字号 / 压间距硬塞满页 |
+| 卡片：短标题 + 至多一行副说明 | 卡片内塞满段落或超长列表 |
+| 关键数字可保留（如「+31.8%」） | 一行塞多个互不相关的指标/从句 |
+| 同一行：名称 / 数字 / 短注分工清晰 | 把整句研报结论塞进一行小字 |
 
-# 字号与间距
+- 大纲里的 `> 备注：` **一律不渲染**到幻灯片（留给演讲者，不进 PPT）。
+- 写页时先问：听众能否 3 秒看懂本页？否则继续删字。
+- **正文/注释禁止加粗**（加粗仅标题/章节头/数据大字）。
+# 字号层级（相对关系；具体 pt 按层级自选，保持整份一致）
 
-| 用途 | 字号 (pt) |
-|------|-----------|
-| 注释/来源 | 10–12 |
-| 正文 | 14–16（**多行说明左对齐**；卡片内短标签/数字/单行标题可居中） |
-| 副标题 | 18–22 |
-| 页标题 | 28–36 |
-| 封面/章节大标题 | 44–60 |
-| 数据大字 | 60–96 |
+| 用途 | 相对层级 |
+|------|----------|
+| 注释/来源 | 最小 |
+| 正文 | 小 |
+| 副标题 | 中 |
+| 页标题 | 大 |
+| 封面/章节大标题 | 最大 |
+| 数据强调 | 可大于页标题 |
 
-| 间距 | 推荐 |
-|------|------|
-| 图标–文字 | 0.12"–0.2" |
-| 列表项 | 0.15"–0.25" |
-| 卡片内边距 | ≥ 0.2" |
-| 卡片/列间距 | ≥ 0.25" |
-| 组间距 | 0.3"–0.5" |
-| 大块间距 | 0.5"–0.8" |
-
-页标题下可用 **短 accent 条**（宽约 1.2"–2.0"、高约 0.04"–0.06"，与标题左对齐）；**不要**拉通栏细线，也不要用长装饰线代替留白。
+对齐：多行说明左对齐；卡片内短标签/数字/单行标题可居中。  
+页标题下可用 **短 accent 条**（宽为标题宽的一小段、高度很薄，与标题左对齐）；勿拉通栏细线代替留白。  
+图标与文字、列表项、卡片内边距、列间距：全部用本页已算的 `gapX`/`gapY`/`pad` 表达，勿另写一套绝对尺寸表。
 
 # 页面类型（每页仅一种）
 
 ## 封面 Cover
-大标题 + 副标题 + 日期/场合；左右非对称或居中。主标题 44–60pt（远大于副标题），副标题 18–22pt。
+大标题 + 副标题 + 日期/场合；左右非对称或居中。主标题远大于副标题；位置由「先算后画」居中或分栏公式得出。
 
 ## 目录 TOC
-3–5 章；竖排/双列/侧栏/卡片均可。页标题 28–36pt；章节号醒目，编号格式与分隔页一致（01、02…）。
+若干章；竖排/双列/侧栏/卡片均可。章节号醒目，编号格式与分隔页一致（01、02…）。用纵向/横向预算公式排布。
 
 ## 章节分隔 Section
 章节号 + 标题 + 可选短引言；留白充足，与内容页明显区分；全文分隔页样式一致。
 
 ## 内容 Content（选一子类）
 纯文字（须配图标/图形，禁止纯字）/ 图文 / 数据可视化（须标来源）/ 对比 / 时间线流程 / 图片展示。  
-页标题 28–36pt，正文 14–16pt 左对齐。每页至少一个非文字元素；相邻内容页布局勿相同。
+每页至少一个非文字元素；相邻内容页布局勿相同。正文遵循「文案密度」。
 
 ## 总结 Summary
-要点回顾 / CTA / 联系 / 致谢。收尾语最醒目；语气呼应封面。
+要点回顾 / CTA / 联系 / 致谢。收尾语最醒目；语气呼应封面。回顾宜短。
 
-# Slide 模块模板
+# Slide 模块模板（必须先算后画；游标切带）
 
 ```javascript
 // {{ WorkspaceDir }}/slides/slide-01.js
 const slideConfig = {
-  type: "cover", // cover | toc | section | content | summary
+  type: "content", // cover | toc | section | content | summary
   index: 1,
   title: "演示标题"
 };
@@ -302,17 +291,71 @@ const slideConfig = {
 function createSlide(pres, theme) { // 必须同步，禁止 async
   const slide = pres.addSlide();
   slide.background = { color: theme.bg };
+
+  // ① 画布（比例自定；勿抄绝对坐标）
+  const PAGE_W = 10; // LAYOUT_16x9
+  const PAGE_H = 5.625;
+  const marginX = PAGE_W * 0.05;
+  const marginY = PAGE_H * 0.08;
+  const footerH = PAGE_H * 0.1;
+  const contentLeft = marginX;
+  const contentRight = PAGE_W - marginX;
+  const contentWidth = contentRight - contentLeft;
+  const contentBottom = PAGE_H - footerH;
+
+  // ② 标题带 + 游标
+  const titleY = marginY;
+  const titleH = PAGE_H * 0.1;
+  let cursorY = titleY + titleH + marginY * 0.4;
+
   slide.addText(slideConfig.title, {
-    x: 0.5, y: 2, w: 9, h: 1.2,
-    fontSize: 48, fontFace: "Arial",
-    color: theme.primary, bold: true, align: "center"
+    x: contentLeft, y: titleY, w: contentWidth, h: titleH,
+    fontSize: 28, fontFace: "Arial",
+    color: theme.primary, bold: true, margin: 0
   });
+
+  // 本页要点（精炼）；用剩余高度均分
+  const items = ["要点甲", "要点乙", "要点丙"];
+  const N = items.length;
+  const gapY = marginY * 0.35;
+  const remaining = contentBottom - cursorY;
+  const step = remaining / N;
+  const cardH = step - gapY;
+  // if (cardH 过小) → 减项/拆页后再算；勿硬画
+
+  items.forEach((text, i) => {
+    const y = cursorY + i * step;
+    slide.addText(text, {
+      x: contentLeft, y, w: contentWidth, h: cardH,
+      fontSize: 16, fontFace: "Arial",
+      color: theme.secondary, valign: "middle", margin: 0
+    });
+  });
+
+  // 页码：页脚带右下（非封面）
+  const pn = String(slideConfig.index);
+  const pnW = footerH * 0.9;
+  const pnH = footerH * 0.65;
+  const pnX = contentRight - pnW;
+  const pnY = PAGE_H - footerH + (footerH - pnH) / 2;
+  slide.addShape(pres.shapes.ROUNDED_RECTANGLE, {
+    x: pnX, y: pnY, w: pnW, h: pnH,
+    fill: { color: theme.accent }, rectRadius: pnH / 2
+  });
+  slide.addText(pn, {
+    x: pnX, y: pnY, w: pnW, h: pnH,
+    fontSize: 12, fontFace: "Arial", color: "FFFFFF",
+    bold: true, align: "center", valign: "middle", margin: 0
+  });
+
   return slide;
 }
 
 module.exports = { createSlide, slideConfig };
 ```
 
+说明：模板中的比例系数**只是写法示范**，须按本套风格自选并全文统一。  
+若页内还有「卡内列表」：先定 `innerTop/innerBottom`，再用 `innerH` 分配子项，**禁止**用整段父高当子 usable。
 # compile.js 模板
 
 ```javascript
@@ -324,8 +367,17 @@ async function main() {
   const pres = new pptxgen();
   pres.layout = "LAYOUT_16x9";
   const theme = {
-    primary: "22223b", secondary: "4a4e69", accent: "9a8c98",
-    light: "c9ada7", bg: "f2e9e4"
+{% if VisualStyle == "educational" %}
+    primary: "1e293b", secondary: "475569", accent: "0d9488",
+    light: "e2e8f0", bg: "f8fafc"
+{% elif VisualStyle == "cute" %}
+    primary: "5b4b6e", secondary: "8b7aa0", accent: "f4a4b8",
+    light: "b8e0d2", bg: "fff8f5"
+{% else %}
+    // default：奶油纸 + 温暖教育向
+    primary: "3d405b", secondary: "6d6a5f", accent: "e07a5f",
+    light: "f2cc8f", bg: "faf6ec"
+{% endif %}
   };
   const totalSlides = 12; // 改为实际页数；整文件覆盖写，勿中途 Edit 改数字
   for (let i = 1; i <= totalSlides; i++) {
@@ -353,75 +405,61 @@ main().catch((err) => { console.error(err); process.exit(1); });
 
 # PptxGenJS API 参考
 
+以下示例中的 `x/y/w/h` **仅表示参数形态**；实装必须换成本页「先算后画」得出的变量，禁止把示例数字当布局抄进 slide。
+
 ## 文本
 
 ```javascript
-// 基本文本
-slide.addText("Simple Text", { x: 1, y: 1, w: 8, h: 2, fontSize: 24, fontFace: "Arial", color: "363636", bold: true, align: "center", valign: "middle" });
+slide.addText("Simple Text", { x, y, w, h, fontSize, fontFace: "Arial", color: "363636", bold: true, align: "center", valign: "middle" });
 
-// 多行文本（必须 breakLine: true）
 slide.addText([
   { text: "Line 1", options: { breakLine: true } },
   { text: "Line 2", options: { breakLine: true } },
-  { text: "Line 3" }  // 最后一项无需 breakLine
-], { x: 0.5, y: 0.5, w: 8, h: 2 });
+  { text: "Line 3" }
+], { x, y, w, h });
 
-// 富文本
-slide.addText([{ text: "Bold ", options: { bold: true } }, { text: "Italic ", options: { italic: true } }], { x: 1, y: 3, w: 8, h: 1 });
+slide.addText([{ text: "Bold ", options: { bold: true } }, { text: "Italic ", options: { italic: true } }], { x, y, w, h });
 
-// 与图形/图标对齐时设 margin: 0
-slide.addText("Title", { x: 0.5, y: 0.3, w: 9, h: 0.6, margin: 0 });
-
-// 长标题防换行
-slide.addText("Long Title", { x: 0.5, y: 2, w: 9, h: 1, fontSize: 48, fit: "shrink" });
+slide.addText("Title", { x, y, w, h, margin: 0 }); // 与图形对齐时 margin: 0
+slide.addText("Long Title", { x, y, w, h, fontSize, fit: "shrink" });
 ```
 
 ## 列表与要点
 
 ```javascript
-// 正确：bullet: true
 slide.addText([
   { text: "First item", options: { bullet: true, breakLine: true } },
   { text: "Second item", options: { bullet: true, breakLine: true } },
   { text: "Third item", options: { bullet: true } }
-], { x: 0.5, y: 0.5, w: 8, h: 3 });
-
-// 错误：禁止在文本里手写 "*" 等 unicode 符号（会变成双重符号）
-// 子项：indentLevel: 1；编号列表：bullet: { type: "number" }
+], { x, y, w, h });
+// 禁止在文本里手写 "*" 等 unicode；子项 indentLevel: 1；编号 bullet: { type: "number" }
 ```
 
 ## 图形
 
 ```javascript
-// 矩形 / 圆形 / 线条
-slide.addShape(pres.shapes.RECTANGLE, { x: 0.5, y: 0.8, w: 1.5, h: 3.0, fill: { color: "FF0000" }, line: { color: "000000", width: 2 } });
-slide.addShape(pres.shapes.OVAL, { x: 4, y: 1, w: 2, h: 2, fill: { color: "0000FF" } });
-slide.addShape(pres.shapes.LINE, { x: 1, y: 3, w: 5, h: 0, line: { color: "FF0000", width: 3, dashType: "dash" } });
-
-// 半透明
-slide.addShape(pres.shapes.RECTANGLE, { x: 1, y: 1, w: 3, h: 2, fill: { color: "0088CC", transparency: 50 } });
-
-// 圆角矩形
-slide.addShape(pres.shapes.ROUNDED_RECTANGLE, { x: 1, y: 1, w: 3, h: 2, fill: { color: "FFFFFF" }, rectRadius: 0.1 });
-
-// 阴影（禁止负 offset；阴影方向用 angle，如向上 270）
-slide.addShape(pres.shapes.RECTANGLE, { x: 1, y: 1, w: 3, h: 2, fill: { color: "FFFFFF" }, shadow: { type: "outer", color: "000000", blur: 6, offset: 2, angle: 135, opacity: 0.15 } });
+slide.addShape(pres.shapes.RECTANGLE, { x, y, w, h, fill: { color: "FF0000" }, line: { color: "000000", width: 2 } });
+slide.addShape(pres.shapes.OVAL, { x, y, w, h, fill: { color: "0000FF" } });
+slide.addShape(pres.shapes.LINE, { x, y, w, h: 0, line: { color: "FF0000", width: 3, dashType: "dash" } });
+slide.addShape(pres.shapes.RECTANGLE, { x, y, w, h, fill: { color: "0088CC", transparency: 50 } });
+slide.addShape(pres.shapes.ROUNDED_RECTANGLE, { x, y, w, h, fill: { color: "FFFFFF" }, rectRadius }); // rectRadius 由卡片短边比例自算
+slide.addShape(pres.shapes.RECTANGLE, { x, y, w, h, fill: { color: "FFFFFF" }, shadow: { type: "outer", color: "000000", blur: 6, offset: 2, angle: 135, opacity: 0.15 } });
+// 阴影禁止负 offset；向上可用 angle: 270
 ```
 
 ## 图片
 
 ```javascript
-slide.addImage({ path: "imgs/chart.png", x: 1, y: 1, w: 5, h: 3 });
-slide.addImage({ path: "imgs/photo.png", x: 1, y: 1, w: 5, h: 3, rounding: true, altText: "desc" });
-// 等比缩放计算：calcWidth = 期望高度 * (原宽 / 原高)
-// 支持 PNG / JPG / GIF / SVG
+slide.addImage({ path: "imgs/chart.png", x, y, w, h });
+slide.addImage({ path: "imgs/photo.png", x, y, w, h, rounding: true, altText: "desc" });
+// 等比：calcWidth = 期望高度 * (原宽 / 原高)；支持 PNG / JPG / GIF / SVG
 ```
 
 ## 表格
 
 ```javascript
 slide.addTable([["Header 1", "Header 2"], ["Cell 1", "Cell 2"]], {
-  x: 1, y: 1, w: 8, h: 2,
+  x, y, w, h,
   border: { pt: 1, color: "999999" }, fill: { color: "F1F1F1" }
 });
 ```
@@ -430,16 +468,15 @@ slide.addTable([["Header 1", "Header 2"], ["Cell 1", "Cell 2"]], {
 
 ```javascript
 slide.addChart(pres.charts.BAR, [{ name: "Sales", labels: ["Q1", "Q2", "Q3", "Q4"], values: [4500, 5500, 6200, 7100] }], {
-  x: 0.5, y: 1, w: 9, h: 4, barDir: "col",
-  chartColors: ["0D9488", "14B8A6", "5EEAD4"],          // 用调色板颜色
+  x, y, w, h, barDir: "col",
+  chartColors: ["0D9488", "14B8A6", "5EEAD4"], // 用调色板
   chartArea: { fill: { color: "FFFFFF" }, roundedCorners: true },
   catAxisLabelColor: "64748B", valAxisLabelColor: "64748B",
   valGridLine: { color: "E2E8F0", size: 0.5 }, catGridLine: { style: "none" },
   showValue: true, dataLabelPosition: "outEnd", dataLabelColor: "1E293B",
   showLegend: false
 });
-// 图表类型：BAR / LINE / PIE / DOUGHNUT / SCATTER / BUBBLE / RADAR
-// 折线图：lineSmooth: true；饼图：showPercent: true
+// BAR / LINE / PIE / DOUGHNUT / SCATTER / BUBBLE / RADAR；折线 lineSmooth；饼图 showPercent
 ```
 
 # 常见陷阱（速查）
@@ -451,17 +488,17 @@ slide.addChart(pres.charts.BAR, [{ name: "Sales", labels: ["Q1", "Q2", "Q3", "Q4
 5. 勿与 bullet 混用 `lineSpacing`，用 `paraSpaceAfter`。
 6. **禁止复用 option 对象** — PptxGenJS 会原地修改（如 shadow→EMU），复用会破坏后续图形；用工厂函数每次新建。
 7. 每个演示文稿用全新的 `pptxgen()` 实例。
-8. 圆角容器勿叠通栏色条；页标题下仅允许短 accent 条（见「字号与间距」），勿用长装饰线代替留白。
+8. 圆角容器勿叠通栏色条；页标题下仅允许短 accent 条（见「字号层级」），勿用长装饰线代替留白。
 9. 禁止纯文字页；正文勿加粗；多行说明勿居中（短标签可居中）；低对比禁止。
 10. 文字对齐形状时 `margin: 0`。
 11. `node` 首次 exit≠0 时：看 stderr 再修源码重跑；**不要**换命令试探环境。
 12. `fill`/`color` 必须是 **hex 字符串**（如 `"023047"`），禁止把整对象当 color（会触发 `(colorStr || "").replace`）。
 13. 失败恢复优先「改源码 → 再 compile」；能合并的探测不要拆成无信息增量的多轮细粒度 `Bash`。
-14. 写完每页后心算：`最后一块.y + h ≤ contentBottom`；循环项用公式生成坐标，禁止同坐标叠绘。
+14. 每页必须「先算后画」+游标切带；嵌套只用 innerH；禁止满高卡叠底 strip；禁止抄绝对坐标。
 
 # QA（未通过不得结束）
 
-1. **编译前自检（必做）**：按「布局预算」核对每页——无内容框相交、无页脚侵占、循环坐标递增、`y+h ≤ contentBottom`。
+1. **编译前自检（必做）**：先算后画；游标/剩余高度是否自洽；有无「嵌套双重计价」「满高卡+底 strip」；`y+h≤contentBottom`；无框相交；无备注上板；要点精炼；正文未滥加粗。
 2. 对 `{{ OutputLocation }}` 调用 `CheckPPTX`（**只验证文件确为 pptx**，不检查排版；排版靠上一步自检）。
-3. 自检发现重叠/溢出，或 `node`/`CheckPPTX` 失败 → 修对应 `.js` → 再编译 → 再自检/校验。
+3. 自检发现重叠/溢出/文案臃肿，或 `node`/`CheckPPTX` 失败 → 修对应 `.js`（回到①②用游标重算，优先减项/删字）→ 再编译 → 再自检/校验。
 4. 格式校验通过且自检无硬伤后立即结束（禁止再探索文件系统；勿为微调无限重写）。

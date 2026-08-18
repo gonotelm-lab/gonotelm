@@ -4,8 +4,20 @@ import (
 	"fmt"
 	"strings"
 
+	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
+
 	einoschema "github.com/cloudwego/eino/schema"
 )
+
+const (
+	logSnippetHead = 200
+	logSnippetTail = 120
+)
+
+// TruncateForLog truncates noisy LLM output for slog fields (keeps head + tail).
+func TruncateForLog(s string) string {
+	return pkgstring.TruncateHeadTail(s, logSnippetHead, logSnippetTail)
+}
 
 func NormalizeStrings(sources []string) []string {
 	normalized := make([]string, 0, len(sources))
@@ -23,7 +35,7 @@ func NormalizeStrings(sources []string) []string {
 // BuildTipMessage constructs a user message for the rendered prompts.
 // When tip is non-empty it carries the user extra requirement; when tip is empty
 // it still returns a short user message so providers that require a user query
-// (e.g. Agnes) accept the request, and the message stays in agent history.
+// accept the request, and the message stays in agent history.
 func BuildTipMessage(tip string) *einoschema.Message {
 	tip = strings.TrimSpace(tip)
 	if tip == "" {

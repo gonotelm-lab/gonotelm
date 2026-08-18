@@ -52,6 +52,11 @@ func (s *Server) GenerateStudioArtifact(ctx context.Context, c *app.RequestConte
 		return
 	}
 
+	if req.Slides != nil && req.Slides.Language != "" && !req.Slides.Language.IsValid() {
+		http.ErrResp(c, errors.ErrParams.Msgf("unsupported language: %s", req.Slides.Language))
+		return
+	}
+
 	if err := validateStudioUserTips(&req); err != nil {
 		http.ErrResp(c, err)
 		return
@@ -75,6 +80,13 @@ func (s *Server) GenerateStudioArtifact(ctx context.Context, c *app.RequestConte
 		}
 		if req.Quiz.Difficulty != "" && !req.Quiz.Difficulty.Supported() {
 			http.ErrResp(c, errors.ErrParams.Msgf("unsupported quiz difficulty: %s", req.Quiz.Difficulty))
+			return
+		}
+	}
+
+	if req.Slides != nil {
+		if req.Slides.VisualStyle != "" && !req.Slides.VisualStyle.Supported() {
+			http.ErrResp(c, errors.ErrParams.Msgf("unsupported slides visual_style: %s", req.Slides.VisualStyle))
 			return
 		}
 	}

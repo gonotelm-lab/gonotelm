@@ -146,14 +146,14 @@ func (m *Generator) parseAgentOutput(ctx context.Context, content string) (*mind
 		LogOnDirectFailure: func(err error, _ []byte) {
 			slog.DebugContext(ctx, "mindmap direct unmarshal did not match, fallback to json extraction",
 				slog.Any("err", err),
-				slog.String("raw_content", content),
+				slog.String("raw_content", types.TruncateForLog(content)),
 			)
 		},
 	}
 	if err := decoder.Unmarshal(pkgstring.AsBytes(content), &expect); err != nil {
 		slog.WarnContext(ctx, "mindmap output unmarshal failed after compatibility fallback",
 			slog.Any("err", err),
-			slog.String("raw_content", content))
+			slog.String("raw_content", types.TruncateForLog(content)))
 		return nil, err
 	}
 

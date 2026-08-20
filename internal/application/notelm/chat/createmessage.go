@@ -222,7 +222,7 @@ func (h *CreateMessageHandler) beginStreamTask(
 				Id:         idgen.Get(taskId.String()),
 				CreateTime: valobj.NewTime().Value(),
 				Error: &chatentity.EventError{
-					Message: "系统错误，请稍后重试",
+					Message: "SystemError",
 				},
 			}
 		} else {

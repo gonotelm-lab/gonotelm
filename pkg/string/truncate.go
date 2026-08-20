@@ -1,5 +1,7 @@
 package string
 
+import "strconv"
+
 func TruncateRune(s string, maxRuneCount int) string {
 	if maxRuneCount <= 0 {
 		return ""
@@ -11,4 +13,22 @@ func TruncateRune(s string, maxRuneCount int) string {
 	}
 
 	return string(runes[:maxRuneCount])
+}
+
+// TruncateHeadTail keeps the head and tail of s for logs; middle is omitted with a length marker.
+func TruncateHeadTail(s string, head, tail int) string {
+	if head < 0 {
+		head = 0
+	}
+	if tail < 0 {
+		tail = 0
+	}
+	runes := []rune(s)
+	n := len(runes)
+	if n <= head+tail {
+		return s
+	}
+	return string(runes[:head]) +
+		"(... truncated, total_runes=" + strconv.Itoa(n) + " ...) " +
+		string(runes[n-tail:])
 }

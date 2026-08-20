@@ -61,6 +61,7 @@ func (b *Builder) WithMaxRedirects(maxRedirects int) *Builder {
 	return b
 }
 
+// 最大重试次数
 func (b *Builder) WithRetries(times int) *Builder {
 	b.maxRetries = times
 	return b

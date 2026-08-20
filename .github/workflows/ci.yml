@@ -37,7 +37,7 @@ jobs:
         run: go build ./...
 
   test:
-    name: Unit tests with PostgreSQL
+    name: Unit tests
     runs-on: ubuntu-24.04
     services:
       postgres:
@@ -53,12 +53,22 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       GONOTELM_DB_HOST: 127.0.0.1
       GONOTELM_DB_PORT: "5432"
       GONOTELM_DB_USER: postgres
       GONOTELM_DB_PASS: postgres
       GONOTELM_DB_DBNAME: postgres
+      GONOTELM_REDIS_ADDRS: "127.0.0.1:6379"
     steps:
       - uses: actions/checkout@v7
 
@@ -67,8 +77,12 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Run db unit tests
-        run: go test -coverprofile=coverage.out ./internal/infrastructure/database/postgres/... ./internal/infrastructure/repository/...
+      - name: Run unit tests
+        run: >
+          go test -coverprofile=coverage.out
+          ./internal/infrastructure/database/postgres/...
+          ./internal/infrastructure/repository/...
+          ./internal/infrastructure/cache/redis/...
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7

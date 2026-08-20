@@ -68,10 +68,7 @@ func (m *Generator) generate(
 ) (*mindmapExpectation, error) {
 	llmOptions := m.llmOptions()
 
-	tip := ""
-	if p, ok := req.Payload.(*artifactentity.MindmapPayload); ok {
-		tip = p.Tip
-	}
+	tip := artifactentity.PayloadAs[*artifactentity.MindmapPayload](req.Payload).GetTip()
 
 	ag, err := types.BuildSourceExploreAgent(
 		m.deps,
@@ -111,9 +108,9 @@ func (m *Generator) generate(
 
 	msgs = append([]*einoschema.Message{}, ag.AccumulatedMessages()...)
 	msgs = append(msgs, types.BuildCompensateMessage(output.Content, []string{
-		"JSON 字段必须且仅能包含 title 和 mindmap",
-		"title 长度必须为 10-30 字",
-		"mindmap 必须是完整 mermaid mindmap 代码块字符串",
+		"JSON must contain only `title` and `mindmap`",
+		"`title` length must be 10-30 characters",
+		"`mindmap` must be a complete mermaid mindmap code-block string",
 	}))
 
 	llmResp, genErr := ag.BaseLLM().Generate(ctx, msgs, llmOptions...)
@@ -149,14 +146,14 @@ func (m *Generator) parseAgentOutput(ctx context.Context, content string) (*mind
 		LogOnDirectFailure: func(err error, _ []byte) {
 			slog.DebugContext(ctx, "mindmap direct unmarshal did not match, fallback to json extraction",
 				slog.Any("err", err),
-				slog.String("raw_content", content),
+				slog.String("raw_content", types.TruncateForLog(content)),
 			)
 		},
 	}
 	if err := decoder.Unmarshal(pkgstring.AsBytes(content), &expect); err != nil {
 		slog.WarnContext(ctx, "mindmap output unmarshal failed after compatibility fallback",
 			slog.Any("err", err),
-			slog.String("raw_content", content))
+			slog.String("raw_content", types.TruncateForLog(content)))
 		return nil, err
 	}
 

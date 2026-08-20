@@ -47,7 +47,7 @@ func TestRetryRoundTripper_RetryOn5xx(t *testing.T) {
 			calls++
 			return &http.Response{StatusCode: http.StatusServiceUnavailable}, nil
 		},
-	})
+	}, WithRetryBaseDelay(time.Millisecond))
 
 	resp, err := rt.RoundTrip(&http.Request{})
 	if err != nil {
@@ -89,7 +89,7 @@ func TestRetryRoundTripper_RetryOnNetworkError(t *testing.T) {
 			calls++
 			return nil, &url.Error{Op: "Get", URL: "http://example.com", Err: errors.New("connection refused")}
 		},
-	})
+	}, WithRetryBaseDelay(time.Millisecond))
 
 	_, err := rt.RoundTrip(&http.Request{})
 	if err == nil {
@@ -149,7 +149,7 @@ func TestRetryRoundTripper_BodyReplay(t *testing.T) {
 			}
 			return &http.Response{StatusCode: http.StatusServiceUnavailable}, nil
 		},
-	})
+	}, WithRetryBaseDelay(time.Millisecond))
 
 	req := &http.Request{
 		Body: io.NopCloser(strings.NewReader(body)),
@@ -228,6 +228,13 @@ func TestRetryRoundTripper_WithOptions(t *testing.T) {
 	}
 }
 
+func TestRetryRoundTripper_DefaultBaseDelay(t *testing.T) {
+	rt := NewRetryRoundTripper(0, nil)
+	if rt.baseDelay != 500*time.Millisecond {
+		t.Fatalf("expected default baseDelay 500ms, got %v", rt.baseDelay)
+	}
+}
+
 func TestRetryRoundTripper_ClosesBodyBeforeRetry(t *testing.T) {
 	var calls int
 	var closedAt []int
@@ -241,7 +248,7 @@ func TestRetryRoundTripper_ClosesBodyBeforeRetry(t *testing.T) {
 			}
 			return &http.Response{StatusCode: http.StatusServiceUnavailable, Body: body}, nil
 		},
-	})
+	}, WithRetryBaseDelay(time.Millisecond))
 
 	_, err := rt.RoundTrip(&http.Request{})
 	if err != nil {
@@ -284,7 +291,7 @@ func TestRetryRoundTripper_RetryThenSuccess(t *testing.T) {
 			}
 			return &http.Response{StatusCode: http.StatusOK}, nil
 		},
-	})
+	}, WithRetryBaseDelay(time.Millisecond))
 
 	resp, err := rt.RoundTrip(&http.Request{})
 	if err != nil {

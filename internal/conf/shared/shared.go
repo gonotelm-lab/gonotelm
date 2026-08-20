@@ -9,6 +9,7 @@ import (
 	text2audio "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio"
 	text2image "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image"
 	mqimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
+	sandboximpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/sandbox"
 	storageimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
 	"github.com/gonotelm-lab/gonotelm/pkg/sql"
@@ -68,6 +69,7 @@ type InfraConfig struct {
 	Embedding  embedding.EmbeddingConfig     `toml:"embedding"`
 	Text2Image text2image.Text2ImageConfig   `toml:"text2image"`
 	Text2Audio text2audio.Text2AudioConfig   `toml:"text2audio"`
+	Sandbox    sandboximpl.ProviderConfig    `toml:"sandbox"`
 
 	Redis    cache.RedisCacheConfig `toml:"redis"`
 	MsgQueue mqimpl.Config          `toml:"msgQueue"`

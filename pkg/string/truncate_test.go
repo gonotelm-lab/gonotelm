@@ -177,3 +177,45 @@ func TestTruncateRune(t *testing.T) {
 		})
 	}
 }
+
+func TestTruncateHeadTail(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		head  int
+		tail  int
+		want  string
+	}{
+		{
+			name:  "short no truncate",
+			input: "hello",
+			head:  3,
+			tail:  3,
+			want:  "hello",
+		},
+		{
+			name:  "truncate middle",
+			input: "abcdefghij",
+			head:  3,
+			tail:  2,
+			want:  "abc(... truncated, total_runes=10 ...) ij",
+		},
+		{
+			name:  "utf8",
+			input: "一二三四五六七八",
+			head:  2,
+			tail:  2,
+			want:  "一二(... truncated, total_runes=8 ...) 七八",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			got := TruncateHeadTail(tt.input, tt.head, tt.tail)
+			if got != tt.want {
+				t.Fatalf("TruncateHeadTail(%q, %d, %d) = %q, want %q", tt.input, tt.head, tt.tail, got, tt.want)
+			}
+		})
+	}
+}

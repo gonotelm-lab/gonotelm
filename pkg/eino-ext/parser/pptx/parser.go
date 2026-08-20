@@ -16,19 +16,19 @@ const markdownContentType = "text/markdown"
 // Config 配置 PptxParser。当前为空，为后续选项（如是否渲染备注）预留。
 type Config struct{}
 
-// PptxParser 将 pptx 演示文稿转换为 markdown，只保留有语义的内容：
+// Parser 将 pptx 演示文稿转换为 markdown，只保留有语义的内容：
 // 标题、文本段落与列表、表格、演讲者备注、图片 alt text；
 // 丢弃主题、版式、动画与图片字节等纯表现层内容。
-type PptxParser struct{}
+type Parser struct{}
 
-var _ einoparser.Parser = (*PptxParser)(nil)
+var _ einoparser.Parser = (*Parser)(nil)
 
-// NewPptxParser 创建解析器，cfg 可以为 nil。
-func NewPptxParser(config *Config) *PptxParser {
-	return &PptxParser{}
+// NewParser 创建解析器，cfg 可以为 nil。
+func NewParser(config *Config) *Parser {
+	return &Parser{}
 }
 
-func (p *PptxParser) Parse(
+func (p *Parser) Parse(
 	ctx context.Context,
 	reader io.Reader,
 	opts ...einoparser.Option,

@@ -56,3 +56,10 @@ type QuizPayload struct {
 
 func (p *QuizPayload) Kind() Kind                { return KindQuiz }
 func (p *QuizPayload) GetSourceIds() []valobj.Id { return p.SourceIds }
+
+func (p *QuizPayload) GetTip() string {
+	if p == nil {
+		return ""
+	}
+	return p.Tip
+}

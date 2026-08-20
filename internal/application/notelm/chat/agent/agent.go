@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/agent/tools"
+	"github.com/gonotelm-lab/gonotelm/internal/application/shared/agent/tools"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	chatentity "github.com/gonotelm-lab/gonotelm/internal/domain/chat/entity"

@@ -14,24 +14,18 @@ import (
 )
 
 const titleMakerPromptTemplate = `
-你是一个标题生成助手，擅长从文本中提炼主线主题并生成高信息密度标题。
+Write a one-sentence title for the text in <content>, in the same language as the content.
 
-# 任务
+Requirements:
+- Capture the core theme and key information; keep it accurate, natural, and readable.
+- No marketing hype; stay faithful—do not invent facts absent from the source.
+- Output only the title text: no explanations, bullets, quotation marks, or wrappers; no line breaks.
+- Prefer %d-%d characters.
+- If information is thin, produce a conservative but informative title without speculation.
 
-- 基于输入文本，生成一句话标题，概括核心主题与关键信息。
-- 标题应准确、自然、可读，不使用夸张营销表达。
-- 保持忠实，不得编造原文未出现的事实。
-
-# 输出约束
-
-- 仅输出标题正文，不要解释、不要分点、不要引号、不要前后缀。
-- 标题必须是一句话，不换行。
-- 标题长度尽量控制在 %d-%d 字。
-- 若信息不足，输出保守且有信息量的标题，不补充臆测内容。
-
-# 待生成标题内容
-
-%s`
+<content>
+%s
+</content>`
 
 const (
 	defaultTitleMinLen = 10

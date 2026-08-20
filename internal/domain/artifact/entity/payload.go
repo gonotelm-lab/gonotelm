@@ -7,6 +7,10 @@ type Payload interface {
 	GetSourceIds() []valobj.Id
 }
 
+func PayloadAs[T any](p Payload) T {
+	return p.(T)
+}
+
 type MindmapPayload struct {
 	NotebookId valobj.Id   `json:"notebook_id"`
 	SourceIds  []valobj.Id `json:"source_ids"`
@@ -16,6 +20,13 @@ type MindmapPayload struct {
 func (p *MindmapPayload) Kind() Kind                { return KindMindmap }
 func (p *MindmapPayload) GetSourceIds() []valobj.Id { return p.SourceIds }
 
+func (p *MindmapPayload) GetTip() string {
+	if p == nil {
+		return ""
+	}
+	return p.Tip
+}
+
 type DataTablePayload struct {
 	NotebookId valobj.Id   `json:"notebook_id"`
 	SourceIds  []valobj.Id `json:"source_ids"`
@@ -24,6 +35,13 @@ type DataTablePayload struct {
 
 func (p *DataTablePayload) Kind() Kind                { return KindDataTable }
 func (p *DataTablePayload) GetSourceIds() []valobj.Id { return p.SourceIds }
+
+func (p *DataTablePayload) GetTip() string {
+	if p == nil {
+		return ""
+	}
+	return p.Tip
+}
 
 type ReportStyle string
 
@@ -58,6 +76,13 @@ type ReportPayload struct {
 func (p *ReportPayload) Kind() Kind                { return KindReport }
 func (p *ReportPayload) GetSourceIds() []valobj.Id { return p.SourceIds }
 
+func (p *ReportPayload) GetTip() string {
+	if p == nil {
+		return ""
+	}
+	return p.Tip
+}
+
 type InfoGraphicPayload struct {
 	NotebookId   valobj.Id              `json:"notebook_id"`
 	SourceIds    []valobj.Id            `json:"source_ids"`
@@ -81,6 +106,13 @@ type AudioOverviewPayload struct {
 
 func (p *AudioOverviewPayload) Kind() Kind                { return KindAudioOverview }
 func (p *AudioOverviewPayload) GetSourceIds() []valobj.Id { return p.SourceIds }
+
+func (p *AudioOverviewPayload) GetTip() string {
+	if p == nil {
+		return ""
+	}
+	return p.Tip
+}
 
 type NotePayload struct {
 	ChatId valobj.Id `json:"chat_id"`

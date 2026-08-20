@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/agent/tools"
+	"github.com/gonotelm-lab/gonotelm/internal/application/shared/agent/tools"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
 	pkgagent "github.com/gonotelm-lab/gonotelm/pkg/agent"
@@ -13,6 +13,8 @@ import (
 	einomodel "github.com/cloudwego/eino/components/model"
 	einotool "github.com/cloudwego/eino/components/tool"
 )
+
+type Agent = pkgagent.Agent[*SessionState]
 
 func BuildSourceExploreAgent(
 	deps *ServiceDeps,
@@ -23,7 +25,7 @@ func BuildSourceExploreAgent(
 	notebookId valobj.Id,
 	sourceIds []valobj.Id,
 	bindAllTools bool,
-) (*pkgagent.Agent[*SessionState], error) {
+) (*Agent, error) {
 	llmModel, err := deps.LLMGateway.GetProvider(modelProvider)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrParams, "get source explore llm model failed: %v", err)
@@ -33,6 +35,7 @@ func BuildSourceExploreAgent(
 		MaxRound: maxRound,
 		BaseLLM:  llmModel,
 		Options:  options,
+		Verbose:  true,
 	}
 
 	ag := pkgagent.New(agConfig, &SessionState{

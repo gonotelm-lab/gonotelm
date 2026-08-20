@@ -23,7 +23,7 @@ func TestPptxParser_EndToEnd(t *testing.T) {
 
 	data := buildDeck(t, []string{slide1, slide2, slide3}, []string{"", notes2, ""})
 
-	docs, err := NewPptxParser(nil).Parse(context.Background(), bytes.NewReader(data))
+	docs, err := NewParser(nil).Parse(context.Background(), bytes.NewReader(data))
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
@@ -65,7 +65,7 @@ func TestPptxParser_MetaURIAndExtra(t *testing.T) {
 	slide := slideXML(spText("T", "", "", "title", p(0, r("Hello"))))
 	data := buildDeck(t, []string{slide}, nil)
 
-	docs, err := NewPptxParser(nil).Parse(context.Background(), bytes.NewReader(data),
+	docs, err := NewParser(nil).Parse(context.Background(), bytes.NewReader(data),
 		einoparser.WithURI("deck.pptx"),
 		einoparser.WithExtraMeta(map[string]any{"origin": "unit-test"}),
 	)
@@ -82,7 +82,7 @@ func TestPptxParser_MetaURIAndExtra(t *testing.T) {
 }
 
 func TestPptxParser_InvalidZip(t *testing.T) {
-	if _, err := NewPptxParser(nil).Parse(context.Background(), bytes.NewReader([]byte("garbage"))); err == nil {
+	if _, err := NewParser(nil).Parse(context.Background(), bytes.NewReader([]byte("garbage"))); err == nil {
 		t.Fatal("expected error for invalid zip")
 	}
 }
@@ -94,7 +94,7 @@ func TestPptxParser_EmptyPresentation(t *testing.T) {
 		zipEntry{"ppt/presentation.xml", presentationXML(0)},
 		zipEntry{"ppt/_rels/presentation.xml.rels", presentationRelsXML(0)},
 	)
-	if _, err := NewPptxParser(nil).Parse(context.Background(), bytes.NewReader(data)); err == nil {
+	if _, err := NewParser(nil).Parse(context.Background(), bytes.NewReader(data)); err == nil {
 		t.Fatal("expected error for empty presentation")
 	}
 }
@@ -104,7 +104,7 @@ func TestPptxParser_RealWorldFile(t *testing.T) {
 	realSlide := `<p:sld ` + slideXMLNS + `><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Title 1"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>Real &amp; Demo</a:t></a:r></a:p></p:txBody></p:sp><p:sp><p:nvSpPr><p:cNvPr id="3" name="Content Placeholder 2"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph idx="1"/></p:nvPr></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>First bullet</a:t></a:r></a:p><a:p><a:pPr lvl="1"/><a:r><a:t>Second level</a:t></a:r></a:p><a:p><a:pPr/><a:r><a:t>Top again</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`
 
 	data := buildDeck(t, []string{realSlide}, nil)
-	docs, err := NewPptxParser(nil).Parse(context.Background(), bytes.NewReader(data))
+	docs, err := NewParser(nil).Parse(context.Background(), bytes.NewReader(data))
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}

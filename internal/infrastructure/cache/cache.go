@@ -48,10 +48,21 @@ type ChatSuggestionCache interface {
 	Delete(ctx context.Context, chatId string) error
 }
 
+type SandboxCache interface {
+	// Set 保存 userId 对应 notebookId 的沙箱描述，过期时间由 ttl 指定
+	Set(ctx context.Context, userId, notebookId string, desc *schema.SandboxDescription, ttl time.Duration) error
+
+	// Get 获取沙箱描述，不存在时返回 nil，非错误
+	Get(ctx context.Context, userId, notebookId string) (*schema.SandboxDescription, error)
+
+	Delete(ctx context.Context, userId, notebookId string) error
+}
+
 type Cache struct {
 	ChatMessageContextCache ChatContextMessageCache
 	ChatMessageStreamCache  ChatMessageStreamCache
 	ChatSuggestionCache     ChatSuggestionCache
+	SandboxCache            SandboxCache
 }
 
 var (

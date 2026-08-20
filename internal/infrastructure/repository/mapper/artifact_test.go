@@ -47,6 +47,7 @@ func TestArtifactRoundTrip_Kinds(t *testing.T) {
 		{artifactentity.KindReport, &artifactentity.ReportPayload{NotebookId: notebookId}},
 		{artifactentity.KindInfoGraphic, &artifactentity.InfoGraphicPayload{NotebookId: notebookId}},
 		{artifactentity.KindAudioOverview, &artifactentity.AudioOverviewPayload{NotebookId: notebookId}},
+		{artifactentity.KindSlides, &artifactentity.SlidesPayload{NotebookId: notebookId}},
 	}
 	for _, c := range cases {
 		a, err := artifactentity.NewArtifact(notebookId, "u1", c.kind, c.payload)

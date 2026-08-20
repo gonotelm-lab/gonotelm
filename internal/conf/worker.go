@@ -10,6 +10,7 @@ import (
 	rerank "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/rerank"
 	text2audio "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio"
 	text2image "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/sandbox"
 	"github.com/gonotelm-lab/gonotelm/pkg/trace"
 )
 
@@ -161,6 +162,14 @@ type StudioConfig struct {
 		NumOfWorkGroup     int           `toml:"numOfWorkGroup"`
 		NumWorkersPerGroup int           `toml:"numWorkersPerGroup"`
 	} `toml:"taskConfig"`
+
+	Slides struct {
+		MaxRound         int              `toml:"maxRound"`
+		ModelProvider    llm.Provider     `toml:"modelProvider"`
+		GenerateMaxRound int              `toml:"generateMaxRound"`
+		Model            string           `toml:"model"`
+		SandboxProvider  sandbox.Provider `toml:"sandboxProvider"`
+	} `toml:"slides"`
 }
 
 func LoadWorkerConfig(path string) (*WorkerConfig, error) {

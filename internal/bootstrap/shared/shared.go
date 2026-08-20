@@ -22,6 +22,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
 	mqkafka "github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq/kafka"
 	infrarepo "github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository"
+	infrasandbox "github.com/gonotelm-lab/gonotelm/internal/infrastructure/sandbox"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage/minio"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
@@ -44,6 +45,7 @@ type Infra struct {
 	Embedder         einoembed.Embedder
 	Text2Image       *text2image.Text2ImageGateway
 	Text2Audio       *text2audio.Text2AudioGateway
+	SandboxGateway   *infrasandbox.Gateway
 	AgentizeService  *agentize.Service
 	DistLock         adapter.DistributedLock
 
@@ -142,6 +144,12 @@ func NewInfra(ctx context.Context, cfg *confshared.InfraConfig) (_ *Infra, outEr
 	}
 	infra.Text2Audio = text2audioGateway
 
+	sandboxGateway, err := newSandboxGateway(ctx, &cfg.Sandbox)
+	if err != nil {
+		return nil, fmt.Errorf("sandbox gateway: %w", err)
+	}
+	infra.SandboxGateway = sandboxGateway
+
 	sourceRepo := infrarepo.NewSourceRepository(db.SourceStore)
 	storageRepo := infrarepo.NewSourceStorageRepository(oss)
 	sourceDocRepo := infrarepo.NewSourceDocRepository(
@@ -173,7 +181,6 @@ func newLLMGateway(ctx context.Context, cfg *infrallm.ProviderConfig) (*chat.Gat
 			Timeout:          cfg.OpenAI.Timeout,
 			BaseUrl:          cfg.OpenAI.BaseUrl,
 			Model:            cfg.OpenAI.Model,
-			MaxTokens:        cfg.OpenAI.MaxTokens,
 			Temperature:      cfg.OpenAI.Temperature,
 			TopP:             cfg.OpenAI.TopP,
 			PresencePenalty:  cfg.OpenAI.PresencePenalty,
@@ -188,7 +195,6 @@ func newLLMGateway(ctx context.Context, cfg *infrallm.ProviderConfig) (*chat.Gat
 			BaseURL:          cfg.DeepSeek.BaseURL,
 			Path:             cfg.DeepSeek.Path,
 			Model:            cfg.DeepSeek.Model,
-			MaxTokens:        cfg.DeepSeek.MaxTokens,
 			Temperature:      cfg.DeepSeek.Temperature,
 			TopP:             cfg.DeepSeek.TopP,
 			PresencePenalty:  cfg.DeepSeek.PresencePenalty,
@@ -203,7 +209,6 @@ func newLLMGateway(ctx context.Context, cfg *infrallm.ProviderConfig) (*chat.Gat
 			Timeout:          cfg.Qwen.Timeout,
 			BaseUrl:          cfg.Qwen.BaseUrl,
 			Model:            cfg.Qwen.Model,
-			MaxTokens:        cfg.Qwen.MaxTokens,
 			Temperature:      cfg.Qwen.Temperature,
 			TopP:             cfg.Qwen.TopP,
 			PresencePenalty:  cfg.Qwen.PresencePenalty,
@@ -217,7 +222,6 @@ func newLLMGateway(ctx context.Context, cfg *infrallm.ProviderConfig) (*chat.Gat
 			Timeout:          cfg.Agnes.Timeout,
 			BaseUrl:          cfg.Agnes.BaseUrl,
 			Model:            cfg.Agnes.Model,
-			MaxTokens:        cfg.Agnes.MaxTokens,
 			Temperature:      cfg.Agnes.Temperature,
 			TopP:             cfg.Agnes.TopP,
 			PresencePenalty:  cfg.Agnes.PresencePenalty,
@@ -228,6 +232,10 @@ func newLLMGateway(ctx context.Context, cfg *infrallm.ProviderConfig) (*chat.Gat
 	}
 
 	return chat.New(ctx, llmCfg)
+}
+
+func newSandboxGateway(ctx context.Context, cfg *infrasandbox.ProviderConfig) (*infrasandbox.Gateway, error) {
+	return infrasandbox.NewGateway(ctx, cfg)
 }
 
 func newMQ(cfg *mq.Config) (*mq.MQ, error) {

@@ -52,6 +52,11 @@ func (s *Server) GenerateStudioArtifact(ctx context.Context, c *app.RequestConte
 		return
 	}
 
+	if req.Slides != nil && req.Slides.Language != "" && !req.Slides.Language.IsValid() {
+		http.ErrResp(c, errors.ErrParams.Msgf("unsupported language: %s", req.Slides.Language))
+		return
+	}
+
 	if err := validateStudioUserTips(&req); err != nil {
 		http.ErrResp(c, err)
 		return
@@ -79,6 +84,13 @@ func (s *Server) GenerateStudioArtifact(ctx context.Context, c *app.RequestConte
 		}
 	}
 
+	if req.Slides != nil {
+		if req.Slides.VisualStyle != "" && !req.Slides.VisualStyle.Supported() {
+			http.ErrResp(c, errors.ErrParams.Msgf("unsupported slides visual_style: %s", req.Slides.VisualStyle))
+			return
+		}
+	}
+
 	resp, err := s.generateArtifactHandler.Handle(ctx,
 		&artifactapp.GenerateRequest{
 			NotebookId:    req.NotebookId,
@@ -91,6 +103,7 @@ func (s *Server) GenerateStudioArtifact(ctx context.Context, c *app.RequestConte
 			Flashcard:     req.Flashcard.ToPayload(),
 			Quiz:          req.Quiz.ToPayload(),
 			DataTable:     req.DataTable.ToPayload(),
+			Slides:        req.Slides.ToPayload(),
 			Note:          req.Note.ToPayload(),
 		})
 	if err != nil {
@@ -128,6 +141,10 @@ func validateStudioUserTips(req *schema.GenerateArtifactRequest) error {
 
 	if req.DataTable != nil && utf8.RuneCountInString(req.DataTable.Tip) > maxUserTipLength {
 		return errors.ErrParams.Msgf("data_table tip exceeds %d characters", maxUserTipLength)
+	}
+
+	if req.Slides != nil && utf8.RuneCountInString(req.Slides.Tip) > maxUserTipLength {
+		return errors.ErrParams.Msgf("slides tip exceeds %d characters", maxUserTipLength)
 	}
 
 	return nil

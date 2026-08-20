@@ -249,18 +249,24 @@ func (s *Storage) UploadObject(
 	ctx, span := s.startSpan(ctx, "PutObject", req.Key)
 	defer span.End()
 
-	var reader io.Reader
+	var (
+		reader io.Reader
+		size   int64
+	)
 	if req.Body != nil {
 		reader = bytes.NewReader(req.Body)
+		size = int64(len(req.Body))
 	} else {
 		reader = req.BodyReader
+		size = -1
 	}
+
 	_, err := s.client.PutObject(
 		ctx,
 		s.bucket,
 		req.Key,
 		reader,
-		int64(len(req.Body)),
+		size,
 		minio.PutObjectOptions{
 			ContentType:  req.ContentType,
 			UserMetadata: req.Metadata,

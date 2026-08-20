@@ -8,6 +8,11 @@ user = "${GONOTELM_DB_USER:-postgres}"
 password = "${GONOTELM_DB_PASSWORD:-postgres}"
 dbName = "${GONOTELM_DB_NAME:-gonotelm}"
 
+[redis]
+addrs = ${GONOTELM_REDIS_ADDRS:-['127.0.0.1:7542']}
+username = "${GONOTELM_REDIS_USERNAME:-}"
+password = "${GONOTELM_REDIS_PASSWORD:-}"
+
 [vectorDb]
 type = "milvus"
 
@@ -74,6 +79,13 @@ maxRound = ${GONOTELM_STUDIO_DATATABLE_MAX_ROUND:-50}
 modelProvider = "${GONOTELM_STUDIO_DATATABLE_PROVIDER:-deepseek}"
 model = "${GONOTELM_STUDIO_DATATABLE_MODEL:-deepseek-v4-flash}"
 
+[studio.slides]
+maxRound = ${GONOTELM_STUDIO_SLIDES_MAX_ROUND:-50}
+modelProvider = "${GONOTELM_STUDIO_SLIDES_PROVIDER:-deepseek}"
+generateMaxRound = ${GONOTELM_STUDIO_SLIDES_GENERATE_MAX_ROUND:-100}
+model = "${GONOTELM_STUDIO_SLIDES_MODEL:-deepseek-v4-flash}"
+sandboxProvider = "${GONOTELM_STUDIO_SLIDES_SANDBOX_PROVIDER:-opensandbox}"
+
 [embedding]
 type = "${GONOTELM_EMBEDDING_TYPE:-dashscope}"
 batchSize = ${GONOTELM_EMBEDDING_BATCH_SIZE:-10}
@@ -103,7 +115,6 @@ apiKey = "${GONOTELM_DEEPSEEK_API_KEY}"
 timeout = "${GONOTELM_DEEPSEEK_TIMEOUT:-5m}"
 baseUrl = "${GONOTELM_DEEPSEEK_BASE_URL:-https://api.deepseek.com}"
 model = "${GONOTELM_DEEPSEEK_MODEL:-deepseek-v4-flash}"
-maxTokens = ${GONOTELM_DEEPSEEK_MAX_TOKENS:-16384}
 thinkingEnabled = false
 
 [provider.qwen]
@@ -111,10 +122,17 @@ apiKey = "${GONOTELM_DASHSCOPE_API_KEY:-}"
 baseUrl = "${GONOTELM_QWEN_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}"
 model = "${GONOTELM_QWEN_MODEL:-glm-5.1}"
 timeout = "${GONOTELM_QWEN_TIMEOUT:-5m}"
-maxTokens = ${GONOTELM_QWEN_MAX_TOKENS:-16384}
 temperature = ${GONOTELM_QWEN_TEMPERATURE:-1.0}
 topP = ${GONOTELM_QWEN_TOP_P:-1.0}
 enableThinking = ${GONOTELM_QWEN_ENABLE_THINKING:-false}
+
+[provider.agnes]
+apiKey = "${GONOTELM_AGNES_API_KEY:-}"
+baseUrl = "${GONOTELM_AGNES_BASE_URL:-https://apihub.agnes-ai.com/v1}"
+model = "${GONOTELM_AGNES_MODEL:-agnes-2.5-pro}"
+timeout = "${GONOTELM_AGNES_TIMEOUT:-5m}"
+temperature = ${GONOTELM_AGNES_TEMPERATURE:-1.0}
+topP = ${GONOTELM_AGNES_TOP_P:-1.0}
 
 [text2image.dashscope]
 apiKey = "${GONOTELM_DASHSCOPE_API_KEY:-}"
@@ -151,6 +169,12 @@ addr        = "${GONOTELM_FLOW_ADDR:-localhost:7091}"
 namespace   = "${GONOTELM_FLOW_NAMESPACE:-gonotelm}"
 maxRetry    = ${GONOTELM_FLOW_MAX_RETRY:-3}
 dialTimeout = "${GONOTELM_FLOW_DIAL_TIMEOUT:-5s}"
+
+[sandbox.opensandbox]
+endpoint = "${GONOTELM_SANDBOX_ENDPOINT:-http://localhost:23080}"
+apiKey = "${GONOTELM_SANDBOX_API_KEY:-123456}"
+timeout = "${GONOTELM_SANDBOX_TIMEOUT:-30s}"
+image = "${GONOTELM_SANDBOX_IMAGE:opensandbox/code-interpreter-base}"
 
 [worker]
 maxConcurrency  = ${GONOTELM_WORKER_MAX_CONCURRENCY:-4}

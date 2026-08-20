@@ -4,8 +4,20 @@ import (
 	"fmt"
 	"strings"
 
+	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
+
 	einoschema "github.com/cloudwego/eino/schema"
 )
+
+const (
+	logSnippetHead = 200
+	logSnippetTail = 120
+)
+
+// TruncateForLog truncates noisy LLM output for slog fields (keeps head + tail).
+func TruncateForLog(s string) string {
+	return pkgstring.TruncateHeadTail(s, logSnippetHead, logSnippetTail)
+}
 
 func NormalizeStrings(sources []string) []string {
 	normalized := make([]string, 0, len(sources))
@@ -20,32 +32,35 @@ func NormalizeStrings(sources []string) []string {
 	return normalized
 }
 
-// BuildTipMessage constructs an optional user message carrying the user-provided
-// custom tip. It returns nil when the tip is empty, so callers can append it
-// conditionally to the rendered system messages.
+// BuildTipMessage constructs a user message for the rendered prompts.
+// When tip is non-empty it carries the user extra requirement; when tip is empty
+// it still returns a short user message so providers that require a user query
+// accept the request, and the message stays in agent history.
 func BuildTipMessage(tip string) *einoschema.Message {
 	tip = strings.TrimSpace(tip)
 	if tip == "" {
-		return nil
+		return &einoschema.Message{
+			Role:    einoschema.User,
+			Content: "Please follow the system instructions and proceed.",
+		}
 	}
 
 	return &einoschema.Message{
 		Role:    einoschema.User,
-		Content: "用户附加要求：\n<user_extra_input>\n" + tip + "\n</user_extra_input>",
+		Content: "User extra requirement:\n<user_extra_input>\n" + tip + "\n</user_extra_input>",
 	}
 }
 
 // BuildCompensateMessage constructs a user message that asks the LLM to re-output
 // its result as strict JSON when the previous output failed parsing.
 // fieldRules specifies the expected JSON fields and format constraints
-// (e.g. "JSON 字段必须且仅能包含 title 和 mindmap").
 func BuildCompensateMessage(output string, fieldRules []string) *einoschema.Message {
-	rules := []string{"只输出一个合法 JSON 对象，不要任何解释性文字"}
+	rules := []string{"Output only one valid JSON object, without any explanatory text"}
 	rules = append(rules, fieldRules...)
-	rules = append(rules, "不允许输出 ```json 代码块包裹")
+	rules = append(rules, "Do not wrap the output in ```json code fences")
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "你刚才输出的结果不符合要求，请严格重输。\n当前输出：\n%s\n\n要求：\n", output)
+	fmt.Fprintf(&b, "Your previous output does not meet the requirements. Please output it again strictly.\nCurrent output:\n%s\n\nRequirements:\n", output)
 	for i, rule := range rules {
 		fmt.Fprintf(&b, "%d) %s\n", i+1, rule)
 	}
@@ -60,7 +75,7 @@ func BuildCompensateMessage(output string, fieldRules []string) *einoschema.Mess
 // re-output plain text (non-JSON) under the given constraints.
 func BuildCompensatePlainMessage(output string, fieldRules []string) *einoschema.Message {
 	var b strings.Builder
-	fmt.Fprintf(&b, "你刚才输出的结果不符合要求，请严格重输。\n当前输出：\n%s\n\n要求：\n", output)
+	fmt.Fprintf(&b, "Your previous output does not meet the requirements. Please output it again strictly.\nCurrent output:\n%s\n\nRequirements:\n", output)
 	for i, rule := range fieldRules {
 		fmt.Fprintf(&b, "%d) %s\n", i+1, rule)
 	}

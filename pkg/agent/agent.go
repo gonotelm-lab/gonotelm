@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"maps"
 	"runtime/debug"
 	"sync"
 
@@ -186,6 +187,35 @@ func (a *Agent[State]) BindTools(tools map[string]einotool.InvokableTool) error 
 	tooledLLM, err := a.cfg.BaseLLM.WithTools(toolInfos)
 	if err != nil {
 		return errors.Wrapf(errors.ErrInner, "bind tools failed: %v", err)
+	}
+	a.tooledLLM = tooledLLM
+
+	return nil
+}
+
+// AppendTools 追加绑定工具，已存在的工具名会被覆盖，其余保持原绑定。
+func (a *Agent[State]) AppendTools(newTools map[string]einotool.InvokableTool) error {
+	if len(newTools) == 0 {
+		return nil
+	}
+
+	merged := make(map[string]einotool.InvokableTool, len(a.tools)+len(newTools))
+	maps.Copy(merged, a.tools)
+	maps.Copy(merged, newTools)
+
+	a.tools = merged
+	toolInfos := make([]*einoschema.ToolInfo, 0, len(merged))
+	for _, tool := range merged {
+		toolInfo, err := tool.Info(context.Background())
+		if err != nil {
+			continue
+		}
+		toolInfos = append(toolInfos, toolInfo)
+	}
+
+	tooledLLM, err := a.cfg.BaseLLM.WithTools(toolInfos)
+	if err != nil {
+		return errors.Wrapf(errors.ErrInner, "append tools failed: %v", err)
 	}
 	a.tooledLLM = tooledLLM
 
@@ -513,9 +543,9 @@ func (a *Agent[State]) handleToolCalls(
 
 			if a.cfg.Verbose {
 				slog.DebugContext(ctx, "handling tool call",
-					slog.String("tool_name", toolCall.Function.Name),
-					slog.String("tool_call_id", toolCall.ID),
-					slog.String("tool_call_arguments", string(toolCall.Function.Arguments)),
+					slog.String("name", toolCall.Function.Name),
+					slog.String("call_id", toolCall.ID),
+					slog.String("call_args", truncateVerbose(toolCall.Function.Arguments)),
 				)
 			}
 
@@ -524,10 +554,10 @@ func (a *Agent[State]) handleToolCalls(
 					panicErr := fmt.Errorf("tool call panic: %v", e)
 					resultForCallback[idx].Error = panicErr
 					slog.ErrorContext(ctx,
-						"handle tool call panic",
+						"handling tool call panic",
 						slog.Any("err", e),
-						slog.String("tool_name", toolCall.Function.Name),
-						slog.String("tool_call_id", toolCall.ID),
+						slog.String("name", toolCall.Function.Name),
+						slog.String("call_id", toolCall.ID),
 						slog.String("stack", string(debug.Stack())),
 					)
 					results[idx].Content = panicErr.Error()
@@ -558,10 +588,10 @@ func (a *Agent[State]) handleToolCalls(
 
 			if a.cfg.Verbose {
 				slog.DebugContext(ctx, "tool call finished",
-					slog.String("tool_name", toolCall.Function.Name),
-					slog.String("tool_call_id", toolCall.ID),
-					slog.String("tool_call_arguments", string(toolCall.Function.Arguments)),
-					slog.String("tool_call_result", result),
+					slog.String("name", toolCall.Function.Name),
+					slog.String("call_id", toolCall.ID),
+					slog.String("call_args", truncateVerbose(toolCall.Function.Arguments)),
+					slog.String("call_result", truncateVerbose(result)),
 				)
 			}
 		})

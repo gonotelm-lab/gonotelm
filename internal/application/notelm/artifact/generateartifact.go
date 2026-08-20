@@ -33,6 +33,7 @@ type GenerateRequest struct {
 	Flashcard     *artifactentity.FlashcardPayload
 	Quiz          *artifactentity.QuizPayload
 	DataTable     *artifactentity.DataTablePayload
+	Slides        *artifactentity.SlidesPayload
 	Note          *artifactentity.NotePayload
 }
 
@@ -220,6 +221,16 @@ func (r *GenerateRequest) buildPayload() (artifactentity.Payload, error) {
 		r.DataTable.NotebookId = r.NotebookId
 		r.DataTable.SourceIds = r.SourceIds
 		return r.DataTable, nil
+	case artifactentity.KindSlides:
+		if r.Slides == nil {
+			return &artifactentity.SlidesPayload{
+				NotebookId: r.NotebookId,
+				SourceIds:  r.SourceIds,
+			}, nil
+		}
+		r.Slides.NotebookId = r.NotebookId
+		r.Slides.SourceIds = r.SourceIds
+		return r.Slides, nil
 	}
 
 	return nil, errors.ErrParams.Msgf("unsupported artifact kind: %s", r.Kind)

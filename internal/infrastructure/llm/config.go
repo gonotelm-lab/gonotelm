@@ -36,7 +36,6 @@ type OpenAIChatConfig struct {
 	Timeout          time.Duration `toml:"timeout"`
 	BaseUrl          string        `toml:"baseUrl"`
 	Model            string        `toml:"model"`
-	MaxTokens        *int          `toml:"maxTokens"`
 	Temperature      *float32      `toml:"temperature"`
 	TopP             *float32      `toml:"topP"`
 	PresencePenalty  *float32      `toml:"presencePenalty"`
@@ -49,17 +48,16 @@ type OpenAIChatConfig struct {
 
 func (c *OpenAIChatConfig) ToEino() *openai.ChatModelConfig {
 	return &openai.ChatModelConfig{
-		APIKey:              c.ApiKey,
-		Timeout:             c.Timeout,
-		HTTPClient:          httpclient.NewBuilder(nil).WithTimeout(c.Timeout).Build(),
-		BaseURL:             c.BaseUrl,
-		Model:               c.Model,
-		MaxCompletionTokens: c.MaxTokens,
-		Temperature:         c.Temperature,
-		TopP:                c.TopP,
-		PresencePenalty:     c.PresencePenalty,
-		FrequencyPenalty:    c.FrequencyPenalty,
-		ReasoningEffort:     openai.ReasoningEffortLevel(c.ReasoningEffort),
+		APIKey:           c.ApiKey,
+		Timeout:          c.Timeout,
+		HTTPClient:       httpclient.NewBuilder(nil).WithTimeout(c.Timeout).Build(),
+		BaseURL:          c.BaseUrl,
+		Model:            c.Model,
+		Temperature:      c.Temperature,
+		TopP:             c.TopP,
+		PresencePenalty:  c.PresencePenalty,
+		FrequencyPenalty: c.FrequencyPenalty,
+		ReasoningEffort:  openai.ReasoningEffortLevel(c.ReasoningEffort),
 	}
 }
 
@@ -68,7 +66,6 @@ type QwenChatConfig struct {
 	Timeout          time.Duration `toml:"timeout"`
 	BaseUrl          string        `toml:"baseUrl"`
 	Model            string        `toml:"model"`
-	MaxTokens        *int          `toml:"maxTokens"`
 	Temperature      *float32      `toml:"temperature"`
 	TopP             *float32      `toml:"topP"`
 	PresencePenalty  *float32      `toml:"presencePenalty"`
@@ -86,7 +83,6 @@ func (c *QwenChatConfig) ToEino() *qwen.ChatModelConfig {
 		HTTPClient:       newHttpClient(c.Timeout),
 		BaseURL:          c.BaseUrl,
 		Model:            c.Model,
-		MaxTokens:        c.MaxTokens,
 		Temperature:      c.Temperature,
 		TopP:             c.TopP,
 		PresencePenalty:  c.PresencePenalty,
@@ -102,7 +98,6 @@ type DeepSeekChatConfig struct {
 	BaseURL          string        `toml:"baseUrl"`
 	Path             string        `toml:"path"`
 	Model            string        `toml:"model"`
-	MaxTokens        int           `toml:"maxTokens"`
 	Temperature      float32       `toml:"temperature"`
 	TopP             float32       `toml:"topP"`
 	PresencePenalty  float32       `toml:"presencePenalty"`
@@ -115,6 +110,7 @@ type DeepSeekChatConfig struct {
 }
 
 func (c *DeepSeekChatConfig) ToEino() *deepseek.ChatModelConfig {
+	// 不设置 MaxTokens：请求体 omit max_tokens，由模型侧默认上限决定
 	dc := &deepseek.ChatModelConfig{
 		APIKey:           c.ApiKey,
 		Timeout:          c.Timeout,
@@ -122,7 +118,6 @@ func (c *DeepSeekChatConfig) ToEino() *deepseek.ChatModelConfig {
 		BaseURL:          c.BaseURL,
 		Path:             c.Path,
 		Model:            c.Model,
-		MaxTokens:        c.MaxTokens,
 		Temperature:      c.Temperature,
 		TopP:             c.TopP,
 		PresencePenalty:  c.PresencePenalty,
@@ -142,7 +137,6 @@ type AgnesChatConfig struct {
 	Timeout          time.Duration `toml:"timeout"`
 	BaseUrl          string        `toml:"baseUrl"`
 	Model            string        `toml:"model"`
-	MaxTokens        *int          `toml:"maxTokens"`
 	Temperature      *float32      `toml:"temperature"`
 	TopP             *float32      `toml:"topP"`
 	PresencePenalty  *float32      `toml:"presencePenalty"`
@@ -153,17 +147,16 @@ type AgnesChatConfig struct {
 
 func (c *AgnesChatConfig) ToEino() *agnes.ChatModelConfig {
 	return &agnes.ChatModelConfig{
-		APIKey:              c.ApiKey,
-		Timeout:             c.Timeout,
-		HTTPClient:          newHttpClient(c.Timeout),
-		BaseURL:             c.BaseUrl,
-		Model:               c.Model,
-		MaxCompletionTokens: c.MaxTokens,
-		Temperature:         c.Temperature,
-		TopP:                c.TopP,
-		PresencePenalty:     c.PresencePenalty,
-		FrequencyPenalty:    c.FrequencyPenalty,
-		Seed:                c.Seed,
+		APIKey:           c.ApiKey,
+		Timeout:          c.Timeout,
+		HTTPClient:       newHttpClient(c.Timeout),
+		BaseURL:          c.BaseUrl,
+		Model:            c.Model,
+		Temperature:      c.Temperature,
+		TopP:             c.TopP,
+		PresencePenalty:  c.PresencePenalty,
+		FrequencyPenalty: c.FrequencyPenalty,
+		Seed:             c.Seed,
 	}
 }
 

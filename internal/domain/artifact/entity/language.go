@@ -15,7 +15,7 @@ func (l Language) DisplayName() string {
 	case LanguageEnglish:
 		return "English"
 	default:
-		return "English"
+		return "中文"
 	}
 }
 

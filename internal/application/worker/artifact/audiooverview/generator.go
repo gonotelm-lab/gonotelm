@@ -69,10 +69,7 @@ type podcastTranscriptExpectation struct {
 }
 
 func (a *Generator) Generate(ctx context.Context, req *types.Request) (*types.Response, error) {
-	payload, ok := req.Payload.(*artifactentity.AudioOverviewPayload)
-	if !ok {
-		return nil, errors.ErrParams.Msgf("audio overview generator expects AudioOverviewPayload")
-	}
+	payload := artifactentity.PayloadAs[*artifactentity.AudioOverviewPayload](req.Payload)
 
 	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioAudioOverviewScene)
 	llmOptions := a.llmOptions()
@@ -283,7 +280,7 @@ func (a *Generator) generateOutline(
 	}
 
 	sourceIds := types.SourceIDsToStrings(req.SourceIds)
-	msgs, err := RenderPodcastOutline(ctx, sourceIds, payload.Language, payload.Tip, payload.Style)
+	msgs, err := RenderPodcastOutline(ctx, sourceIds, payload.Language, payload.GetTip(), payload.Style)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrInner, "render podcast outline prompt failed, err=%v", err)
 	}
@@ -308,9 +305,9 @@ func (a *Generator) generateOutline(
 
 	compensateMsgs := append([]*einoschema.Message{}, ag.AccumulatedMessages()...)
 	compensateMsgs = append(compensateMsgs, types.BuildCompensateMessage(output.Content, []string{
-		"JSON 字段必须且仅能包含 title 和 segments",
-		"title 简短精炼",
-		"segments 是数组，每个元素包含 name 和 content 字段",
+		"JSON must contain only `title` and `segments`",
+		"`title` should be short and concise",
+		"`segments` is an array; each element has `name` and `content`",
 	}))
 
 	llmResp, genErr := ag.BaseLLM().Generate(ctx, compensateMsgs, llmOptions...)
@@ -377,11 +374,11 @@ func (a *Generator) generateTranscript(
 
 	compensateMsgs := append([]*einoschema.Message{}, ag.AccumulatedMessages()...)
 	compensateMsgs = append(compensateMsgs, types.BuildCompensateMessage(output.Content, []string{
-		"JSON 字段必须且仅能包含 title 和 segments",
-		"title 与大纲标题一致",
-		"segments 数量与大纲一致，每个元素包含 name 和 dialogue 字段",
-		"dialogue 是数组，每个元素包含 speaker、text 和 voice_instruction 字段",
-		"voice_instruction 为语音指令",
+		"JSON must contain only `title` and `segments`",
+		"`title` must match the outline title",
+		"`segments` count must match the outline; each element has `name` and `dialogue`",
+		"`dialogue` is an array; each element has `speaker`, `text`, and `voice_instruction`",
+		"`voice_instruction` is a voice direction",
 	}))
 
 	llmResp, genErr := ag.BaseLLM().Generate(ctx, compensateMsgs, llmOptions...)
@@ -418,14 +415,14 @@ func (a *Generator) parseOutlineOutput(ctx context.Context, content string) (*po
 			slog.DebugContext(ctx,
 				"podcast outline direct unmarshal did not match, fallback to json extraction",
 				slog.Any("err", err),
-				slog.String("raw_content", content),
+				slog.String("raw_content", types.TruncateForLog(content)),
 			)
 		},
 	}
 	if err := decoder.Unmarshal(pkgstring.AsBytes(content), &expect); err != nil {
 		slog.WarnContext(ctx, "podcast outline output unmarshal failed after compatibility fallback",
 			slog.Any("err", err),
-			slog.String("raw_content", content))
+			slog.String("raw_content", types.TruncateForLog(content)))
 		return nil, err
 	}
 
@@ -469,14 +466,14 @@ func (a *Generator) parseTranscriptOutput(
 			slog.DebugContext(ctx,
 				"podcast transcript direct unmarshal did not match, fallback to json extraction",
 				slog.Any("err", err),
-				slog.String("raw_content", content),
+				slog.String("raw_content", types.TruncateForLog(content)),
 			)
 		},
 	}
 	if err := decoder.Unmarshal(pkgstring.AsBytes(content), &expect); err != nil {
 		slog.WarnContext(ctx, "podcast transcript output unmarshal failed after compatibility fallback",
 			slog.Any("err", err),
-			slog.String("raw_content", content))
+			slog.String("raw_content", types.TruncateForLog(content)))
 		return nil, err
 	}
 

@@ -18,8 +18,9 @@ func TestCheckStudioMindmapResult(t *testing.T) {
 func TestRenderMindmap(t *testing.T) {
 	msgs, err := RenderMindmap(t.Context(), []string{"src-1"}, "")
 	require.NoError(t, err)
-	assert.NotEmpty(t, msgs)
-	assert.Contains(t, msgs[len(msgs)-1].Content, "src-1")
+	require.Len(t, msgs, 2)
+	assert.Contains(t, msgs[0].Content, "src-1")
+	assert.Equal(t, "user", string(msgs[1].Role))
 }
 
 func TestGenerator_ImplementsGenerator(t *testing.T) {

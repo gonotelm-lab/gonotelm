@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"strings"
 	"testing"
 	"time"
@@ -20,7 +21,7 @@ func TestNotebookStoreCRUD(t *testing.T) {
 			Id:          database.Id(uuid.NewV7()),
 			Name:        "nb_" + uuid.NewV7().String(),
 			Description: "initial desc",
-			OwnerId:     "owner_" + uuid.NewV7().String(),
+			OwnerId:     valobj.NewUid(),
 			UpdatedAt:   time.Now().UnixMilli(),
 		}
 
@@ -67,7 +68,7 @@ func TestNotebookStoreListByOwnerId(t *testing.T) {
 	Convey("NotebookStore ListByOwnerId", t, func() {
 		store := testNotebookStore
 		ctx := t.Context()
-		ownerID := "owner_" + uuid.NewV7().String()
+		ownerID := valobj.NewUid()
 
 		nbOld := &schema.Notebook{
 			Id:          database.Id(uuid.NewV7()),
@@ -108,7 +109,7 @@ func TestNotebookStoreListByOwnerIdInvalidPagination(t *testing.T) {
 	Convey("NotebookStore ListByOwnerId invalid pagination", t, func() {
 		store := testNotebookStore
 		ctx := t.Context()
-		ownerID := "owner_" + uuid.NewV7().String()
+		ownerID := valobj.NewUid()
 
 		_, err := store.ListByOwnerId(ctx, ownerID, 0, 0, 1)
 		So(err, ShouldNotBeNil)
@@ -129,7 +130,7 @@ func TestNotebookStoreUpdateName(t *testing.T) {
 			Id:          database.Id(uuid.NewV7()),
 			Name:        "nb_" + uuid.NewV7().String(),
 			Description: "initial desc",
-			OwnerId:     "owner_" + uuid.NewV7().String(),
+			OwnerId:     valobj.NewUid(),
 			UpdatedAt:   time.Now().UnixMilli(),
 		}
 		err := store.Create(ctx, notebook)
@@ -165,7 +166,7 @@ func TestNotebookStoreUpdateDescription(t *testing.T) {
 				Id:          database.Id(uuid.NewV7()),
 				Name:        "nb_" + uuid.NewV7().String(),
 				Description: desc,
-				OwnerId:     "owner_" + uuid.NewV7().String(),
+				OwnerId:     valobj.NewUid(),
 				UpdatedAt:   updatedAt,
 			}
 			err := store.Create(ctx, notebook)
@@ -232,7 +233,7 @@ func TestNotebookStoreUpsert(t *testing.T) {
 		ctx := t.Context()
 
 		notebookID := database.Id(uuid.NewV7())
-		ownerID := "owner_" + uuid.NewV7().String()
+		ownerID := valobj.NewUid()
 
 		notebook := &schema.Notebook{
 			Id:          notebookID,
@@ -258,7 +259,7 @@ func TestNotebookStoreUpsert(t *testing.T) {
 
 		notebook.Name = "nb_upsert_updated_" + uuid.NewV7().String()
 		notebook.Description = "updated desc"
-		notebook.OwnerId = "owner_should_not_change"
+		notebook.OwnerId = valobj.NewUid()
 		notebook.UpdatedAt = 2000
 
 		err = store.Upsert(ctx, notebook)
@@ -284,7 +285,7 @@ func TestNotebookStoreFillNameAndDescriptionIfEmpty(t *testing.T) {
 				Id:          database.Id(uuid.NewV7()),
 				Name:        name,
 				Description: desc,
-				OwnerId:     "owner_" + uuid.NewV7().String(),
+				OwnerId:     valobj.NewUid(),
 				UpdatedAt:   updatedAt,
 			}
 			err := store.Create(ctx, notebook)

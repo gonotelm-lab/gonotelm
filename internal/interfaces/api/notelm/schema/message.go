@@ -31,7 +31,7 @@ func ToMessage(msg *chatentity.Message) *Message {
 		CreateTime: msg.CreateTime.Value(),
 		UpdateTime: msg.UpdateTime.Value(),
 		ChatId:     msg.ChatId.String(),
-		UserId:     msg.UserId,
+		UserId:     msg.UserId.String(),
 		Role:       msg.Role.String(),
 		Fragments:  msg.Fragments,
 		SeqNo:      msg.SeqNo,

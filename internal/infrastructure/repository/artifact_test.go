@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	artifacterrors "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/errors"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
@@ -47,7 +48,7 @@ func TestMain(m *testing.M) {
 	}
 }
 
-func mustNewArtifact(t *testing.T, notebookId uuid.UUID, userId string, kind artifactentity.Kind, payload artifactentity.Payload) *artifactentity.Artifact {
+func mustNewArtifact(t *testing.T, notebookId uuid.UUID, userId valobj.Uid, kind artifactentity.Kind, payload artifactentity.Payload) *artifactentity.Artifact {
 	t.Helper()
 	a, err := artifactentity.NewArtifact(notebookId, userId, kind, payload)
 	require.NoError(t, err)
@@ -55,7 +56,7 @@ func mustNewArtifact(t *testing.T, notebookId uuid.UUID, userId string, kind art
 }
 
 func TestArtifactRepository_SaveAndFindById(t *testing.T) {
-	a := mustNewArtifact(t, uuid.NewV7(), "u-repo-1", artifactentity.KindMindmap, &artifactentity.MindmapPayload{NotebookId: uuid.NewV7(), SourceIds: nil})
+	a := mustNewArtifact(t, uuid.NewV7(), valobj.NewUid(), artifactentity.KindMindmap, &artifactentity.MindmapPayload{NotebookId: uuid.NewV7(), SourceIds: nil})
 	a.BindFlowTaskId(uuid.NewV7().String())
 	require.NoError(t, artifactRepo.Save(artifactTestCtx, a))
 
@@ -75,7 +76,7 @@ func TestArtifactRepository_FindById_NotFound(t *testing.T) {
 
 func TestArtifactRepository_ListByNotebookId(t *testing.T) {
 	notebookId := uuid.NewV7()
-	a := mustNewArtifact(t, notebookId, "u-repo-list", artifactentity.KindReport, &artifactentity.ReportPayload{NotebookId: notebookId})
+	a := mustNewArtifact(t, notebookId, valobj.NewUid(), artifactentity.KindReport, &artifactentity.ReportPayload{NotebookId: notebookId})
 	a.BindFlowTaskId(uuid.NewV7().String())
 	require.NoError(t, artifactRepo.Save(artifactTestCtx, a))
 
@@ -93,7 +94,7 @@ func TestArtifactRepository_ListByNotebookId(t *testing.T) {
 }
 
 func TestArtifactRepository_ListByStatus(t *testing.T) {
-	a := mustNewArtifact(t, uuid.NewV7(), "u-repo-2", artifactentity.KindReport, &artifactentity.ReportPayload{NotebookId: uuid.NewV7()})
+	a := mustNewArtifact(t, uuid.NewV7(), valobj.NewUid(), artifactentity.KindReport, &artifactentity.ReportPayload{NotebookId: uuid.NewV7()})
 	a.BindFlowTaskId(uuid.NewV7().String())
 	require.NoError(t, artifactRepo.Save(artifactTestCtx, a))
 
@@ -106,7 +107,7 @@ func TestArtifactRepository_ListByStatus(t *testing.T) {
 }
 
 func TestArtifactRepository_Save_UpsertUpdatesFields(t *testing.T) {
-	a := mustNewArtifact(t, uuid.NewV7(), "u-repo-3", artifactentity.KindMindmap, &artifactentity.MindmapPayload{NotebookId: uuid.NewV7()})
+	a := mustNewArtifact(t, uuid.NewV7(), valobj.NewUid(), artifactentity.KindMindmap, &artifactentity.MindmapPayload{NotebookId: uuid.NewV7()})
 	a.BindFlowTaskId(uuid.NewV7().String())
 	require.NoError(t, artifactRepo.Save(artifactTestCtx, a))
 
@@ -122,7 +123,7 @@ func TestArtifactRepository_Save_UpsertUpdatesFields(t *testing.T) {
 }
 
 func TestArtifactRepository_DeleteById(t *testing.T) {
-	a := mustNewArtifact(t, uuid.NewV7(), "u-repo-del", artifactentity.KindReport, &artifactentity.ReportPayload{NotebookId: uuid.NewV7()})
+	a := mustNewArtifact(t, uuid.NewV7(), valobj.NewUid(), artifactentity.KindReport, &artifactentity.ReportPayload{NotebookId: uuid.NewV7()})
 	a.BindFlowTaskId(uuid.NewV7().String())
 	require.NoError(t, artifactRepo.Save(artifactTestCtx, a))
 

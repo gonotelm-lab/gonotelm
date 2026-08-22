@@ -3,6 +3,7 @@ package postgres
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"reflect"
 	"strings"
 	"testing"
@@ -17,7 +18,7 @@ func TestChatMessageStoreCreateListDeleteByChatId(t *testing.T) {
 		store := testChatMessageStore
 		ctx := t.Context()
 		chatID := createNotebookForSourceTest(t, testDB)
-		userID := "user_" + uuid.NewV7().String()
+		userID := valobj.NewUid()
 
 		msgOld := &schema.ChatMessage{
 			ChatId:  chatID,
@@ -104,7 +105,7 @@ func TestChatMessageStoreListByChatIdPagination(t *testing.T) {
 		store := testChatMessageStore
 		ctx := t.Context()
 		chatID := createNotebookForSourceTest(t, testDB)
-		userID := "user_" + uuid.NewV7().String()
+		userID := valobj.NewUid()
 
 		msgOld := &schema.ChatMessage{
 			ChatId:  chatID,
@@ -146,7 +147,7 @@ func TestChatMessageStoreListByChatIdOrderAsc(t *testing.T) {
 		store := testChatMessageStore
 		ctx := t.Context()
 		chatID := createNotebookForSourceTest(t, testDB)
-		userID := "user_" + uuid.NewV7().String()
+		userID := valobj.NewUid()
 
 		msgOld := &schema.ChatMessage{
 			ChatId:  chatID,
@@ -182,7 +183,7 @@ func TestChatMessageStoreListByChatIdBeforeSeqNoIncludesExtra(t *testing.T) {
 		store := testChatMessageStore
 		ctx := t.Context()
 		chatID := createNotebookForSourceTest(t, testDB)
-		userID := "user_" + uuid.NewV7().String()
+		userID := valobj.NewUid()
 
 		msgOld := &schema.ChatMessage{
 			ChatId:  chatID,

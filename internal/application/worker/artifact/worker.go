@@ -36,6 +36,10 @@ func RegisterTypedWorker(client *flowworker.Client, deps *generatetypes.ServiceD
 		if err != nil {
 			return paramErrorResult("source_ids: %v", err), nil
 		}
+		userId, err := valobj.NewUidFromString(in.UserId)
+		if err != nil {
+			return paramErrorResult("user_id: %v", err), nil
+		}
 		payload, err := decodePayload(kind, in.Payload)
 		if err != nil {
 			return paramErrorResult("payload: %v", err), nil
@@ -44,7 +48,7 @@ func RegisterTypedWorker(client *flowworker.Client, deps *generatetypes.ServiceD
 		req := &generatetypes.Request{
 			ArtifactId: artifactId,
 			NotebookId: notebookId,
-			UserId:     in.UserId,
+			UserId:     userId,
 			SourceIds:  sourceIds,
 			Kind:       kind,
 			Payload:    payload,

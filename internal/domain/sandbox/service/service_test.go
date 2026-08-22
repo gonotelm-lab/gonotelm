@@ -55,7 +55,7 @@ func newFakeRepo() *fakeRepo {
 }
 
 func (r *fakeRepo) cacheKey(key entity.SandboxKey) string {
-	return key.UserId + ":" + key.NotebookId.String()
+	return key.UserId.String() + ":" + key.NotebookId.String()
 }
 
 func (r *fakeRepo) GetSandbox(_ context.Context, key entity.SandboxKey) (entity.SandboxDescription, error) {
@@ -151,7 +151,9 @@ func testKey(t *testing.T) entity.SandboxKey {
 	t.Helper()
 	nb, err := valobj.NewIdFromString("01900000-0000-7000-8000-000000000001")
 	require.NoError(t, err)
-	return entity.SandboxKey{UserId: "u1", NotebookId: nb}
+	uid, err := valobj.NewUidFromString("01hf7yat00vtpvxvyaztxbw001")
+	require.NoError(t, err)
+	return entity.SandboxKey{UserId: uid, NotebookId: nb}
 }
 
 func TestGetOrCreateSandbox_DefaultTTLAligned(t *testing.T) {

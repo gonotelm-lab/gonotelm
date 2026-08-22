@@ -43,7 +43,7 @@ func TestManagerLifecycle(t *testing.T) {
 	var manager repository.Manager = m
 
 	sbx, err := manager.CreateSandbox(ctx, entity.SandboxKey{
-		UserId:     "test-user",
+		UserId:     valobj.NewUid(),
 		NotebookId: valobj.NewId(),
 	}, entity.Spec{
 		TTL: 2 * time.Minute,

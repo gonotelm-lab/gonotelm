@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
-	"unicode/utf8"
 
 	coreentity "github.com/gonotelm-lab/gonotelm/internal/core/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
@@ -17,7 +16,6 @@ import (
 
 const (
 	MaxSourceTitleLength   = 255
-	MaxOwnerIdLength       = 255
 	MaxUploadFileSizeBytes = 100 * 1024 * 1024 // 100MB
 
 	// 一篇来源最大允许token数量
@@ -59,7 +57,7 @@ type Source struct {
 	Status           vo.SourceStatus
 	Title            string
 	Abstract         string
-	OwnerId          string
+	OwnerId          valobj.Uid
 	Content          SourceContent
 	ParsedContentKey string
 }
@@ -67,7 +65,7 @@ type Source struct {
 func NewSource(
 	notebookId valobj.Id,
 	kind vo.SourceKind,
-	ownerId string,
+	ownerId valobj.Uid,
 	content *ContentUnion,
 ) (*Source, error) {
 	s := &Source{
@@ -97,8 +95,8 @@ func NewSource(
 }
 
 func (s *Source) validate() error {
-	if len := utf8.RuneCountInString(s.OwnerId); len > MaxOwnerIdLength {
-		return errors.ErrParams.Msgf("owner id is too long, length=%d", len)
+	if s.OwnerId.IsZero() {
+		return errors.ErrParams.Msgf("owner id is required")
 	}
 
 	if s.NotebookId.IsZero() {

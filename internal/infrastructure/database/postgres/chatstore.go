@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/schema"
 	xerror "github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -42,7 +43,7 @@ func (s *ChatStoreImpl) GetById(ctx context.Context, id database.Id) (*schema.Ch
 func (s *ChatStoreImpl) GetByNotebookIdAndOwnerId(
 	ctx context.Context,
 	notebookId database.Id,
-	ownerId string,
+	ownerId valobj.Uid,
 ) (*schema.Chat, error) {
 	var chat schema.Chat
 	err := s.db.WithContext(ctx).
@@ -56,7 +57,7 @@ func (s *ChatStoreImpl) GetByNotebookIdAndOwnerId(
 
 func (s *ChatStoreImpl) ListByOwnerId(
 	ctx context.Context,
-	ownerId string,
+	ownerId valobj.Uid,
 	limit, offset int,
 ) ([]*schema.Chat, error) {
 	if limit <= 0 || offset < 0 {

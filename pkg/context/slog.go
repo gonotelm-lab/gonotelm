@@ -24,11 +24,11 @@ func getReqIdSlogAttr(ctx context.Context) (slog.Attr, bool) {
 
 func getUserIdSlogAttr(ctx context.Context) (slog.Attr, bool) {
 	userId := GetUserId(ctx)
-	if userId == "" {
+	if userId.IsZero() {
 		return slog.Attr{}, false
 	}
 
-	attr := slog.String(AttrKeyUserID, userId)
+	attr := slog.String(AttrKeyUserID, userId.String())
 	return attr, true
 }
 

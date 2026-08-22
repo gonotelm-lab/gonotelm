@@ -41,7 +41,7 @@ type SourceDoc struct {
 	NotebookId valobj.Id
 	SourceId   valobj.Id
 	Content    string
-	Owner      string
+	Owner      valobj.Uid
 
 	// 召回阶段分数 仅在召回阶段有值
 	Score float32
@@ -55,7 +55,7 @@ type SourceDoc struct {
 
 func NewSourceDoc(
 	sourceId, notebookId valobj.Id,
-	owner string,
+	owner valobj.Uid,
 	chunkPos int,
 	doc *einoschema.Document,
 ) (*SourceDoc, error) {

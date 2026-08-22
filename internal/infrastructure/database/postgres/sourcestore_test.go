@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"strings"
 	"testing"
 	"time"
@@ -27,7 +28,7 @@ func TestSourceStoreCRUD(t *testing.T) {
 			Kind:       "doc",
 			Status:     "new",
 			Abstract:   "initial abstract",
-			OwnerId:    "owner_" + uuid.NewV7().String(),
+			OwnerId:    valobj.NewUid(),
 			Content:    []byte(content),
 			UpdatedAt:  time.Now().UnixMilli(),
 		}
@@ -298,7 +299,7 @@ func TestSourceStoreUpdate(t *testing.T) {
 			Kind:       "doc",
 			Status:     "new",
 			Content:    []byte("before update"),
-			OwnerId:    "owner_" + uuid.NewV7().String(),
+			OwnerId:    valobj.NewUid(),
 			UpdatedAt:  1000,
 		}
 
@@ -340,7 +341,7 @@ func TestSourceStoreParsedContentCompatibility(t *testing.T) {
 			Content:          []byte("raw-content"),
 			ParsedContentKey: "converted-content",
 			Abstract:         "initial abstract",
-			OwnerId:          "owner_" + uuid.NewV7().String(),
+			OwnerId:          valobj.NewUid(),
 			UpdatedAt:        1000,
 		}
 
@@ -390,7 +391,7 @@ func TestSourceStoreUpdateAbstract(t *testing.T) {
 			Title:      "source-update-abstract",
 			Content:    []byte("raw-content"),
 			Abstract:   "abstract-old",
-			OwnerId:    "owner_" + uuid.NewV7().String(),
+			OwnerId:    valobj.NewUid(),
 			UpdatedAt:  1000,
 		}
 		So(store.Create(ctx, source), ShouldBeNil)
@@ -431,7 +432,7 @@ func TestSourceStoreUpdateParsedContent(t *testing.T) {
 			Title:            "source-update-converted",
 			Content:          []byte("raw-content"),
 			ParsedContentKey: "converted-old",
-			OwnerId:          "owner_" + uuid.NewV7().String(),
+			OwnerId:          valobj.NewUid(),
 			UpdatedAt:        1000,
 		}
 		So(store.Create(ctx, source), ShouldBeNil)
@@ -465,7 +466,7 @@ func TestSourceStoreUpsert(t *testing.T) {
 		notebookID := createNotebookForSourceTest(t, testDB)
 
 		sourceID := database.Id(uuid.NewV7())
-		ownerID := "owner_" + uuid.NewV7().String()[4:]
+		ownerID := valobj.NewUid()
 		initialContent := []byte("initial content")
 
 		source := &schema.Source{
@@ -506,7 +507,7 @@ func TestSourceStoreUpsert(t *testing.T) {
 		source.Content = []byte("updated content")
 		source.ParsedContentKey = "parsed/new"
 		source.Abstract = "updated abstract"
-		source.OwnerId = "12903"
+		source.OwnerId = valobj.NewUid()
 		source.UpdatedAt = 2000
 
 		err = store.Upsert(ctx, source)
@@ -706,7 +707,7 @@ func createNotebookForSourceTest(t *testing.T, db *gorm.DB) database.Id {
 		Id:          notebookID,
 		Name:        "nb_for_source_" + uuid.NewV7().String(),
 		Description: "for source tests",
-		OwnerId:     "owner_" + uuid.NewV7().String(),
+		OwnerId:     valobj.NewUid(),
 		UpdatedAt:   time.Now().UnixMilli(),
 	}).Error
 	if err != nil {

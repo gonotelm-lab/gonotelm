@@ -48,7 +48,7 @@ func (r *ChatRepositoryImpl) FindById(ctx context.Context, id valobj.Id) (*entit
 	return mapper.ChatFromSchema(sch), nil
 }
 
-func (r *ChatRepositoryImpl) FindByNotebookIdAndOwnerId(ctx context.Context, notebookId valobj.Id, ownerId string) (*entity.Chat, error) {
+func (r *ChatRepositoryImpl) FindByNotebookIdAndOwnerId(ctx context.Context, notebookId valobj.Id, ownerId valobj.Uid) (*entity.Chat, error) {
 	sch, err := r.chatStore.GetByNotebookIdAndOwnerId(ctx, notebookId, ownerId)
 	if err != nil {
 		if errors.Is(err, errors.ErrNoRecord) {

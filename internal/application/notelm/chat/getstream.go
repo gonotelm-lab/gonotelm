@@ -141,7 +141,7 @@ func (h *GetStreamHandler) Handle(
 func canAccessStreamTask(
 	task *chatentity.StreamTask,
 	chatId valobj.Id,
-	userId string,
+	userId valobj.Uid,
 ) error {
 	if task.ChatId != chatId {
 		return errors.ErrParams.Msgf("task chat_id mismatch, task_id=%s, chat_id=%s",

@@ -44,7 +44,7 @@ type Message struct {
 	entity.Base
 
 	ChatId    valobj.Id          `json:"chat_id"`
-	UserId    string             `json:"user_id"`
+	UserId    valobj.Uid         `json:"user_id"`
 	Role      MessageRole        `json:"role"`
 	Fragments []*MessageFragment `json:"fragments,omitempty"`
 	SeqNo     int64              `json:"seq_no"`
@@ -62,7 +62,7 @@ type MessageCitation struct {
 	SourceId valobj.Id `json:"source_id"`
 }
 
-func newMessage(chatId, taskId valobj.Id, userId string, role MessageRole) *Message {
+func newMessage(chatId, taskId valobj.Id, userId valobj.Uid, role MessageRole) *Message {
 	return &Message{
 		Base:   entity.NewBase(),
 		ChatId: chatId,
@@ -73,13 +73,13 @@ func newMessage(chatId, taskId valobj.Id, userId string, role MessageRole) *Mess
 	}
 }
 
-func NewUserTextMessage(chatId, taskId valobj.Id, userId string, question string) *Message {
+func NewUserTextMessage(chatId, taskId valobj.Id, userId valobj.Uid, question string) *Message {
 	msg := newMessage(chatId, taskId, userId, MessageRoleUser)
 	msg.Fragments = append(msg.Fragments, NewMessageFragmentRequest(msg.lastFragmentId()+1, question))
 	return msg
 }
 
-func NewAssistantMessage(chatId, taskId valobj.Id, userId string) *Message {
+func NewAssistantMessage(chatId, taskId valobj.Id, userId valobj.Uid) *Message {
 	msg := newMessage(chatId, taskId, userId, MessageRoleAssistant)
 	msg.streamEvents = append(msg.streamEvents, &StreamTaskEvent{
 		Id:         idgen.Get(taskId.String()),

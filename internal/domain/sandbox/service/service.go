@@ -23,7 +23,7 @@ func sandboxBindingExpire(spec entity.Spec) time.Duration {
 }
 
 func sandboxLockKey(key entity.SandboxKey) string {
-	return fmt.Sprintf("gonotelm:sandbox:lock:%s:%s", key.UserId, key.NotebookId.String())
+	return fmt.Sprintf("gonotelm:sandbox:lock:%s:%s", key.UserId.String(), key.NotebookId.String())
 }
 
 type Service struct {

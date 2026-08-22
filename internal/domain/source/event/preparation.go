@@ -18,7 +18,7 @@ type PreparationEvent struct {
 	NotebookId valobj.Id       `json:"notebook_id"`
 	Kind       vo.SourceKind   `json:"kind"`
 	Status     vo.SourceStatus `json:"status"`
-	UserId     string          `json:"user_id"`
+	UserId     valobj.Uid      `json:"user_id"`
 
 	isRetry bool
 }
@@ -55,7 +55,7 @@ func NewPreparationEvent(
 	notebookId valobj.Id,
 	kind vo.SourceKind,
 	status vo.SourceStatus,
-	userId string,
+	userId valobj.Uid,
 	isRetry bool,
 ) *PreparationEvent {
 	return &PreparationEvent{

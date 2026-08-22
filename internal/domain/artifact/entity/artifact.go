@@ -78,7 +78,7 @@ func (r ResultKind) String() string { return string(r) }
 type Artifact struct {
 	entity.Base
 	NotebookId valobj.Id
-	UserId     string
+	UserId     valobj.Uid
 	Kind       Kind
 	Status     Status
 	FlowTaskId string
@@ -88,7 +88,7 @@ type Artifact struct {
 	Payload    Payload
 }
 
-func NewArtifact(notebookId valobj.Id, userId string, kind Kind, payload Payload) (*Artifact, error) {
+func NewArtifact(notebookId valobj.Id, userId valobj.Uid, kind Kind, payload Payload) (*Artifact, error) {
 	a := &Artifact{
 		NotebookId: notebookId,
 		UserId:     userId,
@@ -109,7 +109,7 @@ func (a *Artifact) validate() error {
 	if a.NotebookId.IsZero() {
 		return artifacterrors.ErrInvalidNotebookId
 	}
-	if a.UserId == "" {
+	if a.UserId.IsZero() {
 		return artifacterrors.ErrInvalidUserId
 	}
 	if !a.Kind.Supported() {
@@ -125,7 +125,7 @@ func (a *Artifact) validate() error {
 	return nil
 }
 
-func (a *Artifact) IsOwner(userId string) bool { return a.UserId == userId }
+func (a *Artifact) IsOwner(userId valobj.Uid) bool { return a.UserId == userId }
 
 func (a *Artifact) BindFlowTaskId(flowTaskId string) { a.FlowTaskId = flowTaskId }
 

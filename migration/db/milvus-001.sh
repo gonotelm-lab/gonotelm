@@ -59,7 +59,7 @@ export collectionSchema='{
             "fieldName": "owner",
             "dataType": "VarChar",
             "elementTypeParams": {
-                "max_length": 255
+                "max_length": 64
             }
         },
         {

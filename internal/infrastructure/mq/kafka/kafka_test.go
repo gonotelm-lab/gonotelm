@@ -8,6 +8,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/requestid"
+	"github.com/gonotelm-lab/gonotelm/pkg/ulid"
 	pkgtrace "github.com/gonotelm-lab/gonotelm/pkg/trace"
 	pkgpropagation "github.com/gonotelm-lab/gonotelm/pkg/trace/propagation"
 
@@ -33,7 +34,7 @@ func TestMessageHeadersRoundTrip(t *testing.T) {
 
 	// 模拟上游请求上下文：server span + req id + user id
 	reqId := requestid.Gen()
-	userId := "user-123"
+	userId := ulid.MustParseString("01hf7yat00vtpvxvyaztxbw001")
 	ctx, span := otel.Tracer("test").Start(context.Background(), "server-span",
 		oteltrace.WithSpanKind(oteltrace.SpanKindServer))
 	defer span.End()
@@ -73,7 +74,7 @@ func TestMessageHeadersRoundTrip(t *testing.T) {
 	if got := getHeader(msg.Headers, requestid.HeaderKey); got != reqId.String() {
 		t.Fatalf("req id header mismatch: got %s want %s", got, reqId)
 	}
-	if got := getHeader(msg.Headers, userIdHeaderKey); got != userId {
+	if got := getHeader(msg.Headers, userIdHeaderKey); got != userId.String() {
 		t.Fatalf("user id header mismatch: got %s want %s", got, userId)
 	}
 
@@ -101,16 +102,16 @@ func TestMessageHeadersRoundTrip(t *testing.T) {
 }
 
 func TestRestoreRequestContextInvalid(t *testing.T) {
-	// 非法 req id 不 panic，跳过还原
+	// 非法 req id / user id 不 panic，跳过还原
 	ctx := restoreRequestContext(context.Background(), []kafka.Header{
 		{Key: requestid.HeaderKey, Value: []byte("not-a-uuid")},
-		{Key: userIdHeaderKey, Value: []byte("u1")},
+		{Key: userIdHeaderKey, Value: []byte("not-a-ulid")},
 	})
 	if got := pkgcontext.GetReqId(ctx); !got.IsZero() {
 		t.Fatalf("invalid req id should not be restored: %s", got)
 	}
-	if got := pkgcontext.GetUserId(ctx); got != "u1" {
-		t.Fatalf("user id should be restored: %s", got)
+	if got := pkgcontext.GetUserId(ctx); !got.IsZero() {
+		t.Fatalf("invalid user id should not be restored: %s", got)
 	}
 }
 

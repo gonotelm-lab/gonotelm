@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/gonotelm-lab/gonotelm/pkg/requestid"
+	"github.com/gonotelm-lab/gonotelm/pkg/ulid"
 )
 
 type contextKey string
@@ -29,14 +30,14 @@ func GetReqId(ctx context.Context) requestid.ID {
 	return reqId
 }
 
-func WithUserId(ctx context.Context, userId string) context.Context {
+func WithUserId(ctx context.Context, userId ulid.ULID) context.Context {
 	return context.WithValue(ctx, ContextKeyUserId, userId)
 }
 
-func GetUserId(ctx context.Context) string {
-	userId, ok := ctx.Value(ContextKeyUserId).(string)
+func GetUserId(ctx context.Context) ulid.ULID {
+	userId, ok := ctx.Value(ContextKeyUserId).(ulid.ULID)
 	if !ok {
-		return ""
+		return ulid.EmptyULID()
 	}
 
 	return userId

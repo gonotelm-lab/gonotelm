@@ -73,7 +73,8 @@ func (s *NotebookStoreImpl) GetById(
 
 func (s *NotebookStoreImpl) GetByNameAndOwnerId(
 	ctx context.Context,
-	name, ownerId string,
+	name string,
+	ownerId valobj.Uid,
 ) (*schema.Notebook, error) {
 	var notebook schema.Notebook
 	err := s.db.WithContext(ctx).
@@ -88,7 +89,7 @@ func (s *NotebookStoreImpl) GetByNameAndOwnerId(
 
 func (s *NotebookStoreImpl) ListByOwnerId(
 	ctx context.Context,
-	ownerId string,
+	ownerId valobj.Uid,
 	limit, offset, orderBy int,
 ) ([]*schema.Notebook, error) {
 	if limit <= 0 || offset < 0 {

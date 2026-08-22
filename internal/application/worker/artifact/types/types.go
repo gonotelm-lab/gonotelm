@@ -19,7 +19,7 @@ import (
 type Request struct {
 	ArtifactId valobj.Id
 	NotebookId valobj.Id
-	UserId     string
+	UserId     valobj.Uid
 	SourceIds  []valobj.Id
 	Kind       artifactentity.Kind
 	Payload    artifactentity.Payload
@@ -50,6 +50,6 @@ type Generator interface {
 type SessionState struct {
 	NotebookId valobj.Id
 	SourceIds  []valobj.Id
-	UserId     string
+	UserId     valobj.Uid
 	Lang       string
 }

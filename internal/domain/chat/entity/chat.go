@@ -8,10 +8,10 @@ import (
 type Chat struct {
 	entity.Base
 	NotebookId valobj.Id
-	OwnerId    string
+	OwnerId    valobj.Uid
 }
 
-func NewChat(notebookId valobj.Id, ownerId string) *Chat {
+func NewChat(notebookId valobj.Id, ownerId valobj.Uid) *Chat {
 	return &Chat{
 		Base:       entity.NewBase(),
 		NotebookId: notebookId,

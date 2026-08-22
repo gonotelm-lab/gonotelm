@@ -15,7 +15,7 @@ import (
 
 func TestNewArtifact(t *testing.T) {
 	notebookId := uuid.NewV7()
-	userId := "user-1"
+	userId := valobj.NewUid()
 	payload := &MindmapPayload{NotebookId: notebookId, SourceIds: []valobj.Id{uuid.NewV7()}}
 
 	got, err := NewArtifact(notebookId, userId, KindMindmap, payload)
@@ -37,16 +37,16 @@ func TestNewArtifact_Validation_Errors(t *testing.T) {
 	tests := []struct {
 		name       string
 		notebookId valobj.Id
-		userId     string
+		userId     valobj.Uid
 		kind       Kind
 		payload    Payload
 		errTarget  error
 	}{
-		{"empty notebook id", valobj.Id{}, "u1", KindMindmap, validPayload, artifacterrors.ErrInvalidNotebookId},
-		{"empty user id", notebookId, "", KindMindmap, validPayload, artifacterrors.ErrInvalidUserId},
-		{"unsupported kind", notebookId, "u1", Kind("bogus"), validPayload, artifacterrors.ErrInvalidKind},
-		{"nil payload", notebookId, "u1", KindMindmap, nil, artifacterrors.ErrInvalidPayload},
-		{"payload kind mismatch", notebookId, "u1", KindMindmap, &ReportPayload{NotebookId: notebookId}, artifacterrors.ErrPayloadKindMismatch},
+		{"empty notebook id", valobj.Id{}, valobj.NewUid(), KindMindmap, validPayload, artifacterrors.ErrInvalidNotebookId},
+		{"empty user id", notebookId, valobj.Uid{}, KindMindmap, validPayload, artifacterrors.ErrInvalidUserId},
+		{"unsupported kind", notebookId, valobj.NewUid(), Kind("bogus"), validPayload, artifacterrors.ErrInvalidKind},
+		{"nil payload", notebookId, valobj.NewUid(), KindMindmap, nil, artifacterrors.ErrInvalidPayload},
+		{"payload kind mismatch", notebookId, valobj.NewUid(), KindMindmap, &ReportPayload{NotebookId: notebookId}, artifacterrors.ErrPayloadKindMismatch},
 	}
 
 	for _, tt := range tests {
@@ -58,7 +58,7 @@ func TestNewArtifact_Validation_Errors(t *testing.T) {
 }
 
 func TestNewArtifact_SetsUpdateTime(t *testing.T) {
-	a, err := NewArtifact(uuid.NewV7(), "u1", KindMindmap, &MindmapPayload{NotebookId: uuid.NewV7()})
+	a, err := NewArtifact(uuid.NewV7(), valobj.NewUid(), KindMindmap, &MindmapPayload{NotebookId: uuid.NewV7()})
 	require.NoError(t, err)
 	assert.NotZero(t, a.UpdateTime.Value())
 }
@@ -145,8 +145,8 @@ func TestArtifactRetry_NotFailedOrCancelled(t *testing.T) {
 
 func TestArtifactIsOwner(t *testing.T) {
 	a := newTestArtifact(t)
-	assert.True(t, a.IsOwner("user-1"))
-	assert.False(t, a.IsOwner("user-2"))
+	assert.True(t, a.IsOwner(a.UserId))
+	assert.False(t, a.IsOwner(valobj.NewUid()))
 }
 
 func TestArtifactMarkCompleted_EmitsEvent(t *testing.T) {
@@ -215,7 +215,7 @@ func TestArtifactUpdateTitle(t *testing.T) {
 
 func newTestArtifact(t *testing.T) *Artifact {
 	t.Helper()
-	a, err := NewArtifact(uuid.NewV7(), "user-1", KindMindmap, &MindmapPayload{NotebookId: uuid.NewV7()})
+	a, err := NewArtifact(uuid.NewV7(), valobj.NewUid(), KindMindmap, &MindmapPayload{NotebookId: uuid.NewV7()})
 	require.NoError(t, err)
 	return a
 }

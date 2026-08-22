@@ -10,7 +10,7 @@ import (
 )
 
 type SessionState struct {
-	userId string
+	userId valobj.Uid
 	taskId valobj.Id
 
 	chat     *chatentity.Chat

@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/misc"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
@@ -15,9 +16,9 @@ type NotebookStore interface {
 	Create(ctx context.Context, notebook *schema.Notebook) error
 	Upsert(ctx context.Context, notebook *schema.Notebook) error
 	GetById(ctx context.Context, id Id) (*schema.Notebook, error)
-	GetByNameAndOwnerId(ctx context.Context, name, ownerId string) (*schema.Notebook, error)
+	GetByNameAndOwnerId(ctx context.Context, name string, ownerId valobj.Uid) (*schema.Notebook, error)
 	// orderBy=0 -> default order; orderBy=1 -> order by updated_at
-	ListByOwnerId(ctx context.Context, ownerId string, limit, offset, orderBy int) ([]*schema.Notebook, error)
+	ListByOwnerId(ctx context.Context, ownerId valobj.Uid, limit, offset, orderBy int) ([]*schema.Notebook, error)
 	Update(ctx context.Context, notebook *schema.Notebook) error
 	DeleteById(ctx context.Context, id Id) error
 	UpdateName(ctx context.Context, params *schema.NotebookUpdateNameParams) error
@@ -48,9 +49,9 @@ type SourceStore interface {
 type ChatStore interface {
 	Create(ctx context.Context, chat *schema.Chat) error
 	GetById(ctx context.Context, id Id) (*schema.Chat, error)
-	GetByNotebookIdAndOwnerId(ctx context.Context, notebookId Id, ownerId string) (*schema.Chat, error)
+	GetByNotebookIdAndOwnerId(ctx context.Context, notebookId Id, ownerId valobj.Uid) (*schema.Chat, error)
 	ListByNotebookId(ctx context.Context, notebookId Id) ([]*schema.Chat, error)
-	ListByOwnerId(ctx context.Context, ownerId string, limit, offset int) ([]*schema.Chat, error)
+	ListByOwnerId(ctx context.Context, ownerId valobj.Uid, limit, offset int) ([]*schema.Chat, error)
 	DeleteById(ctx context.Context, id Id) error
 	DeleteByNotebookId(ctx context.Context, notebookId Id) error
 }

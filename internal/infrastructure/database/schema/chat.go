@@ -1,12 +1,15 @@
 package schema
 
-import "github.com/gonotelm-lab/gonotelm/pkg/uuid"
+import (
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
+)
 
 type Chat struct {
-	Id         uuid.UUID `gorm:"column:id"`
-	NotebookId uuid.UUID `gorm:"column:notebook_id"`
-	OwnerId    string    `gorm:"column:owner_id"`
-	UpdatedAt  int64     `gorm:"column:updated_at"`
+	Id         uuid.UUID  `gorm:"column:id"`
+	NotebookId uuid.UUID  `gorm:"column:notebook_id"`
+	OwnerId    valobj.Uid `gorm:"column:owner_id"`
+	UpdatedAt  int64      `gorm:"column:updated_at"`
 }
 
 func (Chat) TableName() string {

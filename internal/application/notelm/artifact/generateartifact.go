@@ -243,7 +243,7 @@ func taskTypeFor(kind artifactentity.Kind) string {
 func (h *GenerateArtifactHandler) beginArtifactTask(
 	ctx context.Context,
 	cmd *GenerateRequest,
-	userId string,
+	userId valobj.Uid,
 ) (*GenerateResponse, error) {
 	// 构建所有产物生成的请求payload
 	payload, err := cmd.buildPayload()
@@ -301,7 +301,7 @@ func (h *GenerateArtifactHandler) beginArtifactTask(
 func (h *GenerateArtifactHandler) saveAsNote(
 	ctx context.Context,
 	req *GenerateRequest,
-	userId string,
+	userId valobj.Uid,
 ) (*GenerateResponse, error) {
 	if req.Note == nil {
 		return nil, errors.ErrParams.Msg("note payload is required")

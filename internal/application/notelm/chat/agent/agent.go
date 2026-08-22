@@ -85,7 +85,7 @@ func New(
 type RunRequest struct {
 	Notebook        *notebookentity.Notebook
 	Chat            *chatentity.Chat
-	UserId          string
+	UserId          valobj.Uid
 	ContextMessages []*chatentity.ContextMessage
 	Sources         []*sourceentity.Source
 	EnableThinking  bool

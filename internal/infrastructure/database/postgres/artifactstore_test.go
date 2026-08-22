@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"testing"
 	"time"
 
@@ -19,7 +20,7 @@ func TestArtifactStore_CreateAndGetById(t *testing.T) {
 	id := uuid.NewV7()
 	now := nowMilli()
 	in := &schema.Artifact{
-		Id: id, NotebookId: uuid.NewV7(), UserId: "u1",
+		Id: id, NotebookId: uuid.NewV7(), UserId: valobj.NewUid(),
 		Kind: "mindmap", Status: "pending", FlowTaskId: "ft-1",
 		Payload: []byte(`{}`), CreatedAt: now, UpdatedAt: now,
 	}
@@ -40,13 +41,13 @@ func TestArtifactStore_Upsert(t *testing.T) {
 	now := nowMilli()
 
 	require.NoError(t, store.Create(ctx, &schema.Artifact{
-		Id: id, NotebookId: nbId, UserId: "u1",
+		Id: id, NotebookId: nbId, UserId: valobj.NewUid(),
 		Kind: "report", Status: "pending", FlowTaskId: "ft-2",
 		Payload: []byte(`{}`), CreatedAt: now, UpdatedAt: now,
 	}))
 
 	require.NoError(t, store.Upsert(ctx, &schema.Artifact{
-		Id: id, NotebookId: nbId, UserId: "u1",
+		Id: id, NotebookId: nbId, UserId: valobj.NewUid(),
 		Kind: "report", Status: "running", FlowTaskId: "ft-2",
 		Payload: []byte(`{}`), CreatedAt: now, UpdatedAt: now + 1000,
 	}))
@@ -63,7 +64,7 @@ func TestArtifactStore_ListByStatus(t *testing.T) {
 	id1, id2 := uuid.NewV7(), uuid.NewV7()
 	for _, id := range []uuid.UUID{id1, id2} {
 		require.NoError(t, store.Create(ctx, &schema.Artifact{
-			Id: id, NotebookId: uuid.NewV7(), UserId: "u3",
+			Id: id, NotebookId: uuid.NewV7(), UserId: valobj.NewUid(),
 			Kind: "mindmap", Status: "pending", FlowTaskId: uuid.NewV7().String(),
 			Payload: []byte(`{}`), CreatedAt: nowMilli(), UpdatedAt: nowMilli(),
 		}))

@@ -2,6 +2,7 @@ package notebook
 
 import (
 	"context"
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 
 	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
@@ -26,7 +27,7 @@ const (
 )
 
 type ListNotebooksHandleQuery struct {
-	OwnerId string
+	OwnerId valobj.Uid
 	Limit   int
 	Offset  int
 	SortBy  SortBy

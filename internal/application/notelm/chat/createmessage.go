@@ -420,7 +420,7 @@ func (h *CreateMessageHandler) initStreamTask(
 	cancel context.CancelFunc,
 	chatId valobj.Id,
 	sourceIds []valobj.Id,
-	userId string,
+	userId valobj.Uid,
 ) (*chatentity.StreamTask, chan *chatentity.StreamTaskEvent) {
 	task := chatentity.NewStreamTask(chatId, sourceIds, userId)
 	eventChan := make(chan *chatentity.StreamTaskEvent, 1024)

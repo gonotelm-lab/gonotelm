@@ -61,7 +61,7 @@ func (s *NotebookRepositoryImpl) FindById(ctx context.Context, id valobj.Id) (*n
 
 func (s *NotebookRepositoryImpl) ListByOwner(
 	ctx context.Context,
-	ownerId string,
+	ownerId valobj.Uid,
 	spec *notebookrepo.ListSpec,
 ) ([]*notebookentity.Notebook, error) {
 	if err := spec.Validate(); err != nil {

@@ -26,7 +26,7 @@ func NewSandboxRepository(sandboxCache cache.SandboxCache) sandboxrepo.Repositor
 var _ sandboxrepo.Repository = &SandboxRepositoryImpl{}
 
 func (r *SandboxRepositoryImpl) GetSandbox(ctx context.Context, key entity.SandboxKey) (entity.SandboxDescription, error) {
-	desc, err := r.sandboxCache.Get(ctx, key.UserId, key.NotebookId.String())
+	desc, err := r.sandboxCache.Get(ctx, key.UserId.String(), key.NotebookId.String())
 	if err != nil {
 		return entity.SandboxDescription{}, err
 	}
@@ -39,10 +39,15 @@ func (r *SandboxRepositoryImpl) GetSandbox(ctx context.Context, key entity.Sandb
 		return entity.SandboxDescription{}, pkgerr.Wrapf(pkgerr.ErrSerde, "invalid sandbox desc notebook id: %s", err.Error())
 	}
 
+	userId, err := valobj.NewUidFromString(desc.Key.UserId)
+	if err != nil {
+		return entity.SandboxDescription{}, pkgerr.Wrapf(pkgerr.ErrSerde, "invalid sandbox desc user id: %s", err.Error())
+	}
+
 	return entity.SandboxDescription{
 		Id: desc.Id,
 		Key: entity.SandboxKey{
-			UserId:     desc.Key.UserId,
+			UserId:     userId,
 			NotebookId: notebookId,
 		},
 		Runtime: desc.Runtime,
@@ -50,18 +55,18 @@ func (r *SandboxRepositoryImpl) GetSandbox(ctx context.Context, key entity.Sandb
 }
 
 func (r *SandboxRepositoryImpl) DeleteSandbox(ctx context.Context, key entity.SandboxKey) error {
-	return r.sandboxCache.Delete(ctx, key.UserId, key.NotebookId.String())
+	return r.sandboxCache.Delete(ctx, key.UserId.String(), key.NotebookId.String())
 }
 
 func (r *SandboxRepositoryImpl) SetSandbox(ctx context.Context, key entity.SandboxKey, desc entity.SandboxDescription, ttl time.Duration) error {
 	cacheDesc := &schema.SandboxDescription{
 		Id: desc.Id,
 		Key: schema.SandboxKey{
-			UserId:     desc.Key.UserId,
+			UserId:     desc.Key.UserId.String(),
 			NotebookId: desc.Key.NotebookId.String(),
 		},
 		Runtime: desc.Runtime,
 	}
 
-	return r.sandboxCache.Set(ctx, key.UserId, key.NotebookId.String(), cacheDesc, ttl)
+	return r.sandboxCache.Set(ctx, key.UserId.String(), key.NotebookId.String(), cacheDesc, ttl)
 }

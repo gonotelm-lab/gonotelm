@@ -72,7 +72,7 @@ func NewService(
 type GenerateSuggestionsCommand struct {
 	Chat      *entity.Chat
 	SourceIds []valobj.Id
-	UserId    string
+	UserId    valobj.Uid
 }
 
 type GenerateSuggestionsResult struct {
@@ -94,7 +94,7 @@ func (h *Service) Get(ctx context.Context, chatId valobj.Id) (*GenerateSuggestio
 			slog.ErrorContext(ctx, "suggestion get locked failed", slog.String("chat_id", chatId.String()))
 			continue
 		}
-		
+
 		if !hasLock {
 			// 锁已释放，可以读取建议
 			suggestions, err := h.suggestionRepo.Get(ctx, chatId)

@@ -10,6 +10,7 @@ import (
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/ulid"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -41,7 +42,7 @@ func (s *updateArtifactRepoStub) DeleteById(context.Context, valobj.Id) error { 
 
 func (s *updateArtifactRepoStub) DeleteByNotebookId(context.Context, valobj.Id) error { return nil }
 
-func newCompletedArtifact(t *testing.T, userId string) *entity.Artifact {
+func newCompletedArtifact(t *testing.T, userId valobj.Uid) *entity.Artifact {
 	t.Helper()
 	a, err := entity.NewArtifact(uuid.NewV7(), userId, entity.KindMindmap, &entity.MindmapPayload{NotebookId: uuid.NewV7()})
 	require.NoError(t, err)
@@ -50,10 +51,10 @@ func newCompletedArtifact(t *testing.T, userId string) *entity.Artifact {
 }
 
 func TestUpdateArtifactHandler_Title(t *testing.T) {
-	a := newCompletedArtifact(t, "user-1")
+	a := newCompletedArtifact(t, ulid.MustParseString("01hf7yat00vtpvxvyaztxbw001"))
 	repo := &updateArtifactRepoStub{a: a}
 	h := NewUpdateArtifactHandler(repo)
-	ctx := pkgcontext.WithUserId(context.Background(), "user-1")
+	ctx := pkgcontext.WithUserId(context.Background(), ulid.MustParseString("01hf7yat00vtpvxvyaztxbw001"))
 
 	err := h.Handle(ctx, &UpdateCommand{
 		ArtifactId: a.Id,
@@ -66,10 +67,10 @@ func TestUpdateArtifactHandler_Title(t *testing.T) {
 }
 
 func TestUpdateArtifactHandler_UnsupportedTarget(t *testing.T) {
-	a := newCompletedArtifact(t, "user-1")
+	a := newCompletedArtifact(t, ulid.MustParseString("01hf7yat00vtpvxvyaztxbw001"))
 	repo := &updateArtifactRepoStub{a: a}
 	h := NewUpdateArtifactHandler(repo)
-	ctx := pkgcontext.WithUserId(context.Background(), "user-1")
+	ctx := pkgcontext.WithUserId(context.Background(), ulid.MustParseString("01hf7yat00vtpvxvyaztxbw001"))
 
 	err := h.Handle(ctx, &UpdateCommand{
 		ArtifactId: a.Id,
@@ -80,10 +81,10 @@ func TestUpdateArtifactHandler_UnsupportedTarget(t *testing.T) {
 }
 
 func TestUpdateArtifactHandler_NotOwner(t *testing.T) {
-	a := newCompletedArtifact(t, "user-1")
+	a := newCompletedArtifact(t, ulid.MustParseString("01hf7yat00vtpvxvyaztxbw001"))
 	repo := &updateArtifactRepoStub{a: a}
 	h := NewUpdateArtifactHandler(repo)
-	ctx := pkgcontext.WithUserId(context.Background(), "other-user")
+	ctx := pkgcontext.WithUserId(context.Background(), ulid.MustParseString("01hf7yat00vtpvxvyaztxbw002"))
 
 	err := h.Handle(ctx, &UpdateCommand{
 		ArtifactId: a.Id,

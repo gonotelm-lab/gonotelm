@@ -26,7 +26,7 @@ func NewCreateNotebookHandler(notebookRepo notebookrepo.Repository, eventBus eve
 type CreateNotebookHandleCommand struct {
 	Name    string
 	Desc    string
-	OwnerId string
+	OwnerId valobj.Uid
 }
 
 func (h *CreateNotebookHandler) Handle(

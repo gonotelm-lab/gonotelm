@@ -14,7 +14,7 @@ func FilterReadySources(
 	sourceRepo sourcerepo.Repository,
 	notebookId valobj.Id,
 	sourceIds []valobj.Id,
-	userId string,
+	userId valobj.Uid,
 ) ([]*sourceentity.Source, error) {
 	if len(sourceIds) == 0 {
 		return nil, nil

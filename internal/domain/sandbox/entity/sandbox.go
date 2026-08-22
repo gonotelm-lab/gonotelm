@@ -72,19 +72,19 @@ type SandboxDescription struct {
 }
 
 type SandboxKey struct {
-	UserId     string
+	UserId     valobj.Uid
 	NotebookId valobj.Id
 }
 
 func (k *SandboxKey) WorkspaceDir() string {
-	return path.Join("/tmp", k.UserId, k.NotebookId.String())
+	return path.Join("/tmp", k.UserId.String(), k.NotebookId.String())
 }
 
 func (k *SandboxKey) String() string {
 	if k == nil {
 		return ""
 	}
-	return "uid:" + k.UserId + ", notebookId:" + k.NotebookId.String()
+	return "uid:" + k.UserId.String() + ", notebookId:" + k.NotebookId.String()
 }
 
 type Spec struct {

@@ -36,7 +36,7 @@ type StreamTask struct {
 	Status         StreamTaskStatus
 	ChatId         valobj.Id
 	SourceIds      []valobj.Id
-	UserId         string
+	UserId         valobj.Uid
 	ExpireDuration time.Duration
 }
 
@@ -44,7 +44,7 @@ const (
 	TaskExpireDuration = 5 * time.Minute
 )
 
-func NewStreamTask(chatId valobj.Id, sourceIds []valobj.Id, userId string) *StreamTask {
+func NewStreamTask(chatId valobj.Id, sourceIds []valobj.Id, userId valobj.Uid) *StreamTask {
 	return &StreamTask{
 		Base:           entity.NewUnOrderedBase(),
 		Status:         StreamTaskStatusRunning,

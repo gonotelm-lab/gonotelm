@@ -21,12 +21,17 @@ func SchemaToSourceDoc(schema *schema.SourceDoc) (*entity.SourceDoc, error) {
 		return nil, err
 	}
 
+	owner, err := valobj.NewUidFromString(schema.Owner)
+	if err != nil {
+		return nil, err
+	}
+
 	domainDoc := &entity.SourceDoc{
 		Id:         id,
 		NotebookId: notebookId,
 		SourceId:   sourceId,
 		Content:    schema.Content,
-		Owner:      schema.Owner,
+		Owner:      owner,
 		ChunkPos:   int(schema.ChunkPos),
 		Score:      schema.Score,
 		BytePos:    &entity.SourceDocPosition{},
@@ -70,7 +75,7 @@ func SourceDocToSchema(doc *entity.SourceDoc) *schema.SourceDoc {
 		NotebookId: doc.NotebookId.String(),
 		SourceId:   doc.SourceId.String(),
 		Content:    doc.Content,
-		Owner:      doc.Owner,
+		Owner:      doc.Owner.String(),
 		ChunkPos:   int32(doc.ChunkPos),
 	}
 

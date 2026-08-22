@@ -13,7 +13,6 @@ import (
 const (
 	MaxNameLength        = 128
 	MaxDescriptionLength = 1024
-	MaxOwnerIdLength     = 255
 )
 
 const (
@@ -25,7 +24,7 @@ type Notebook struct {
 
 	Name        string
 	Description string
-	OwnerId     string
+	OwnerId     valobj.Uid
 
 	SourceCount int64
 }
@@ -33,7 +32,7 @@ type Notebook struct {
 func NewNotebook(
 	name string,
 	description string,
-	ownerId string,
+	ownerId valobj.Uid,
 ) (*Notebook, error) {
 	n := Notebook{
 		Base:        coreentity.NewBase(),
@@ -60,7 +59,7 @@ func (n *Notebook) validate() error {
 		return notebookerrors.ErrInvalidDescription
 	}
 
-	if len := utf8.RuneCountInString(n.OwnerId); len > MaxOwnerIdLength {
+	if n.OwnerId.IsZero() {
 		return notebookerrors.ErrInvalidOwnerId
 	}
 

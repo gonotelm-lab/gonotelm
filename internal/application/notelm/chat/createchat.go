@@ -29,7 +29,7 @@ func NewCreateChatHandler(
 
 type CreateChatCommand struct {
 	NotebookId valobj.Id
-	OwnerId    string
+	OwnerId    valobj.Uid
 }
 
 func (h *CreateChatHandler) Handle(ctx context.Context, cmd *CreateChatCommand) (*chatentity.Chat, error) {

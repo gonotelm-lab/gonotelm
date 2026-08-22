@@ -2,6 +2,7 @@ package valobj
 
 import "github.com/gonotelm-lab/gonotelm/pkg/uuid"
 
+// General purpose unique id
 type Id = uuid.UUID
 
 func NewId() Id {

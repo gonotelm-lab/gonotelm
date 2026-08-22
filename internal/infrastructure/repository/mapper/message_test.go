@@ -12,7 +12,7 @@ import (
 func TestMessageCitationRoundtrip(t *testing.T) {
 	docID := valobj.Id(uuid.NewV7())
 	sourceID := valobj.Id(uuid.NewV7())
-	msg := chatdomain.NewAssistantMessage(valobj.Id(uuid.NewV7()), valobj.Id(uuid.NewV7()), "user1")
+	msg := chatdomain.NewAssistantMessage(valobj.Id(uuid.NewV7()), valobj.Id(uuid.NewV7()), valobj.NewUid())
 	msg.SetCitations([]chatdomain.MessageCitation{
 		{DocId: docID, SourceId: sourceID},
 	})
@@ -41,7 +41,7 @@ func TestMessageFromSchemaEmptyExtra(t *testing.T) {
 	sch := &schema.ChatMessage{
 		Id:      uuid.NewV7(),
 		ChatId:  uuid.NewV7(),
-		UserId:  "u1",
+		UserId:  valobj.NewUid(),
 		MsgRole: 1,
 		Content: []byte(`[]`),
 		SeqNo:   1,
@@ -59,7 +59,7 @@ func TestMessageFromSchemaNullAndEmptyExtra(t *testing.T) {
 	base := &schema.ChatMessage{
 		Id:      uuid.NewV7(),
 		ChatId:  uuid.NewV7(),
-		UserId:  "u1",
+		UserId:  valobj.NewUid(),
 		MsgRole: 1,
 		Content: []byte(`[]`),
 		SeqNo:   1,

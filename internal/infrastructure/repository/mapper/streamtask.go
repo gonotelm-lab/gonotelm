@@ -18,7 +18,7 @@ func StreamTaskToSchema(task *entity.StreamTask) *schema.ChatMessageTask {
 		UpdatedAt:      task.UpdateTime.Value(),
 		ChatId:         task.ChatId.String(),
 		SourceIds:      valobj.IdsToStrings(task.SourceIds),
-		UserId:         task.UserId,
+		UserId:         task.UserId.String(),
 		ExpireDuration: task.ExpireDuration,
 	}
 }
@@ -39,6 +39,11 @@ func StreamTaskFromSchema(sch *schema.ChatMessageTask) (*entity.StreamTask, erro
 		return nil, err
 	}
 
+	userId, err := valobj.NewUidFromString(sch.UserId)
+	if err != nil {
+		return nil, err
+	}
+
 	return &entity.StreamTask{
 		Base: coreentity.Base{
 			Id:         id,
@@ -48,7 +53,7 @@ func StreamTaskFromSchema(sch *schema.ChatMessageTask) (*entity.StreamTask, erro
 		Status:         entity.StreamTaskStatus(sch.Status),
 		ChatId:         chatId,
 		SourceIds:      sourceIds,
-		UserId:         sch.UserId,
+		UserId:         userId,
 		ExpireDuration: sch.ExpireDuration,
 	}, nil
 }

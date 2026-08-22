@@ -2,6 +2,7 @@ package schema
 
 import (
 	"encoding/json"
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
@@ -12,7 +13,7 @@ import (
 type ChatMessage struct {
 	Id      uuid.UUID       `gorm:"column:id"`
 	ChatId  uuid.UUID       `gorm:"column:chat_id"`
-	UserId  string          `gorm:"column:user_id"`
+	UserId  valobj.Uid      `gorm:"column:user_id"`
 	MsgRole int8            `gorm:"column:msg_role"`
 	Content json.RawMessage `gorm:"column:content"` // see [model.ChatMessageContent]
 	SeqNo   int64           `gorm:"column:seq_no"`

@@ -37,7 +37,7 @@ func NewCreateSourceHandler(
 
 type CreateSourceHandleCommand struct {
 	NotebookId valobj.Id
-	OwnerId    string
+	OwnerId    valobj.Uid
 	Kind       sourcevo.SourceKind
 	Text       string
 	Url        *url.URL

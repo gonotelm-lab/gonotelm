@@ -116,7 +116,7 @@ func (m *Manager) CreateSandbox(ctx context.Context, key entity.SandboxKey, spec
 			TimeoutSeconds: ttl,
 			Env:            spec.Env,
 			Metadata: map[string]string{
-				MetadataUserIdKey:     key.UserId,
+				MetadataUserIdKey:     key.UserId.String(),
 				MetadataNotebookIdKey: key.NotebookId.String(),
 				MetadataServiceKey:    MetadataServiceValue,
 			},
@@ -208,7 +208,10 @@ func (m *Manager) GetSandbox(ctx context.Context, sandboxId string) (entity.Sand
 
 // keyFromMetadata 从沙箱元信息中还原绑定的 key
 func keyFromMetadata(meta map[string]string) entity.SandboxKey {
-	key := entity.SandboxKey{UserId: meta[MetadataUserIdKey]}
+	key := entity.SandboxKey{}
+	if uid, err := valobj.NewUidFromString(meta[MetadataUserIdKey]); err == nil {
+		key.UserId = uid
+	}
 	if nbId, ok := meta[MetadataNotebookIdKey]; ok {
 		if id, err := valobj.NewIdFromString(nbId); err == nil {
 			key.NotebookId = id

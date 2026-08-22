@@ -15,6 +15,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkglog "github.com/gonotelm-lab/gonotelm/pkg/log"
 	"github.com/gonotelm-lab/gonotelm/pkg/requestid"
+	"github.com/gonotelm-lab/gonotelm/pkg/ulid"
 	pkgtrace "github.com/gonotelm-lab/gonotelm/pkg/trace"
 	"github.com/gonotelm-lab/gonotelm/pkg/trace/instrumentation/messagingconv"
 	"github.com/gonotelm-lab/gonotelm/pkg/trace/propagation"
@@ -93,8 +94,8 @@ func buildMessageHeaders(ctx context.Context, headers []mq.MessageHeader) []kafk
 	if reqId := pkgcontext.GetReqId(ctx); !reqId.IsZero() {
 		hds = append(hds, kafka.Header{Key: requestid.HeaderKey, Value: []byte(reqId.String())})
 	}
-	if userId := pkgcontext.GetUserId(ctx); userId != "" {
-		hds = append(hds, kafka.Header{Key: userIdHeaderKey, Value: []byte(userId)})
+	if userId := pkgcontext.GetUserId(ctx); !userId.IsZero() {
+		hds = append(hds, kafka.Header{Key: userIdHeaderKey, Value: []byte(userId.String())})
 	}
 
 	carrier := propagation.NewKafkaHeaderCarrier(hds)
@@ -121,7 +122,9 @@ func restoreRequestContext(ctx context.Context, headers []kafka.Header) context.
 		}
 	}
 	if v := carrier.Get(userIdHeaderKey); v != "" {
-		ctx = pkgcontext.WithUserId(ctx, v)
+		if id, err := ulid.ParseString(v); err == nil {
+			ctx = pkgcontext.WithUserId(ctx, id)
+		}
 	}
 
 	return ctx

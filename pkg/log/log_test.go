@@ -11,6 +11,7 @@ import (
 	"time"
 
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
+	"github.com/gonotelm-lab/gonotelm/pkg/ulid"
 )
 
 func TestContextJSONHandler_AddsUserIDFromContext(t *testing.T) {
@@ -19,7 +20,8 @@ func TestContextJSONHandler_AddsUserIDFromContext(t *testing.T) {
 		Level: slog.LevelDebug,
 	}))
 
-	ctx := pkgcontext.WithUserId(context.Background(), "u-123")
+	uid := ulid.MustParseString("01hf7yat00vtpvxvyaztxbw001")
+	ctx := pkgcontext.WithUserId(context.Background(), uid)
 	logger.InfoContext(ctx, "hello")
 
 	var got map[string]any
@@ -27,7 +29,7 @@ func TestContextJSONHandler_AddsUserIDFromContext(t *testing.T) {
 		t.Fatalf("unmarshal log json failed: %v", err)
 	}
 
-	if got[pkgcontext.AttrKeyUserID] != "u-123" {
+	if got[pkgcontext.AttrKeyUserID] != uid.String() {
 		t.Fatalf("user_id mismatch, got=%v", got[pkgcontext.AttrKeyUserID])
 	}
 }

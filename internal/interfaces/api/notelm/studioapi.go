@@ -2,7 +2,6 @@ package notelm
 
 import (
 	"context"
-	"unicode/utf8"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/route"
@@ -12,8 +11,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 )
-
-const maxUserTipLength = 300
 
 func (s *Server) registerStudioRoutes(g *route.RouterGroup) {
 	artifactGroup := g.Group("/artifacts/:id")
@@ -42,55 +39,6 @@ func (s *Server) GenerateStudioArtifact(ctx context.Context, c *app.RequestConte
 		return
 	}
 
-	if req.AudioOverview != nil && !req.AudioOverview.Language.IsValid() {
-		http.ErrResp(c, errors.ErrParams.Msgf("unsupported language: %s", req.AudioOverview.Language))
-		return
-	}
-
-	if req.Report != nil && !req.Report.Language.IsValid() {
-		http.ErrResp(c, errors.ErrParams.Msgf("unsupported language: %s", req.Report.Language))
-		return
-	}
-
-	if req.Slides != nil && req.Slides.Language != "" && !req.Slides.Language.IsValid() {
-		http.ErrResp(c, errors.ErrParams.Msgf("unsupported language: %s", req.Slides.Language))
-		return
-	}
-
-	if err := validateStudioUserTips(&req); err != nil {
-		http.ErrResp(c, err)
-		return
-	}
-
-	if req.Flashcard != nil {
-		if req.Flashcard.Count != "" && !req.Flashcard.Count.Supported() {
-			http.ErrResp(c, errors.ErrParams.Msgf("unsupported flashcard count: %s", req.Flashcard.Count))
-			return
-		}
-		if req.Flashcard.Difficulty != "" && !req.Flashcard.Difficulty.Supported() {
-			http.ErrResp(c, errors.ErrParams.Msgf("unsupported flashcard difficulty: %s", req.Flashcard.Difficulty))
-			return
-		}
-	}
-
-	if req.Quiz != nil {
-		if req.Quiz.Count != "" && !req.Quiz.Count.Supported() {
-			http.ErrResp(c, errors.ErrParams.Msgf("unsupported quiz count: %s", req.Quiz.Count))
-			return
-		}
-		if req.Quiz.Difficulty != "" && !req.Quiz.Difficulty.Supported() {
-			http.ErrResp(c, errors.ErrParams.Msgf("unsupported quiz difficulty: %s", req.Quiz.Difficulty))
-			return
-		}
-	}
-
-	if req.Slides != nil {
-		if req.Slides.VisualStyle != "" && !req.Slides.VisualStyle.Supported() {
-			http.ErrResp(c, errors.ErrParams.Msgf("unsupported slides visual_style: %s", req.Slides.VisualStyle))
-			return
-		}
-	}
-
 	resp, err := s.generateArtifactHandler.Handle(ctx,
 		&artifactapp.GenerateRequest{
 			NotebookId:    req.NotebookId,
@@ -112,42 +60,6 @@ func (s *Server) GenerateStudioArtifact(ctx context.Context, c *app.RequestConte
 	}
 
 	http.OkResp(c, schema.GenerateArtifactResponse{TaskId: resp.ArtifactId.String()})
-}
-
-func validateStudioUserTips(req *schema.GenerateArtifactRequest) error {
-	if req.Mindmap != nil && utf8.RuneCountInString(req.Mindmap.Tip) > maxUserTipLength {
-		return errors.ErrParams.Msgf("mindmap tip exceeds %d characters", maxUserTipLength)
-	}
-
-	if req.Report != nil && utf8.RuneCountInString(req.Report.Tip) > maxUserTipLength {
-		return errors.ErrParams.Msgf("report tip exceeds %d characters", maxUserTipLength)
-	}
-
-	if req.InfoGraphic != nil && utf8.RuneCountInString(req.InfoGraphic.ExtraPrompt) > maxUserTipLength {
-		return errors.ErrParams.Msgf("info_graphic prompt exceeds %d characters", maxUserTipLength)
-	}
-
-	if req.AudioOverview != nil && utf8.RuneCountInString(req.AudioOverview.Tip) > maxUserTipLength {
-		return errors.ErrParams.Msgf("audio_overview tip exceeds %d characters", maxUserTipLength)
-	}
-
-	if req.Flashcard != nil && utf8.RuneCountInString(req.Flashcard.Tip) > maxUserTipLength {
-		return errors.ErrParams.Msgf("flashcard tip exceeds %d characters", maxUserTipLength)
-	}
-
-	if req.Quiz != nil && utf8.RuneCountInString(req.Quiz.Tip) > maxUserTipLength {
-		return errors.ErrParams.Msgf("quiz tip exceeds %d characters", maxUserTipLength)
-	}
-
-	if req.DataTable != nil && utf8.RuneCountInString(req.DataTable.Tip) > maxUserTipLength {
-		return errors.ErrParams.Msgf("data_table tip exceeds %d characters", maxUserTipLength)
-	}
-
-	if req.Slides != nil && utf8.RuneCountInString(req.Slides.Tip) > maxUserTipLength {
-		return errors.ErrParams.Msgf("slides tip exceeds %d characters", maxUserTipLength)
-	}
-
-	return nil
 }
 
 func (s *Server) GetStudioArtifactStatus(ctx context.Context, c *app.RequestContext) {

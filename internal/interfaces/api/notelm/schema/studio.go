@@ -1,6 +1,8 @@
 package schema
 
 import (
+	"unicode/utf8"
+
 	audiooverview "github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/audiooverview"
 	infographic "github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/infographic"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
@@ -15,6 +17,12 @@ type (
 	Status     = artifactentity.Status
 	ResultKind = artifactentity.ResultKind
 )
+
+const maxUserTipLength = 300
+
+type generatePayload interface {
+	Validate() error
+}
 
 type GenerateArtifactRequest struct {
 	NotebookId uuid.UUID   `path:"id,required"`
@@ -36,32 +44,57 @@ type GenerateArtifactRequest struct {
 }
 
 func (r *GenerateArtifactRequest) Validate() error {
-	// Kind → 对应 payload 指针；校验「kind 合法」且「匹配字段非 nil」
-	required := map[Kind]func() any{
-		artifactentity.KindMindmap:       func() any { return r.Mindmap },
-		artifactentity.KindReport:        func() any { return r.Report },
-		artifactentity.KindInfoGraphic:   func() any { return r.InfoGraphic },
-		artifactentity.KindAudioOverview: func() any { return r.AudioOverview },
-		artifactentity.KindFlashcard:     func() any { return r.Flashcard },
-		artifactentity.KindQuiz:          func() any { return r.Quiz },
-		artifactentity.KindDataTable:     func() any { return r.DataTable },
-		artifactentity.KindSlides:        func() any { return r.Slides },
-		artifactentity.KindNote:          func() any { return r.Note },
-	}
-
-	get, ok := required[r.Kind]
-	if !ok {
-		return errors.ErrParams.Msgf("invalid kind: %s", r.Kind)
-	}
-
-	if get() == nil {
-		return errors.ErrParams.Msgf("%s is required", r.Kind)
-	}
-
 	if len(r.SourceIds) == 0 && r.Kind != artifactentity.KindNote {
 		return errors.ErrParams.Msg("source_ids are required")
 	}
 
+	for _, item := range []struct {
+		kind    Kind
+		payload generatePayload
+	}{
+		{artifactentity.KindMindmap, asPayload(r.Mindmap)},
+		{artifactentity.KindReport, asPayload(r.Report)},
+		{artifactentity.KindInfoGraphic, asPayload(r.InfoGraphic)},
+		{artifactentity.KindAudioOverview, asPayload(r.AudioOverview)},
+		{artifactentity.KindFlashcard, asPayload(r.Flashcard)},
+		{artifactentity.KindQuiz, asPayload(r.Quiz)},
+		{artifactentity.KindDataTable, asPayload(r.DataTable)},
+		{artifactentity.KindSlides, asPayload(r.Slides)},
+		{artifactentity.KindNote, asPayload(r.Note)},
+	} {
+		if item.kind != r.Kind {
+			continue
+		}
+		if item.payload == nil {
+			return errors.ErrParams.Msgf("%s is required", r.Kind)
+		}
+		return item.payload.Validate()
+	}
+
+	return errors.ErrParams.Msgf("invalid kind: %s", r.Kind)
+}
+
+func asPayload[T any](p *T) generatePayload {
+	if p == nil {
+		return nil
+	}
+	return any(p).(generatePayload)
+}
+
+func validateUserTip(tip string) error {
+	if utf8.RuneCountInString(tip) > maxUserTipLength {
+		return errors.ErrParams.Msgf("tip exceeds %d characters", maxUserTipLength)
+	}
+	return nil
+}
+
+func validateLanguage(lang artifactentity.Language, allowEmpty bool) error {
+	if allowEmpty && lang == "" {
+		return nil
+	}
+	if !lang.IsValid() {
+		return errors.ErrParams.Msgf("unsupported language: %s", lang)
+	}
 	return nil
 }
 
@@ -120,10 +153,21 @@ type GenerateMindmapParameters struct {
 	Tip string `json:"tip,omitempty"`
 }
 
+func (p *GenerateMindmapParameters) Validate() error {
+	return validateUserTip(p.Tip)
+}
+
 type GenerateReportParameters struct {
 	Style    artifactentity.ReportStyle `json:"style,omitempty"`
 	Language artifactentity.Language    `json:"language,omitempty"`
 	Tip      string                     `json:"tip,omitempty"`
+}
+
+func (p *GenerateReportParameters) Validate() error {
+	if err := validateLanguage(p.Language, false); err != nil {
+		return err
+	}
+	return validateUserTip(p.Tip)
 }
 
 type GenerateInfoGraphicParameters struct {
@@ -134,10 +178,21 @@ type GenerateInfoGraphicParameters struct {
 	VisualStyle  artifactentity.InfoGraphicVisualStyle `json:"visual_style,omitempty"`
 }
 
+func (p *GenerateInfoGraphicParameters) Validate() error {
+	return validateUserTip(p.ExtraPrompt)
+}
+
 type GenerateAudioOverviewParameters struct {
 	Tip      string                            `json:"tip,omitempty"`
 	Language artifactentity.Language           `json:"language,omitempty"`
 	Style    artifactentity.AudioOverviewStyle `json:"style,omitempty"`
+}
+
+func (p *GenerateAudioOverviewParameters) Validate() error {
+	if err := validateLanguage(p.Language, false); err != nil {
+		return err
+	}
+	return validateUserTip(p.Tip)
 }
 
 type GenerateFlashcardParameters struct {
@@ -146,14 +201,38 @@ type GenerateFlashcardParameters struct {
 	Tip        string                             `json:"tip,omitempty"`
 }
 
+func (p *GenerateFlashcardParameters) Validate() error {
+	if p.Count != "" && !p.Count.Supported() {
+		return errors.ErrParams.Msgf("unsupported flashcard count: %s", p.Count)
+	}
+	if p.Difficulty != "" && !p.Difficulty.Supported() {
+		return errors.ErrParams.Msgf("unsupported flashcard difficulty: %s", p.Difficulty)
+	}
+	return validateUserTip(p.Tip)
+}
+
 type GenerateQuizParameters struct {
 	Count      artifactentity.QuizCount      `json:"count,omitempty"`
 	Difficulty artifactentity.QuizDifficulty `json:"difficulty,omitempty"`
 	Tip        string                        `json:"tip,omitempty"`
 }
 
+func (p *GenerateQuizParameters) Validate() error {
+	if p.Count != "" && !p.Count.Supported() {
+		return errors.ErrParams.Msgf("unsupported quiz count: %s", p.Count)
+	}
+	if p.Difficulty != "" && !p.Difficulty.Supported() {
+		return errors.ErrParams.Msgf("unsupported quiz difficulty: %s", p.Difficulty)
+	}
+	return validateUserTip(p.Tip)
+}
+
 type GenerateDataTableParameters struct {
 	Tip string `json:"tip,omitempty"`
+}
+
+func (p *GenerateDataTableParameters) Validate() error {
+	return validateUserTip(p.Tip)
 }
 
 type GenerateSlidesParameters struct {
@@ -162,10 +241,24 @@ type GenerateSlidesParameters struct {
 	Language    artifactentity.Language          `json:"language,omitempty"`
 }
 
+func (p *GenerateSlidesParameters) Validate() error {
+	if err := validateLanguage(p.Language, true); err != nil {
+		return err
+	}
+	if p.VisualStyle != "" && !p.VisualStyle.Supported() {
+		return errors.ErrParams.Msgf("unsupported slides visual_style: %s", p.VisualStyle)
+	}
+	return validateUserTip(p.Tip)
+}
+
 // 将对话内容保存为笔记
 type GenerateNoteParameters struct {
 	ChatId uuid.UUID `json:"chat_id,required"`
 	MsgId  uuid.UUID `json:"msg_id,required"`
+}
+
+func (p *GenerateNoteParameters) Validate() error {
+	return nil
 }
 
 type ArtifactItem struct {

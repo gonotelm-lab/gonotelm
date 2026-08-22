@@ -151,16 +151,17 @@ func (a *Agent) prepareRun(req *RunRequest) (*ChatAgent, *SessionState, error) {
 		chat.WithModel(req.Model),
 	)
 	session := &SessionState{
-		chat:     req.Chat,
-		notebook: req.Notebook,
-		sources:  req.Sources,
-		userId:   req.UserId,
+		chat:        req.Chat,
+		notebook:    req.Notebook,
+		sources:     req.Sources,
+		userId:      req.UserId,
+		curRunPhase: runPhase1,
 	}
 	domainAgent := domainagent.New(domainagent.Config[*SessionState]{
 		MaxRound: conf.NotelmGlobal().Chat.GetMaxRound(),
 		BaseLLM:  toolCallingChatModel,
 		Options:  options,
-		// Verbose:  true,
+		Verbose:  true,
 	}, session)
 
 	sourceIds := make([]valobj.Id, 0, len(req.Sources))
@@ -217,6 +218,8 @@ func (a *Agent) preparePrompt(ctx context.Context, domainAgent *ChatAgent, req *
 }
 
 // Run 是底层大模型为纯流式输出 大模型的每个输出都直接反映到设置的回调函数上
+//
+// Deprecated
 func (a *Agent) Run(ctx context.Context, req *RunRequest) (*RunResponse, error) {
 	domainAgent, session, err := a.prepareRun(req)
 	if err != nil {
@@ -262,6 +265,7 @@ func (a *Agent) RunV2(ctx context.Context, req *RunRequest) (*RunResponse, error
 	for _, msg := range req.ContextMessages {
 		ctxMsgs = append(ctxMsgs, msg.Message)
 	}
+	session.enterRunPhase1()
 	_, err = domainAgent.React(ctx, ctxMsgs) // 此时只是中间结果
 	if err != nil {
 		return nil, errors.WithMessage(err, "intermediate agent react failed")
@@ -270,6 +274,7 @@ func (a *Agent) RunV2(ctx context.Context, req *RunRequest) (*RunResponse, error
 	slog.DebugContext(ctx, "runV2 after react, now reactStream")
 
 	// 第二个阶段开始流式输出
+	session.enterRunPhase2()
 	finalMsg, err := domainAgent.ReactStream(ctx, nil)
 	if err != nil {
 		return nil, errors.WithMessage(err, "final agent react stream failed")
@@ -358,7 +363,7 @@ func (a *Agent) bindHooksV2(domainAgent *ChatAgent, req *RunRequest) {
 
 	domainAgent.OnAfterRound(func(ctx context.Context, round int, state *SessionState, roundMsg *domainagent.EinoMessage) (bool, error) {
 		// 工具调用中出现了最后一个就Phase提前结束
-		if state.finalPhaseMarked {
+		if state.isInRunPhase1() && state.finalPhaseMarked {
 			return true, nil
 		}
 		return false, nil

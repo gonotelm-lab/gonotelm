@@ -5,6 +5,7 @@ type SceneType string
 const (
 	UnknownScene             = SceneType("unknown")
 	ChatScene                = SceneType("chat")
+	SourcePrepareScene       = SceneType("scene.prepare")
 	StudioMindmapScene       = SceneType("studio.mindmap")
 	StudioReportScene        = SceneType("studio.report")
 	StudioInfographicScene   = SceneType("studio.info_graphic")

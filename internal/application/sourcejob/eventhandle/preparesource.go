@@ -17,6 +17,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/batch"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 
 	"github.com/bytedance/sonic"
 )
@@ -57,6 +58,7 @@ func (h *PrepareSourceHandler) Handle(
 ) error {
 	sourceId := evt.Id
 
+	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.SourcePrepareScene)
 	targetSource, err := h.sourceRepo.FindById(ctx, sourceId)
 	if err != nil {
 		if errors.Is(err, sourceerr.ErrSourceNotFound) {

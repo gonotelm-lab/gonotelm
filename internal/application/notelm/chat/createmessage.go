@@ -255,6 +255,7 @@ func (h *CreateMessageHandler) beginStreamTask(
 		slog.Any("chat_id", bundle.chatId), slog.Any("task_id", taskId), slog.Any("msg_id", msgId),
 	)
 	chatCfg := conf.NotelmGlobal().Chat
+	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.ChatScene)
 	// block here
 	runResponse, err := agt.RunV2(ctx,
 		&chatagent.RunRequest{

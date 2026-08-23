@@ -10,7 +10,9 @@ import (
 
 	ch "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
+	"github.com/gonotelm-lab/gonotelm/pkg/trace/instrumentation/clickhouseconv"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -85,7 +87,19 @@ func (p *BatchInserter) Close() error {
 // Append queues a struct value for insert. val must be compatible with
 // AppendStruct (typically a pointer to struct). Blocks when the queue is full
 // until ctx is done, the batcher is closed, or space is available.
-func (p *BatchInserter) Append(ctx context.Context, val any) error {
+func (p *BatchInserter) Append(ctx context.Context, val any) (err error) {
+	tracer := otel.Tracer("gonotelm/pkg/clickhouse")
+	ctx, span := tracer.Start(ctx, clickhouseconv.AppendSpanName(p.query),
+		clickhouseconv.AppendSpanStartOpts(p.query)...,
+	)
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+		}
+		span.End()
+	}()
+
 	p.mu.Lock()
 	if p.closed {
 		p.mu.Unlock()

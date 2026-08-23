@@ -6,19 +6,20 @@ import (
 	"fmt"
 	"log/slog"
 
-	flowworker "github.com/gonotelm-lab/flow/client/worker"
 	"github.com/gonotelm-lab/gonotelm/internal/application/shared/contract"
 	generatetypes "github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
-	errx "github.com/gonotelm-lab/multimodal/error"
+
+	flow "github.com/gonotelm-lab/flow/client/worker"
+	multimodalerr "github.com/gonotelm-lab/multimodal/error"
 
 	"github.com/bytedance/sonic"
 )
 
-func RegisterTypedWorker(client *flowworker.Client, deps *generatetypes.ServiceDeps) {
-	flowworker.RegisterTypedResult(client, func(ctx context.Context, in contract.WorkerInput) (flowworker.Result, error) {
+func RegisterTypedWorker(client *flow.Client, deps *generatetypes.ServiceDeps) {
+	flow.RegisterTypedResult(client, func(ctx context.Context, in contract.WorkerInput) (flow.Result, error) {
 		kind := artifactentity.Kind(in.Kind)
 		if !kind.Supported() {
 			return paramErrorResult("unsupported artifact kind: %s", kind), nil
@@ -53,6 +54,7 @@ func RegisterTypedWorker(client *flowworker.Client, deps *generatetypes.ServiceD
 			Kind:       kind,
 			Payload:    payload,
 		}
+
 		resp, err := Run(ctx, deps, req)
 		if err != nil {
 			errMsg := err.Error()
@@ -64,7 +66,7 @@ func RegisterTypedWorker(client *flowworker.Client, deps *generatetypes.ServiceD
 				slog.String("payload", string(in.Payload)),
 			)
 
-			return flowworker.ErrorResult{
+			return flow.ErrorResult{
 				Data:      []byte(errMsg),
 				SkipRetry: shouldSkipRetry(err),
 			}, nil
@@ -76,26 +78,26 @@ func RegisterTypedWorker(client *flowworker.Client, deps *generatetypes.ServiceD
 			ResultKind: string(resp.ResultKind),
 		})
 		if err != nil {
-			return flowworker.ErrorResult{
+			return flow.ErrorResult{
 				Data:      []byte(err.Error()),
 				SkipRetry: true,
 			}, nil
 		}
-		return flowworker.OkResult{Data: data}, nil
+		return flow.OkResult{Data: data}, nil
 	})
 }
 
-func paramErrorResult(format string, args ...any) flowworker.Result {
+func paramErrorResult(format string, args ...any) flow.Result {
 	err := errors.ErrParams.Msgf(format, args...)
-	return flowworker.ErrorResult{
+	return flow.ErrorResult{
 		Data:      []byte(err.Error()),
 		SkipRetry: true,
 	}
 }
 
 func shouldSkipRetry(err error) bool {
-	if errx.GetKind(err) != 0 {
-		return !errx.IsRetryable(err)
+	if multimodalerr.GetKind(err) != 0 {
+		return !multimodalerr.IsRetryable(err)
 	}
 	if errors.Is(err, errors.ErrParams) || errors.Is(err, errors.ErrSerde) {
 		return true

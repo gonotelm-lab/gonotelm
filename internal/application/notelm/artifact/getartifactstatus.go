@@ -28,10 +28,10 @@ type StatusResponse struct {
 type GetArtifactStatusHandler struct {
 	*baseHandler
 	flowc   flow.TaskClient
-	storage adapter.StorageGateway
+	storage adapter.StorageAdapter
 }
 
-func NewGetArtifactStatusHandler(repo artifactrepo.Repository, flowc flow.TaskClient, storage adapter.StorageGateway) *GetArtifactStatusHandler {
+func NewGetArtifactStatusHandler(repo artifactrepo.Repository, flowc flow.TaskClient, storage adapter.StorageAdapter) *GetArtifactStatusHandler {
 	return &GetArtifactStatusHandler{baseHandler: newBaseHandler(repo), flowc: flowc, storage: storage}
 }
 

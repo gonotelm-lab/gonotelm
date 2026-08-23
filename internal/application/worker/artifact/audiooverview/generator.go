@@ -17,7 +17,6 @@ import (
 	workererrors "github.com/gonotelm-lab/gonotelm/internal/domain/worker/errors"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	pkgagent "github.com/gonotelm-lab/gonotelm/pkg/agent"
-	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/httpclient"
@@ -71,7 +70,6 @@ type podcastTranscriptExpectation struct {
 func (a *Generator) Generate(ctx context.Context, req *types.Request) (*types.Response, error) {
 	payload := artifactentity.PayloadAs[*artifactentity.AudioOverviewPayload](req.Payload)
 
-	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioAudioOverviewScene)
 	llmOptions := a.llmOptions()
 	ckpt := a.loadCheckpoint(ctx, req)
 

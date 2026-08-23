@@ -23,7 +23,7 @@ func TestNewGenerator_SupportedKinds(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		_, err := newGenerator(tt.kind, &generatetypes.ServiceDeps{})
+		_, _, err := newGenerator(tt.kind, &generatetypes.ServiceDeps{})
 		if tt.ok && err != nil {
 			t.Errorf("expected success for kind %s, got err=%v", tt.kind, err)
 		}
@@ -45,7 +45,7 @@ func TestRun_UnknownKind(t *testing.T) {
 }
 
 func TestNewGenerator_ReportKind(t *testing.T) {
-	g, err := newGenerator(artifactentity.KindReport, &generatetypes.ServiceDeps{})
+	g, _, err := newGenerator(artifactentity.KindReport, &generatetypes.ServiceDeps{})
 	if err != nil {
 		t.Fatalf("expected success for KindReport, got err=%v", err)
 	}
@@ -55,7 +55,7 @@ func TestNewGenerator_ReportKind(t *testing.T) {
 }
 
 func TestNewGenerator_InfoGraphicKind(t *testing.T) {
-	g, err := newGenerator(artifactentity.KindInfoGraphic, &generatetypes.ServiceDeps{})
+	g, _, err := newGenerator(artifactentity.KindInfoGraphic, &generatetypes.ServiceDeps{})
 	if err != nil {
 		t.Fatalf("expected success for KindInfoGraphic, got err=%v", err)
 	}

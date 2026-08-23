@@ -11,7 +11,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
-	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
@@ -172,8 +171,6 @@ func (g *Generator) loadOutlineSources(ctx context.Context, sourceIds []valobj.I
 
 // 探索生成幻灯片大纲
 func (g *Generator) generateOutline(ctx context.Context, req *types.Request, sources []OutlineSource) (*slidesOutlineExpectation, error) {
-	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioSlidesScene)
-
 	agent, err := g.buildAgent(req, 0, true, false) // 大纲：关 thinking
 	if err != nil {
 		return nil, errors.Wrapf(err, "build source explore agent for slides outline failed, err=%v", err)

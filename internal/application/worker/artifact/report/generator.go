@@ -9,7 +9,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
-	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 
@@ -46,8 +45,6 @@ func (r *Generator) generate(
 	ctx context.Context,
 	req *types.Request,
 ) (string, error) {
-	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioReportScene)
-
 	var (
 		reportModel         = conf.WorkerGlobal().Studio.Report.Model
 		reportModelProvider = conf.WorkerGlobal().Studio.Report.ModelProvider

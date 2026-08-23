@@ -12,7 +12,6 @@ import (
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
-	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 
 	einomodel "github.com/cloudwego/eino/components/model"
@@ -37,7 +36,6 @@ type mindmapExpectation struct {
 }
 
 func (m *Generator) Generate(ctx context.Context, req *types.Request) (*types.Response, error) {
-	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioMindmapScene)
 	expect, err := m.generate(ctx, req)
 	if err != nil {
 		return nil, err

@@ -10,7 +10,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
-	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
@@ -80,7 +79,6 @@ func (g *Generator) generate(
 	ctx context.Context,
 	req *types.Request,
 ) (*flashcardExpectation, error) {
-	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioFlashcardScene)
 	llmOptions := g.llmOptions()
 
 	p := artifactentity.PayloadAs[*artifactentity.FlashcardPayload](req.Payload)

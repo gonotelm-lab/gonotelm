@@ -9,7 +9,6 @@ import (
 
 	einoschema "github.com/cloudwego/eino/schema"
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 )
 
@@ -33,12 +32,12 @@ const (
 )
 
 type TitleMakerImpl struct {
-	provider llm.Provider
+	provider chat.Provider
 	model    string
 	llm      *chat.Gateway
 }
 
-func NewTitleMaker(gw *chat.Gateway, provider llm.Provider, model string) adapter.TitleMaker {
+func NewTitleMaker(gw *chat.Gateway, provider chat.Provider, model string) adapter.TitleMaker {
 	return &TitleMakerImpl{
 		provider: provider,
 		model:    model,
@@ -61,7 +60,7 @@ func (t *TitleMakerImpl) MakeTitle(
 
 	provider := t.provider
 	if opt.Provider != "" {
-		provider = llm.Provider(opt.Provider)
+		provider = chat.Provider(opt.Provider)
 	}
 
 	model := t.model

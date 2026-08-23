@@ -104,6 +104,7 @@ func (h *CreateMessageHandler) Handle(
 		return nil, err
 	}
 
+	ctx = pkgcontext.WithScene(ctx, pkgcontext.ChatScene, cmd.ChatId.String())
 	userId := pkgcontext.GetUserId(ctx)
 	targetSources, err := shared.FilterReadySources(ctx, h.sourceRepo, targetChat.NotebookId, cmd.SourceIds, userId)
 	if err != nil {
@@ -255,7 +256,6 @@ func (h *CreateMessageHandler) beginStreamTask(
 		slog.Any("chat_id", bundle.chatId), slog.Any("task_id", taskId), slog.Any("msg_id", msgId),
 	)
 	chatCfg := conf.NotelmGlobal().Chat
-	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.ChatScene)
 	// block here
 	runResponse, err := agt.RunV2(ctx,
 		&chatagent.RunRequest{

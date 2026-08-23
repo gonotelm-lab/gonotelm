@@ -23,7 +23,7 @@ func (f *fakeStorage) PresignGet(ctx context.Context, key string) (string, error
 	return f.presigned, f.err
 }
 
-var _ adapter.StorageGateway = &fakeStorage{}
+var _ adapter.StorageAdapter = &fakeStorage{}
 
 func TestMaterializeStorageResult_FromWorkerOutput(t *testing.T) {
 	sr := infographic.StorageResult{

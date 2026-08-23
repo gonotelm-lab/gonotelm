@@ -1,4 +1,4 @@
-package llm
+package chat
 
 import (
 	"net/http"

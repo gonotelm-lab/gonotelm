@@ -12,6 +12,14 @@ user = "${GONOTELM_DB_USER:-postgres}"
 password = "${GONOTELM_DB_PASSWORD:-postgres}"
 dbName = "${GONOTELM_DB_NAME:-gonotelm}"
 
+[databaseOlap]
+type = "clickhouse"
+host = "${GONOTELM_OLAP_DB_HOST:-127.0.0.1}"
+port = ${GONOTELM_OLAP_DB_PORT:-9000}
+user = "${GONOTELM_OLAP_DB_USER:-clickhouse}"
+password = "${GONOTELM_OLAP_DB_PASSWORD:-clickhouse}"
+dbName = "${GONOTELM_OLAP_DB_NAME:-gonotelm}"
+
 [redis]
 addrs = ${GONOTELM_REDIS_ADDRS:-['127.0.0.1:7542']}
 username = "${GONOTELM_REDIS_USERNAME:-}"

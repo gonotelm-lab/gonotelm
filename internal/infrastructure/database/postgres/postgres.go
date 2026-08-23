@@ -4,7 +4,6 @@ import (
 	"context"
 	"strings"
 
-	"github.com/gonotelm-lab/gonotelm/internal/conf/shared"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
 	"github.com/gonotelm-lab/gonotelm/pkg/misc"
 	"github.com/gonotelm-lab/gonotelm/pkg/sql"
@@ -12,14 +11,8 @@ import (
 	"gorm.io/plugin/opentelemetry/tracing"
 )
 
-func Open(cfg shared.DatabaseConfig) (*database.Dao, error) {
-	db, err := sql.OpenPgSql(&sql.Config{
-		Host:     cfg.Host,
-		Port:     cfg.Port,
-		User:     cfg.User,
-		Password: cfg.Password,
-		DbName:   cfg.DBName,
-	})
+func Open(cfg *sql.Config) (*database.Dao, error) {
+	db, err := sql.OpenPgSql(cfg)
 	if err != nil {
 		return nil, err
 	}

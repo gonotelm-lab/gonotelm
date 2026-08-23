@@ -7,7 +7,6 @@ import (
 	"io"
 	"sync"
 
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
 	"github.com/gonotelm-lab/gonotelm/pkg/safe"
 	pkgtrace "github.com/gonotelm-lab/gonotelm/pkg/trace"
 	"github.com/gonotelm-lab/gonotelm/pkg/trace/instrumentation/genaiconv"
@@ -31,52 +30,82 @@ type Gateway struct {
 	rootCtx context.Context
 	mu      sync.RWMutex
 
-	providers map[llm.Provider]einomodel.ToolCallingChatModel
+	providers map[Provider]einomodel.ToolCallingChatModel
+
+	recorder Recorder
 }
 
-func New(ctx context.Context, cfg *llm.ProviderConfig) (*Gateway, error) {
-	gw := &Gateway{
-		rootCtx:   ctx,
-		providers: make(map[llm.Provider]einomodel.ToolCallingChatModel),
+type gatewayOption struct {
+	recorder Recorder
+}
+
+type GatewayOption func(o *gatewayOption)
+
+func WithRecorder(r Recorder) GatewayOption {
+	return func(o *gatewayOption) {
+		o.recorder = r
+	}
+}
+
+func New(ctx context.Context, cfg *ProviderConfig, opts ...GatewayOption) (*Gateway, error) {
+	opt := gatewayOption{}
+	for _, o := range opts {
+		if o != nil {
+			o(&opt)
+		}
 	}
 
-	err := gw.initProviders(cfg)
+	g := &Gateway{
+		rootCtx:   ctx,
+		providers: make(map[Provider]einomodel.ToolCallingChatModel),
+		recorder:  opt.recorder,
+	}
+
+	err := g.initProviders(cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	return gw, nil
+	return g, nil
 }
 
-func (g *Gateway) initProviders(cfg *llm.ProviderConfig) error {
-	deepseekModel, err := NewChatModel(g.rootCtx, llm.ProviderDeepSeek, cfg)
+func (g *Gateway) initProviders(cfg *ProviderConfig) error {
+	deepseekModel, err := NewChatModel(g.rootCtx, ProviderDeepSeek, cfg)
 	if err != nil {
 		return err
 	}
-	g.providers[llm.ProviderDeepSeek] = newWrappedChatModel(g.rootCtx, deepseekModel, llm.ProviderDeepSeek, cfg.DeepSeek.MaxConcurrency)
+	g.providers[ProviderDeepSeek] = newWrappedChatModel(g.rootCtx, deepseekModel, ProviderDeepSeek,
+		cfg.DeepSeek.MaxConcurrency, g.recorder,
+	)
 
-	openaiModel, err := NewChatModel(g.rootCtx, llm.ProviderOpenAI, cfg)
+	openaiModel, err := NewChatModel(g.rootCtx, ProviderOpenAI, cfg)
 	if err != nil {
 		return err
 	}
-	g.providers[llm.ProviderOpenAI] = newWrappedChatModel(g.rootCtx, openaiModel, llm.ProviderOpenAI, cfg.OpenAI.MaxConcurrency)
+	g.providers[ProviderOpenAI] = newWrappedChatModel(g.rootCtx, openaiModel, ProviderOpenAI,
+		cfg.OpenAI.MaxConcurrency, g.recorder,
+	)
 
-	qwenModel, err := NewChatModel(g.rootCtx, llm.ProviderQwen, cfg)
+	qwenModel, err := NewChatModel(g.rootCtx, ProviderQwen, cfg)
 	if err != nil {
 		return err
 	}
-	g.providers[llm.ProviderQwen] = newWrappedChatModel(g.rootCtx, qwenModel, llm.ProviderQwen, cfg.Qwen.MaxConcurrency)
+	g.providers[ProviderQwen] = newWrappedChatModel(g.rootCtx, qwenModel, ProviderQwen,
+		cfg.Qwen.MaxConcurrency, g.recorder,
+	)
 
-	agnesModel, err := NewChatModel(g.rootCtx, llm.ProviderAgnes, cfg)
+	agnesModel, err := NewChatModel(g.rootCtx, ProviderAgnes, cfg)
 	if err != nil {
 		return err
 	}
-	g.providers[llm.ProviderAgnes] = newWrappedChatModel(g.rootCtx, agnesModel, llm.ProviderAgnes, cfg.Agnes.MaxConcurrency)
+	g.providers[ProviderAgnes] = newWrappedChatModel(g.rootCtx, agnesModel, ProviderAgnes,
+		cfg.Agnes.MaxConcurrency, g.recorder,
+	)
 
 	return nil
 }
 
-func (g *Gateway) GetProvider(providerType llm.Provider) (einomodel.ToolCallingChatModel, error) {
+func (g *Gateway) GetProvider(providerType Provider) (einomodel.ToolCallingChatModel, error) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 
@@ -91,21 +120,23 @@ func (g *Gateway) GetProvider(providerType llm.Provider) (einomodel.ToolCallingC
 type wrappedChatModel struct {
 	rootCtx        context.Context
 	typ            string
-	provider       llm.Provider
+	provider       Provider
 	impl           einomodel.ToolCallingChatModel
 	maxConcurrency int
 	sem            *semaphore.Weighted
+	recorder       Recorder
 }
 
 func newWrappedChatModel(
 	ctx context.Context,
 	impl einomodel.ToolCallingChatModel,
-	provider llm.Provider,
+	provider Provider,
 	maxConcurrency int,
+	recorder Recorder,
 ) *wrappedChatModel {
 	typ, ok := components.GetType(impl)
 	if !ok {
-		typ = "GatewayWrapped"
+		typ = "WrappedGateway"
 	}
 
 	if maxConcurrency <= 0 {
@@ -121,6 +152,7 @@ func newWrappedChatModel(
 		impl:           impl,
 		maxConcurrency: maxConcurrency,
 		sem:            sem,
+		recorder:       recorder,
 	}
 }
 
@@ -133,11 +165,12 @@ func (g *wrappedChatModel) Generate(
 ) (*einoschema.Message, error) {
 	modelName := extractOptionModelName(opts...)
 	ctx = withModelName(ctx, modelName)
+	ctx = withProvider(ctx, g.provider)
 	ctx = callbacks.InitCallbacks(ctx, &callbacks.RunInfo{
 		Name:      wrappedChatModelRunName,
 		Type:      g.typ,
 		Component: components.ComponentOfChatModel,
-	}, &Interceptor{rootCtx: g.rootCtx})
+	}, newInterceptor(g.rootCtx, g.recorder))
 
 	opts = applyProviderCallOptions(g.provider, false, opts)
 
@@ -165,12 +198,13 @@ func (g *wrappedChatModel) Stream(
 ) (*einoschema.StreamReader[*einoschema.Message], error) {
 	modelName := extractOptionModelName(opts...)
 	ctx = withModelName(ctx, modelName)
-	ctx = withIsStreaming(ctx, true)
+	ctx = withStreaming(ctx, true)
+	ctx = withProvider(ctx, g.provider)
 	ctx = callbacks.InitCallbacks(ctx, &callbacks.RunInfo{
 		Name:      wrappedChatModelRunName,
 		Type:      g.typ,
 		Component: components.ComponentOfChatModel,
-	}, &Interceptor{rootCtx: g.rootCtx})
+	}, newInterceptor(g.rootCtx, g.recorder))
 
 	opts = applyProviderCallOptions(g.provider, true, opts)
 
@@ -222,11 +256,14 @@ func (g *wrappedChatModel) Stream(
 }
 
 // startChatSpan 为一次 chat 调用创建 gen_ai client span。
-func startChatSpan(ctx context.Context, provider llm.Provider, modelName string) (context.Context, oteltrace.Span) {
-	return pkgtrace.GetOtelTracer().Start(ctx, genaiconv.SpanName("chat"),
-		oteltrace.WithSpanKind(oteltrace.SpanKindClient),
-		oteltrace.WithAttributes(genaiconv.Attributes(string(provider), "chat", modelName)...),
-	)
+func startChatSpan(ctx context.Context, provider Provider, modelName string) (context.Context, oteltrace.Span) {
+	return pkgtrace.GetOtelTracer().
+		Start(
+			ctx,
+			genaiconv.SpanName("chat"), // gen_ai.chat
+			oteltrace.WithSpanKind(oteltrace.SpanKindClient),
+			oteltrace.WithAttributes(genaiconv.Attributes(string(provider), "chat", modelName)...),
+		)
 }
 
 func (g *wrappedChatModel) WithTools(
@@ -237,7 +274,7 @@ func (g *wrappedChatModel) WithTools(
 		return nil, err
 	}
 
-	return newWrappedChatModel(g.rootCtx, impl, g.provider, g.maxConcurrency), nil
+	return newWrappedChatModel(g.rootCtx, impl, g.provider, g.maxConcurrency, g.recorder), nil
 }
 
 func extractOptionModelName(opts ...einomodel.Option) string {

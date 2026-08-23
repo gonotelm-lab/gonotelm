@@ -7,21 +7,21 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 )
 
-type StorageGatewayImpl struct {
+type StorageAdapterImpl struct {
 	store storage.Storage
 }
 
-func NewStorageGateway(store storage.Storage) adapter.StorageGateway {
-	return &StorageGatewayImpl{store: store}
+func NewStorageAdapter(store storage.Storage) adapter.StorageAdapter {
+	return &StorageAdapterImpl{store: store}
 }
 
-var _ adapter.StorageGateway = &StorageGatewayImpl{}
+var _ adapter.StorageAdapter = &StorageAdapterImpl{}
 
-func (s *StorageGatewayImpl) DeleteObject(ctx context.Context, key string) error {
+func (s *StorageAdapterImpl) DeleteObject(ctx context.Context, key string) error {
 	return s.store.DeleteObject(ctx, &storage.DeleteObjectRequest{Key: key})
 }
 
-func (s *StorageGatewayImpl) PresignGet(ctx context.Context, key string) (string, error) {
+func (s *StorageAdapterImpl) PresignGet(ctx context.Context, key string) (string, error) {
 	resp, err := s.store.PresignedGetObject(ctx, &storage.PresignedGetObjectRequest{Key: key})
 	if err != nil {
 		return "", err

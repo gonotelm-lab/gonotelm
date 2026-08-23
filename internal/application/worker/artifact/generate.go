@@ -13,35 +13,39 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/slides"
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 func Run(ctx context.Context, deps *types.ServiceDeps, req *types.Request) (*types.Response, error) {
-	g, err := newGenerator(req.Kind, deps)
+	g, scene, err := newGenerator(req.Kind, deps)
 	if err != nil {
 		return nil, err
 	}
+
+	ctx = pkgcontext.WithScene(ctx, scene, req.ArtifactId.String())
+
 	return g.Generate(ctx, req)
 }
 
-func newGenerator(kind artifactentity.Kind, deps *types.ServiceDeps) (types.Generator, error) {
+func newGenerator(kind artifactentity.Kind, deps *types.ServiceDeps) (types.Generator, pkgcontext.SceneType, error) {
 	switch kind {
 	case artifactentity.KindMindmap:
-		return mindmap.New(deps), nil
+		return mindmap.New(deps), pkgcontext.StudioMindmapScene, nil
 	case artifactentity.KindReport:
-		return report.New(deps), nil
+		return report.New(deps), pkgcontext.StudioReportScene, nil
 	case artifactentity.KindInfoGraphic:
-		return infographic.New(deps), nil
+		return infographic.New(deps), pkgcontext.StudioInfographicScene, nil
 	case artifactentity.KindAudioOverview:
-		return audiooverview.New(deps), nil
+		return audiooverview.New(deps), pkgcontext.StudioAudioOverviewScene, nil
 	case artifactentity.KindFlashcard:
-		return flashcard.New(deps), nil
+		return flashcard.New(deps), pkgcontext.StudioFlashcardScene, nil
 	case artifactentity.KindQuiz:
-		return quiz.New(deps), nil
+		return quiz.New(deps), pkgcontext.StudioQuizScene, nil
 	case artifactentity.KindDataTable:
-		return datatable.New(deps), nil
+		return datatable.New(deps), pkgcontext.StudioDataTableScene, nil
 	case artifactentity.KindSlides:
-		return slides.New(deps), nil
+		return slides.New(deps), pkgcontext.StudioSlidesScene, nil
 	}
-	return nil, errors.ErrParams.Msgf("unsupported kind: %s", kind)
+	return nil, pkgcontext.UnknownScene, errors.ErrParams.Msgf("unsupported kind: %s", kind)
 }

@@ -11,6 +11,7 @@ import (
 	generatetypes "github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	bootshared "github.com/gonotelm-lab/gonotelm/internal/bootstrap/shared"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
+	"github.com/gonotelm-lab/gonotelm/internal/domain/source/service/agentize"
 	infrarepo "github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository"
 	"github.com/gonotelm-lab/gonotelm/pkg/trace"
 
@@ -58,8 +59,20 @@ func NewWorker(ctx context.Context, cfg *conf.WorkerConfig) (*Worker, error) {
 		return nil, err
 	}
 
+	sourceRepo := infrarepo.NewSourceRepository(shared.Database.SourceStore)
+	storageRepo := infrarepo.NewSourceStorageRepository(shared.Storage)
+	sourceDocRepo := infrarepo.NewSourceDocRepository(
+		shared.Embedder,
+		shared.VectorDatabase.SourceDocStore,
+		infrarepo.SourceDocRepositoryConfig{
+			EmbedBatchSize:      cfg.Embedding.BatchSize,
+			EmbedMaxConcurrency: cfg.Embedding.MaxConcurrency,
+		},
+	)
+	agentizeService := agentize.NewService(agentize.Config{}, sourceRepo, storageRepo, sourceDocRepo)
+
 	deps := &generatetypes.ServiceDeps{
-		Agentize:             shared.AgentizeService,
+		Agentize:             agentizeService,
 		LLMGateway:           shared.LLMGateway,
 		Text2Image:           shared.Text2Image,
 		Text2Audio:           shared.Text2Audio,
@@ -67,7 +80,7 @@ func NewWorker(ctx context.Context, cfg *conf.WorkerConfig) (*Worker, error) {
 		SandboxRepository:    infrarepo.NewSandboxRepository(shared.Cache.SandboxCache),
 		DistLock:             shared.DistLock,
 		ObjectStorage:        shared.Storage,
-		CheckpointRepository: infrarepo.NewCheckpointRepository(shared.DB.WorkerCheckpointStore),
+		CheckpointRepository: infrarepo.NewCheckpointRepository(shared.Database.WorkerCheckpointStore),
 	}
 
 	app := &Worker{shared: shared}

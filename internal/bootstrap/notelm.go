@@ -70,27 +70,27 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 	}
 
 	// ── 2. Repositories ──
-	notebookRepo := repository.NewNotebookRepository(infra.DB.NotebookStore, infra.DB.SourceStore)
-	sourceRepo := repository.NewSourceRepository(infra.DB.SourceStore)
+	notebookRepo := repository.NewNotebookRepository(infra.Database.NotebookStore, infra.Database.SourceStore)
+	sourceRepo := repository.NewSourceRepository(infra.Database.SourceStore)
 	sourceStorageRepo := repository.NewSourceStorageRepository(infra.Storage)
 	sourceDocRepo := repository.NewSourceDocRepository(
 		infra.Embedder,
-		infra.VDB.SourceDocStore,
+		infra.VectorDatabase.SourceDocStore,
 		repository.SourceDocRepositoryConfig{
 			EmbedBatchSize:      cfg.Embedding.BatchSize,
 			EmbedMaxConcurrency: cfg.Embedding.MaxConcurrency,
 		},
 	)
-	chatRepo := repository.NewChatRepository(infra.DB.ChatStore)
-	messageRepo := repository.NewMessageRepository(infra.DB.ChatMessageStore)
+	chatRepo := repository.NewChatRepository(infra.Database.ChatStore)
+	messageRepo := repository.NewMessageRepository(infra.Database.ChatMessageStore)
 	contextMsgRepo := repository.NewContextMessageRepository(infra.Cache.ChatMessageContextCache)
-	artifactRepo := repository.NewArtifactRepository(infra.DB.ArtifactStore)
+	artifactRepo := repository.NewArtifactRepository(infra.Database.ArtifactStore)
 	streamTaskRepo := repository.NewStreamTaskRepository(infra.Cache.ChatMessageStreamCache)
 	suggestionRepo := repository.NewSuggestionRepository(infra.Cache.ChatSuggestionCache)
 
 	// ── 3. Event Bus ──
 	innerBus := eventbus.NewInnerEventBus()
-	outerBus := eventbus.NewOuterEventBus(infra.MQ)
+	outerBus := eventbus.NewOuterEventBus(infra.MessageQueue)
 	eventBus := eventbus.NewCompositeEventBus(innerBus, outerBus)
 
 	// ── 4. Adapters ──
@@ -125,7 +125,7 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 	addCloser(flowClient)
 
 	// ── 6. Storage gateway adapter ──
-	storageGateway := adapter.NewStorageGateway(infra.Storage)
+	storageGateway := adapter.NewStorageAdapter(infra.Storage)
 
 	// ── 7. Syncer ──
 	syncerCfg := syncerpkg.Config{

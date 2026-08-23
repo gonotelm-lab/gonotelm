@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache"
-	chat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
+	chat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	embedding "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/embedding"
 	text2audio "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio"
 	text2image "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image"
@@ -56,20 +56,21 @@ func (d *DatabaseConfig) ToSQLConfig() *sql.Config {
 		Port:     d.Port,
 		User:     d.User,
 		Password: d.Password,
-		DbName:   d.DBName,
+		DBName:   d.DBName,
 	}
 }
 
 // InfraConfig 为 notelm / worker 共用的基础设施配置。
 type InfraConfig struct {
-	Database   DatabaseConfig                `toml:"database"`
-	VectorDB   vectordb.Config               `toml:"vectorDb"`
-	Storage    storageimpl.StorageTypeConfig `toml:"storage"`
-	Provider   chat.ProviderConfig           `toml:"provider"`
-	Embedding  embedding.EmbeddingConfig     `toml:"embedding"`
-	Text2Image text2image.Text2ImageConfig   `toml:"text2image"`
-	Text2Audio text2audio.Text2AudioConfig   `toml:"text2audio"`
-	Sandbox    sandboximpl.ProviderConfig    `toml:"sandbox"`
+	Database     DatabaseConfig                `toml:"database"`
+	VectorDB     vectordb.Config               `toml:"vectorDb"`
+	Storage      storageimpl.StorageTypeConfig `toml:"storage"`
+	Provider     chat.ProviderConfig           `toml:"provider"`
+	Embedding    embedding.EmbeddingConfig     `toml:"embedding"`
+	Text2Image   text2image.Text2ImageConfig   `toml:"text2image"`
+	Text2Audio   text2audio.Text2AudioConfig   `toml:"text2audio"`
+	Sandbox      sandboximpl.ProviderConfig    `toml:"sandbox"`
+	DatabaseOlap DatabaseConfig                `toml:"databaseOlap"`
 
 	Redis    cache.RedisCacheConfig `toml:"redis"`
 	MsgQueue mqimpl.Config          `toml:"msgQueue"`

@@ -15,9 +15,9 @@ import (
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/service/agentize"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
-	domainagent "github.com/gonotelm-lab/gonotelm/pkg/agent"
+	pkgagt "github.com/gonotelm-lab/gonotelm/pkg/agent"
+	"github.com/gonotelm-lab/gonotelm/pkg/llm"
 
 	"github.com/bytedance/sonic"
 	einotool "github.com/cloudwego/eino/components/tool"
@@ -101,7 +101,7 @@ type RunRequest struct {
 type (
 	RunResponse struct {
 		SourceDocCitations []valobj.Id
-		FinalMessage       *domainagent.EinoMessage
+		FinalMessage       *pkgagt.EinoMessage
 	}
 
 	Phase struct {
@@ -124,7 +124,7 @@ type (
 
 	PhaseMarkHook func(ctx context.Context, phase Phase)
 
-	RoundFinishedHook func(ctx context.Context, newMsgs []*domainagent.EinoMessage)
+	RoundFinishedHook func(ctx context.Context, newMsgs []*pkgagt.EinoMessage)
 
 	Hooks struct {
 		ThinkStart        ThinkStartHook
@@ -138,16 +138,16 @@ type (
 	}
 )
 
-type ChatAgent = domainagent.Agent[*SessionState]
+type ChatAgent = pkgagt.Agent[*SessionState]
 
 func (a *Agent) prepareRun(req *RunRequest) (*ChatAgent, *SessionState, error) {
-	toolCallingChatModel, err := a.gateway.GetProvider(llm.Provider(req.ModelProvider))
+	toolCallingChatModel, err := a.gateway.GetProvider(chat.Provider(req.ModelProvider))
 	if err != nil {
 		return nil, nil, err
 	}
 
 	options := chat.BuildLLMOptions(
-		chat.WithThinking(llm.Provider(req.ModelProvider), req.EnableThinking),
+		chat.WithThinking(chat.Provider(req.ModelProvider), req.EnableThinking),
 		chat.WithModel(req.Model),
 	)
 	session := &SessionState{
@@ -157,7 +157,7 @@ func (a *Agent) prepareRun(req *RunRequest) (*ChatAgent, *SessionState, error) {
 		userId:      req.UserId,
 		curRunPhase: runPhase1,
 	}
-	domainAgent := domainagent.New(domainagent.Config[*SessionState]{
+	domainAgent := pkgagt.New(pkgagt.Config[*SessionState]{
 		MaxRound: conf.NotelmGlobal().Chat.GetMaxRound(),
 		BaseLLM:  toolCallingChatModel,
 		Options:  options,
@@ -266,16 +266,33 @@ func (a *Agent) RunV2(ctx context.Context, req *RunRequest) (*RunResponse, error
 		ctxMsgs = append(ctxMsgs, msg.Message)
 	}
 	session.enterRunPhase1()
-	_, err = domainAgent.React(ctx, ctxMsgs) // 此时只是中间结果
+	phase1FinalMsg, err := domainAgent.React(ctx, ctxMsgs) // 此时只是中间结果
 	if err != nil {
 		return nil, errors.WithMessage(err, "intermediate agent react failed")
 	}
 
-	slog.DebugContext(ctx, "runV2 after react, now reactStream")
+	if phase1FinalMsg != nil &&
+		phase1FinalMsg.ResponseMeta != nil &&
+		phase1FinalMsg.ResponseMeta.FinishReason == llm.FinishReasonStop &&
+		!session.finalPhaseMarked {
+		// 此处兼容一种情况 如果phase1直接输出了finish_stop 意味着模型没有严格遵守要求直接输出了答案
+		// 那就直接推送 不要浪费token了 手动触发一次hook
+		slog.DebugContext(ctx, "runV2 phase1 directly finish_reason=stop, manual pushing...")
+		a.manualPushFinalMsg(ctx, phase1FinalMsg, &req.Hooks)
+		return &RunResponse{
+			FinalMessage:       phase1FinalMsg,
+			SourceDocCitations: session.sourceDocCitations,
+		}, nil
+	}
+
+	slog.DebugContext(ctx, "runV2 after phase1 react, now reactStream")
 
 	// 第二个阶段开始流式输出
 	session.enterRunPhase2()
-	finalMsg, err := domainAgent.ReactStream(ctx, nil)
+	finalMsg, err := domainAgent.ReactStream(ctx, []*pkgagt.EinoMessage{{
+		Role:    einoschema.User,
+		Content: "Please output the final answer now.",
+	}})
 	if err != nil {
 		return nil, errors.WithMessage(err, "final agent react stream failed")
 	}
@@ -286,11 +303,31 @@ func (a *Agent) RunV2(ctx context.Context, req *RunRequest) (*RunResponse, error
 	}, nil
 }
 
+func (a *Agent) manualPushFinalMsg(ctx context.Context, msg *pkgagt.EinoMessage, hooks *Hooks) {
+	if msg.Content == "" {
+		return
+	}
+
+	if hooks.ResponseStart != nil {
+		hooks.ResponseStart(ctx)
+	}
+
+	if hooks.ResponseDelta != nil {
+		for chunk := range strings.SplitAfterSeq(msg.Content, "\n") {
+			hooks.ResponseDelta(ctx, chunk)
+		}
+	}
+
+	if hooks.ResponseEnd != nil {
+		hooks.ResponseEnd(ctx)
+	}
+}
+
 func (a *Agent) bindBasicHooks(domainAgent *ChatAgent, req *RunRequest) {
-	domainAgent.OnBeforeRound(domainagent.NewFinalRoundHook(domainAgent, conf.NotelmGlobal().Chat.GetMaxRound()))
+	domainAgent.OnBeforeRound(pkgagt.NewFinalRoundHook(domainAgent, conf.NotelmGlobal().Chat.GetMaxRound()))
 
 	if req.Hooks.RoundFinishedHook != nil {
-		domainAgent.OnMsgAppender(func(ctx context.Context, state *SessionState, newMsgs []*domainagent.EinoMessage) {
+		domainAgent.OnMsgAppender(func(ctx context.Context, state *SessionState, newMsgs []*pkgagt.EinoMessage) {
 			req.Hooks.RoundFinishedHook(ctx, newMsgs)
 		})
 	}
@@ -333,7 +370,7 @@ func (a *Agent) bindBasicHooks(domainAgent *ChatAgent, req *RunRequest) {
 		})
 	}
 
-	domainAgent.OnAfterToolCall(func(ctx context.Context, state *SessionState, results []*domainagent.ToolCallResult) {
+	domainAgent.OnAfterToolCall(func(ctx context.Context, state *SessionState, results []*pkgagt.ToolCallResult) {
 		// 额外处理工具调用结果
 		for _, result := range results {
 			switch result.Name {
@@ -361,7 +398,7 @@ func (a *Agent) bindHooks(domainAgent *ChatAgent, req *RunRequest) {
 func (a *Agent) bindHooksV2(domainAgent *ChatAgent, req *RunRequest) {
 	a.bindBasicHooks(domainAgent, req)
 
-	domainAgent.OnAfterRound(func(ctx context.Context, round int, state *SessionState, roundMsg *domainagent.EinoMessage) (bool, error) {
+	domainAgent.OnAfterRound(func(ctx context.Context, round int, state *SessionState, roundMsg *pkgagt.EinoMessage) (bool, error) {
 		// 工具调用中出现了最后一个就Phase提前结束
 		if state.isInRunPhase1() && state.finalPhaseMarked {
 			return true, nil

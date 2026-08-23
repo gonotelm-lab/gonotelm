@@ -44,7 +44,7 @@ type ServerDeps struct {
 	ArtifactRepo   artifactrepo.Repository
 	FlowClient     flow.TaskClient
 	Poller         artifactapp.Poller
-	StorageGateway adapter.StorageGateway
+	StorageGateway adapter.StorageAdapter
 
 	TitleMaker adapter.TitleMaker
 }

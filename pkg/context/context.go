@@ -10,11 +10,12 @@ import (
 type contextKey string
 
 const (
-	ContextKeyReqId     = contextKey("_req_id")
-	ContextKeyUserId    = contextKey("_user_id")
-	ContextKeySceneType = contextKey("_scene_type")
-	ContextLang         = contextKey("_lang")
-	ContextOperatorType = contextKey("_operator_type")
+	ContextKeyReqId        = contextKey("_req_id")
+	ContextKeyUserId       = contextKey("_user_id")
+	ContextKeySceneType    = contextKey("_scene_type")
+	ContextKeySceneGroupId = contextKey("_scene_group_id")
+	ContextLang            = contextKey("_lang")
+	ContextOperatorType    = contextKey("_operator_type")
 )
 
 func WithReqId(ctx context.Context, reqId requestid.ID) context.Context {
@@ -54,6 +55,23 @@ func GetSceneType(ctx context.Context) SceneType {
 	}
 
 	return sceneType
+}
+
+func WithSceneGroupId(ctx context.Context, sceneGroupId SceneGroupId) context.Context {
+	return context.WithValue(ctx, ContextKeySceneGroupId, sceneGroupId)
+}
+
+func GetSceneGroupId(ctx context.Context) SceneGroupId {
+	sceneGroupId, ok := ctx.Value(ContextKeySceneGroupId).(SceneGroupId)
+	if ok {
+		return sceneGroupId
+	}
+
+	return ""
+}
+
+func WithScene(ctx context.Context, sceneType SceneType, id SceneGroupId) context.Context {
+	return WithSceneGroupId(WithSceneType(ctx, sceneType), id)
 }
 
 func WithLang(ctx context.Context, lang string) context.Context {

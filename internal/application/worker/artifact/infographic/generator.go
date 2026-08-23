@@ -18,7 +18,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
-	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/httpclient"
@@ -84,8 +83,6 @@ func (ig *Generator) generate(
 	artifactId valobj.Id,
 	payload *artifactentity.InfoGraphicPayload,
 ) (*infoGraphicExpectation, *StorageResult, error) {
-	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioInfographicScene)
-
 	ckpt, err := ig.deps.CheckpointRepository.FindByArtifactId(ctx, artifactId)
 	if err != nil {
 		if !errors.Is(err, workererrors.ErrCheckpointNotFound) {

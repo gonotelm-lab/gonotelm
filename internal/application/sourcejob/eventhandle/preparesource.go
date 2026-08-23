@@ -15,9 +15,9 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/service/index"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/pkg/batch"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
-	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 
 	"github.com/bytedance/sonic"
 )
@@ -58,7 +58,7 @@ func (h *PrepareSourceHandler) Handle(
 ) error {
 	sourceId := evt.Id
 
-	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.SourcePrepareScene)
+	ctx = pkgcontext.WithScene(ctx, pkgcontext.SourcePrepareScene, sourceId.String())
 	targetSource, err := h.sourceRepo.FindById(ctx, sourceId)
 	if err != nil {
 		if errors.Is(err, sourceerr.ErrSourceNotFound) {

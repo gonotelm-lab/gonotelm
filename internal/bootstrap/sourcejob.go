@@ -33,16 +33,16 @@ func NewSourceJob(ctx context.Context, cfg *conf.SourceJobConfig) (*SourceJob, e
 	if err != nil {
 		return nil, err
 	}
-	if infra.MQ == nil {
+	if infra.MessageQueue == nil {
 		_ = infra.Close(ctx)
 		return nil, fmt.Errorf("sourcejob requires mq")
 	}
 
-	sourceRepo := repository.NewSourceRepository(infra.DB.SourceStore)
+	sourceRepo := repository.NewSourceRepository(infra.Database.SourceStore)
 	sourceStorageRepo := repository.NewSourceStorageRepository(infra.Storage)
 	sourceDocRepo := repository.NewSourceDocRepository(
 		infra.Embedder,
-		infra.VDB.SourceDocStore,
+		infra.VectorDatabase.SourceDocStore,
 		repository.SourceDocRepositoryConfig{
 			EmbedBatchSize:      cfg.Embedding.BatchSize,
 			EmbedMaxConcurrency: cfg.Embedding.MaxConcurrency,
@@ -50,7 +50,7 @@ func NewSourceJob(ctx context.Context, cfg *conf.SourceJobConfig) (*SourceJob, e
 	)
 
 	innerBus := eventbus.NewInnerEventBus()
-	outerBus := eventbus.NewOuterEventBus(infra.MQ)
+	outerBus := eventbus.NewOuterEventBus(infra.MessageQueue)
 	bus := eventbus.NewCompositeEventBus(innerBus, outerBus)
 
 	summarizer := adapter.NewSummarizer(

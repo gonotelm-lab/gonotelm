@@ -15,10 +15,10 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkglog "github.com/gonotelm-lab/gonotelm/pkg/log"
 	"github.com/gonotelm-lab/gonotelm/pkg/requestid"
-	"github.com/gonotelm-lab/gonotelm/pkg/ulid"
 	pkgtrace "github.com/gonotelm-lab/gonotelm/pkg/trace"
 	"github.com/gonotelm-lab/gonotelm/pkg/trace/instrumentation/messagingconv"
 	"github.com/gonotelm-lab/gonotelm/pkg/trace/propagation"
+	"github.com/gonotelm-lab/gonotelm/pkg/ulid"
 
 	"github.com/segmentio/kafka-go"
 	"github.com/segmentio/kafka-go/sasl/plain"
@@ -257,10 +257,11 @@ func (c *Consumer) Subscribe(ctx context.Context, topic string, handler mq.Messa
 
 			// 从 kafka header 中提取 trace 上下文，并创建 consumer span
 			carrier := propagation.NewKafkaHeaderCarrier(msg.Headers)
-			propCtx := pkgtrace.GetTextMapPropagator().Extract(ctx, carrier)
-
+			propCtx := pkgtrace.GetTextMapPropagator().Extract(ctx, carrier) // 复原span
 			tracer := pkgtrace.GetOtelTracer()
-			spanCtx, span := tracer.Start(propCtx, messagingconv.ProcessSpanName(msg.Topic),
+			reqCtx, span := tracer.Start(
+				propCtx,
+				messagingconv.ProcessSpanName(msg.Topic),
 				oteltrace.WithSpanKind(oteltrace.SpanKindConsumer),
 				oteltrace.WithAttributes(messagingconv.ProcessAttributes(msg.Topic, msg.Key,
 					messagingconv.ProcessOptions{
@@ -273,15 +274,14 @@ func (c *Consumer) Subscribe(ctx context.Context, topic string, handler mq.Messa
 			)
 
 			// 从 kafka header 中还原请求上下文
-			spanCtx = restoreRequestContext(spanCtx, msg.Headers)
-
+			reqCtx = restoreRequestContext(reqCtx, msg.Headers)
 			kafkaMsg := &KafkaMessage{
 				topic:   msg.Topic,
 				key:     msg.Key,
 				value:   msg.Value,
 				headers: msg.Headers,
 			}
-			err = handler(spanCtx, kafkaMsg)
+			err = handler(reqCtx, kafkaMsg)
 			if err != nil {
 				span.RecordError(err)
 				span.SetStatus(codes.Error, err.Error())

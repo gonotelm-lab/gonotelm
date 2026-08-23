@@ -22,6 +22,9 @@ func Open(ctx context.Context, cfg *sql.Config) (*olap.Dao, error) {
 			Password: cfg.Password,
 		},
 		Logger: slog.Default(),
+		Compression: &ch.Compression{
+			Method: ch.CompressionLZ4,
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("clickhouse open failed: %w", err)

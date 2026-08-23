@@ -161,7 +161,7 @@ func (a *Agent) prepareRun(req *RunRequest) (*ChatAgent, *SessionState, error) {
 		MaxRound: conf.NotelmGlobal().Chat.GetMaxRound(),
 		BaseLLM:  toolCallingChatModel,
 		Options:  options,
-		Verbose:  true,
+		Verbose:  false,
 	}, session)
 
 	sourceIds := make([]valobj.Id, 0, len(req.Sources))

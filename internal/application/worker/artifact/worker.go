@@ -10,7 +10,9 @@ import (
 	generatetypes "github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/trace"
 
 	flow "github.com/gonotelm-lab/flow/client/worker"
 	multimodalerr "github.com/gonotelm-lab/multimodal/error"
@@ -55,6 +57,8 @@ func RegisterTypedWorker(client *flow.Client, deps *generatetypes.ServiceDeps) {
 			Payload:    payload,
 		}
 
+		ctx = trace.RestoreReqIdFromTrace(ctx)
+		ctx = pkgcontext.WithUserId(ctx, userId)
 		resp, err := Run(ctx, deps, req)
 		if err != nil {
 			errMsg := err.Error()

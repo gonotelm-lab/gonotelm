@@ -35,7 +35,7 @@ func BuildSourceExploreAgent(
 		MaxRound: maxRound,
 		BaseLLM:  llmModel,
 		Options:  options,
-		Verbose:  true,
+		Verbose:  false,
 	}
 
 	ag := pkgagent.New(agConfig, &SessionState{

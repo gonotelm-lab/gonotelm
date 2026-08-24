@@ -13,6 +13,7 @@ import (
 
 const (
 	RecordMetaStreaming = "streaming"
+	RecordMetaThinking  = "thinking"
 )
 
 type RecordTokenUsage struct {
@@ -181,6 +182,9 @@ type Recorder interface {
 func buildRecord(ctx context.Context, endTime time.Time) *Record {
 	metadatas := make(map[string]any)
 	metadatas[RecordMetaStreaming] = getStreaming(ctx)
+	if thinking, ok := getThinking(ctx); ok {
+		metadatas[RecordMetaThinking] = thinking
+	}
 
 	return &Record{
 		Provider:  getProvider(ctx),

@@ -164,15 +164,15 @@ func (g *wrappedChatModel) Generate(
 	opts ...einomodel.Option,
 ) (*einoschema.Message, error) {
 	modelName := extractOptionModelName(opts...)
+	opts, callOpts := applyProviderCallOptions(g.provider, false, opts)
 	ctx = withModelName(ctx, modelName)
 	ctx = withProvider(ctx, g.provider)
+	ctx = withCallOptions(ctx, callOpts)
 	ctx = callbacks.InitCallbacks(ctx, &callbacks.RunInfo{
 		Name:      wrappedChatModelRunName,
 		Type:      g.typ,
 		Component: components.ComponentOfChatModel,
 	}, newInterceptor(g.rootCtx, g.recorder))
-
-	opts = applyProviderCallOptions(g.provider, false, opts)
 
 	err := g.sem.Acquire(ctx, 1)
 	if err != nil {
@@ -197,16 +197,16 @@ func (g *wrappedChatModel) Stream(
 	opts ...einomodel.Option,
 ) (*einoschema.StreamReader[*einoschema.Message], error) {
 	modelName := extractOptionModelName(opts...)
+	opts, callOpts := applyProviderCallOptions(g.provider, true, opts)
 	ctx = withModelName(ctx, modelName)
 	ctx = withStreaming(ctx, true)
 	ctx = withProvider(ctx, g.provider)
+	ctx = withCallOptions(ctx, callOpts)
 	ctx = callbacks.InitCallbacks(ctx, &callbacks.RunInfo{
 		Name:      wrappedChatModelRunName,
 		Type:      g.typ,
 		Component: components.ComponentOfChatModel,
 	}, newInterceptor(g.rootCtx, g.recorder))
-
-	opts = applyProviderCallOptions(g.provider, true, opts)
 
 	err := g.sem.Acquire(ctx, 1)
 	if err != nil {

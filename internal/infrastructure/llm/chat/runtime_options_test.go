@@ -23,14 +23,13 @@ func TestMergeExtraFields(t *testing.T) {
 }
 
 func TestApplyProviderCallOptions_DeepSeekGenerateHasThinkingOnly(t *testing.T) {
-	opts := applyProviderCallOptions(
+	opts, callOpts := applyProviderCallOptions(
 		ProviderDeepSeek,
 		false,
 		[]einomodel.Option{WithThinking(ProviderDeepSeek, false)},
 	)
 	require.NotEmpty(t, opts)
 
-	callOpts := einomodel.GetImplSpecificOptions(&callOptions{}, opts...)
 	require.NotNil(t, callOpts.EnableThinking)
 	assert.False(t, *callOpts.EnableThinking)
 
@@ -61,7 +60,7 @@ func TestApplyProviderCallOptions_DeepSeekResponseFormatMerged(t *testing.T) {
 
 func TestApplyProviderCallOptions_ResponseFormatOptions(t *testing.T) {
 	t.Run("deepseek", func(t *testing.T) {
-		opts := applyProviderCallOptions(
+		opts, _ := applyProviderCallOptions(
 			ProviderDeepSeek,
 			false,
 			[]einomodel.Option{WithResponseJsonObject(ProviderDeepSeek)},
@@ -72,7 +71,7 @@ func TestApplyProviderCallOptions_ResponseFormatOptions(t *testing.T) {
 	})
 
 	t.Run("openai", func(t *testing.T) {
-		opts := applyProviderCallOptions(
+		opts, _ := applyProviderCallOptions(
 			ProviderOpenAI,
 			false,
 			[]einomodel.Option{WithResponseJsonObject(ProviderOpenAI)},
@@ -81,14 +80,14 @@ func TestApplyProviderCallOptions_ResponseFormatOptions(t *testing.T) {
 	})
 
 	t.Run("agnes_appends_chat_template_kwargs", func(t *testing.T) {
-		opts := applyProviderCallOptions(
+		opts, _ := applyProviderCallOptions(
 			ProviderAgnes,
 			false,
 			[]einomodel.Option{WithResponseJsonObject(ProviderAgnes)},
 		)
 		require.Len(t, opts, 2, "agnes should append one provider-native option")
 
-		opts = applyProviderCallOptions(
+		opts, _ = applyProviderCallOptions(
 			ProviderAgnes,
 			false,
 			[]einomodel.Option{},
@@ -97,7 +96,7 @@ func TestApplyProviderCallOptions_ResponseFormatOptions(t *testing.T) {
 	})
 
 	t.Run("agnes_thinking_and_response_format", func(t *testing.T) {
-		opts := applyProviderCallOptions(
+		opts, _ := applyProviderCallOptions(
 			ProviderAgnes,
 			false,
 			[]einomodel.Option{

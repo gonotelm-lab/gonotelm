@@ -159,9 +159,11 @@ func initEmbedding(cfg *confshared.InfraConfig, infra *Infra) error {
 	if infra.Redis != nil {
 		embedCacher = embedding.NewRedisCacher(infra.Redis)
 	}
+	recorder := infraadapter.NewEmbeddingRecorderAdapter(infra.OlapDatabase.EmbeddingLogStore)
 	embeddingGateway, err := embedding.NewEmbeddingGateway(
 		&cfg.Embedding,
 		embedCacher,
+		embedding.WithRecorder(recorder),
 	)
 	if err != nil {
 		return fmt.Errorf("embedding gateway: %w", err)

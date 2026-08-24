@@ -11,15 +11,25 @@ type LLMLogStore interface {
 	Create(ctx context.Context, log *schema.LLMLog) error
 }
 
+type EmbeddingLogStore interface {
+	Create(ctx context.Context, log *schema.EmbeddingLog) error
+}
+
 type Dao struct {
 	Closer misc.Closer
 
-	LLMLogStore LLMLogStore
+	LLMLogStore       LLMLogStore
+	EmbeddingLogStore EmbeddingLogStore
 }
 
-func NewDao(closer misc.Closer, llmLogStore LLMLogStore) *Dao {
+func NewDao(
+	closer misc.Closer,
+	llmLogStore LLMLogStore,
+	embeddingLogStore EmbeddingLogStore,
+) *Dao {
 	return &Dao{
-		Closer:      closer,
-		LLMLogStore: llmLogStore,
+		Closer:            closer,
+		LLMLogStore:       llmLogStore,
+		EmbeddingLogStore: embeddingLogStore,
 	}
 }

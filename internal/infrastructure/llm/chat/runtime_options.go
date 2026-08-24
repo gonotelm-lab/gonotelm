@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"context"
 	"maps"
 
 	"github.com/cloudwego/eino-ext/components/model/deepseek"
@@ -71,7 +72,7 @@ func applyProviderCallOptions(
 	provider Provider,
 	streaming bool,
 	opts []einomodel.Option,
-) []einomodel.Option {
+) ([]einomodel.Option, *callOptions) {
 	callOpts := einomodel.GetImplSpecificOptions(&callOptions{}, opts...)
 
 	switch provider {
@@ -130,5 +131,13 @@ func applyProviderCallOptions(
 		}
 	}
 
-	return opts
+	return opts, callOpts
+}
+
+func withCallOptions(ctx context.Context, callOpts *callOptions) context.Context {
+	if callOpts != nil && callOpts.EnableThinking != nil {
+		ctx = withThinking(ctx, *callOpts.EnableThinking)
+	}
+
+	return ctx
 }

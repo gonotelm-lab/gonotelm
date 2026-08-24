@@ -8,11 +8,11 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/util"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/safe"
 
 	"github.com/cloudwego/eino/callbacks"
-	"github.com/cloudwego/eino/components"
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
 )
@@ -28,24 +28,6 @@ func init() {
 			return slog.String("llm.model", modelName), true
 		},
 	)
-}
-
-type renamedRunInfo struct {
-	Name      string               `json:"name"`
-	Type      string               `json:"type"`
-	Component components.Component `json:"component"`
-}
-
-func renameRunInfo(info *callbacks.RunInfo) *renamedRunInfo {
-	if info == nil {
-		return nil
-	}
-
-	return &renamedRunInfo{
-		Name:      info.Name,
-		Type:      info.Type,
-		Component: info.Component,
-	}
 }
 
 type Interceptor struct {
@@ -66,7 +48,7 @@ func (i *Interceptor) OnStart(
 	info *callbacks.RunInfo,
 	src callbacks.CallbackInput,
 ) context.Context {
-	slog.DebugContext(ctx, "[Interceptor] OnStart", slog.Any("info", renameRunInfo(info)))
+	slog.DebugContext(ctx, "[Interceptor] OnStart", slog.Any("info", util.RenameRunInfo(info)))
 	input := model.ConvCallbackInput(src)
 	start := time.Now()
 	ctx = withOnStartInput(ctx, input)
@@ -79,10 +61,10 @@ func (i *Interceptor) OnEnd(
 	info *callbacks.RunInfo,
 	src callbacks.CallbackOutput,
 ) context.Context {
-	slog.DebugContext(ctx, "[Interceptor] OnEnd", slog.Any("info", renameRunInfo(info)))
+	slog.DebugContext(ctx, "[Interceptor] OnEnd", slog.Any("info", util.RenameRunInfo(info)))
 	output := model.ConvCallbackOutput(src)
 	if output == nil {
-		slog.WarnContext(ctx, "[Interceptor] OnEnd empty callback output", slog.Any("info", renameRunInfo(info)))
+		slog.WarnContext(ctx, "[Interceptor] OnEnd empty callback output", slog.Any("info", util.RenameRunInfo(info)))
 		return ctx
 	}
 
@@ -100,7 +82,7 @@ func (i *Interceptor) OnError(
 	runSemRelease(ctx)
 
 	slog.ErrorContext(ctx, "[Interceptor] OnError",
-		slog.Any("info", renameRunInfo(info)), slog.Bool("streaming", getStreaming(ctx)), slog.Any("err", err),
+		slog.Any("info", util.RenameRunInfo(info)), slog.Bool("streaming", getStreaming(ctx)), slog.Any("err", err),
 	)
 
 	i.recordError(ctx, err)
@@ -154,7 +136,7 @@ func (i *Interceptor) OnEndWithStreamOutput(
 
 			if err != nil {
 				slog.ErrorContext(ctx, "[Interceptor] OnEndWithStreamOutput Recv error",
-					slog.Any("info", renameRunInfo(info)),
+					slog.Any("info", util.RenameRunInfo(info)),
 					slog.Any("err", err),
 				)
 

@@ -3,7 +3,6 @@ package clickhouse
 import (
 	"context"
 	"fmt"
-	"log/slog"
 
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/olap"
 	"github.com/gonotelm-lab/gonotelm/pkg/clickhouse"
@@ -21,7 +20,7 @@ func Open(ctx context.Context, cfg *sql.Config) (*olap.Dao, error) {
 			Username: cfg.User,
 			Password: cfg.Password,
 		},
-		Logger: slog.Default(),
+		Logger: clickhouse.DriverLogger(),
 		Compression: &ch.Compression{
 			Method: ch.CompressionLZ4,
 		},
@@ -41,8 +40,14 @@ func Open(ctx context.Context, cfg *sql.Config) (*olap.Dao, error) {
 		return nil, fmt.Errorf("create llm log store err: %w", err)
 	}
 
+	embeddingLogStore, err := NewEmbeddingLogStoreImpl(ctx, c)
+	if err != nil {
+		return nil, fmt.Errorf("create embedding log store err: %w", err)
+	}
+
 	return olap.NewDao(
 		closer,
 		llmLogStore,
+		embeddingLogStore,
 	), nil
 }

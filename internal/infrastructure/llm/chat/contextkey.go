@@ -11,6 +11,7 @@ type (
 	modelNameCtxKey      struct{}
 	semReleaseFuncCtxKey struct{}
 	streamingCtxKey      struct{}
+	thinkingCtxKey       struct{}
 	onStartInputCtxKey   struct{}
 	providerCtxKey       struct{}
 	startTimeCtxKey      struct{}
@@ -27,6 +28,15 @@ func getStreaming(ctx context.Context) bool {
 	}
 
 	return streaming
+}
+
+func withThinking(ctx context.Context, enableThinking bool) context.Context {
+	return context.WithValue(ctx, thinkingCtxKey{}, enableThinking)
+}
+
+func getThinking(ctx context.Context) (bool, bool) {
+	thinking, ok := ctx.Value(thinkingCtxKey{}).(bool)
+	return thinking, ok
 }
 
 func withProvider(ctx context.Context, provider Provider) context.Context {

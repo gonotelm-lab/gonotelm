@@ -4,6 +4,8 @@ import "time"
 
 type EmbeddingType string
 
+func (t EmbeddingType) String() string { return string(t) }
+
 const (
 	Ark                EmbeddingType = "ark"
 	EmbeddingDashScope EmbeddingType = "dashscope"

@@ -112,7 +112,7 @@ func toRecordInputTool(tools []*schema.ToolInfo) []*RecordInputTool {
 			Desc: t.Desc,
 		}
 		if t.ParamsOneOf != nil {
-			if jschema, _ := t.ParamsOneOf.ToJSONSchema(); jschema != nil {
+			if jschema, _ := t.ToJSONSchema(); jschema != nil {
 				paramSchema, err := json.Marshal(jschema)
 				if err == nil {
 					tc.ParamsSchema = paramSchema

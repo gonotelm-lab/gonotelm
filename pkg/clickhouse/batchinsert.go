@@ -13,7 +13,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/trace/instrumentation/clickhouseconv"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/trace"
 )
 
 var ErrBatcherIsClosed = errors.New("clickhouse batcher is closed")
@@ -42,13 +41,6 @@ func NewBatchInserter(ctx context.Context, conn ch.Conn, query string, chanSize 
 	}
 	if interval <= 0 {
 		return nil, fmt.Errorf("clickhouse batcher: interval must be > 0")
-	}
-
-	spanContext := trace.SpanContextFromContext(ctx)
-	if !spanContext.IsValid() {
-		tracer := otel.Tracer("gonotelm/pkg/clickhouse")
-		ctx, span := tracer.Start(ctx, "clickhouse.batch")
-		ctx = ch.Context(ctx, ch.WithSpan(span.SpanContext()))
 	}
 
 	b := &BatchInserter{

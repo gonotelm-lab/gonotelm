@@ -44,10 +44,6 @@ func (s *SessionState) isInRunPhase1() bool {
 	return s.curRunPhase == runPhase1
 }
 
-func (s *SessionState) isInRunPhase2() bool {
-	return s.curRunPhase == runPhase2
-}
-
 func (s *SessionState) ChatId() valobj.Id {
 	return s.chat.Id
 }

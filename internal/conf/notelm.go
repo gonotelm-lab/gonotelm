@@ -93,7 +93,7 @@ func LoadNotelmConfig(path string) (*NotelmConfig, error) {
 }
 
 func (c *NotelmConfig) applyDefaults() {
-	c.ApplyDefaults()
+	c.Init()
 	c.Logging.ApplyDefaults()
 	c.Flow.ApplyDefaults()
 

@@ -189,6 +189,9 @@ timeout = "${GONOTELM_AGNES_TIMEOUT:-5m}"
 temperature = ${GONOTELM_AGNES_TEMPERATURE:-1.0}
 topP = ${GONOTELM_AGNES_TOP_P:-1.0}
 
+[providerBilling]
+deepSeekScript = ""
+
 [flow]
 addr        = "${GONOTELM_FLOW_ADDR:-localhost:7091}"
 namespace   = "${GONOTELM_FLOW_NAMESPACE:-gonotelm}"

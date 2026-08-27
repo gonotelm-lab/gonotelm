@@ -14,6 +14,8 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/postgres"
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat/billing"
+	llmchatbilling "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat/billing"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/embedding"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image"
@@ -40,6 +42,7 @@ type Infra struct {
 	MessageQueue     *mq.MessageQueue
 	Storage          storage.Storage
 	LLMGateway       *llmchat.Gateway
+	LLMBillingMeter  llmchatbilling.Meter
 	EmbeddingGateway *embedding.EmbeddingGateway
 	Embedder         einoembed.Embedder
 	Text2Image       *text2image.Text2ImageGateway
@@ -144,12 +147,27 @@ func initStorage(cfg *confshared.InfraConfig, infra *Infra) error {
 
 func initLLMGateway(ctx context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
 	// create llm recorder
-	recorder := infraadapter.NewLLMRecorderAdapter(infra.OlapDatabase.LLMLogStore)
+	recorder := infraadapter.NewLLMRecorderAdapter(
+		infra.OlapDatabase.LLMLogStore,
+		infra.LLMBillingMeter,
+	)
 	llmGateway, err := llmchat.New(ctx, &cfg.Provider, llmchat.WithRecorder(recorder))
 	if err != nil {
 		return fmt.Errorf("llm gateway: %w", err)
 	}
 	infra.LLMGateway = llmGateway
+
+	return nil
+}
+
+func initLLMBillingMeters(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
+	meter, err := billing.NewStandardMeter(llmchatbilling.StandardMeterConfig{
+		DeepSeekScript: cfg.ProviderBilling.DeepSeekScript,
+	})
+	if err != nil {
+		return fmt.Errorf("llm chat billing: %w", err)
+	}
+	infra.LLMBillingMeter = meter
 
 	return nil
 }
@@ -238,6 +256,9 @@ func NewInfra(ctx context.Context, cfg *confshared.InfraConfig) (_ *Infra, final
 		return nil, err
 	}
 	if err := initStorage(cfg, infra); err != nil {
+		return nil, err
+	}
+	if err := initLLMBillingMeters(ctx, cfg, infra); err != nil {
 		return nil, err
 	}
 	if err := initLLMGateway(ctx, cfg, infra); err != nil {

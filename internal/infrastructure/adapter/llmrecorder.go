@@ -4,15 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat/billing"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/olap"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/olap/schema"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
+	"github.com/shopspring/decimal"
 )
 
 const (
@@ -22,12 +25,19 @@ const (
 	usageTotalTokens        = "total_tokens"
 )
 
+const (
+	priceCachedToken   = "cached_token_prices"
+	priceUncachedToken = "uncached_token_prices"
+	priceOutputToken   = "output_prices"
+)
+
 type LLMRecorderAdapter struct {
-	store olap.LLMLogStore
+	store        olap.LLMLogStore
+	billingMeter billing.Meter
 }
 
-func NewLLMRecorderAdapter(store olap.LLMLogStore) chat.Recorder {
-	return &LLMRecorderAdapter{store: store}
+func NewLLMRecorderAdapter(store olap.LLMLogStore, billingMeter billing.Meter) chat.Recorder {
+	return &LLMRecorderAdapter{store: store, billingMeter: billingMeter}
 }
 
 func (a *LLMRecorderAdapter) Record(ctx context.Context, record *chat.Record) error {
@@ -72,7 +82,27 @@ func (a *LLMRecorderAdapter) Record(ctx context.Context, record *chat.Record) er
 			usageCompletionTokens:   uint64(record.Usage.CompletionTokens),
 			usageTotalTokens:        uint64(record.Usage.TotalTokens),
 		}
+
+		if a.billingMeter != nil {
+			totalCost, costDetails, err := a.billingMeter.Calculate(ctx, record.Provider, log.Model, *record.Usage)
+			if err != nil {
+				slog.ErrorContext(ctx,
+					"llm recorder billing meter failed to evaluate cost",
+					slog.Any("err", err),
+					slog.String("llm_provider", record.Provider.String()),
+					slog.String("llm_model", log.Model),
+				)
+			} else {
+				log.TotalCost = totalCost
+				log.CostDetails = map[string]decimal.Decimal{
+					priceCachedToken:   costDetails[billing.CacheHitPriceKey],
+					priceUncachedToken: costDetails[billing.CacheMissPriceKey],
+					priceOutputToken:   costDetails[billing.OutputPriceKey],
+				}
+			}
+		}
 	}
+
 	if len(record.Metadatas) > 0 {
 		metadatas := make(map[string]string, len(record.Metadatas))
 		for k, v := range record.Metadatas {

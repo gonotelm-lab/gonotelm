@@ -185,7 +185,7 @@ func LoadWorkerConfig(path string) (*WorkerConfig, error) {
 }
 
 func (c *WorkerConfig) applyDefaults() {
-	c.ApplyDefaults()
+	c.Init()
 	c.Logging.ApplyDefaults()
 	c.Flow.ApplyDefaults()
 

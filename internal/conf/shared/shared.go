@@ -1,10 +1,11 @@
 package shared
 
 import (
+	_ "embed"
 	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache"
-	chat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
+	llmchat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	embedding "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/embedding"
 	text2audio "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio"
 	text2image "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image"
@@ -60,23 +61,37 @@ func (d *DatabaseConfig) ToSQLConfig() *sql.Config {
 	}
 }
 
+//go:embed deepseek.price.expr
+var defaultDeepSeekPricingScript string
+
+type ProviderBillingConfig struct {
+	DeepSeekScript string
+}
+
+func (c *ProviderBillingConfig) Init() {
+	if c.DeepSeekScript == "" {
+		c.DeepSeekScript = defaultDeepSeekPricingScript
+	}
+}
+
 // InfraConfig 为 notelm / worker 共用的基础设施配置。
 type InfraConfig struct {
-	Database     DatabaseConfig                `toml:"database"`
-	VectorDB     vectordb.Config               `toml:"vectorDb"`
-	Storage      storageimpl.StorageTypeConfig `toml:"storage"`
-	Provider     chat.ProviderConfig           `toml:"provider"`
-	Embedding    embedding.EmbeddingConfig     `toml:"embedding"`
-	Text2Image   text2image.Text2ImageConfig   `toml:"text2image"`
-	Text2Audio   text2audio.Text2AudioConfig   `toml:"text2audio"`
-	Sandbox      sandboximpl.ProviderConfig    `toml:"sandbox"`
-	DatabaseOlap DatabaseConfig                `toml:"databaseOlap"`
+	Database        DatabaseConfig                `toml:"database"`
+	VectorDB        vectordb.Config               `toml:"vectorDb"`
+	Storage         storageimpl.StorageTypeConfig `toml:"storage"`
+	Provider        llmchat.ProviderConfig        `toml:"provider"`
+	ProviderBilling ProviderBillingConfig         `toml:"providerBilling"`
+	Embedding       embedding.EmbeddingConfig     `toml:"embedding"`
+	Text2Image      text2image.Text2ImageConfig   `toml:"text2image"`
+	Text2Audio      text2audio.Text2AudioConfig   `toml:"text2audio"`
+	Sandbox         sandboximpl.ProviderConfig    `toml:"sandbox"`
+	DatabaseOlap    DatabaseConfig                `toml:"databaseOlap"`
 
 	Redis    cache.RedisCacheConfig `toml:"redis"`
 	MsgQueue mqimpl.Config          `toml:"msgQueue"`
 }
 
-func (c *InfraConfig) ApplyDefaults() {
+func (c *InfraConfig) Init() {
 	if c.Storage.Type == "" {
 		c.Storage.Type = storageimpl.Minio
 	}
@@ -89,6 +104,8 @@ func (c *InfraConfig) ApplyDefaults() {
 	if c.Embedding.MaxConcurrency <= 0 {
 		c.Embedding.MaxConcurrency = 4
 	}
+
+	c.ProviderBilling.Init()
 }
 
 func (c *InfraConfig) SQLConfig() *sql.Config {

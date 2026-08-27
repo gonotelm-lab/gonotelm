@@ -139,5 +139,9 @@ func withCallOptions(ctx context.Context, callOpts *callOptions) context.Context
 		ctx = withThinking(ctx, *callOpts.EnableThinking)
 	}
 
+	if callOpts != nil {
+		ctx = withJSONObject(ctx, callOpts.ResponseFormatJSONObject)
+	}
+
 	return ctx
 }

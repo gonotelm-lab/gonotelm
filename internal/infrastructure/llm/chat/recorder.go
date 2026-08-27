@@ -12,8 +12,9 @@ import (
 )
 
 const (
-	RecordMetaStreaming = "streaming"
-	RecordMetaThinking  = "thinking"
+	RecordMetaStreaming  = "streaming"
+	RecordMetaThinking   = "thinking"
+	RecordMetaJSONObject = "json_object"
 )
 
 type RecordTokenUsage struct {
@@ -185,6 +186,7 @@ func buildRecord(ctx context.Context, endTime time.Time) *Record {
 	if thinking, ok := getThinking(ctx); ok {
 		metadatas[RecordMetaThinking] = thinking
 	}
+	metadatas[RecordMetaJSONObject] = getJSONObject(ctx)
 
 	return &Record{
 		Provider:  getProvider(ctx),

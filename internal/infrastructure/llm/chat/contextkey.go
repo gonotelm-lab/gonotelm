@@ -12,6 +12,7 @@ type (
 	semReleaseFuncCtxKey struct{}
 	streamingCtxKey      struct{}
 	thinkingCtxKey       struct{}
+	jsonObjectCtxKey     struct{}
 	onStartInputCtxKey   struct{}
 	providerCtxKey       struct{}
 	startTimeCtxKey      struct{}
@@ -37,6 +38,19 @@ func withThinking(ctx context.Context, enableThinking bool) context.Context {
 func getThinking(ctx context.Context) (bool, bool) {
 	thinking, ok := ctx.Value(thinkingCtxKey{}).(bool)
 	return thinking, ok
+}
+
+func withJSONObject(ctx context.Context, jsonObject bool) context.Context {
+	return context.WithValue(ctx, jsonObjectCtxKey{}, jsonObject)
+}
+
+func getJSONObject(ctx context.Context) bool {
+	jsonObject, ok := ctx.Value(jsonObjectCtxKey{}).(bool)
+	if !ok {
+		return false
+	}
+
+	return jsonObject
 }
 
 func withProvider(ctx context.Context, provider Provider) context.Context {

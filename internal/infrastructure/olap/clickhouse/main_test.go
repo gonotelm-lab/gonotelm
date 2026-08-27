@@ -31,10 +31,8 @@ CREATE TABLE IF NOT EXISTS llm_logs (
 	cost_details Map(LowCardinality(String), Decimal64(12)),
 	total_cost Nullable(Decimal64(12)),
 	create_time DateTime64(3),
-	update_time DateTime64(3),
 	metadata Map(LowCardinality(String), String),
-	error Nullable(String),
-	is_deleted UInt8
+	error Nullable(String)
 ) ENGINE = Memory`
 
 var testDriver ch.Conn

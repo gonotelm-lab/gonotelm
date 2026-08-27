@@ -43,9 +43,6 @@ func (s *EmbeddingLogStoreImpl) Create(ctx context.Context, log *schema.Embeddin
 	if log.CreateTime.IsZero() {
 		log.CreateTime = now
 	}
-	if log.UpdateTime.IsZero() {
-		log.UpdateTime = now
-	}
 
 	err := s.createBatcher.Append(ctx, log)
 	if err != nil {

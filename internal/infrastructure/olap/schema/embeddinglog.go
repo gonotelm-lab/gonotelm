@@ -24,10 +24,8 @@ type EmbeddingLog struct {
 	CostDetails         map[string]decimal.Decimal `ch:"cost_details"`
 	TotalCost           *decimal.Decimal           `ch:"total_cost"`
 	CreateTime          time.Time                  `ch:"create_time"`
-	UpdateTime          time.Time                  `ch:"update_time"`
 	Metadata            map[string]string          `ch:"metadata"`
 	Error               *string                    `ch:"error"`
-	IsDeleted           uint8                      `ch:"is_deleted"`
 }
 
 func (EmbeddingLog) TableName() string {

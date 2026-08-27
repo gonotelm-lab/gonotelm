@@ -82,13 +82,11 @@ func fullLLMLog() *schema.LLMLog {
 		},
 		TotalCost:  &totalCost,
 		CreateTime: now,
-		UpdateTime: now,
 		Metadata: map[string]string{
 			"notebook_id": "nb-1",
 			"version":     "v2",
 		},
 		Error:     &errMsg,
-		IsDeleted: 0,
 	}
 
 	return log
@@ -124,11 +122,9 @@ func assertLLMLogEqual(t *testing.T, want, got schema.LLMLog) {
 	require.NotNil(t, got.TotalCost)
 	assert.True(t, want.TotalCost.Equal(*got.TotalCost))
 	assert.WithinDuration(t, want.CreateTime, got.CreateTime, time.Millisecond)
-	assert.WithinDuration(t, want.UpdateTime, got.UpdateTime, time.Millisecond)
 	assert.Equal(t, want.Metadata, got.Metadata)
 	require.NotNil(t, got.Error)
 	assert.Equal(t, *want.Error, *got.Error)
-	assert.Equal(t, want.IsDeleted, got.IsDeleted)
 }
 
 func TestLLMLogStoreImpl_Create_NilLog(t *testing.T) {
@@ -165,7 +161,6 @@ func TestLLMLogStoreImpl_Create_AssignsDefaultsAndPersists(t *testing.T) {
 
 	assert.NotEmpty(t, log.ID)
 	assert.False(t, log.CreateTime.IsZero())
-	assert.False(t, log.UpdateTime.IsZero())
 
 	require.NoError(t, conn.Close())
 
@@ -188,13 +183,11 @@ func TestLLMLogStoreImpl_Create_PreservesExistingFields(t *testing.T) {
 		GroupID:    "group-2",
 		TraceID:    "trace-2",
 		CreateTime: now,
-		UpdateTime: now,
 	}
 	require.NoError(t, store.Create(ctx, log))
 
 	assert.Equal(t, "fixed-id", log.ID)
 	assert.Equal(t, now, log.CreateTime)
-	assert.Equal(t, now, log.UpdateTime)
 
 	require.NoError(t, conn.Close())
 

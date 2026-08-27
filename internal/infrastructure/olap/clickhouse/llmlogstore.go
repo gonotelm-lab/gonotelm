@@ -46,9 +46,6 @@ func (s *LLMLogStoreImpl) Create(ctx context.Context, log *schema.LLMLog) error 
 	if log.CreateTime.IsZero() {
 		log.CreateTime = now
 	}
-	if log.UpdateTime.IsZero() {
-		log.UpdateTime = now
-	}
 
 	err := s.createBatcher.Append(ctx, log)
 	if err != nil {

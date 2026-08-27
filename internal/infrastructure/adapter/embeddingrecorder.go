@@ -36,8 +36,6 @@ func (a *EmbeddingRecorderAdapter) Record(ctx context.Context, record *embedding
 		CallFinishTime: record.EndTime,
 		InputCount:     uint32(len(record.Input)),
 		CreateTime:     now,
-		UpdateTime:     now,
-		IsDeleted:      0,
 	}
 	if record.Parameters != nil {
 		log.Model = record.Parameters.Model

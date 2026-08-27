@@ -19,10 +19,8 @@ CREATE TABLE IF NOT EXISTS gonotelm.llm_logs (
 	`cost_details` Map(LowCardinality(String), Decimal64(12)),
 	`total_cost` Nullable(Decimal64(12)),
 	`create_time` DateTime64(3) DEFAULT now64(3),
-	`update_time` DateTime64(3) DEFAULT now64(3),
 	`metadata` Map(LowCardinality(String), String),
 	`error` Nullable(String),
-	`is_deleted` UInt8,
 
 	INDEX idx_id id TYPE bloom_filter(0.01) GRANULARITY 4,
 	INDEX idx_trace_id trace_id TYPE bloom_filter(0.01) GRANULARITY 4,
@@ -53,10 +51,8 @@ CREATE TABLE IF NOT EXISTS gonotelm.embedding_logs (
 	`cost_details` Map(LowCardinality(String), Decimal64(12)),
 	`total_cost` Nullable(Decimal64(12)),
 	`create_time` DateTime64(3) DEFAULT now64(3),
-	`update_time` DateTime64(3) DEFAULT now64(3),
 	`metadata` Nullable(Map(LowCardinality(String), String)),
 	`error` Nullable(String),
-	`is_deleted` UInt8,
 
 	INDEX idx_id id TYPE bloom_filter(0.01) GRANULARITY 4,
 	INDEX idx_trace_id trace_id TYPE bloom_filter(0.01) GRANULARITY 4,

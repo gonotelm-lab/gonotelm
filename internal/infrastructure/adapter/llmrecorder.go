@@ -52,8 +52,6 @@ func (a *LLMRecorderAdapter) Record(ctx context.Context, record *chat.Record) er
 		CallStartTime:  record.StartTime,
 		CallFinishTime: record.EndTime,
 		CreateTime:     now,
-		UpdateTime:     now,
-		IsDeleted:      0, // false
 	}
 	if record.Parameters != nil {
 		log.Model = record.Parameters.Model

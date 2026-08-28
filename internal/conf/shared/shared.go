@@ -61,16 +61,23 @@ func (d *DatabaseConfig) ToSQLConfig() *sql.Config {
 	}
 }
 
-//go:embed deepseek.price.expr
+//go:embed prices/deepseek.chat
 var defaultDeepSeekPricingScript string
 
+//go:embed prices/dashscope.embedding
+var defaultDashScopeEmbeddingPricingScript string
+
 type ProviderBillingConfig struct {
-	DeepSeekScript string
+	DeepSeekScript           string
+	EmbeddingDashScopeScript string
 }
 
 func (c *ProviderBillingConfig) Init() {
 	if c.DeepSeekScript == "" {
 		c.DeepSeekScript = defaultDeepSeekPricingScript
+	}
+	if c.EmbeddingDashScopeScript == "" {
+		c.EmbeddingDashScopeScript = defaultDashScopeEmbeddingPricingScript
 	}
 }
 

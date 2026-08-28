@@ -17,6 +17,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat/billing"
 	llmchatbilling "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat/billing"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/embedding"
+	embeddingbilling "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/embedding/billing"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
@@ -35,20 +36,21 @@ import (
 )
 
 type Infra struct {
-	Database         *database.Dao
-	OlapDatabase     *olap.Dao
-	VectorDatabase   *vectordb.DAL
-	Cache            *infracache.Cache
-	MessageQueue     *mq.MessageQueue
-	Storage          storage.Storage
-	LLMGateway       *llmchat.Gateway
-	LLMBillingMeter  llmchatbilling.Meter
-	EmbeddingGateway *embedding.EmbeddingGateway
-	Embedder         einoembed.Embedder
-	Text2Image       *text2image.Text2ImageGateway
-	Text2Audio       *text2audio.Text2AudioGateway
-	SandboxGateway   *infrasandbox.Gateway
-	DistLock         adapter.DistributedLock
+	Database              *database.Dao
+	OlapDatabase          *olap.Dao
+	VectorDatabase        *vectordb.DAL
+	Cache                 *infracache.Cache
+	MessageQueue          *mq.MessageQueue
+	Storage               storage.Storage
+	LLMGateway            *llmchat.Gateway
+	LLMBillingMeter       llmchatbilling.Meter
+	EmbeddingGateway      *embedding.EmbeddingGateway
+	EmbeddingBillingMeter embeddingbilling.Meter
+	Embedder              einoembed.Embedder
+	Text2Image            *text2image.Text2ImageGateway
+	Text2Audio            *text2audio.Text2AudioGateway
+	SandboxGateway        *infrasandbox.Gateway
+	DistLock              adapter.DistributedLock
 
 	Redis redisv9.UniversalClient
 
@@ -172,12 +174,24 @@ func initLLMBillingMeters(_ context.Context, cfg *confshared.InfraConfig, infra 
 	return nil
 }
 
+func initEmbeddingBillingMeter(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
+	meter, err := embeddingbilling.NewStandardMeter(embeddingbilling.StandardMeterConfig{
+		DashScopeScript: cfg.ProviderBilling.EmbeddingDashScopeScript,
+	})
+	if err != nil {
+		return fmt.Errorf("llm embedding billing: %w", err)
+	}
+	infra.EmbeddingBillingMeter = meter
+
+	return nil
+}
+
 func initEmbedding(cfg *confshared.InfraConfig, infra *Infra) error {
 	var embedCacher embedcache.Cacher
 	if infra.Redis != nil {
 		embedCacher = embedding.NewRedisCacher(infra.Redis)
 	}
-	recorder := infraadapter.NewEmbeddingRecorderAdapter(infra.OlapDatabase.EmbeddingLogStore)
+	recorder := infraadapter.NewEmbeddingRecorderAdapter(infra.OlapDatabase.EmbeddingLogStore, infra.EmbeddingBillingMeter)
 	embeddingGateway, err := embedding.NewEmbeddingGateway(
 		&cfg.Embedding,
 		embedCacher,
@@ -259,6 +273,9 @@ func NewInfra(ctx context.Context, cfg *confshared.InfraConfig) (_ *Infra, final
 		return nil, err
 	}
 	if err := initLLMBillingMeters(ctx, cfg, infra); err != nil {
+		return nil, err
+	}
+	if err := initEmbeddingBillingMeter(ctx, cfg, infra); err != nil {
 		return nil, err
 	}
 	if err := initLLMGateway(ctx, cfg, infra); err != nil {

@@ -191,6 +191,7 @@ topP = ${GONOTELM_AGNES_TOP_P:-1.0}
 
 [providerBilling]
 deepSeekScript = ""
+embeddingDashScopeScript = ""
 
 [flow]
 addr        = "${GONOTELM_FLOW_ADDR:-localhost:7091}"

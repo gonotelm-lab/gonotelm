@@ -5,21 +5,27 @@ import (
 
 	pkgtrace "github.com/gonotelm-lab/gonotelm/pkg/trace"
 	"github.com/gonotelm-lab/gonotelm/pkg/trace/instrumentation/genaiconv"
+	"github.com/gonotelm-lab/multimodal/callbacks"
 	pkgt2i "github.com/gonotelm-lab/multimodal/image"
 	pkgt2ischema "github.com/gonotelm-lab/multimodal/image/schema"
 	"go.opentelemetry.io/otel/codes"
 	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
-// tracingGenerator 包装 Generator，为每次 Generate 调用创建 gen_ai client span。
-type tracingGenerator struct {
-	system string
-	impl   pkgt2i.Generator
+const wrappedGeneratorRunName = "gateway-text2image"
+
+type wrappedGenerator struct {
+	provider Text2ImageProvider
+	impl     pkgt2i.Generator
 }
 
-var _ pkgt2i.Generator = (*tracingGenerator)(nil)
+func newWrappedGenerator(provider Text2ImageProvider, impl pkgt2i.Generator) pkgt2i.Generator {
+	return &wrappedGenerator{provider: provider, impl: impl}
+}
 
-func (t *tracingGenerator) Generate(
+var _ pkgt2i.Generator = (*wrappedGenerator)(nil)
+
+func (t *wrappedGenerator) Generate(
 	ctx context.Context,
 	req *pkgt2ischema.Request,
 	opts ...pkgt2i.Option,
@@ -31,9 +37,15 @@ func (t *tracingGenerator) Generate(
 
 	ctx, span := pkgtrace.GetOtelTracer().Start(ctx, genaiconv.SpanName("text2image"),
 		oteltrace.WithSpanKind(oteltrace.SpanKindClient),
-		oteltrace.WithAttributes(genaiconv.Attributes(t.system, "text2image", model)...),
+		oteltrace.WithAttributes(genaiconv.Attributes(t.provider.String(), "text2image", model)...),
 	)
 	defer span.End()
+
+	ctx = callbacks.InitCallbacks(ctx, &callbacks.RunInfo{
+		Name:      wrappedGeneratorRunName,
+		Type:      t.provider.String(),
+		Component: callbacks.ComponentImage,
+	}, newInterceptor())
 
 	resp, err := t.impl.Generate(ctx, req, opts...)
 	if err != nil {

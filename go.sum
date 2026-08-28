@@ -292,8 +292,8 @@ github.com/gonotelm-lab/flow/api v0.2.0 h1:nkZYlf2KP8OdAcGi9RewSAuc1c4a8weJZ7D2E
 github.com/gonotelm-lab/flow/api v0.2.0/go.mod h1:S9jc/IJ0EV8E3RVTC4CPoM2FlV07e6fPtqX1URIw2Jk=
 github.com/gonotelm-lab/flow/client v0.2.0 h1:FqL9tR46PbrRa1w2vS3RI+BatdaMTWDQv88fijfqOc4=
 github.com/gonotelm-lab/flow/client v0.2.0/go.mod h1:NOaT/H5PlI3tNEqRWPdZzpT3ltDAYXqN+j++YZ+q7AA=
-github.com/gonotelm-lab/multimodal v0.2.2 h1:WzlcajvXqtPsaukghrKLToQBY3tcjprQoMk0hw4qtyo=
-github.com/gonotelm-lab/multimodal v0.2.2/go.mod h1:VyQmUs50KDwFzm8sRoaarP6krTNoEWg1OUfVi4P5NRs=
+github.com/gonotelm-lab/multimodal v0.2.3 h1:3W1yczCduREewcpFp5HjottmdV2PsMs2bn34+Ad9sgc=
+github.com/gonotelm-lab/multimodal v0.2.3/go.mod h1:VyQmUs50KDwFzm8sRoaarP6krTNoEWg1OUfVi4P5NRs=
 github.com/google/btree v1.1.2 h1:xf4v41cLI2Z6FxbKm+8Bu+m8ifhj15JuZ9sa0jZCMUU=
 github.com/google/btree v1.1.2/go.mod h1:qOPhT0dTNdNzV6Z/lhRX0YXUafgPLFUh+gZMl761Gm4=
 github.com/google/go-cmp v0.2.0/go.mod h1:oXzfMopK8JAjlY9xF4vHSVASa0yLyX7SntLO5aqRK0M=

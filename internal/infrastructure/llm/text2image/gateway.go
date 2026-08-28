@@ -54,7 +54,7 @@ func (g *Text2ImageGateway) initProvider(providerType Text2ImageProvider) (pkgt2
 	if err != nil {
 		return nil, err
 	}
-	provider = &tracingGenerator{system: string(providerType), impl: impl}
+	provider = newWrappedGenerator(providerType, impl)
 
 	g.providers[providerType] = provider
 	return provider, nil

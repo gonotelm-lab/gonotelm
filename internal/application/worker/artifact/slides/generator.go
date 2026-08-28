@@ -398,7 +398,7 @@ func (g *Generator) generatePPTX(
 	sources []OutlineSource,
 ) (*SlidesStorageResult, error) {
 	// use thinking in pptx generation, it will take much longer
-	agent, err := g.buildAgent(req, conf.WorkerGlobal().Studio.Slides.GenerateMaxRound, false, true) 
+	agent, err := g.buildAgent(req, conf.WorkerGlobal().Studio.Slides.GenerateMaxRound, false, true)
 	if err != nil {
 		return nil, errors.WithMessage(err, "build generate pptx agent failed")
 	}

@@ -16,5 +16,5 @@ func TestDecimal(t *testing.T) {
 	r := v1.Div(v2)
 	t.Log(r)
 
-	t.Log(0.05/1000000)
+	t.Log(0.05 / 1000000)
 }

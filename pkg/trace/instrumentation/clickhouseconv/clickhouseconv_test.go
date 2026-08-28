@@ -28,7 +28,7 @@ func TestAppendAttributes(t *testing.T) {
 		t.Errorf("db.system.name: got %q want %q", got.AsString(), "clickhouse")
 	}
 	wantStr := map[attribute.Key]string{
-		"db.operation.name": "INSERT",
+		"db.operation.name":  "INSERT",
 		"db.collection.name": "events",
 		"db.query.summary":   "INSERT events",
 		"db.query.text":      "INSERT INTO events(id)",

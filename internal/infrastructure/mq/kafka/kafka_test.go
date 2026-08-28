@@ -8,9 +8,9 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/requestid"
-	"github.com/gonotelm-lab/gonotelm/pkg/ulid"
 	pkgtrace "github.com/gonotelm-lab/gonotelm/pkg/trace"
 	pkgpropagation "github.com/gonotelm-lab/gonotelm/pkg/trace/propagation"
+	"github.com/gonotelm-lab/gonotelm/pkg/ulid"
 
 	"github.com/segmentio/kafka-go"
 	"go.opentelemetry.io/otel"

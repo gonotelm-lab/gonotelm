@@ -94,4 +94,3 @@ func BenchmarkOtelNewIDsParallel(b *testing.B) {
 		benchSinkTID, benchSinkSID = tid, sid
 	})
 }
-

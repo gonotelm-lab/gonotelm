@@ -22,7 +22,7 @@ func NewDeleteChatContextHandler(
 	return &DeleteChatContextHandler{
 		baseHandler:            newBaseHandler(chatRepo),
 		chatContextMessageRepo: chatContextMessageRepo,
-		suggestionRepo:        suggestionRepo,
+		suggestionRepo:         suggestionRepo,
 	}
 }
 

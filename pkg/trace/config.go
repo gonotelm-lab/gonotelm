@@ -25,7 +25,7 @@ func (c *Config) normalize() error {
 	if c.Exporter == "" {
 		c.Exporter = ExporterKindGrpc
 	}
-	
+
 	if c.Endpoint == "" {
 		return fmt.Errorf("[trace] no endpoint configured")
 	}

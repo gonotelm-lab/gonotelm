@@ -14,7 +14,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/postgres"
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat/billing"
 	llmchatbilling "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat/billing"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/embedding"
 	embeddingbilling "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/embedding/billing"
@@ -163,7 +162,7 @@ func initLLMGateway(ctx context.Context, cfg *confshared.InfraConfig, infra *Inf
 }
 
 func initLLMBillingMeters(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
-	meter, err := billing.NewStandardMeter(llmchatbilling.StandardMeterConfig{
+	meter, err := llmchatbilling.NewStandardMeter(llmchatbilling.StandardMeterConfig{
 		DeepSeekScript: cfg.ProviderBilling.DeepSeekScript,
 	})
 	if err != nil {

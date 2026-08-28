@@ -34,6 +34,6 @@ func RenderMindmap(ctx context.Context, sourceIds []string, tip string) ([]*eino
 	if tipMsg := types.BuildTipMessage(tip); tipMsg != nil {
 		msgs = append(msgs, tipMsg)
 	}
-	
+
 	return msgs, nil
 }

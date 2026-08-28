@@ -86,7 +86,7 @@ func fullLLMLog() *schema.LLMLog {
 			"notebook_id": "nb-1",
 			"version":     "v2",
 		},
-		Error:     &errMsg,
+		Error: &errMsg,
 	}
 
 	return log

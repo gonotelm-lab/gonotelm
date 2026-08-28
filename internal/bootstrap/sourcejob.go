@@ -25,7 +25,7 @@ func NewSourceJob(ctx context.Context, cfg *conf.SourceJobConfig) (*SourceJob, e
 		return nil, fmt.Errorf("sourcejob requires msgQueue")
 	}
 
-		if err := trace.Init(ctx, cfg.OtelTrace); err != nil {
+	if err := trace.Init(ctx, cfg.OtelTrace); err != nil {
 		slog.ErrorContext(ctx, fmt.Sprintf("[worker.bootstrap] can not init trace: %v", err))
 	}
 

@@ -66,7 +66,7 @@ func (i *Infra) addCloser(closer io.Closer) {
 
 func (i *Infra) Closers() []io.Closer { return i.closers }
 
-func initDatabase(cfg *confshared.InfraConfig, infra *Infra) error {
+func initDatabase(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
 	db, err := postgres.Open(cfg.Database.ToSQLConfig())
 	if err != nil {
 		return fmt.Errorf("database: %w", err)
@@ -80,7 +80,7 @@ func initDatabase(cfg *confshared.InfraConfig, infra *Infra) error {
 	return nil
 }
 
-func initOlapDatabase(cfg *confshared.InfraConfig, infra *Infra) error {
+func initOlapDatabase(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
 	dao, err := clickhouse.Open(context.Background(), cfg.DatabaseOlap.ToSQLConfig())
 	if err != nil {
 		return fmt.Errorf("olap database: %w", err)
@@ -94,7 +94,7 @@ func initOlapDatabase(cfg *confshared.InfraConfig, infra *Infra) error {
 	return nil
 }
 
-func initVectorDB(cfg *confshared.InfraConfig, infra *Infra) error {
+func initVectorDB(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
 	vdb, err := milvus.Open(&cfg.VectorDB)
 	if err != nil {
 		return fmt.Errorf("vectordb: %w", err)
@@ -107,7 +107,7 @@ func initVectorDB(cfg *confshared.InfraConfig, infra *Infra) error {
 	return nil
 }
 
-func initRedis(cfg *confshared.InfraConfig, infra *Infra) error {
+func initRedis(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
 	if len(cfg.Redis.Addrs) == 0 {
 		return nil
 	}
@@ -126,12 +126,12 @@ func initRedis(cfg *confshared.InfraConfig, infra *Infra) error {
 	return nil
 }
 
-func initMQ(cfg *confshared.InfraConfig, infra *Infra) error {
+func initMessageQueue(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
 	if cfg.MsgQueue.Type == "" {
 		return nil
 	}
 
-	mqInst, err := newMQ(&cfg.MsgQueue)
+	mqInst, err := newMessageQueue(&cfg.MsgQueue)
 	if err != nil {
 		return fmt.Errorf("mq: %w", err)
 	}
@@ -140,7 +140,7 @@ func initMQ(cfg *confshared.InfraConfig, infra *Infra) error {
 	return nil
 }
 
-func initStorage(cfg *confshared.InfraConfig, infra *Infra) error {
+func initStorage(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
 	oss, err := newStorage(&cfg.Storage)
 	if err != nil {
 		return fmt.Errorf("storage: %w", err)
@@ -214,7 +214,7 @@ func initText2AudioBillingMeter(_ context.Context, cfg *confshared.InfraConfig, 
 	return nil
 }
 
-func initEmbedding(cfg *confshared.InfraConfig, infra *Infra) error {
+func initEmbedding(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
 	var embedCacher embedcache.Cacher
 	if infra.Redis != nil {
 		embedCacher = embedding.NewRedisCacher(infra.Redis)
@@ -239,7 +239,7 @@ func initEmbedding(cfg *confshared.InfraConfig, infra *Infra) error {
 	return nil
 }
 
-func initText2Image(cfg *confshared.InfraConfig, infra *Infra) error {
+func initText2Image(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
 	recorder := infraadapter.NewText2ImageRecorderAdapter(
 		infra.OlapDatabase.Text2ImageLogStore,
 		infra.Text2ImageBillingMeter,
@@ -256,7 +256,7 @@ func initText2Image(cfg *confshared.InfraConfig, infra *Infra) error {
 	return nil
 }
 
-func initText2Audio(cfg *confshared.InfraConfig, infra *Infra) error {
+func initText2Audio(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
 	recorder := infraadapter.NewText2AudioRecorderAdapter(
 		infra.OlapDatabase.Text2AudioLogStore,
 		infra.Text2AudioBillingMeter,
@@ -283,6 +283,8 @@ func initSandbox(ctx context.Context, cfg *confshared.InfraConfig, infra *Infra)
 	return nil
 }
 
+type infraInit func(ctx context.Context, cfg *confshared.InfraConfig, infra *Infra) error
+
 func NewInfra(ctx context.Context, cfg *confshared.InfraConfig) (_ *Infra, finalErr error) {
 	infra := &Infra{}
 	defer func() {
@@ -296,50 +298,27 @@ func NewInfra(ctx context.Context, cfg *confshared.InfraConfig) (_ *Infra, final
 	}()
 
 	// Do not switch the orders of initialization
-	if err := initDatabase(cfg, infra); err != nil {
-		return nil, err
+	inits := []infraInit{
+		initDatabase,
+		initOlapDatabase,
+		initVectorDB,
+		initRedis,
+		initMessageQueue,
+		initStorage,
+		initLLMBillingMeters,
+		initEmbeddingBillingMeter,
+		initText2ImageBillingMeter,
+		initText2AudioBillingMeter,
+		initLLMGateway,
+		initEmbedding,
+		initText2Image,
+		initText2Audio,
+		initSandbox,
 	}
-	if err := initOlapDatabase(cfg, infra); err != nil {
-		return nil, err
-	}
-	if err := initVectorDB(cfg, infra); err != nil {
-		return nil, err
-	}
-	if err := initRedis(cfg, infra); err != nil {
-		return nil, err
-	}
-	if err := initMQ(cfg, infra); err != nil {
-		return nil, err
-	}
-	if err := initStorage(cfg, infra); err != nil {
-		return nil, err
-	}
-	if err := initLLMBillingMeters(ctx, cfg, infra); err != nil {
-		return nil, err
-	}
-	if err := initEmbeddingBillingMeter(ctx, cfg, infra); err != nil {
-		return nil, err
-	}
-	if err := initText2ImageBillingMeter(ctx, cfg, infra); err != nil {
-		return nil, err
-	}
-	if err := initText2AudioBillingMeter(ctx, cfg, infra); err != nil {
-		return nil, err
-	}
-	if err := initLLMGateway(ctx, cfg, infra); err != nil {
-		return nil, err
-	}
-	if err := initEmbedding(cfg, infra); err != nil {
-		return nil, err
-	}
-	if err := initText2Image(cfg, infra); err != nil {
-		return nil, err
-	}
-	if err := initText2Audio(cfg, infra); err != nil {
-		return nil, err
-	}
-	if err := initSandbox(ctx, cfg, infra); err != nil {
-		return nil, err
+	for _, fn := range inits {
+		if err := fn(ctx, cfg, infra); err != nil {
+			return nil, err
+		}
 	}
 
 	return infra, nil
@@ -355,7 +334,7 @@ func (s *Infra) Close(ctx context.Context) error {
 	return nil
 }
 
-func newMQ(cfg *mq.Config) (*mq.MessageQueue, error) {
+func newMessageQueue(cfg *mq.Config) (*mq.MessageQueue, error) {
 	switch cfg.Type {
 	case mq.Kafka:
 		kc := cfg.Kafka

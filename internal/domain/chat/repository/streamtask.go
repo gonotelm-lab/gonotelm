@@ -14,6 +14,8 @@ type StreamTaskRepository interface {
 
 	Save(ctx context.Context, task *entity.StreamTask) error
 	FindById(ctx context.Context, taskId valobj.Id) (*entity.StreamTask, error)
+	// 获取用户某个对话中正在进行的任务
+	FindByUserAndChat(ctx context.Context, userId valobj.Uid, chatId valobj.Id) (*entity.StreamTask, error)
 	DeleteById(ctx context.Context, taskId valobj.Id) error
 }
 

@@ -10,6 +10,7 @@ import (
 	chatapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat"
 	chatagent "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/agent"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	chaterrors "github.com/gonotelm-lab/gonotelm/internal/domain/chat/errors"
 	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
@@ -31,6 +32,8 @@ func (s *Server) registerChatRoutes(g *route.RouterGroup) {
 		chatIdGroup.POST("/messages", s.ChatCreateMessage)
 		// POST /api/v1/chats/:id/stream/abort
 		chatIdGroup.POST("/stream/abort", s.ChatAbortStream)
+		// GET /api/v1/chats/:id/stream-task — current running task id
+		chatIdGroup.GET("/stream-task", s.GetChatRunningTask)
 		// GET /api/v1/chats/:id/stream — SSE
 		chatIdGroup.GET("/stream", middleware.SlowRequestThreshold(120*time.Second), s.GetChatStream)
 		// DELETE /api/v1/chats/:id/context
@@ -228,6 +231,32 @@ func (s *Server) DeleteChatContext(ctx context.Context, c *app.RequestContext) {
 	}
 
 	http.OkRespNoContent(c)
+}
+
+func (s *Server) GetChatRunningTask(ctx context.Context, c *app.RequestContext) {
+	var req schema.GetRunningTaskRequest
+	err := c.BindAndValidate(&req)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	taskId, err := s.getChatRunningTaskHandler.Handle(ctx,
+		&chatapp.GetRunningTaskQuery{
+			ChatId: req.Id,
+		})
+	if err != nil {
+		if errors.Is(err, chaterrors.ErrStreamTaskNotFound) {
+			http.OkResp(c, schema.GetRunningTaskResponse{TaskId: ""})
+			return
+		}
+		http.ErrResp(c, err)
+		return
+	}
+
+	http.OkResp(c, schema.GetRunningTaskResponse{
+		TaskId: taskId.String(),
+	})
 }
 
 func (s *Server) GetChatSuggestions(ctx context.Context, c *app.RequestContext) {

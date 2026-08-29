@@ -31,6 +31,8 @@ type ChatMessageStreamCache interface {
 
 	GetTask(ctx context.Context, taskId string) (*schema.ChatMessageTask, error)
 
+	GetTaskByUserAndChatId(ctx context.Context, userId, chatId string) (*schema.ChatMessageTask, error)
+
 	DeleteTask(ctx context.Context, taskId string) error
 
 	AppendEventStream(ctx context.Context, taskId string, event *schema.ChatMessageStreamEvent) (string, error)

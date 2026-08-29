@@ -48,14 +48,33 @@ func (r *StreamTaskRepositoryImpl) FindById(ctx context.Context, taskId valobj.I
 	return mapper.StreamTaskFromSchema(sch)
 }
 
+func (r *StreamTaskRepositoryImpl) FindByUserAndChat(
+	ctx context.Context,
+	userId valobj.Uid,
+	chatId valobj.Id,
+) (*entity.StreamTask, error) {
+	task, err := r.streamCache.GetTaskByUserAndChatId(
+		ctx, userId.String(), chatId.String(),
+	)
+	if err != nil {
+		if errors.Is(err, cacheerrors.ErrTaskNotFound) {
+			return nil, chaterrors.ErrStreamTaskNotFound
+		}
+		return nil, errors.WithMessage(err, "get stream task by user and chat failed")
+	}
+
+	return mapper.StreamTaskFromSchema(task)
+}
+
 func (r *StreamTaskRepositoryImpl) DeleteById(ctx context.Context, taskId valobj.Id) error {
-	return r.streamCache.DeleteTask(ctx, taskId.String())
+	err := r.streamCache.DeleteTask(ctx, taskId.String())
+	return errors.WithMessage(err, "delete stream task failed")
 }
 
 func (r *StreamTaskRepositoryImpl) EmitStreamEvent(ctx context.Context, taskId valobj.Id, event *entity.StreamTaskEvent) error {
 	data, err := mapper.StreamTaskEventToData(event)
 	if err != nil {
-		return err
+		return errors.WithMessage(err, "marshal stream task event failed")
 	}
 
 	if event.Id == "" {
@@ -67,15 +86,17 @@ func (r *StreamTaskRepositoryImpl) EmitStreamEvent(ctx context.Context, taskId v
 			Id:   event.Id,
 			Data: data,
 		})
-	return err
+	return errors.WithMessage(err, "append stream task event failed")
 }
 
 func (r *StreamTaskRepositoryImpl) DeleteStream(ctx context.Context, taskId valobj.Id) error {
-	return r.streamCache.DeleteEventStream(ctx, taskId.String())
+	err := r.streamCache.DeleteEventStream(ctx, taskId.String())
+	return errors.WithMessage(err, "delete stream task event failed")
 }
 
 func (r *StreamTaskRepositoryImpl) SetStreamTTL(ctx context.Context, taskId valobj.Id, ttl time.Duration) error {
-	return r.streamCache.SetEventStreamTTL(ctx, taskId.String(), ttl)
+	err := r.streamCache.SetEventStreamTTL(ctx, taskId.String(), ttl)
+	return errors.WithMessage(err, "set stream task event ttl failed")
 }
 
 func (r *StreamTaskRepositoryImpl) BlockOnStreamEvent(
@@ -92,7 +113,7 @@ func (r *StreamTaskRepositoryImpl) BlockOnStreamEvent(
 		if errors.Is(err, cacheerrors.ErrStreamNoData) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, errors.WithMessage(err, "pull stream task event failed")
 	}
 
 	results := make([]*entity.StreamTaskEvent, 0, len(events))

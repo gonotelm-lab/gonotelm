@@ -40,6 +40,7 @@ type ServerDeps struct {
 	EventBus               eventbus.EventBus
 	WaitGroup              *sync.WaitGroup
 	LLMGateway             *chat.Gateway
+	DistLock               adapter.DistributedLock
 
 	ArtifactRepo   artifactrepo.Repository
 	FlowClient     flow.TaskClient
@@ -75,6 +76,7 @@ type Server struct {
 	createChatMessageHandler  *chatapp.CreateMessageHandler
 	listChatMessagesHandler   *chatapp.ListMessagesHandler
 	getChatStreamHandler      *chatapp.GetStreamHandler
+	getChatRunningTaskHandler *chatapp.GetRunningTaskHandler
 	abortChatStreamHandler    *chatapp.AbortStreamHandler
 	deleteChatContextHandler  *chatapp.DeleteChatContextHandler
 	getChatSuggestionsHandler *chatapp.ChatSuggestHandler
@@ -133,6 +135,7 @@ func NewServer(
 
 		createChatMessageHandler: chatapp.NewCreateMessageHandler(
 			deps.WaitGroup,
+			deps.DistLock,
 			deps.NotebookRepo,
 			deps.ChatRepo,
 			deps.ChatMessageRepo,
@@ -149,6 +152,10 @@ func NewServer(
 			deps.ChatMessageRepo,
 		),
 		getChatStreamHandler:   chatapp.NewGetStreamHandler(deps.ChatStreamTaskRepo),
+		getChatRunningTaskHandler: chatapp.NewGetRunningTaskHandler(
+			deps.ChatRepo,
+			deps.ChatStreamTaskRepo,
+		),
 		abortChatStreamHandler: chatapp.NewAbortStreamHandler(deps.ChatStreamTaskRepo, deps.EventBus),
 		deleteChatContextHandler: chatapp.NewDeleteChatContextHandler(
 			deps.ChatRepo,

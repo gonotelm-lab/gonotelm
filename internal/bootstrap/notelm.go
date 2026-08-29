@@ -179,6 +179,7 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 			EventBus:   eventBus,
 			WaitGroup:  wg,
 			LLMGateway: infra.LLMGateway,
+			DistLock:   infra.DistLock,
 
 			FlowClient:     flowClient,
 			Poller:         syncerInst,

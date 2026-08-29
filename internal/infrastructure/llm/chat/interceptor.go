@@ -128,9 +128,10 @@ func (i *Interceptor) OnEndWithStreamOutput(
 				}
 
 				lastChunk := accumulatedChunks[len(accumulatedChunks)-1]
-				lastChunk.Message = finalMsg
-
-				i.recordEnd(ctx, lastChunk)
+				// 拷贝一份 因为拦截器中的是Copy的Stream 如果直接修改lastChunk可能有并发修改问题 导致工具参数重复拼接
+				recordOut := *lastChunk
+				recordOut.Message = finalMsg
+				i.recordEnd(ctx, &recordOut)
 				break
 			}
 

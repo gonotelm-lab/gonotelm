@@ -16,6 +16,7 @@ type StandardMeter struct {
 
 type StandardMeterConfig struct {
 	DeepSeekScript string
+	QwenScript     string
 }
 
 func NewStandardMeter(c StandardMeterConfig) (Meter, error) {
@@ -24,11 +25,18 @@ func NewStandardMeter(c StandardMeterConfig) (Meter, error) {
 	}
 
 	if len(c.DeepSeekScript) > 0 {
-		deepSeek, err := NewDeepSeekPriceProvider(c.DeepSeekScript)
+		deepSeek, err := NewScriptedPriceProvider(c.DeepSeekScript)
 		if err != nil {
 			return nil, fmt.Errorf("init deepseek script err: %w", err)
 		}
 		meter.SetProvider(chat.ProviderDeepSeek, deepSeek)
+	}
+	if len(c.QwenScript) > 0 {
+		qwen, err := NewScriptedPriceProvider(c.QwenScript)
+		if err != nil {
+			return nil, fmt.Errorf("init qwen script err: %w", err)
+		}
+		meter.SetProvider(chat.ProviderQwen, qwen)
 	}
 
 	return meter, nil
@@ -56,7 +64,7 @@ func (m *StandardMeter) Calculate(
 		return nil, nil, fmt.Errorf("%s: %w", provider, ErrPriceProviderNotFound)
 	}
 
-	prices, err := priceProvider.Provide(ctx, model)
+	prices, err := priceProvider.Provide(ctx, model, usage)
 	if err != nil {
 		return nil, nil, fmt.Errorf("%s: %w", model, err)
 	}
@@ -81,3 +89,4 @@ func (m *StandardMeter) Calculate(
 		OutputPriceKey:    outputPrice,
 	}, nil
 }
+

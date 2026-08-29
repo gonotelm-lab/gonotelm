@@ -12,6 +12,9 @@ import (
 var (
 	ErrPriceProviderNotFound = errors.New("price provider not found")
 	ErrModelNotFound         = errors.New("model not found")
+
+	ErrMissingPromptPrice = errors.New("scripted price provider missing prompt key")
+	ErrPromptNotNumber    = errors.New("scripted price provider prompt is not number")
 )
 
 var millionUnit = decimal.NewFromInt(1_000_000) // 1M
@@ -37,5 +40,5 @@ type TokenPrices struct {
 }
 
 type TokenPricesProvider interface {
-	Provide(ctx context.Context, model string) (TokenPrices, error)
+	Provide(ctx context.Context, model string, usage embedding.RecordTokenUsage) (TokenPrices, error)
 }

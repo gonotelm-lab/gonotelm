@@ -61,11 +61,13 @@ func (d *DatabaseConfig) ToSQLConfig() *sql.Config {
 	}
 }
 
-//go:embed prices/deepseek.chat
-var defaultDeepSeekPricingScript string
+var (
+	//go:embed modelprice/deepseek.chat
+	defaultDeepSeekPricingScript string
 
-//go:embed prices/dashscope.embedding
-var defaultDashScopeEmbeddingPricingScript string
+	//go:embed modelprice/dashscope.embedding
+	defaultDashScopeEmbeddingPricingScript string
+)
 
 type ProviderBillingConfig struct {
 	DeepSeekScript           string

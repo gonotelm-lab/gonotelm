@@ -24,7 +24,7 @@ func NewStandardMeter(c StandardMeterConfig) (Meter, error) {
 	}
 
 	if len(c.DashScopeScript) > 0 {
-		dashScope, err := NewDashScopePriceProvider(c.DashScopeScript)
+		dashScope, err := NewScriptedPriceProvider(c.DashScopeScript)
 		if err != nil {
 			return nil, fmt.Errorf("init dashscope script err: %w", err)
 		}
@@ -56,7 +56,7 @@ func (m *StandardMeter) Calculate(
 		return nil, nil, fmt.Errorf("%s: %w", provider, ErrPriceProviderNotFound)
 	}
 
-	prices, err := priceProvider.Provide(ctx, model)
+	prices, err := priceProvider.Provide(ctx, model, usage)
 	if err != nil {
 		return nil, nil, fmt.Errorf("%s: %w", model, err)
 	}

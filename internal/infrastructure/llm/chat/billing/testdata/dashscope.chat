@@ -1,0 +1,25 @@
+if model == 'qwen3.8-flash' {
+  {cache_hit_1m: "0.1", cache_miss_1m: "0.8", output_1m: "2.7"}
+} else if model == 'qwen3.8-max' {
+  {cache_hit_1m: "1.5", cache_miss_1m: "12", output_1m: "36"}
+} else if model == 'qwen3.7-max' {
+  {cache_hit_1m: "1.2", cache_miss_1m: "6", output_1m: "18"}
+} else if model == 'qwen3.7-plus' {
+  // tiered pricing
+  if usage.prompt_tokens <= 256000 {
+    {cache_hit_1m: "0.32", cache_miss_1m: "1.6", output_1m: "6.4"}
+  } else {
+    {cache_hit_1m: "0.96", cache_miss_1m: "4.8", output_1m: "19.2"}
+  }
+} else if model == 'qwen3.7-flash' {
+  // tiered pricing
+  if usage.prompt_tokens <= 32000 {
+    {cache_hit_1m: "0.04", cache_miss_1m: "0.2", output_1m: "0.8"}
+  } else if usage.prompt_tokens > 32000 && usage.prompt_tokens <= 256000 {
+    {cache_hit_1m: "0.12", cache_miss_1m: "0.6", output_1m: "2.4"}
+  } else {
+    {cache_hit_1m: "0.24", cache_miss_1m: "1.2", output_1m: "4.8"}
+  }
+} else {
+  'model not supported to provide price'
+}

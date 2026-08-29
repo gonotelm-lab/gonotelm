@@ -89,4 +89,3 @@ func (m *StandardMeter) Calculate(
 		OutputPriceKey:    outputPrice,
 	}, nil
 }
-

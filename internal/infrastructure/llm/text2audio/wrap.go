@@ -17,10 +17,11 @@ const wrappedGeneratorRunName = "gateway-text2audio"
 type wrappedGenerator struct {
 	provider Text2AudioProvider
 	impl     audios.Generator
+	recorder Recorder
 }
 
-func newWrappedGenerator(provider Text2AudioProvider, impl audios.Generator) audios.Generator {
-	return &wrappedGenerator{provider: provider, impl: impl}
+func newWrappedGenerator(provider Text2AudioProvider, impl audios.Generator, recorder Recorder) audios.Generator {
+	return &wrappedGenerator{provider: provider, impl: impl, recorder: recorder}
 }
 
 var _ audios.Generator = (*wrappedGenerator)(nil)
@@ -35,6 +36,9 @@ func (t *wrappedGenerator) Generate(
 		model = req.Model
 	}
 
+	ctx = withModelName(ctx, model)
+	ctx = withProvider(ctx, t.provider)
+
 	ctx, span := pkgtrace.GetOtelTracer().Start(ctx, genaiconv.SpanName("text2audio"),
 		oteltrace.WithSpanKind(oteltrace.SpanKindClient),
 		oteltrace.WithAttributes(genaiconv.Attributes(t.provider.String(), "text2audio", model)...),
@@ -45,7 +49,7 @@ func (t *wrappedGenerator) Generate(
 		Name:      wrappedGeneratorRunName,
 		Type:      t.provider.String(),
 		Component: callbacks.ComponentAudio,
-	}, newInterceptor())
+	}, newInterceptor(t.recorder))
 
 	resp, err := t.impl.Generate(ctx, req, opts...)
 	if err != nil {

@@ -50,10 +50,16 @@ func Open(ctx context.Context, cfg *sql.Config) (*olap.Dao, error) {
 		return nil, fmt.Errorf("create text2image log store err: %w", err)
 	}
 
+	text2AudioLogStore, err := NewText2AudioLogStoreImpl(ctx, c)
+	if err != nil {
+		return nil, fmt.Errorf("create text2audio log store err: %w", err)
+	}
+
 	return olap.NewDao(
 		closer,
 		llmLogStore,
 		embeddingLogStore,
 		text2ImageLogStore,
+		text2AudioLogStore,
 	), nil
 }

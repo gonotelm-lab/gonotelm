@@ -48,7 +48,7 @@ func (i *Interceptor) OnStart(
 	info *callbacks.RunInfo,
 	src callbacks.CallbackInput,
 ) context.Context {
-	slog.DebugContext(ctx, "[Interceptor] OnStart", slog.Any("info", util.RenameRunInfo(info)))
+	slog.DebugContext(ctx, "[chat.Interceptor] OnStart", slog.Any("info", util.RenameRunInfo(info)))
 	input := model.ConvCallbackInput(src)
 	start := time.Now()
 	ctx = withOnStartInput(ctx, input)
@@ -61,10 +61,10 @@ func (i *Interceptor) OnEnd(
 	info *callbacks.RunInfo,
 	src callbacks.CallbackOutput,
 ) context.Context {
-	slog.DebugContext(ctx, "[Interceptor] OnEnd", slog.Any("info", util.RenameRunInfo(info)))
+	slog.DebugContext(ctx, "[chat.Interceptor] OnEnd", slog.Any("info", util.RenameRunInfo(info)))
 	output := model.ConvCallbackOutput(src)
 	if output == nil {
-		slog.WarnContext(ctx, "[Interceptor] OnEnd empty callback output", slog.Any("info", util.RenameRunInfo(info)))
+		slog.WarnContext(ctx, "[chat.Interceptor] OnEnd empty callback output", slog.Any("info", util.RenameRunInfo(info)))
 		return ctx
 	}
 
@@ -81,7 +81,7 @@ func (i *Interceptor) OnError(
 ) context.Context {
 	runSemRelease(ctx)
 
-	slog.ErrorContext(ctx, "[Interceptor] OnError",
+	slog.ErrorContext(ctx, "[chat.Interceptor] OnError",
 		slog.Any("info", util.RenameRunInfo(info)), slog.Bool("streaming", getStreaming(ctx)), slog.Any("err", err),
 	)
 
@@ -135,7 +135,7 @@ func (i *Interceptor) OnEndWithStreamOutput(
 			}
 
 			if err != nil {
-				slog.ErrorContext(ctx, "[Interceptor] OnEndWithStreamOutput Recv error",
+				slog.ErrorContext(ctx, "[chat.Interceptor] OnEndWithStreamOutput Recv error",
 					slog.Any("info", util.RenameRunInfo(info)),
 					slog.Any("err", err),
 				)
@@ -153,7 +153,7 @@ func (i *Interceptor) OnEndWithStreamOutput(
 func (i *Interceptor) recordError(ctx context.Context, err error) {
 	if i.recorder != nil {
 		if rErr := i.recorder.Record(ctx, buildErrorRecord(ctx, err, time.Now())); rErr != nil {
-			slog.ErrorContext(ctx, "[Interceptor] record error failed", slog.Any("err", rErr))
+			slog.ErrorContext(ctx, "[chat.Interceptor] record error failed", slog.Any("err", rErr))
 		}
 	}
 }
@@ -162,7 +162,7 @@ func (i *Interceptor) recordEnd(ctx context.Context, output *model.CallbackOutpu
 	if i.recorder != nil {
 		r := buildEndRecord(ctx, getOnStartInput(ctx), output, time.Now())
 		if err := i.recorder.Record(ctx, r); err != nil {
-			slog.ErrorContext(ctx, "[Interceptor] record end failed", slog.Any("err", err))
+			slog.ErrorContext(ctx, "[chat.Interceptor] record end failed", slog.Any("err", err))
 		}
 	}
 }

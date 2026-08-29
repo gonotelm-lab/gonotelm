@@ -36,7 +36,7 @@ require (
 	github.com/golang/snappy v1.0.0
 	github.com/gonotelm-lab/flow/api v0.2.0
 	github.com/gonotelm-lab/flow/client v0.2.0
-	github.com/gonotelm-lab/multimodal v0.2.4
+	github.com/gonotelm-lab/multimodal v0.2.5
 	github.com/google/uuid v1.6.0
 	github.com/hertz-contrib/logger/slog v1.0.0
 	github.com/klippa-app/go-pdfium v1.17.3

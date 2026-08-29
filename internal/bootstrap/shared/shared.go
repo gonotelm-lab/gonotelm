@@ -16,15 +16,16 @@ import (
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	llmchatbilling "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat/billing"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/embedding"
-	embeddingbilling "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/embedding/billing"
+	embbilling "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/embedding/billing"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio"
+	t2abilling "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio/billing"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image"
-	text2imagebilling "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image/billing"
+	t2ibilling "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image/billing"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
 	mqkafka "github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq/kafka"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/olap"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/olap/clickhouse"
-	infrasandbox "github.com/gonotelm-lab/gonotelm/internal/infrastructure/sandbox"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/sandbox"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage/minio"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
@@ -36,22 +37,23 @@ import (
 )
 
 type Infra struct {
-	Database              *database.Dao
-	OlapDatabase          *olap.Dao
-	VectorDatabase        *vectordb.DAL
-	Cache                 *infracache.Cache
-	MessageQueue          *mq.MessageQueue
-	Storage               storage.Storage
-	LLMGateway            *llmchat.Gateway
-	LLMBillingMeter       llmchatbilling.Meter
-	EmbeddingGateway      *embedding.EmbeddingGateway
-	EmbeddingBillingMeter  embeddingbilling.Meter
-	Text2ImageBillingMeter text2imagebilling.Meter
+	Database               *database.Dao
+	OlapDatabase           *olap.Dao
+	VectorDatabase         *vectordb.DAL
+	Cache                  *infracache.Cache
+	MessageQueue           *mq.MessageQueue
+	Storage                storage.Storage
+	LLMGateway             *llmchat.Gateway
+	LLMBillingMeter        llmchatbilling.Meter
+	EmbeddingGateway       *embedding.EmbeddingGateway
+	EmbeddingBillingMeter  embbilling.Meter
+	Text2ImageBillingMeter t2ibilling.Meter
+	Text2AudioBillingMeter t2abilling.Meter
 	Embedder               einoembed.Embedder
 	Text2Image             *text2image.Text2ImageGateway
 	Text2Audio             *text2audio.Text2AudioGateway
-	SandboxGateway        *infrasandbox.Gateway
-	DistLock              adapter.DistributedLock
+	SandboxGateway         *sandbox.Gateway
+	DistLock               adapter.DistributedLock
 
 	Redis redisv9.UniversalClient
 
@@ -176,7 +178,7 @@ func initLLMBillingMeters(_ context.Context, cfg *confshared.InfraConfig, infra 
 }
 
 func initEmbeddingBillingMeter(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
-	meter, err := embeddingbilling.NewStandardMeter(embeddingbilling.StandardMeterConfig{
+	meter, err := embbilling.NewStandardMeter(embbilling.StandardMeterConfig{
 		DashScopeScript: cfg.ProviderBilling.EmbeddingDashScopeScript,
 	})
 	if err != nil {
@@ -188,13 +190,26 @@ func initEmbeddingBillingMeter(_ context.Context, cfg *confshared.InfraConfig, i
 }
 
 func initText2ImageBillingMeter(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
-	meter, err := text2imagebilling.NewStandardMeter(text2imagebilling.StandardMeterConfig{
+	meter, err := t2ibilling.NewStandardMeter(t2ibilling.StandardMeterConfig{
 		DashScopeScript: cfg.ProviderBilling.Text2ImageDashScopeScript,
 	})
 	if err != nil {
 		return fmt.Errorf("llm text2image billing: %w", err)
 	}
 	infra.Text2ImageBillingMeter = meter
+
+	return nil
+}
+
+func initText2AudioBillingMeter(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
+	meter, err := t2abilling.NewStandardMeter(t2abilling.StandardMeterConfig{
+		DashScopeScript: cfg.ProviderBilling.Text2AudioDashScopeScript,
+		MiniMaxScript:   cfg.ProviderBilling.Text2AudioMiniMaxScript,
+	})
+	if err != nil {
+		return fmt.Errorf("llm text2audio billing: %w", err)
+	}
+	infra.Text2AudioBillingMeter = meter
 
 	return nil
 }
@@ -242,7 +257,14 @@ func initText2Image(cfg *confshared.InfraConfig, infra *Infra) error {
 }
 
 func initText2Audio(cfg *confshared.InfraConfig, infra *Infra) error {
-	text2audioGateway, err := text2audio.NewText2AudioGateway(&cfg.Text2Audio)
+	recorder := infraadapter.NewText2AudioRecorderAdapter(
+		infra.OlapDatabase.Text2AudioLogStore,
+		infra.Text2AudioBillingMeter,
+	)
+	text2audioGateway, err := text2audio.NewText2AudioGateway(
+		&cfg.Text2Audio,
+		text2audio.WithRecorder(recorder),
+	)
 	if err != nil {
 		return fmt.Errorf("text2audio gateway: %w", err)
 	}
@@ -252,7 +274,7 @@ func initText2Audio(cfg *confshared.InfraConfig, infra *Infra) error {
 }
 
 func initSandbox(ctx context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
-	sandboxGateway, err := infrasandbox.NewGateway(ctx, &cfg.Sandbox)
+	sandboxGateway, err := sandbox.NewGateway(ctx, &cfg.Sandbox)
 	if err != nil {
 		return fmt.Errorf("sandbox gateway: %w", err)
 	}
@@ -299,6 +321,9 @@ func NewInfra(ctx context.Context, cfg *confshared.InfraConfig) (_ *Infra, final
 		return nil, err
 	}
 	if err := initText2ImageBillingMeter(ctx, cfg, infra); err != nil {
+		return nil, err
+	}
+	if err := initText2AudioBillingMeter(ctx, cfg, infra); err != nil {
 		return nil, err
 	}
 	if err := initLLMGateway(ctx, cfg, infra); err != nil {

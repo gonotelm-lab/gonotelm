@@ -5,9 +5,23 @@ import (
 	"log/slog"
 	"time"
 
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/multimodal/callbacks"
 	pkgt2i "github.com/gonotelm-lab/multimodal/image"
 )
+
+func init() {
+	pkgcontext.RegisterSlogAttrs(
+		func(ctx context.Context) (slog.Attr, bool) {
+			modelName := getModelName(ctx)
+			if modelName == "" {
+				return slog.Attr{}, false
+			}
+
+			return slog.String("text2image.model", modelName), true
+		},
+	)
+}
 
 type Interceptor struct {
 	recorder Recorder

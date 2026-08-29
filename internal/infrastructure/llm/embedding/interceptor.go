@@ -20,7 +20,7 @@ func init() {
 				return slog.Attr{}, false
 			}
 
-			return slog.String("llm.model", modelName), true
+			return slog.String("embedding.model", modelName), true
 		},
 	)
 }

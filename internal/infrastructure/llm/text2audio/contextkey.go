@@ -1,10 +1,10 @@
-package text2image
+package text2audio
 
 import (
 	"context"
 	"time"
 
-	pkgt2i "github.com/gonotelm-lab/multimodal/image"
+	audios "github.com/gonotelm-lab/multimodal/audio"
 )
 
 type (
@@ -14,12 +14,12 @@ type (
 	startTimeCtxKey    struct{}
 )
 
-func withProvider(ctx context.Context, provider Text2ImageProvider) context.Context {
+func withProvider(ctx context.Context, provider Text2AudioProvider) context.Context {
 	return context.WithValue(ctx, providerCtxKey{}, provider)
 }
 
-func getProvider(ctx context.Context) Text2ImageProvider {
-	provider, ok := ctx.Value(providerCtxKey{}).(Text2ImageProvider)
+func getProvider(ctx context.Context) Text2AudioProvider {
+	provider, ok := ctx.Value(providerCtxKey{}).(Text2AudioProvider)
 	if !ok {
 		return ""
 	}
@@ -38,12 +38,12 @@ func getModelName(ctx context.Context) string {
 	return modelName
 }
 
-func withOnStartInput(ctx context.Context, input *pkgt2i.CallbackInput) context.Context {
+func withOnStartInput(ctx context.Context, input *audios.CallbackInput) context.Context {
 	return context.WithValue(ctx, onStartInputCtxKey{}, input)
 }
 
-func getOnStartInput(ctx context.Context) *pkgt2i.CallbackInput {
-	v, ok := ctx.Value(onStartInputCtxKey{}).(*pkgt2i.CallbackInput)
+func getOnStartInput(ctx context.Context) *audios.CallbackInput {
+	v, ok := ctx.Value(onStartInputCtxKey{}).(*audios.CallbackInput)
 	if ok {
 		return v
 	}

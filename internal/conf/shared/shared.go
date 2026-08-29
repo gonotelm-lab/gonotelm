@@ -70,12 +70,17 @@ var (
 
 	//go:embed modelprice/dashscope.text2image
 	defaultDashScopeText2ImagePricingScript string
+
+	//go:embed modelprice/dashscope.text2audio
+	defaultDashScopeText2AudioPricingScript string
 )
 
 type ProviderBillingConfig struct {
 	DeepSeekScript            string
 	EmbeddingDashScopeScript  string
 	Text2ImageDashScopeScript string
+	Text2AudioDashScopeScript string
+	Text2AudioMiniMaxScript   string
 }
 
 func (c *ProviderBillingConfig) Init() {
@@ -87,6 +92,9 @@ func (c *ProviderBillingConfig) Init() {
 	}
 	if c.Text2ImageDashScopeScript == "" {
 		c.Text2ImageDashScopeScript = defaultDashScopeText2ImagePricingScript
+	}
+	if c.Text2AudioDashScopeScript == "" {
+		c.Text2AudioDashScopeScript = defaultDashScopeText2AudioPricingScript
 	}
 }
 

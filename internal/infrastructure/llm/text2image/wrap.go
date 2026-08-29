@@ -36,6 +36,7 @@ func (t *wrappedGenerator) Generate(
 		model = req.Model
 	}
 
+	ctx = withModelName(ctx, model)
 	ctx = withProvider(ctx, t.provider)
 
 	ctx, span := pkgtrace.GetOtelTracer().Start(ctx, genaiconv.SpanName("text2image"),

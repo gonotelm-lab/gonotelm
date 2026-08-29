@@ -43,7 +43,7 @@ func withImageHTTPClient(opts []image.ClientOption, timeout time.Duration) []ima
 		DialContext:           httpclient.DefaultDialer.DialContext,
 		MaxIdleConns:          200,
 		IdleConnTimeout:       120 * time.Second,
-		ResponseHeaderTimeout: time.Minute * 5, 
+		ResponseHeaderTimeout: time.Minute * 5,
 		TLSHandshakeTimeout:   time.Minute * 5,
 	}
 

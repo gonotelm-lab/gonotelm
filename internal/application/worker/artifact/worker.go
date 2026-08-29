@@ -62,12 +62,10 @@ func RegisterTypedWorker(client *flow.Client, deps *generatetypes.ServiceDeps) {
 		resp, err := Run(ctx, deps, req)
 		if err != nil {
 			errMsg := err.Error()
-			slog.Error("generate artifact failed",
-				slog.String("error", errMsg),
-				slog.Any("error_details", err),
+			slog.ErrorContext(ctx, "worker generate artifact failed",
+				slog.Any("err", err),
 				slog.String("artifact_id", artifactId.String()),
 				slog.String("notebook_id", notebookId.String()),
-				slog.String("payload", string(in.Payload)),
 			)
 
 			return flow.ErrorResult{

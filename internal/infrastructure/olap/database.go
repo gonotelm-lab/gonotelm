@@ -15,21 +15,28 @@ type EmbeddingLogStore interface {
 	Create(ctx context.Context, log *schema.EmbeddingLog) error
 }
 
+type Text2ImageLogStore interface {
+	Create(ctx context.Context, log *schema.Text2ImageLog) error
+}
+
 type Dao struct {
 	Closer misc.Closer
 
-	LLMLogStore       LLMLogStore
-	EmbeddingLogStore EmbeddingLogStore
+	LLMLogStore        LLMLogStore
+	EmbeddingLogStore  EmbeddingLogStore
+	Text2ImageLogStore Text2ImageLogStore
 }
 
 func NewDao(
 	closer misc.Closer,
 	llmLogStore LLMLogStore,
 	embeddingLogStore EmbeddingLogStore,
+	text2ImageLogStore Text2ImageLogStore,
 ) *Dao {
 	return &Dao{
-		Closer:            closer,
-		LLMLogStore:       llmLogStore,
-		EmbeddingLogStore: embeddingLogStore,
+		Closer:             closer,
+		LLMLogStore:        llmLogStore,
+		EmbeddingLogStore:  embeddingLogStore,
+		Text2ImageLogStore: text2ImageLogStore,
 	}
 }

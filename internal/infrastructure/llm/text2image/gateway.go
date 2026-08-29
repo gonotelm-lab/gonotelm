@@ -12,17 +12,45 @@ type Text2ImageGateway struct {
 
 	cfg        *Text2ImageConfig
 	clientOpts []pkgt2i.ClientOption
+	recorder   Recorder
 	providers  map[Text2ImageProvider]pkgt2i.Generator
 }
 
-func NewText2ImageGateway(cfg *Text2ImageConfig, opts ...pkgt2i.ClientOption) (*Text2ImageGateway, error) {
+type gatewayOption struct {
+	recorder   Recorder
+	clientOpts []pkgt2i.ClientOption
+}
+
+type GatewayOption func(o *gatewayOption)
+
+func WithRecorder(r Recorder) GatewayOption {
+	return func(o *gatewayOption) {
+		o.recorder = r
+	}
+}
+
+func WithClientOptions(opts ...pkgt2i.ClientOption) GatewayOption {
+	return func(o *gatewayOption) {
+		o.clientOpts = append(o.clientOpts, opts...)
+	}
+}
+
+func NewText2ImageGateway(cfg *Text2ImageConfig, opts ...GatewayOption) (*Text2ImageGateway, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("text2image config must not be nil")
 	}
 
+	opt := gatewayOption{}
+	for _, o := range opts {
+		if o != nil {
+			o(&opt)
+		}
+	}
+
 	return &Text2ImageGateway{
 		cfg:        cfg,
-		clientOpts: opts,
+		clientOpts: opt.clientOpts,
+		recorder:   opt.recorder,
 		providers:  make(map[Text2ImageProvider]pkgt2i.Generator),
 	}, nil
 }
@@ -54,7 +82,7 @@ func (g *Text2ImageGateway) initProvider(providerType Text2ImageProvider) (pkgt2
 	if err != nil {
 		return nil, err
 	}
-	provider = newWrappedGenerator(providerType, impl)
+	provider = newWrappedGenerator(providerType, impl, g.recorder)
 
 	g.providers[providerType] = provider
 	return provider, nil

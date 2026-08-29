@@ -17,10 +17,11 @@ const wrappedGeneratorRunName = "gateway-text2image"
 type wrappedGenerator struct {
 	provider Text2ImageProvider
 	impl     pkgt2i.Generator
+	recorder Recorder
 }
 
-func newWrappedGenerator(provider Text2ImageProvider, impl pkgt2i.Generator) pkgt2i.Generator {
-	return &wrappedGenerator{provider: provider, impl: impl}
+func newWrappedGenerator(provider Text2ImageProvider, impl pkgt2i.Generator, recorder Recorder) pkgt2i.Generator {
+	return &wrappedGenerator{provider: provider, impl: impl, recorder: recorder}
 }
 
 var _ pkgt2i.Generator = (*wrappedGenerator)(nil)
@@ -35,6 +36,8 @@ func (t *wrappedGenerator) Generate(
 		model = req.Model
 	}
 
+	ctx = withProvider(ctx, t.provider)
+
 	ctx, span := pkgtrace.GetOtelTracer().Start(ctx, genaiconv.SpanName("text2image"),
 		oteltrace.WithSpanKind(oteltrace.SpanKindClient),
 		oteltrace.WithAttributes(genaiconv.Attributes(t.provider.String(), "text2image", model)...),
@@ -45,7 +48,7 @@ func (t *wrappedGenerator) Generate(
 		Name:      wrappedGeneratorRunName,
 		Type:      t.provider.String(),
 		Component: callbacks.ComponentImage,
-	}, newInterceptor())
+	}, newInterceptor(t.recorder))
 
 	resp, err := t.impl.Generate(ctx, req, opts...)
 	if err != nil {

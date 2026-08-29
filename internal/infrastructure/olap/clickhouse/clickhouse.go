@@ -45,9 +45,15 @@ func Open(ctx context.Context, cfg *sql.Config) (*olap.Dao, error) {
 		return nil, fmt.Errorf("create embedding log store err: %w", err)
 	}
 
+	text2ImageLogStore, err := NewText2ImageLogStoreImpl(ctx, c)
+	if err != nil {
+		return nil, fmt.Errorf("create text2image log store err: %w", err)
+	}
+
 	return olap.NewDao(
 		closer,
 		llmLogStore,
 		embeddingLogStore,
+		text2ImageLogStore,
 	), nil
 }

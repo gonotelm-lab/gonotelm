@@ -19,6 +19,7 @@ import (
 	embeddingbilling "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/embedding/billing"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image"
+	text2imagebilling "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image/billing"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
 	mqkafka "github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq/kafka"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/olap"
@@ -44,10 +45,11 @@ type Infra struct {
 	LLMGateway            *llmchat.Gateway
 	LLMBillingMeter       llmchatbilling.Meter
 	EmbeddingGateway      *embedding.EmbeddingGateway
-	EmbeddingBillingMeter embeddingbilling.Meter
-	Embedder              einoembed.Embedder
-	Text2Image            *text2image.Text2ImageGateway
-	Text2Audio            *text2audio.Text2AudioGateway
+	EmbeddingBillingMeter  embeddingbilling.Meter
+	Text2ImageBillingMeter text2imagebilling.Meter
+	Embedder               einoembed.Embedder
+	Text2Image             *text2image.Text2ImageGateway
+	Text2Audio             *text2audio.Text2AudioGateway
 	SandboxGateway        *infrasandbox.Gateway
 	DistLock              adapter.DistributedLock
 
@@ -185,6 +187,18 @@ func initEmbeddingBillingMeter(_ context.Context, cfg *confshared.InfraConfig, i
 	return nil
 }
 
+func initText2ImageBillingMeter(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
+	meter, err := text2imagebilling.NewStandardMeter(text2imagebilling.StandardMeterConfig{
+		DashScopeScript: cfg.ProviderBilling.Text2ImageDashScopeScript,
+	})
+	if err != nil {
+		return fmt.Errorf("llm text2image billing: %w", err)
+	}
+	infra.Text2ImageBillingMeter = meter
+
+	return nil
+}
+
 func initEmbedding(cfg *confshared.InfraConfig, infra *Infra) error {
 	var embedCacher embedcache.Cacher
 	if infra.Redis != nil {
@@ -211,7 +225,14 @@ func initEmbedding(cfg *confshared.InfraConfig, infra *Infra) error {
 }
 
 func initText2Image(cfg *confshared.InfraConfig, infra *Infra) error {
-	text2imageGateway, err := text2image.NewText2ImageGateway(&cfg.Text2Image)
+	recorder := infraadapter.NewText2ImageRecorderAdapter(
+		infra.OlapDatabase.Text2ImageLogStore,
+		infra.Text2ImageBillingMeter,
+	)
+	text2imageGateway, err := text2image.NewText2ImageGateway(
+		&cfg.Text2Image,
+		text2image.WithRecorder(recorder),
+	)
 	if err != nil {
 		return fmt.Errorf("text2image gateway: %w", err)
 	}
@@ -275,6 +296,9 @@ func NewInfra(ctx context.Context, cfg *confshared.InfraConfig) (_ *Infra, final
 		return nil, err
 	}
 	if err := initEmbeddingBillingMeter(ctx, cfg, infra); err != nil {
+		return nil, err
+	}
+	if err := initText2ImageBillingMeter(ctx, cfg, infra); err != nil {
 		return nil, err
 	}
 	if err := initLLMGateway(ctx, cfg, infra); err != nil {

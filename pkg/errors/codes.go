@@ -22,12 +22,14 @@ const (
 )
 
 var (
-	ErrParams          = New200InnerError(CodeInvalidParams, MsgInvalidParams)
-	ErrNoRecord        = New200InnerError(CodeNoRecord, MsgNoRecord)
-	ErrEmbed           = New200InnerError(CodeEmbedErr, MsgEmbedErr)
-	ErrLLM             = New200InnerError(CodeLLMErr, MsgLLMErr)
-	ErrLockNotAcquired = New200InnerError(CodeLockNotAcquired, MsgLockNotAcquired)
-	ErrLockTaken       = New200InnerError(CodeLockTaken, MsgLockTaken)
+	statusOk = http.StatusOK
+
+	ErrParams          = NewInnerError(statusOk, CodeInvalidParams, MsgInvalidParams)
+	ErrNoRecord        = NewInnerError(statusOk, CodeNoRecord, MsgNoRecord)
+	ErrEmbed           = NewInnerError(statusOk, CodeEmbedErr, MsgEmbedErr)
+	ErrLLM             = NewInnerError(statusOk, CodeLLMErr, MsgLLMErr)
+	ErrLockNotAcquired = NewInnerError(statusOk, CodeLockNotAcquired, MsgLockNotAcquired)
+	ErrLockTaken       = NewInnerError(statusOk, CodeLockTaken, MsgLockTaken)
 )
 
 const (

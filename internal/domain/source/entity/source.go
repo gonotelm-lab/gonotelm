@@ -6,9 +6,11 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/gabriel-vasile/mimetype"
 	coreentity "github.com/gonotelm-lab/gonotelm/internal/core/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/entity/vo"
+	sourceerr "github.com/gonotelm-lab/gonotelm/internal/domain/source/errors"
 	sourceevent "github.com/gonotelm-lab/gonotelm/internal/domain/source/event"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
@@ -34,19 +36,33 @@ const (
 	MimeTypePPTX     = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 )
 
+var supportedFileMimeTypesMap = map[string]struct{}{
+	MimeTypePDF:      {},
+	MimeTypeText:     {},
+	MimeTypeMarkdown: {},
+	MimeTypeCSV:      {},
+	MimeTypeEPUB:     {},
+	MimeTypeWord:     {},
+	MimeTypeXLSX:     {},
+	MimeTypePPTX:     {},
+}
+
 func SupportedFileMimeType(mimeType string) bool {
-	switch mimeType {
-	case MimeTypePDF,
-		MimeTypeText,
-		MimeTypeMarkdown,
-		MimeTypeCSV,
-		MimeTypeEPUB,
-		MimeTypeWord,
-		MimeTypeXLSX,
-		MimeTypePPTX:
-		return true
+	_, ok := supportedFileMimeTypesMap[mimeType]
+	return ok
+}
+
+func supportedFileMimeType2(target *mimetype.MIME) bool {
+	for st := range supportedFileMimeTypesMap {
+		if target.Is(st) {
+			return true
+		}
 	}
-	return false
+
+	tg := target.String()
+	return strings.HasPrefix(tg, "text/plain") ||
+		strings.HasPrefix(tg, "text/markdown") ||
+		strings.HasPrefix(tg, "text/csv")
 }
 
 type Source struct {
@@ -180,6 +196,29 @@ func (s *Source) checkUploadable() error {
 	return nil
 }
 
+type CheckProcessableParams struct {
+	TotalSize   int64
+	ContentType *mimetype.MIME
+}
+
+// check if source is processable
+// if this is a file source, we check if the file is valid (includes size and content type)
+func (s *Source) CheckProcessable(p *CheckProcessableParams) error {
+	if !s.Kind.IsFile() {
+		return nil
+	}
+
+	if p.TotalSize > MaxUploadFileSizeBytes {
+		return errors.ErrParams.Msgf("file size is too large: %d", p.TotalSize)
+	}
+
+	if !supportedFileMimeType2(p.ContentType) {
+		return errors.ErrParams.Msgf("unsupported mime type: %s", p.ContentType)
+	}
+
+	return nil
+}
+
 func (s *Source) formatFileStoreKey(params *UploadFileParams) string {
 	var (
 		notebookId = s.NotebookId.String()
@@ -202,16 +241,20 @@ func (s *Source) formatParsedContentStoreKey() string {
 
 func (s *Source) GetFileContent() (*FileSourceContent, error) {
 	if s.Content == nil {
-		return nil, errors.ErrParams.Msgf("source content is nil")
+		return nil, sourceerr.ErrSourceContentCorrupted.Msgf("source content is nil")
 	}
 
 	if s.Content.Kind() != vo.SourceKindFile {
-		return nil, errors.ErrParams.Msgf("source content is not a file, kind=%s", s.Content.Kind())
+		return nil, sourceerr.ErrSourceContentCorrupted.Msgf(
+			"source content is not a file, kind=%s", s.Content.Kind(),
+		)
 	}
 
 	fileContent, ok := s.Content.(*FileSourceContent)
 	if !ok {
-		return nil, errors.ErrParams.Msgf("source content is not a file, kind=%s", s.Content.Kind())
+		return nil, sourceerr.ErrSourceContentCorrupted.Msgf(
+			"source content is not a file, kind=%s", s.Content.Kind(),
+		)
 	}
 
 	return fileContent, nil
@@ -219,16 +262,20 @@ func (s *Source) GetFileContent() (*FileSourceContent, error) {
 
 func (s *Source) GetTextContent() (*TextSourceContent, error) {
 	if s.Content == nil {
-		return nil, errors.ErrParams.Msgf("source content is nil")
+		return nil, sourceerr.ErrSourceContentCorrupted.Msgf("source content is nil")
 	}
 
 	if s.Content.Kind() != vo.SourceKindText {
-		return nil, errors.ErrParams.Msgf("source content is not a text, kind=%s", s.Content.Kind())
+		return nil, sourceerr.ErrSourceContentCorrupted.Msgf(
+			"source content is not a text, kind=%s", s.Content.Kind(),
+		)
 	}
 
 	textContent, ok := s.Content.(*TextSourceContent)
 	if !ok {
-		return nil, errors.ErrParams.Msgf("source content is not a text, kind=%s", s.Content.Kind())
+		return nil, sourceerr.ErrSourceContentCorrupted.Msgf(
+			"source content is not a text, kind=%s", s.Content.Kind(),
+		)
 	}
 
 	return textContent, nil
@@ -236,16 +283,20 @@ func (s *Source) GetTextContent() (*TextSourceContent, error) {
 
 func (s *Source) GetUrlContent() (*UrlSourceContent, error) {
 	if s.Content == nil {
-		return nil, errors.ErrParams.Msgf("source content is nil")
+		return nil, sourceerr.ErrSourceContentCorrupted.Msgf("source content is nil")
 	}
 
 	if s.Content.Kind() != vo.SourceKindUrl {
-		return nil, errors.ErrParams.Msgf("source content is not a url, kind=%s", s.Content.Kind())
+		return nil, sourceerr.ErrSourceContentCorrupted.Msgf(
+			"source content is not a url, kind=%s", s.Content.Kind(),
+		)
 	}
 
 	urlContent, ok := s.Content.(*UrlSourceContent)
 	if !ok {
-		return nil, errors.ErrParams.Msgf("source content is not a url, kind=%s", s.Content.Kind())
+		return nil, sourceerr.ErrSourceContentCorrupted.Msgf(
+			"source content is not a url, kind=%s", s.Content.Kind(),
+		)
 	}
 
 	return urlContent, nil
@@ -253,8 +304,8 @@ func (s *Source) GetUrlContent() (*UrlSourceContent, error) {
 
 func (s *Source) MarkPreparing() {
 	s.Status = vo.SourceStatusPreparing
-	s.addPreparationEvent(false)
 	s.UpdateTime = valobj.NewTime()
+	s.addPreparationEvent(false)
 }
 
 func (s *Source) MarkFailed() {
@@ -273,7 +324,16 @@ func (s *Source) MarkReady() {
 	s.addIndexEvent()
 }
 
+func (s *Source) MarkInvalid() {
+	s.Status = vo.SourceStatusInvalid
+	s.UpdateTime = valobj.NewTime()
+}
+
 func (s *Source) RetryPreparation() error {
+	if s.Status.IsInvalid() { // invalid source can not be retried
+		return errors.ErrParams.Msg("invalid source can not be retried")
+	}
+
 	if !s.Status.IsFailed() {
 		return errors.ErrParams.Msg("no need to retry")
 	}

@@ -315,6 +315,7 @@ func (s *Service) fetchSourceContent(
 		return nil, "", fmt.Errorf("source does not contain any valid parsed content key")
 	}
 
+	// parsed content is considered to be smaller so we can get the whole object here
 	content, _, err := s.storageRepo.GetObject(ctx, src.ParsedContentKey)
 	if err != nil {
 		return nil, "", fmt.Errorf("get parsed content failed, id=%s, err=%w", sourceId, err)

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
+	sourceerr "github.com/gonotelm-lab/gonotelm/internal/domain/source/errors"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	myparser "github.com/gonotelm-lab/gonotelm/internal/domain/source/service/index/convertdoc/parser"
 	mytransformer "github.com/gonotelm-lab/gonotelm/internal/domain/source/service/index/convertdoc/transformer"
@@ -85,7 +86,7 @@ func fileConversionOptions(fs *entity.FileSourceContent) ([]einoparser.Option, [
 }
 
 func (h *FileObjectHandler) loadObjectBody(ctx context.Context, storeKey string) ([]byte, bool, error) {
-	objBody, size, err := h.objectStorage.GetObject(ctx, storeKey)
+	objBody, info, err := h.objectStorage.GetObject(ctx, storeKey)
 	if err != nil {
 		if errors.Is(err, repository.ErrObjectNotFound) {
 			slog.ErrorContext(ctx, "file source object not found", "store_key", storeKey)
@@ -95,8 +96,12 @@ func (h *FileObjectHandler) loadObjectBody(ctx context.Context, storeKey string)
 		return nil, false, errors.Wrap(err, "get file source object failed")
 	}
 
-	if size > h.c.MaxSourceFileSizeBytes {
-		return nil, false, errors.ErrParams.Msgf("file source object size exceeds max size, size=%d", size)
+	if info.Size > h.c.MaxSourceFileSizeBytes {
+		return nil, false, errors.Wrapf(
+			sourceerr.ErrSourceContentTooLarge,
+			"file source object size exceeds max size, size=%d",
+			info.Size,
+		)
 	}
 
 	return objBody, true, nil

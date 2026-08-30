@@ -1,4 +1,4 @@
-package eventhandle
+package source
 
 import (
 	"context"
@@ -42,12 +42,14 @@ func NewPrepareSourceHandler(
 	eventBus eventbus.EventBus,
 ) *PrepareSourceHandler {
 	return &PrepareSourceHandler{
-		sourceRepo:         sourceRepo,
-		sourceIndexService: index.New(index.ServiceConfig{}, sourceStorageRepo, sourceDocRepo),
-		sourceStorageRepo:  sourceStorageRepo,
-		sourceDocRepo:      sourceDocRepo,
-		summarizer:         summarizer,
-		eventBus:           eventBus,
+		sourceRepo: sourceRepo,
+		sourceIndexService: index.New(index.ServiceConfig{
+			DefaultMaxSourceFileSizeBytes: entity.MaxUploadFileSizeBytes,
+		}, sourceStorageRepo, sourceDocRepo),
+		sourceStorageRepo: sourceStorageRepo,
+		sourceDocRepo:     sourceDocRepo,
+		summarizer:        summarizer,
+		eventBus:          eventBus,
 	}
 }
 
@@ -120,7 +122,12 @@ func (h *PrepareSourceHandler) Handle(
 			slog.Any("err", err),
 		)
 
-		targetSource.MarkFailed()
+		if sourceerr.IsSourceInvalidError(err) {
+			targetSource.MarkInvalid()
+		} else {
+			targetSource.MarkFailed()
+		}
+
 		if saveErr := h.sourceRepo.Save(ctx, targetSource); saveErr != nil {
 			slog.ErrorContext(ctx, "save source failed status failed",
 				slog.String("source_id", sourceId.String()),

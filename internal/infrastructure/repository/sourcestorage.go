@@ -58,35 +58,70 @@ func (s *SourceStorageRepositoryImpl) CheckExist(ctx context.Context, storeKey s
 			Key: storeKey,
 		})
 	if err != nil {
-		if errors.Is(err, errors.ErrNoRecord) {
+		if errors.Is(err, storage.ErrObjectNotFound) {
 			return false, nil
 		}
 
-		return false, err
+		return false, errors.WithMessage(err, "check object exist failed")
 	}
 
 	return true, nil
 }
 
-func (s *SourceStorageRepositoryImpl) GetObject(ctx context.Context, storeKey string) ([]byte, int64, error) {
+func (s *SourceStorageRepositoryImpl) GetObject(ctx context.Context, storeKey string) ([]byte, *sourcerepo.ObjectInfo, error) {
 	object, err := s.storage.GetObject(ctx, &storage.GetObjectRequest{
 		Key: storeKey,
 	})
 	if err != nil {
 		if errors.Is(err, storage.ErrObjectNotFound) {
-			return nil, 0, sourcerepo.ErrObjectNotFound
+			return nil, nil, sourcerepo.ErrObjectNotFound
 		}
 
-		return nil, 0, err
+		return nil, nil, errors.WithMessage(err, "get object failed")
 	}
 
-	return object.Body, object.Info.Size, nil
+	return object.Body, &sourcerepo.ObjectInfo{
+		Key:         object.Info.Key,
+		Size:        object.Info.Size,
+		ContentType: object.Info.ContentType,
+	}, nil
+}
+
+func (s *SourceStorageRepositoryImpl) GetPartialObject(
+	ctx context.Context,
+	storeKey string,
+	offset int64,
+	length int64,
+) ([]byte, *sourcerepo.ObjectInfo, error) {
+	object, err := s.storage.GetPartialObject(ctx, &storage.GetPartialObjectRequest{
+		Key:    storeKey,
+		Offset: offset,
+		Length: length,
+	})
+	if err != nil {
+		if errors.Is(err, storage.ErrObjectNotFound) {
+			return nil, nil, sourcerepo.ErrObjectNotFound
+		}
+
+		return nil, nil, errors.WithMessage(err, "get partial object failed")
+	}
+
+	return object.Body, &sourcerepo.ObjectInfo{
+		Key:         object.Info.Key,
+		Size:        object.Info.Size,
+		ContentType: object.Info.ContentType,
+	}, nil
 }
 
 func (s *SourceStorageRepositoryImpl) DeleteObject(ctx context.Context, storeKey string) error {
-	return s.storage.DeleteObject(ctx, &storage.DeleteObjectRequest{
+	err := s.storage.DeleteObject(ctx, &storage.DeleteObjectRequest{
 		Key: storeKey,
 	})
+	if err != nil {
+		return errors.WithMessage(err, "delete object failed")
+	}
+
+	return nil
 }
 
 func (s *SourceStorageRepositoryImpl) UploadObject(
@@ -95,10 +130,15 @@ func (s *SourceStorageRepositoryImpl) UploadObject(
 	content []byte,
 	contentType string,
 ) error {
-	return s.storage.UploadObject(ctx,
+	err := s.storage.UploadObject(ctx,
 		&storage.UploadObjectRequest{
 			Key:         storeKey,
 			Body:        content,
 			ContentType: contentType,
 		})
+	if err != nil {
+		return errors.WithMessage(err, "upload object failed")
+	}
+
+	return nil
 }

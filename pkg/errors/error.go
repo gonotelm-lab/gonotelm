@@ -111,3 +111,11 @@ func NewInnerError(httpStatus, code int, msg string) *InnerError {
 		Message: msg,
 	}
 }
+
+func New200InnerError(code int, msg string) *InnerError {
+	return &InnerError{
+		Status:  http.StatusOK,
+		Code:    code,
+		Message: msg,
+	}
+}

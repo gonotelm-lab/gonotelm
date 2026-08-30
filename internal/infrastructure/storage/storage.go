@@ -26,8 +26,8 @@ type Provider interface {
 
 type ObjectGetter interface {
 	StatObject(ctx context.Context, req *StatObjectRequest) (*StatObjectResponse, error)
-
 	GetObject(ctx context.Context, req *GetObjectRequest) (*GetObjectResponse, error)
+	GetPartialObject(ctx context.Context, req *GetPartialObjectRequest) (*GetPartialObjectResponse, error)
 }
 
 type ObjectDeleter interface {
@@ -53,6 +53,16 @@ type StatObjectRequest struct {
 	Key string
 }
 
+func (r *StatObjectRequest) Validate() error {
+	if r == nil {
+		return errors.ErrParams.Msg("stat object request is nil")
+	}
+	if r.Key == "" {
+		return errors.ErrParams.Msg("stat object request key is empty")
+	}
+	return nil
+}
+
 type StatObjectResponse struct {
 	ObjectInfo
 }
@@ -64,6 +74,16 @@ type PresignedPostPolicyRequest struct {
 	Filename      string
 	Md5           string
 	Metadata      map[string]string
+}
+
+func (r *PresignedPostPolicyRequest) Validate() error {
+	if r == nil {
+		return errors.ErrParams.Msg("presigned post policy request is nil")
+	}
+	if r.Key == "" {
+		return errors.ErrParams.Msg("presigned post policy request key is empty")
+	}
+	return nil
 }
 
 type PresignedPostPolicyResponse struct {
@@ -85,6 +105,16 @@ type PresignedGetObjectRequest struct {
 	ContentType string
 }
 
+func (r *PresignedGetObjectRequest) Validate() error {
+	if r == nil {
+		return errors.ErrParams.Msg("presigned get object request is nil")
+	}
+	if r.Key == "" {
+		return errors.ErrParams.Msg("presigned get object request key is empty")
+	}
+	return nil
+}
+
 type PresignedGetObjectResponse struct {
 	Url string
 }
@@ -93,29 +123,90 @@ type GetObjectRequest struct {
 	Key string
 }
 
+func (r *GetObjectRequest) Validate() error {
+	if r == nil {
+		return errors.ErrParams.Msg("get object request is nil")
+	}
+	if r.Key == "" {
+		return errors.ErrParams.Msg("get object request key is empty")
+	}
+	return nil
+}
+
 type GetObjectResponse struct {
 	Body []byte
 	Info ObjectInfo
+}
+
+type GetPartialObjectRequest struct {
+	Key    string
+	Offset int64
+	Length int64
+}
+
+func (r *GetPartialObjectRequest) Validate() error {
+	if r == nil {
+		return errors.ErrParams.Msg("get partial object request is nil")
+	}
+	if r.Key == "" {
+		return errors.ErrParams.Msg("get partial object request key is empty")
+	}
+	if r.Offset < 0 {
+		return errors.ErrParams.Msg("get partial object request invalid offset")
+	}
+	if r.Length <= 0 {
+		return errors.ErrParams.Msg("get partial object request invalid length")
+	}
+	return nil
+}
+
+type GetPartialObjectResponse struct {
+	Body      []byte
+	BytesRead int
+	Info      ObjectInfo
 }
 
 type DeleteObjectRequest struct {
 	Key string
 }
 
+func (r *DeleteObjectRequest) Validate() error {
+	if r == nil {
+		return errors.ErrParams.Msg("delete object request is nil")
+	}
+	if r.Key == "" {
+		return errors.ErrParams.Msg("delete object request key is empty")
+	}
+	return nil
+}
+
 type BatchDeleteObjectRequest struct {
 	Keys []string
 }
 
+func (r *BatchDeleteObjectRequest) Validate() error {
+	if r == nil {
+		return errors.ErrParams.Msg("batch delete object request is nil")
+	}
+	return nil
+}
+
 type UploadObjectRequest struct {
-	Key string
-
-	Body []byte
-
-	BodyReader io.Reader
-
+	Key         string
+	Body        []byte
+	BodyReader  io.Reader
 	ContentType string
+	Metadata    map[string]string
+}
 
-	Metadata map[string]string
+func (r *UploadObjectRequest) Validate() error {
+	if r == nil {
+		return errors.ErrParams.Msg("upload object request is nil")
+	}
+	if r.Key == "" {
+		return errors.ErrParams.Msg("upload object request key is empty")
+	}
+	return nil
 }
 
 type UploadObjectResponse struct {

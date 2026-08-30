@@ -12,6 +12,7 @@ const (
 	SourceStatusPreparing SourceStatus = "preparing"
 	SourceStatusReady     SourceStatus = "ready"
 	SourceStatusFailed    SourceStatus = "failed"
+	SourceStatusInvalid   SourceStatus = "invalid" // source is invalid, can not be processed
 )
 
 func (s SourceStatus) IsInited() bool {
@@ -32,4 +33,8 @@ func (s SourceStatus) IsReady() bool {
 
 func (s SourceStatus) IsFailed() bool {
 	return s == SourceStatusFailed
+}
+
+func (s SourceStatus) IsInvalid() bool {
+	return s == SourceStatusInvalid
 }

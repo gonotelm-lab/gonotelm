@@ -55,6 +55,6 @@ func RenderFlashcard(
 	if tipMsg := types.BuildTipMessage(tip); tipMsg != nil {
 		msgs = append(msgs, tipMsg)
 	}
-	
+
 	return msgs, nil
 }

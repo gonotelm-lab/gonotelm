@@ -14,17 +14,42 @@ type EmbeddingGateway struct {
 
 	cfg       *EmbeddingConfig
 	cacher    embedcache.Cacher
+	recorder  Recorder
 	providers map[EmbeddingType]einoembed.Embedder
 }
 
-func NewEmbeddingGateway(cfg *EmbeddingConfig, cacher embedcache.Cacher) (*EmbeddingGateway, error) {
+type gatewayOption struct {
+	recorder Recorder
+}
+
+type GatewayOption func(o *gatewayOption)
+
+func WithRecorder(r Recorder) GatewayOption {
+	return func(o *gatewayOption) {
+		o.recorder = r
+	}
+}
+
+func NewEmbeddingGateway(
+	cfg *EmbeddingConfig,
+	cacher embedcache.Cacher,
+	opts ...GatewayOption,
+) (*EmbeddingGateway, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("embedding config must not be nil")
 	}
 
+	opt := gatewayOption{}
+	for _, o := range opts {
+		if o != nil {
+			o(&opt)
+		}
+	}
+
 	gw := &EmbeddingGateway{
 		cfg:       cfg,
-		cacher:    cacher,
+		cacher:    wrapCacher(cacher),
+		recorder:  opt.recorder,
 		providers: make(map[EmbeddingType]einoembed.Embedder),
 	}
 
@@ -70,7 +95,7 @@ func (g *EmbeddingGateway) initProvider(providerType EmbeddingType) (einoembed.E
 	if err != nil {
 		return nil, err
 	}
-	provider = &tracingEmbedder{system: string(providerType), impl: impl}
+	provider = newWrappedEmbedder(providerType, impl, g.recorder)
 
 	g.providers[providerType] = provider
 	return provider, nil

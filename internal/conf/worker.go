@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/conf/shared"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
+	llmchat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	rerank "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/rerank"
 	text2audio "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio"
 	text2image "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image"
@@ -42,7 +42,7 @@ type WorkerPoolConfig struct {
 
 type ChatConfig struct {
 	MaxRound              int                   `toml:"maxRound"`
-	ModelProvider         llm.Provider          `toml:"modelProvider"`
+	ModelProvider         llmchat.Provider      `toml:"modelProvider"`
 	Model                 string                `toml:"model"` // 对话使用的模型
 	SourceDocsRecallCount int                   `toml:"sourceDocsRecallCount"`
 	TaskTimeout           time.Duration         `toml:"taskTimeout"`    // 流式任务超时时间
@@ -87,8 +87,8 @@ func (c *ChatConfig) GetRerankTopN() int {
 var sourceUrlBlacklistRegex *regexp.Regexp
 
 type SourceConfig struct {
-	ModelProvider llm.Provider `toml:"modelProvider"`
-	Model         string       `toml:"model"`
+	ModelProvider llmchat.Provider `toml:"modelProvider"`
+	Model         string           `toml:"model"`
 
 	UrlBlacklistRegex string `toml:"urlBlacklistRegex"`
 
@@ -110,20 +110,20 @@ func (c *SourceConfig) GetURLBlacklistRegex() *regexp.Regexp {
 
 type StudioConfig struct {
 	Mindmap struct {
-		MaxRound      int          `toml:"maxRound"`
-		ModelProvider llm.Provider `toml:"modelProvider"`
-		Model         string       `toml:"model"`
+		MaxRound      int              `toml:"maxRound"`
+		ModelProvider llmchat.Provider `toml:"modelProvider"`
+		Model         string           `toml:"model"`
 	} `toml:"mindmap"`
 
 	Report struct {
-		MaxRound      int          `toml:"maxRound"`
-		ModelProvider llm.Provider `toml:"modelProvider"`
-		Model         string       `toml:"model"`
+		MaxRound      int              `toml:"maxRound"`
+		ModelProvider llmchat.Provider `toml:"modelProvider"`
+		Model         string           `toml:"model"`
 	} `toml:"report"`
 
 	InfoGraphic struct {
 		MaxRound           int                           `toml:"maxRound"`
-		ModelProvider      llm.Provider                  `toml:"modelProvider"`
+		ModelProvider      llmchat.Provider              `toml:"modelProvider"`
 		Model              string                        `toml:"model"`
 		ImageModelProvider text2image.Text2ImageProvider `toml:"imageModelProvider"`
 		ImageModel         string                        `toml:"imageModel"`
@@ -131,7 +131,7 @@ type StudioConfig struct {
 
 	AudioOverview struct {
 		MaxRound              int                           `toml:"maxRound"`
-		ModelProvider         llm.Provider                  `toml:"modelProvider"`
+		ModelProvider         llmchat.Provider              `toml:"modelProvider"`
 		Model                 string                        `toml:"model"`
 		AudioModelProvider    text2audio.Text2AudioProvider `toml:"audioModelProvider"`
 		AudioModel            string                        `toml:"audioModel"`
@@ -139,21 +139,21 @@ type StudioConfig struct {
 	} `toml:"audioOverview"`
 
 	Flashcard struct {
-		MaxRound      int          `toml:"maxRound"`
-		ModelProvider llm.Provider `toml:"modelProvider"`
-		Model         string       `toml:"model"`
+		MaxRound      int              `toml:"maxRound"`
+		ModelProvider llmchat.Provider `toml:"modelProvider"`
+		Model         string           `toml:"model"`
 	} `toml:"flashcard"`
 
 	Quiz struct {
-		MaxRound      int          `toml:"maxRound"`
-		ModelProvider llm.Provider `toml:"modelProvider"`
-		Model         string       `toml:"model"`
+		MaxRound      int              `toml:"maxRound"`
+		ModelProvider llmchat.Provider `toml:"modelProvider"`
+		Model         string           `toml:"model"`
 	} `toml:"quiz"`
 
 	DataTable struct {
-		MaxRound      int          `toml:"maxRound"`
-		ModelProvider llm.Provider `toml:"modelProvider"`
-		Model         string       `toml:"model"`
+		MaxRound      int              `toml:"maxRound"`
+		ModelProvider llmchat.Provider `toml:"modelProvider"`
+		Model         string           `toml:"model"`
 	} `toml:"dataTable"`
 
 	TaskConfig struct {
@@ -165,7 +165,7 @@ type StudioConfig struct {
 
 	Slides struct {
 		MaxRound         int              `toml:"maxRound"`
-		ModelProvider    llm.Provider     `toml:"modelProvider"`
+		ModelProvider    llmchat.Provider `toml:"modelProvider"`
 		GenerateMaxRound int              `toml:"generateMaxRound"`
 		Model            string           `toml:"model"`
 		SandboxProvider  sandbox.Provider `toml:"sandboxProvider"`
@@ -185,7 +185,7 @@ func LoadWorkerConfig(path string) (*WorkerConfig, error) {
 }
 
 func (c *WorkerConfig) applyDefaults() {
-	c.ApplyDefaults()
+	c.Init()
 	c.Logging.ApplyDefaults()
 	c.Flow.ApplyDefaults()
 

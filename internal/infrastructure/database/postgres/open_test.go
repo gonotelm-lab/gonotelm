@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/gonotelm-lab/gonotelm/internal/conf/shared"
+	"github.com/gonotelm-lab/gonotelm/pkg/sql"
 	"github.com/gonotelm-lab/gonotelm/pkg/sql/testsuite"
 )
 
@@ -16,7 +16,7 @@ func TestOpen(t *testing.T) {
 		t.Fatalf("invalid %s: %v", testsuite.EnvGonotelmDBPort, err)
 	}
 
-	dao, err := Open(shared.DatabaseConfig{
+	dao, err := Open(&sql.Config{
 		Host:     os.Getenv(testsuite.EnvGonotelmDBHost),
 		Port:     port,
 		User:     os.Getenv(testsuite.EnvGonotelmDBUser),

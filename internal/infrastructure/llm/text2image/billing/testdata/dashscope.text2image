@@ -1,0 +1,9 @@
+if model == 'qwen-image-3.0' {
+	{image: "0.18"}
+} else if model == 'qwen-image-3.0-pro' {
+	{image: "0.25"}
+} else if model == 'qwen-image-2.0-pro' {
+	{image: "0.5"}
+} else {
+	'model not supported to provide price'
+}

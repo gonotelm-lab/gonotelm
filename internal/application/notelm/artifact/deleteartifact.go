@@ -13,10 +13,10 @@ import (
 type DeleteArtifactHandler struct {
 	*baseHandler
 	flowc   flow.TaskClient
-	storage adapter.StorageGateway
+	storage adapter.StorageAdapter
 }
 
-func NewDeleteArtifactHandler(repo artifactrepo.Repository, flowc flow.TaskClient, storage adapter.StorageGateway) *DeleteArtifactHandler {
+func NewDeleteArtifactHandler(repo artifactrepo.Repository, flowc flow.TaskClient, storage adapter.StorageAdapter) *DeleteArtifactHandler {
 	return &DeleteArtifactHandler{baseHandler: newBaseHandler(repo), flowc: flowc, storage: storage}
 }
 

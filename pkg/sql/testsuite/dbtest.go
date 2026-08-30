@@ -101,7 +101,7 @@ func NewTestGormDBFromEnv(driver string) (*TestDb, error) {
 			Port:     port,
 			User:     user,
 			Password: pass,
-			DbName:   dbName,
+			DBName:   dbName,
 		})
 	default:
 		return nil, fmt.Errorf("driver %s env loader is not implemented yet", normalizedDriver)
@@ -156,7 +156,7 @@ func (t *TestDb) setupPgsql(migrationFilePath string) error {
 	}
 
 	testConfig := t.config
-	testConfig.DbName = testDBName
+	testConfig.DBName = testDBName
 	testDB, err := sql.OpenPgSqlWithLogger(&testConfig, t.logger)
 	if err != nil {
 		_ = dropPgDatabase(&t.config, testDBName, t.logger)
@@ -244,7 +244,7 @@ func dropPgDatabase(config *sql.Config, dbName string, gormLogger gormlogger.Int
 
 func dropTestTables(adminConfig *sql.Config, testDBName string, gormLogger gormlogger.Interface) error {
 	testConfig := *adminConfig
-	testConfig.DbName = testDBName
+	testConfig.DBName = testDBName
 
 	testDB, err := sql.OpenPgSqlWithLogger(&testConfig, gormLogger)
 	if err != nil {
@@ -331,12 +331,12 @@ func validateConfig(driver string, config *sql.Config) error {
 		if strings.TrimSpace(config.Password) == "" {
 			return fmt.Errorf("db password is empty")
 		}
-		if strings.TrimSpace(config.DbName) == "" {
+		if strings.TrimSpace(config.DBName) == "" {
 			return fmt.Errorf("db name is empty")
 		}
 		return nil
 	case "sqlite":
-		if strings.TrimSpace(config.DbName) == "" {
+		if strings.TrimSpace(config.DBName) == "" {
 			return fmt.Errorf("sqlite db name/path is empty")
 		}
 		return nil
@@ -387,14 +387,14 @@ func openPgAdminDB(config *sql.Config, gormLogger gormlogger.Interface) (*gorm.D
 
 	candidates := make([]string, 0, 3)
 	candidates = append(candidates, "postgres", "template1")
-	if dbName := strings.TrimSpace(config.DbName); dbName != "" {
+	if dbName := strings.TrimSpace(config.DBName); dbName != "" {
 		candidates = append(candidates, dbName)
 	}
 
 	var errs []error
 	for _, dbName := range candidates {
 		adminConfig := *config
-		adminConfig.DbName = dbName
+		adminConfig.DBName = dbName
 
 		db, err := sql.OpenPgSqlWithLogger(&adminConfig, gormLogger)
 		if err == nil {

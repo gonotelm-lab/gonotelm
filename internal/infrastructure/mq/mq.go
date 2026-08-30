@@ -43,7 +43,7 @@ type ProducerFactory func() Producer
 
 type ConsumerFactory func(topic, groupID string) Consumer
 
-type MQ struct {
+type MessageQueue struct {
 	NewProducer ProducerFactory
 	NewConsumer ConsumerFactory
 }

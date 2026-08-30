@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	einomodel "github.com/cloudwego/eino/components/model"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
 	openaiext "github.com/gonotelm-lab/gonotelm/pkg/eino-ext/openai"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,14 +23,13 @@ func TestMergeExtraFields(t *testing.T) {
 }
 
 func TestApplyProviderCallOptions_DeepSeekGenerateHasThinkingOnly(t *testing.T) {
-	opts := applyProviderCallOptions(
-		llm.ProviderDeepSeek,
+	opts, callOpts := applyProviderCallOptions(
+		ProviderDeepSeek,
 		false,
-		[]einomodel.Option{WithThinking(llm.ProviderDeepSeek, false)},
+		[]einomodel.Option{WithThinking(ProviderDeepSeek, false)},
 	)
 	require.NotEmpty(t, opts)
 
-	callOpts := einomodel.GetImplSpecificOptions(&callOptions{}, opts...)
 	require.NotNil(t, callOpts.EnableThinking)
 	assert.False(t, *callOpts.EnableThinking)
 
@@ -62,10 +60,10 @@ func TestApplyProviderCallOptions_DeepSeekResponseFormatMerged(t *testing.T) {
 
 func TestApplyProviderCallOptions_ResponseFormatOptions(t *testing.T) {
 	t.Run("deepseek", func(t *testing.T) {
-		opts := applyProviderCallOptions(
-			llm.ProviderDeepSeek,
+		opts, _ := applyProviderCallOptions(
+			ProviderDeepSeek,
 			false,
-			[]einomodel.Option{WithResponseJsonObject(llm.ProviderDeepSeek)},
+			[]einomodel.Option{WithResponseJsonObject(ProviderDeepSeek)},
 		)
 		require.NotEmpty(t, opts)
 		fields := deepSeekFieldsForTest(false, false, true)
@@ -73,24 +71,24 @@ func TestApplyProviderCallOptions_ResponseFormatOptions(t *testing.T) {
 	})
 
 	t.Run("openai", func(t *testing.T) {
-		opts := applyProviderCallOptions(
-			llm.ProviderOpenAI,
+		opts, _ := applyProviderCallOptions(
+			ProviderOpenAI,
 			false,
-			[]einomodel.Option{WithResponseJsonObject(llm.ProviderOpenAI)},
+			[]einomodel.Option{WithResponseJsonObject(ProviderOpenAI)},
 		)
 		require.NotEmpty(t, opts)
 	})
 
 	t.Run("agnes_appends_chat_template_kwargs", func(t *testing.T) {
-		opts := applyProviderCallOptions(
-			llm.ProviderAgnes,
+		opts, _ := applyProviderCallOptions(
+			ProviderAgnes,
 			false,
-			[]einomodel.Option{WithResponseJsonObject(llm.ProviderAgnes)},
+			[]einomodel.Option{WithResponseJsonObject(ProviderAgnes)},
 		)
 		require.Len(t, opts, 2, "agnes should append one provider-native option")
 
-		opts = applyProviderCallOptions(
-			llm.ProviderAgnes,
+		opts, _ = applyProviderCallOptions(
+			ProviderAgnes,
 			false,
 			[]einomodel.Option{},
 		)
@@ -98,12 +96,12 @@ func TestApplyProviderCallOptions_ResponseFormatOptions(t *testing.T) {
 	})
 
 	t.Run("agnes_thinking_and_response_format", func(t *testing.T) {
-		opts := applyProviderCallOptions(
-			llm.ProviderAgnes,
+		opts, _ := applyProviderCallOptions(
+			ProviderAgnes,
 			false,
 			[]einomodel.Option{
-				WithThinking(llm.ProviderAgnes, false),
-				WithResponseJsonObject(llm.ProviderAgnes),
+				WithThinking(ProviderAgnes, false),
+				WithResponseJsonObject(ProviderAgnes),
 			},
 		)
 		require.Len(t, opts, 3, "input 2 + appended 1")

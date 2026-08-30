@@ -31,7 +31,7 @@ type Response struct {
 	ResultKind artifactentity.ResultKind
 }
 
-type ServiceDeps struct {
+type WorkerDeps struct {
 	Agentize             *agentize.Service
 	LLMGateway           *chat.Gateway
 	Text2Image           *text2image.Text2ImageGateway

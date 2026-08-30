@@ -35,12 +35,33 @@ func NewChatMessageStreamCacheImpl(
 
 var _ cache.ChatMessageStreamCache = &ChatMessageStreamCacheImpl{}
 
-func taskCacheKey(taskId string) string {
+func streamTaskCacheKey(taskId string) string {
+	// redis type string
+	// key: gonotelm:stream:task:123
+	// value: {task data}
 	return fmt.Sprintf("gonotelm:stream:task:%s", taskId)
 }
 
-func taskEventStreamKey(taskId string) string {
+func streamTaskUserChatIdCacheKey(userId, chatId string) string {
+	// redis type string
+	// key: gonotelm:stream:task:user:123:chat:456
+	// value: taskId
+	return fmt.Sprintf("gonotelm:stream:task:user:%s:chat:%s", userId, chatId)
+}
+
+func streamTaskEventCacheKey(taskId string) string {
+	// redis type stream
+	// key: gonotelm:stream:task:event:123
+	// value: {event data}
 	return fmt.Sprintf("gonotelm:stream:task:event:%s", taskId)
+}
+
+func decodeTask(encTask string) (*schema.ChatMessageTask, error) {
+	decTask := &schema.ChatMessageTask{}
+	if err := msgpack.Unmarshal(pkgstring.AsBytes(encTask), decTask); err != nil {
+		return nil, errors.Wrap(errors.ErrSerde, err.Error())
+	}
+	return decTask, nil
 }
 
 func (c *ChatMessageStreamCacheImpl) SetTask(
@@ -51,14 +72,21 @@ func (c *ChatMessageStreamCacheImpl) SetTask(
 		task.Id = uuid.NewV4().String()
 	}
 
-	encBytes, err := msgpack.Marshal(task)
+	taskEncBytes, err := msgpack.Marshal(task)
 	if err != nil {
 		return task.Id, errors.Wrap(errors.ErrSerde, err.Error())
 	}
 
-	key := taskCacheKey(task.Id)
-	if err := c.rd.Set(ctx, key, encBytes, task.ExpireDuration).Err(); err != nil {
-		return task.Id, errors.Wrap(errors.ErrSerde, err.Error())
+	taskKey := streamTaskCacheKey(task.Id)
+	taskUserChatIdKey := streamTaskUserChatIdCacheKey(task.UserId, task.ChatId)
+	// we need to set task data and user data associated with the task
+	_, err = c.rd.TxPipelined(ctx, func(p goredis.Pipeliner) error {
+		p.Set(ctx, taskKey, taskEncBytes, task.ExpireDuration)
+		p.Set(ctx, taskUserChatIdKey, task.Id, task.ExpireDuration)
+		return nil
+	})
+	if err != nil {
+		return task.Id, errors.Wrap(errors.ErrCache, err.Error())
 	}
 
 	return task.Id, nil
@@ -68,7 +96,7 @@ func (c *ChatMessageStreamCacheImpl) GetTask(
 	ctx context.Context,
 	taskId string,
 ) (*schema.ChatMessageTask, error) {
-	encTask, err := c.rd.Get(ctx, taskCacheKey(taskId)).Result()
+	encTask, err := c.rd.Get(ctx, streamTaskCacheKey(taskId)).Result()
 	if err != nil {
 		if errors.Is(err, goredis.Nil) {
 			return nil, cacheerrors.ErrTaskNotFound
@@ -77,12 +105,73 @@ func (c *ChatMessageStreamCacheImpl) GetTask(
 		return nil, errors.Wrap(errors.ErrCache, err.Error())
 	}
 
-	decTask := &schema.ChatMessageTask{}
-	if err := msgpack.Unmarshal(pkgstring.AsBytes(encTask), decTask); err != nil {
+	decTask, err := decodeTask(encTask)
+	if err != nil {
 		return nil, errors.Wrap(errors.ErrSerde, err.Error())
 	}
 
 	return decTask, nil
+}
+
+func (c *ChatMessageStreamCacheImpl) GetTaskByUserAndChatId(ctx context.Context, userId, chatId string) (*schema.ChatMessageTask, error) {
+	taskUserChatIdKey := streamTaskUserChatIdCacheKey(userId, chatId)
+	taskId, err := c.rd.Get(ctx, taskUserChatIdKey).Result()
+	if err != nil {
+		if errors.Is(err, goredis.Nil) {
+			return nil, cacheerrors.ErrTaskNotFound
+		}
+
+		return nil, errors.Wrap(errors.ErrCache, err.Error())
+	}
+
+	if taskId == "" {
+		return nil, cacheerrors.ErrTaskNotFound
+	}
+
+	return c.GetTask(ctx, taskId)
+}
+
+func (c *ChatMessageStreamCacheImpl) DeleteTask(ctx context.Context, taskId string) error {
+	// get then delete
+	taskKey := streamTaskCacheKey(taskId)
+	var encTaskResult *goredis.StringCmd
+	_, err := c.rd.TxPipelined(ctx, func(p goredis.Pipeliner) error {
+		encTaskResult = p.Get(ctx, taskKey)
+		p.Del(ctx, taskKey)
+
+		return nil
+	})
+	// GET miss yields redis.Nil on the pipeline; still inspect the command result below
+	if err != nil && !errors.Is(err, goredis.Nil) {
+		return errors.Wrap(errors.ErrCache, err.Error())
+	}
+
+	if encTaskResult == nil {
+		return cacheerrors.ErrTaskNotFound
+	}
+	encTask, err := encTaskResult.Result()
+	if err != nil {
+		if errors.Is(err, goredis.Nil) {
+			return cacheerrors.ErrTaskNotFound
+		}
+		return errors.Wrap(errors.ErrCache, err.Error())
+	}
+
+	decTask, err := decodeTask(encTask)
+	if err != nil {
+		return errors.Wrap(errors.ErrSerde, err.Error())
+	}
+	if decTask.Id != taskId {
+		return errors.ErrCache.Msg("task id mismatch")
+	}
+
+	// delete task data and user data associated with the task
+	taskUserChatIdKey := streamTaskUserChatIdCacheKey(decTask.UserId, decTask.ChatId)
+	if err := c.rd.Del(ctx, taskUserChatIdKey).Err(); err != nil {
+		return errors.Wrap(errors.ErrCache, err.Error())
+	}
+
+	return nil
 }
 
 func (c *ChatMessageStreamCacheImpl) AppendEventStream(
@@ -104,7 +193,7 @@ func (c *ChatMessageStreamCacheImpl) AppendEventStream(
 	}
 
 	xaddArgs := &goredis.XAddArgs{
-		Stream: taskEventStreamKey(taskId),
+		Stream: streamTaskEventCacheKey(taskId),
 		Values: map[string]any{
 			streamEventDataKey: encEvent,
 		},
@@ -121,15 +210,8 @@ func (c *ChatMessageStreamCacheImpl) AppendEventStream(
 	return eventId, nil
 }
 
-func (c *ChatMessageStreamCacheImpl) DeleteTask(ctx context.Context, taskId string) error {
-	if err := c.rd.Del(ctx, taskCacheKey(taskId)).Err(); err != nil {
-		return errors.Wrap(errors.ErrCache, err.Error())
-	}
-	return nil
-}
-
 func (c *ChatMessageStreamCacheImpl) DeleteEventStream(ctx context.Context, taskId string) error {
-	if err := c.rd.Del(ctx, taskEventStreamKey(taskId)).Err(); err != nil {
+	if err := c.rd.Del(ctx, streamTaskEventCacheKey(taskId)).Err(); err != nil {
 		return errors.Wrap(errors.ErrCache, err.Error())
 	}
 	return nil
@@ -140,7 +222,7 @@ func (c *ChatMessageStreamCacheImpl) SetEventStreamTTL(
 	taskId string,
 	ttl time.Duration,
 ) error {
-	if err := c.rd.Expire(ctx, taskEventStreamKey(taskId), ttl).Err(); err != nil {
+	if err := c.rd.Expire(ctx, streamTaskEventCacheKey(taskId), ttl).Err(); err != nil {
 		return errors.Wrap(errors.ErrCache, err.Error())
 	}
 
@@ -152,7 +234,7 @@ func (c *ChatMessageStreamCacheImpl) PullEventStream(
 	taskId string,
 	args schema.PullEventStreamArgs,
 ) ([]*schema.ChatMessageStreamEvent, error) {
-	key := taskEventStreamKey(taskId)
+	key := streamTaskEventCacheKey(taskId)
 
 	if args.LastId == "" {
 		args.LastId = "0-0"

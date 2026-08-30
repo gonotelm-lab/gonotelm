@@ -36,7 +36,7 @@ func LoadSourceJobConfig(path string) (*SourceJobConfig, error) {
 }
 
 func (c *SourceJobConfig) applyDefaults() {
-	c.ApplyDefaults()
+	c.Init()
 	c.Logging.ApplyDefaults()
 
 	if c.MsgQueue.Type == "" {

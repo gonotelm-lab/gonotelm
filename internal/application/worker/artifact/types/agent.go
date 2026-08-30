@@ -6,7 +6,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/shared/agent/tools"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
+	llmchat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	pkgagent "github.com/gonotelm-lab/gonotelm/pkg/agent"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 
@@ -17,8 +17,8 @@ import (
 type Agent = pkgagent.Agent[*SessionState]
 
 func BuildSourceExploreAgent(
-	deps *ServiceDeps,
-	modelProvider llm.Provider,
+	deps *WorkerDeps,
+	modelProvider llmchat.Provider,
 	model string,
 	maxRound int,
 	options []einomodel.Option,
@@ -35,7 +35,7 @@ func BuildSourceExploreAgent(
 		MaxRound: maxRound,
 		BaseLLM:  llmModel,
 		Options:  options,
-		Verbose:  true,
+		Verbose:  false,
 	}
 
 	ag := pkgagent.New(agConfig, &SessionState{

@@ -4,7 +4,7 @@ import (
 	"context"
 )
 
-type StorageGateway interface {
+type StorageAdapter interface {
 	DeleteObject(ctx context.Context, key string) error
 	PresignGet(ctx context.Context, key string) (string, error)
 }

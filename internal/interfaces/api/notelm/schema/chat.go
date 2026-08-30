@@ -96,3 +96,11 @@ type GetChatSuggestionsResponse struct {
 	Type      string   `json:"type"`
 	Questions []string `json:"questions"`
 }
+
+type GetRunningTaskRequest struct {
+	Id uuid.UUID `path:"id,required"`
+}
+
+type GetRunningTaskResponse struct {
+	TaskId string `json:"task_id"`
+}

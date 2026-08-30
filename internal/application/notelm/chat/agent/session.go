@@ -23,6 +23,25 @@ type SessionState struct {
 	accumulatedId    int64
 	cancel           context.CancelFunc
 	finalPhaseMarked bool
+	curRunPhase      uint8
+}
+
+const (
+	runPhase1 uint8 = 1
+	runPhase2 uint8 = 2
+)
+
+func (s *SessionState) enterRunPhase1() {
+	s.curRunPhase = runPhase1
+}
+
+func (s *SessionState) enterRunPhase2() {
+	s.curRunPhase = runPhase2
+	s.finalPhaseMarked = false
+}
+
+func (s *SessionState) isInRunPhase1() bool {
+	return s.curRunPhase == runPhase1
 }
 
 func (s *SessionState) ChatId() valobj.Id {

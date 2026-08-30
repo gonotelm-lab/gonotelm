@@ -2,6 +2,7 @@ package chat
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"runtime/debug"
 	"sync"
@@ -9,8 +10,10 @@ import (
 	chatagent "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/agent"
 	"github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/shared"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	chatentity "github.com/gonotelm-lab/gonotelm/internal/domain/chat/entity"
+	chaterrors "github.com/gonotelm-lab/gonotelm/internal/domain/chat/errors"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
 	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
@@ -27,10 +30,15 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 
+func streamTaskCreateLockKey(userId valobj.Uid, chatId valobj.Id) string {
+	return fmt.Sprintf("gonotelm:stream:task:lock:user:%s:chat:%s", userId, chatId)
+}
+
 type CreateMessageHandler struct {
 	*baseHandler
 	wg *sync.WaitGroup
 
+	distLock               adapter.DistributedLock
 	notebookRepo           notebookrepo.Repository
 	chatMessageRepo        chatrepo.MessageRepository
 	chatContextMessageRepo chatrepo.ContextMessageRepository
@@ -47,6 +55,7 @@ type CreateMessageHandler struct {
 
 func NewCreateMessageHandler(
 	wg *sync.WaitGroup,
+	distLock adapter.DistributedLock,
 	notebookRepo notebookrepo.Repository,
 	chatRepo chatrepo.ChatRepository,
 	chatMessageRepo chatrepo.MessageRepository,
@@ -67,6 +76,7 @@ func NewCreateMessageHandler(
 	return &CreateMessageHandler{
 		baseHandler:            newBaseHandler(chatRepo),
 		wg:                     wg,
+		distLock:               distLock,
 		notebookRepo:           notebookRepo,
 		chatMessageRepo:        chatMessageRepo,
 		chatContextMessageRepo: chatContextMessageRepo,
@@ -104,6 +114,7 @@ func (h *CreateMessageHandler) Handle(
 		return nil, err
 	}
 
+	ctx = pkgcontext.WithScene(ctx, pkgcontext.ChatScene, cmd.ChatId.String())
 	userId := pkgcontext.GetUserId(ctx)
 	targetSources, err := shared.FilterReadySources(ctx, h.sourceRepo, targetChat.NotebookId, cmd.SourceIds, userId)
 	if err != nil {
@@ -120,9 +131,23 @@ func (h *CreateMessageHandler) Handle(
 
 	newCtx := context.WithoutCancel(ctx)
 	taskCtx, taskCancel := context.WithCancel(newCtx)
+
+	// make sure only one stream task is created for the same user+chat
+	lockKey := streamTaskCreateLockKey(userId, cmd.ChatId)
+	if err := h.distLock.Lock(ctx, lockKey); err != nil {
+		taskCancel()
+		return nil, errors.WithMessagef(err, "failed to lock stream task create, chat_id=%s", cmd.ChatId)
+	}
+
 	// 1. add user task
-	task, eventChan := h.initStreamTask(taskCtx, taskCancel, cmd.ChatId, cmd.SourceIds, userId)
+	task, eventChan, err := h.initStreamTask(taskCtx, taskCancel, cmd.ChatId, cmd.SourceIds, userId)
+	if err != nil {
+		_ = h.distLock.Unlock(ctx, lockKey)
+		taskCancel()
+		return nil, errors.WithMessagef(err, "failed to init stream task, chat_id=%s", cmd.ChatId)
+	}
 	err = h.streamTaskRepo.Save(ctx, task)
+	_ = h.distLock.Unlock(ctx, lockKey)
 	if err != nil {
 		taskCancel()
 		return nil, errors.WithMessagef(err, "failed to save stream task, chat_id=%s", cmd.ChatId)
@@ -421,18 +446,32 @@ func (h *CreateMessageHandler) initStreamTask(
 	chatId valobj.Id,
 	sourceIds []valobj.Id,
 	userId valobj.Uid,
-) (*chatentity.StreamTask, chan *chatentity.StreamTaskEvent) {
-	task := chatentity.NewStreamTask(chatId, sourceIds, userId)
-	eventChan := make(chan *chatentity.StreamTaskEvent, 1024)
+) (*chatentity.StreamTask, chan *chatentity.StreamTaskEvent, error) {
+	// first we check if there is a running task for this chat and user
+	runningTask, err := h.streamTaskRepo.FindByUserAndChat(ctx, userId, chatId)
+	if err != nil {
+		if !errors.Is(err, chaterrors.ErrStreamTaskNotFound) {
+			return nil, nil, errors.WithMessagef(err, "failed to find running stream task, chat_id=%s", chatId)
+		}
+	}
+
+	if runningTask != nil && runningTask.Status.IsRunning() {
+		return nil, nil, errors.ErrParams.Msgf("running stream task already exists, chat_id=%s", chatId)
+	}
+
+	const streamTaskBufferSize = 1024
+
+	newTask := chatentity.NewStreamTask(chatId, sourceIds, userId)
+	eventChan := make(chan *chatentity.StreamTaskEvent, streamTaskBufferSize)
 
 	h.wg.Go(func() {
 		safe.Do(ctx, func() error {
-			h.consumeStreamTaskEvents(ctx, cancel, task.Id, eventChan)
+			h.consumeStreamTaskEvents(ctx, cancel, newTask.Id, eventChan)
 			return nil
 		})()
 	})
 
-	return task, eventChan
+	return newTask, eventChan, nil
 }
 
 func (h *CreateMessageHandler) consumeStreamTaskEvents(

@@ -12,13 +12,13 @@ import (
 
 type outerEventBus struct {
 	producer  mq.Producer
-	mqFactory *mq.MQ
+	mqFactory *mq.MessageQueue
 
 	mu        sync.Mutex
 	consumers []mq.Consumer
 }
 
-func NewOuterEventBus(mqFactory *mq.MQ) EventBus {
+func NewOuterEventBus(mqFactory *mq.MessageQueue) EventBus {
 	evbus := &outerEventBus{
 		mqFactory: mqFactory,
 	}

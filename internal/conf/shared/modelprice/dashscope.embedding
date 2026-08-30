@@ -1,0 +1,11 @@
+if model == 'qwen3.7-text-embedding' {
+	{prompt_1m: "0.5"}
+} else if model == 'text-embedding-v4' {
+	{prompt_1m: "0.5"}
+} else if model == 'text-embedding-v2' {
+	{prompt_1m: "0.7"}
+} else if model == 'text-embedding-v1' {
+	{prompt_1m: "0.7"}
+} else {
+	{prompt_1m: "0.5"}
+}

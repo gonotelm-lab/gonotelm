@@ -9,7 +9,6 @@ import (
 
 	einoschema "github.com/cloudwego/eino/schema"
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 )
 
@@ -34,12 +33,12 @@ const (
 )
 
 type SummarizerImpl struct {
-	provider llm.Provider
+	provider chat.Provider
 	model    string
 	llm      *chat.Gateway
 }
 
-func NewSummarizer(gw *chat.Gateway, provider llm.Provider, model string) adapter.Summarizer {
+func NewSummarizer(gw *chat.Gateway, provider chat.Provider, model string) adapter.Summarizer {
 	return &SummarizerImpl{
 		provider: provider,
 		model:    model,
@@ -62,7 +61,7 @@ func (s *SummarizerImpl) Summarize(
 
 	provider := s.provider
 	if opt.Provider != "" {
-		provider = llm.Provider(opt.Provider)
+		provider = chat.Provider(opt.Provider)
 	}
 
 	model := s.model

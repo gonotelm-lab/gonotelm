@@ -46,6 +46,6 @@ func RenderInfographic(ctx context.Context, vars TemplateVars) ([]*einoschema.Me
 	if tipMsg := types.BuildTipMessage(vars.ExtraPrompt); tipMsg != nil {
 		msgs = append(msgs, tipMsg)
 	}
-	
+
 	return msgs, nil
 }

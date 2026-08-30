@@ -8,21 +8,24 @@ import (
 
 	confshared "github.com/gonotelm-lab/gonotelm/internal/conf/shared"
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
-	"github.com/gonotelm-lab/gonotelm/internal/domain/source/service/agentize"
 	infraadapter "github.com/gonotelm-lab/gonotelm/internal/infrastructure/adapter"
 	infracache "github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache/redis"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/postgres"
-	infrallm "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
+	llmchat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
+	llmchatbilling "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat/billing"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/embedding"
+	embbilling "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/embedding/billing"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio"
+	t2abilling "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio/billing"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image"
+	t2ibilling "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image/billing"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
 	mqkafka "github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq/kafka"
-	infrarepo "github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository"
-	infrasandbox "github.com/gonotelm-lab/gonotelm/internal/infrastructure/sandbox"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/olap"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/olap/clickhouse"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/sandbox"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage/minio"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
@@ -34,31 +37,258 @@ import (
 )
 
 type Infra struct {
-	DB               *database.Dao
-	VDB              *vectordb.DAL
-	Redis            redisv9.UniversalClient
-	Cache            *infracache.Cache
-	MQ               *mq.MQ
-	Storage          storage.Storage
-	LLMGateway       *chat.Gateway
-	EmbeddingGateway *embedding.EmbeddingGateway
-	Embedder         einoembed.Embedder
-	Text2Image       *text2image.Text2ImageGateway
-	Text2Audio       *text2audio.Text2AudioGateway
-	SandboxGateway   *infrasandbox.Gateway
-	AgentizeService  *agentize.Service
-	DistLock         adapter.DistributedLock
+	Database               *database.Dao
+	OlapDatabase           *olap.Dao
+	VectorDatabase         *vectordb.DAL
+	Cache                  *infracache.Cache
+	MessageQueue           *mq.MessageQueue
+	Storage                storage.Storage
+	LLMGateway             *llmchat.Gateway
+	LLMBillingMeter        llmchatbilling.Meter
+	EmbeddingGateway       *embedding.EmbeddingGateway
+	EmbeddingBillingMeter  embbilling.Meter
+	Text2ImageBillingMeter t2ibilling.Meter
+	Text2AudioBillingMeter t2abilling.Meter
+	Embedder               einoembed.Embedder
+	Text2Image             *text2image.Text2ImageGateway
+	Text2Audio             *text2audio.Text2AudioGateway
+	SandboxGateway         *sandbox.Gateway
+	DistLock               adapter.DistributedLock
+
+	Redis redisv9.UniversalClient
 
 	closers []io.Closer
 }
 
-func (s *Infra) Closers() []io.Closer { return s.closers }
+func (i *Infra) addCloser(closer io.Closer) {
+	i.closers = append(i.closers, closer)
+}
 
-func NewInfra(ctx context.Context, cfg *confshared.InfraConfig) (_ *Infra, outErr error) {
+func (i *Infra) Closers() []io.Closer { return i.closers }
+
+func initDatabase(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
+	db, err := postgres.Open(cfg.Database.ToSQLConfig())
+	if err != nil {
+		return fmt.Errorf("database: %w", err)
+	}
+
+	infra.addCloser(contextCloser(func(ctx context.Context) error {
+		return db.Close(ctx)
+	}))
+	infra.Database = db
+
+	return nil
+}
+
+func initOlapDatabase(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
+	dao, err := clickhouse.Open(context.Background(), cfg.DatabaseOlap.ToSQLConfig())
+	if err != nil {
+		return fmt.Errorf("olap database: %w", err)
+	}
+
+	infra.addCloser(contextCloser(func(ctx context.Context) error {
+		return dao.Closer.Close(ctx)
+	}))
+	infra.OlapDatabase = dao
+
+	return nil
+}
+
+func initVectorDB(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
+	vdb, err := milvus.Open(&cfg.VectorDB)
+	if err != nil {
+		return fmt.Errorf("vectordb: %w", err)
+	}
+	infra.addCloser(contextCloser(func(ctx context.Context) error {
+		return vdb.Close(ctx)
+	}))
+	infra.VectorDatabase = vdb
+
+	return nil
+}
+
+func initRedis(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
+	if len(cfg.Redis.Addrs) == 0 {
+		return nil
+	}
+
+	if err := infracache.Init(&cfg.Redis); err != nil {
+		return fmt.Errorf("cache init: %w", err)
+	}
+	redisClient := infracache.GetRedis()
+	infra.addCloser(contextCloser(func(ctx context.Context) error {
+		return redisClient.Close()
+	}))
+	infra.Redis = redisClient
+	infra.Cache = redis.NewCache(redisClient)
+	infra.DistLock = infraadapter.NewRedisDistributedLock(redisClient)
+
+	return nil
+}
+
+func initMessageQueue(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
+	if cfg.MsgQueue.Type == "" {
+		return nil
+	}
+
+	mqInst, err := newMessageQueue(&cfg.MsgQueue)
+	if err != nil {
+		return fmt.Errorf("mq: %w", err)
+	}
+	infra.MessageQueue = mqInst
+
+	return nil
+}
+
+func initStorage(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
+	oss, err := newStorage(&cfg.Storage)
+	if err != nil {
+		return fmt.Errorf("storage: %w", err)
+	}
+	infra.Storage = oss
+
+	return nil
+}
+
+func initLLMGateway(ctx context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
+	// create llm recorder
+	recorder := infraadapter.NewLLMRecorderAdapter(
+		infra.OlapDatabase.LLMLogStore,
+		infra.LLMBillingMeter,
+	)
+	llmGateway, err := llmchat.New(ctx, &cfg.Provider, llmchat.WithRecorder(recorder))
+	if err != nil {
+		return fmt.Errorf("llm gateway: %w", err)
+	}
+	infra.LLMGateway = llmGateway
+
+	return nil
+}
+
+func initLLMBillingMeters(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
+	meter, err := llmchatbilling.NewStandardMeter(llmchatbilling.StandardMeterConfig{
+		DeepSeekScript: cfg.ProviderBilling.DeepSeekScript,
+	})
+	if err != nil {
+		return fmt.Errorf("llm chat billing: %w", err)
+	}
+	infra.LLMBillingMeter = meter
+
+	return nil
+}
+
+func initEmbeddingBillingMeter(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
+	meter, err := embbilling.NewStandardMeter(embbilling.StandardMeterConfig{
+		DashScopeScript: cfg.ProviderBilling.EmbeddingDashScopeScript,
+	})
+	if err != nil {
+		return fmt.Errorf("llm embedding billing: %w", err)
+	}
+	infra.EmbeddingBillingMeter = meter
+
+	return nil
+}
+
+func initText2ImageBillingMeter(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
+	meter, err := t2ibilling.NewStandardMeter(t2ibilling.StandardMeterConfig{
+		DashScopeScript: cfg.ProviderBilling.Text2ImageDashScopeScript,
+	})
+	if err != nil {
+		return fmt.Errorf("llm text2image billing: %w", err)
+	}
+	infra.Text2ImageBillingMeter = meter
+
+	return nil
+}
+
+func initText2AudioBillingMeter(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
+	meter, err := t2abilling.NewStandardMeter(t2abilling.StandardMeterConfig{
+		DashScopeScript: cfg.ProviderBilling.Text2AudioDashScopeScript,
+		MiniMaxScript:   cfg.ProviderBilling.Text2AudioMiniMaxScript,
+	})
+	if err != nil {
+		return fmt.Errorf("llm text2audio billing: %w", err)
+	}
+	infra.Text2AudioBillingMeter = meter
+
+	return nil
+}
+
+func initEmbedding(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
+	var embedCacher embedcache.Cacher
+	if infra.Redis != nil {
+		embedCacher = embedding.NewRedisCacher(infra.Redis)
+	}
+	recorder := infraadapter.NewEmbeddingRecorderAdapter(infra.OlapDatabase.EmbeddingLogStore, infra.EmbeddingBillingMeter)
+	embeddingGateway, err := embedding.NewEmbeddingGateway(
+		&cfg.Embedding,
+		embedCacher,
+		embedding.WithRecorder(recorder),
+	)
+	if err != nil {
+		return fmt.Errorf("embedding gateway: %w", err)
+	}
+	infra.EmbeddingGateway = embeddingGateway
+
+	embedder, err := embeddingGateway.GetProvider(cfg.Embedding.Type)
+	if err != nil {
+		return fmt.Errorf("embedder: %w", err)
+	}
+	infra.Embedder = embedder
+
+	return nil
+}
+
+func initText2Image(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
+	recorder := infraadapter.NewText2ImageRecorderAdapter(
+		infra.OlapDatabase.Text2ImageLogStore,
+		infra.Text2ImageBillingMeter,
+	)
+	text2imageGateway, err := text2image.NewText2ImageGateway(
+		&cfg.Text2Image,
+		text2image.WithRecorder(recorder),
+	)
+	if err != nil {
+		return fmt.Errorf("text2image gateway: %w", err)
+	}
+	infra.Text2Image = text2imageGateway
+
+	return nil
+}
+
+func initText2Audio(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
+	recorder := infraadapter.NewText2AudioRecorderAdapter(
+		infra.OlapDatabase.Text2AudioLogStore,
+		infra.Text2AudioBillingMeter,
+	)
+	text2audioGateway, err := text2audio.NewText2AudioGateway(
+		&cfg.Text2Audio,
+		text2audio.WithRecorder(recorder),
+	)
+	if err != nil {
+		return fmt.Errorf("text2audio gateway: %w", err)
+	}
+	infra.Text2Audio = text2audioGateway
+
+	return nil
+}
+
+func initSandbox(ctx context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
+	sandboxGateway, err := sandbox.NewGateway(ctx, &cfg.Sandbox)
+	if err != nil {
+		return fmt.Errorf("sandbox gateway: %w", err)
+	}
+	infra.SandboxGateway = sandboxGateway
+
+	return nil
+}
+
+type infraInit func(ctx context.Context, cfg *confshared.InfraConfig, infra *Infra) error
+
+func NewInfra(ctx context.Context, cfg *confshared.InfraConfig) (_ *Infra, finalErr error) {
 	infra := &Infra{}
-	addCloser := func(c io.Closer) { infra.closers = append(infra.closers, c) }
 	defer func() {
-		if outErr != nil {
+		if finalErr != nil { // 初始化过程出错 就以此关闭已经初始化的组件
 			for i := len(infra.closers) - 1; i >= 0; i-- {
 				if err := infra.closers[i].Close(); err != nil {
 					slog.Error("close error", "err", err)
@@ -67,105 +297,35 @@ func NewInfra(ctx context.Context, cfg *confshared.InfraConfig) (_ *Infra, outEr
 		}
 	}()
 
-	db, err := postgres.Open(cfg.Database)
-	if err != nil {
-		return nil, fmt.Errorf("database: %w", err)
+	// Do not switch the orders of initialization
+	inits := []infraInit{
+		initDatabase,
+		initOlapDatabase,
+		initVectorDB,
+		initRedis,
+		initMessageQueue,
+		initStorage,
+		initLLMBillingMeters,
+		initEmbeddingBillingMeter,
+		initText2ImageBillingMeter,
+		initText2AudioBillingMeter,
+		initLLMGateway,
+		initEmbedding,
+		initText2Image,
+		initText2Audio,
+		initSandbox,
 	}
-	addCloser(contextCloser(func(ctx context.Context) error { return db.Close(ctx) }))
-	infra.DB = db
-
-	vdb, err := milvus.Open(&cfg.VectorDB)
-	if err != nil {
-		return nil, fmt.Errorf("vectordb: %w", err)
-	}
-	addCloser(contextCloser(func(ctx context.Context) error { return vdb.Close(ctx) }))
-	infra.VDB = vdb
-
-	var redisClient redisv9.UniversalClient
-	if len(cfg.Redis.Addrs) > 0 {
-		if err := infracache.Init(&cfg.Redis); err != nil {
-			return nil, fmt.Errorf("cache init: %w", err)
+	for _, fn := range inits {
+		if err := fn(ctx, cfg, infra); err != nil {
+			return nil, err
 		}
-		redisClient = infracache.GetRedis()
-		addCloser(contextCloser(func(ctx context.Context) error { return redisClient.Close() }))
-		infra.Redis = redisClient
-		infra.Cache = redis.NewCache(redisClient)
-		infra.DistLock = infraadapter.NewRedisDistributedLock(redisClient)
 	}
-
-	if cfg.MsgQueue.Type != "" {
-		mqInst, err := newMQ(&cfg.MsgQueue)
-		if err != nil {
-			return nil, fmt.Errorf("mq: %w", err)
-		}
-		infra.MQ = mqInst
-	}
-
-	oss, err := newStorage(&cfg.Storage)
-	if err != nil {
-		return nil, fmt.Errorf("storage: %w", err)
-	}
-	infra.Storage = oss
-
-	llmGateway, err := newLLMGateway(ctx, &cfg.Provider)
-	if err != nil {
-		return nil, fmt.Errorf("llm gateway: %w", err)
-	}
-	infra.LLMGateway = llmGateway
-
-	var embedCacher embedcache.Cacher
-	if redisClient != nil {
-		embedCacher = embedding.NewRedisCacher(redisClient)
-	}
-	embeddingGateway, err := embedding.NewEmbeddingGateway(
-		&cfg.Embedding,
-		embedCacher,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("embedding gateway: %w", err)
-	}
-	infra.EmbeddingGateway = embeddingGateway
-
-	embedder, err := embeddingGateway.GetProvider(cfg.Embedding.Type)
-	if err != nil {
-		return nil, fmt.Errorf("embedder: %w", err)
-	}
-	infra.Embedder = embedder
-
-	text2imageGateway, err := text2image.NewText2ImageGateway(&cfg.Text2Image)
-	if err != nil {
-		return nil, fmt.Errorf("text2image gateway: %w", err)
-	}
-	infra.Text2Image = text2imageGateway
-
-	text2audioGateway, err := text2audio.NewText2AudioGateway(&cfg.Text2Audio)
-	if err != nil {
-		return nil, fmt.Errorf("text2audio gateway: %w", err)
-	}
-	infra.Text2Audio = text2audioGateway
-
-	sandboxGateway, err := newSandboxGateway(ctx, &cfg.Sandbox)
-	if err != nil {
-		return nil, fmt.Errorf("sandbox gateway: %w", err)
-	}
-	infra.SandboxGateway = sandboxGateway
-
-	sourceRepo := infrarepo.NewSourceRepository(db.SourceStore)
-	storageRepo := infrarepo.NewSourceStorageRepository(oss)
-	sourceDocRepo := infrarepo.NewSourceDocRepository(
-		embedder,
-		vdb.SourceDocStore,
-		infrarepo.SourceDocRepositoryConfig{
-			EmbedBatchSize:      cfg.Embedding.BatchSize,
-			EmbedMaxConcurrency: cfg.Embedding.MaxConcurrency,
-		},
-	)
-	infra.AgentizeService = agentize.NewService(agentize.Config{}, sourceRepo, storageRepo, sourceDocRepo)
 
 	return infra, nil
 }
 
 func (s *Infra) Close(ctx context.Context) error {
+	// in reverse order
 	for i := len(s.closers) - 1; i >= 0; i-- {
 		if err := s.closers[i].Close(); err != nil {
 			slog.Error("close error", "err", err)
@@ -174,75 +334,11 @@ func (s *Infra) Close(ctx context.Context) error {
 	return nil
 }
 
-func newLLMGateway(ctx context.Context, cfg *infrallm.ProviderConfig) (*chat.Gateway, error) {
-	llmCfg := &infrallm.ProviderConfig{
-		OpenAI: infrallm.OpenAIChatConfig{
-			ApiKey:           cfg.OpenAI.ApiKey,
-			Timeout:          cfg.OpenAI.Timeout,
-			BaseUrl:          cfg.OpenAI.BaseUrl,
-			Model:            cfg.OpenAI.Model,
-			Temperature:      cfg.OpenAI.Temperature,
-			TopP:             cfg.OpenAI.TopP,
-			PresencePenalty:  cfg.OpenAI.PresencePenalty,
-			Seed:             cfg.OpenAI.Seed,
-			FrequencyPenalty: cfg.OpenAI.FrequencyPenalty,
-			ReasoningEffort:  cfg.OpenAI.ReasoningEffort,
-			MaxConcurrency:   cfg.OpenAI.MaxConcurrency,
-		},
-		DeepSeek: infrallm.DeepSeekChatConfig{
-			ApiKey:           cfg.DeepSeek.ApiKey,
-			Timeout:          cfg.DeepSeek.Timeout,
-			BaseURL:          cfg.DeepSeek.BaseURL,
-			Path:             cfg.DeepSeek.Path,
-			Model:            cfg.DeepSeek.Model,
-			Temperature:      cfg.DeepSeek.Temperature,
-			TopP:             cfg.DeepSeek.TopP,
-			PresencePenalty:  cfg.DeepSeek.PresencePenalty,
-			FrequencyPenalty: cfg.DeepSeek.FrequencyPenalty,
-			LogProbs:         cfg.DeepSeek.LogProbs,
-			TopLogProbs:      cfg.DeepSeek.TopLogProbs,
-			ThinkingEnabled:  cfg.DeepSeek.ThinkingEnabled,
-			MaxConcurrency:   cfg.DeepSeek.MaxConcurrency,
-		},
-		Qwen: infrallm.QwenChatConfig{
-			ApiKey:           cfg.Qwen.ApiKey,
-			Timeout:          cfg.Qwen.Timeout,
-			BaseUrl:          cfg.Qwen.BaseUrl,
-			Model:            cfg.Qwen.Model,
-			Temperature:      cfg.Qwen.Temperature,
-			TopP:             cfg.Qwen.TopP,
-			PresencePenalty:  cfg.Qwen.PresencePenalty,
-			Seed:             cfg.Qwen.Seed,
-			FrequencyPenalty: cfg.Qwen.FrequencyPenalty,
-			EnableThinking:   cfg.Qwen.EnableThinking,
-			MaxConcurrency:   cfg.Qwen.MaxConcurrency,
-		},
-		Agnes: infrallm.AgnesChatConfig{
-			ApiKey:           cfg.Agnes.ApiKey,
-			Timeout:          cfg.Agnes.Timeout,
-			BaseUrl:          cfg.Agnes.BaseUrl,
-			Model:            cfg.Agnes.Model,
-			Temperature:      cfg.Agnes.Temperature,
-			TopP:             cfg.Agnes.TopP,
-			PresencePenalty:  cfg.Agnes.PresencePenalty,
-			Seed:             cfg.Agnes.Seed,
-			FrequencyPenalty: cfg.Agnes.FrequencyPenalty,
-			MaxConcurrency:   cfg.Agnes.MaxConcurrency,
-		},
-	}
-
-	return chat.New(ctx, llmCfg)
-}
-
-func newSandboxGateway(ctx context.Context, cfg *infrasandbox.ProviderConfig) (*infrasandbox.Gateway, error) {
-	return infrasandbox.NewGateway(ctx, cfg)
-}
-
-func newMQ(cfg *mq.Config) (*mq.MQ, error) {
+func newMessageQueue(cfg *mq.Config) (*mq.MessageQueue, error) {
 	switch cfg.Type {
 	case mq.Kafka:
 		kc := cfg.Kafka
-		return &mq.MQ{
+		return &mq.MessageQueue{
 			NewProducer: func() mq.Producer {
 				return mqkafka.NewProducer(mqkafka.ProducerConfig{
 					Brokers:  kc.Brokers,

@@ -47,6 +47,8 @@ func (h *ChatSuggestHandler) Handle(ctx context.Context, cmd *ChatSuggestCommand
 		}, nil
 	}
 
+	ctx = pkgcontext.WithScene(ctx, pkgcontext.ChatSuggestionScene, cmd.ChatId.String())
+
 	targetChat, err := h.commonHandle(ctx, cmd.ChatId)
 	if err != nil {
 		return nil, err

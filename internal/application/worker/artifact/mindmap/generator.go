@@ -8,12 +8,11 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
+	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
-
-	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 
 	einomodel "github.com/cloudwego/eino/components/model"
 	einoschema "github.com/cloudwego/eino/schema"
@@ -22,12 +21,12 @@ import (
 const MindmapMaxOnceToken = 32_000
 
 type Generator struct {
-	deps *types.ServiceDeps
+	deps *types.WorkerDeps
 }
 
 var _ types.Generator = &Generator{}
 
-func New(deps *types.ServiceDeps) *Generator {
+func New(deps *types.WorkerDeps) *Generator {
 	return &Generator{deps: deps}
 }
 

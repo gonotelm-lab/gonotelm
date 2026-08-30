@@ -8,6 +8,7 @@ import (
 	chatevent "github.com/gonotelm-lab/gonotelm/internal/domain/chat/event"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/safe"
 )
@@ -75,6 +76,7 @@ func (h *OnStreamTaskEventHandler) generateSuggestions(
 		return
 	}
 
+	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.ChatSuggestionScene)
 	_, err = h.suggestionService.Generate(
 		ctx,
 		&suggestion.GenerateSuggestionsCommand{

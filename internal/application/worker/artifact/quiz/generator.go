@@ -6,17 +6,16 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/bytedance/sonic"
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
-	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 
+	"github.com/bytedance/sonic"
 	einomodel "github.com/cloudwego/eino/components/model"
 	einoschema "github.com/cloudwego/eino/schema"
 )
@@ -44,12 +43,12 @@ type quizExpectation struct {
 }
 
 type Generator struct {
-	deps *types.ServiceDeps
+	deps *types.WorkerDeps
 }
 
 var _ types.Generator = &Generator{}
 
-func New(deps *types.ServiceDeps) *Generator {
+func New(deps *types.WorkerDeps) *Generator {
 	return &Generator{deps: deps}
 }
 
@@ -103,7 +102,6 @@ func (g *Generator) generate(
 	ctx context.Context,
 	req *types.Request,
 ) (*quizExpectation, error) {
-	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioQuizScene)
 	llmOptions := g.llmOptions()
 
 	p := artifactentity.PayloadAs[*artifactentity.QuizPayload](req.Payload)

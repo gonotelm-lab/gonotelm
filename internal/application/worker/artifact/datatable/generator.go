@@ -9,7 +9,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
-	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 
@@ -22,12 +21,12 @@ import (
 const dataTableMaxCompensateRetry = 3
 
 type Generator struct {
-	deps *types.ServiceDeps
+	deps *types.WorkerDeps
 }
 
 var _ types.Generator = &Generator{}
 
-func New(deps *types.ServiceDeps) *Generator {
+func New(deps *types.WorkerDeps) *Generator {
 	return &Generator{deps: deps}
 }
 
@@ -50,8 +49,6 @@ func (g *Generator) generate(
 	ctx context.Context,
 	req *types.Request,
 ) (string, error) {
-	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioDataTableScene)
-
 	var (
 		model         = conf.WorkerGlobal().Studio.DataTable.Model
 		modelProvider = conf.WorkerGlobal().Studio.DataTable.ModelProvider

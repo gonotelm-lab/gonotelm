@@ -13,7 +13,7 @@ type Config struct {
 	Port     int
 	User     string
 	Password string
-	DbName   string
+	DBName   string
 }
 
 func OpenPgSql(config *Config) (*gorm.DB, error) {
@@ -22,7 +22,7 @@ func OpenPgSql(config *Config) (*gorm.DB, error) {
 
 func OpenPgSqlWithLogger(config *Config, logger gormlogger.Interface) (*gorm.DB, error) {
 	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-		config.Host, config.Port, config.User, config.Password, config.DbName)
+		config.Host, config.Port, config.User, config.Password, config.DBName)
 	if logger == nil {
 		logger = NewSlogGormLogger(nil)
 	}

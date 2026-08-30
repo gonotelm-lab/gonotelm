@@ -1,14 +1,35 @@
 package chat
 
 import (
+	"context"
+	"maps"
+
 	"github.com/cloudwego/eino-ext/components/model/deepseek"
 	"github.com/cloudwego/eino-ext/components/model/openai"
 	"github.com/cloudwego/eino-ext/components/model/qwen"
 	einomodel "github.com/cloudwego/eino/components/model"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
 	"github.com/gonotelm-lab/gonotelm/pkg/eino-ext/model/agnes"
 	openaiext "github.com/gonotelm-lab/gonotelm/pkg/eino-ext/openai"
 )
+
+var streamOptionsIncludeUsage = openaiext.StreamOptionsIncludeUsage
+
+func cloneExtraFields(base map[string]any) map[string]any {
+	if len(base) == 0 {
+		return map[string]any{}
+	}
+	out := make(map[string]any, len(base))
+	maps.Copy(out, base)
+	return out
+}
+
+// mergeExtraFields returns a new map with overrides applied on top of base.
+// eino-ext WithExtraFields replaces the whole map, so callers must merge explicitly.
+func mergeExtraFields(base map[string]any, overrides map[string]any) map[string]any {
+	out := cloneExtraFields(base)
+	maps.Copy(out, overrides)
+	return out
+}
 
 // callOptions carries gateway-level request options. wrappedChatModel translates
 // them into provider-specific options for both Generate and Stream.
@@ -18,7 +39,7 @@ type callOptions struct {
 }
 
 func WithThinking(
-	providerType llm.Provider,
+	providerType Provider,
 	enableThinking bool,
 ) einomodel.Option {
 	enabled := enableThinking
@@ -35,7 +56,7 @@ func WithModel(model string) einomodel.Option {
 	return einomodel.Option{}
 }
 
-func WithResponseJsonObject(providerType llm.Provider) einomodel.Option {
+func WithResponseJsonObject(providerType Provider) einomodel.Option {
 	return einomodel.WrapImplSpecificOptFn(func(o *callOptions) {
 		o.ResponseFormatJSONObject = true
 	})
@@ -48,14 +69,14 @@ func BuildLLMOptions(opts ...einomodel.Option) []einomodel.Option {
 // applyProviderCallOptions translates callOptions into provider-native options.
 // streaming controls whether stream_options is merged (DeepSeek/Qwen ExtraFields replace, not merge).
 func applyProviderCallOptions(
-	provider llm.Provider,
+	provider Provider,
 	streaming bool,
 	opts []einomodel.Option,
-) []einomodel.Option {
+) ([]einomodel.Option, *callOptions) {
 	callOpts := einomodel.GetImplSpecificOptions(&callOptions{}, opts...)
 
 	switch provider {
-	case llm.ProviderDeepSeek:
+	case ProviderDeepSeek:
 		fields := map[string]any{}
 		if streaming {
 			fields = mergeExtraFields(fields, streamOptionsIncludeUsage)
@@ -74,7 +95,7 @@ func applyProviderCallOptions(
 			// Append last so this map wins over any earlier deepseek.WithExtraFields.
 			opts = append(opts, deepseek.WithExtraFields(fields))
 		}
-	case llm.ProviderQwen:
+	case ProviderQwen:
 		fields := map[string]any{}
 		if streaming {
 			fields = mergeExtraFields(fields, streamOptionsIncludeUsage)
@@ -88,7 +109,7 @@ func applyProviderCallOptions(
 		if len(fields) > 0 {
 			opts = append(opts, qwen.WithExtraFields(fields))
 		}
-	case llm.ProviderAgnes:
+	case ProviderAgnes:
 		chatTemplateKwargs := map[string]any{}
 		if callOpts.EnableThinking != nil {
 			chatTemplateKwargs["enable_thinking"] = *callOpts.EnableThinking
@@ -101,7 +122,7 @@ func applyProviderCallOptions(
 				"chat_template_kwargs": chatTemplateKwargs,
 			}))
 		}
-	case llm.ProviderOpenAI:
+	case ProviderOpenAI:
 		if callOpts.EnableThinking != nil && *callOpts.EnableThinking {
 			opts = append(opts, openai.WithReasoningEffort(openai.ReasoningEffortLevelHigh))
 		}
@@ -110,5 +131,17 @@ func applyProviderCallOptions(
 		}
 	}
 
-	return opts
+	return opts, callOpts
+}
+
+func withCallOptions(ctx context.Context, callOpts *callOptions) context.Context {
+	if callOpts != nil && callOpts.EnableThinking != nil {
+		ctx = withThinking(ctx, *callOpts.EnableThinking)
+	}
+
+	if callOpts != nil {
+		ctx = withJSONObject(ctx, callOpts.ResponseFormatJSONObject)
+	}
+
+	return ctx
 }

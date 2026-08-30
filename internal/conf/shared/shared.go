@@ -1,10 +1,11 @@
 package shared
 
 import (
+	_ "embed"
 	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache"
-	chat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm"
+	llmchat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	embedding "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/embedding"
 	text2audio "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio"
 	text2image "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image"
@@ -56,26 +57,65 @@ func (d *DatabaseConfig) ToSQLConfig() *sql.Config {
 		Port:     d.Port,
 		User:     d.User,
 		Password: d.Password,
-		DbName:   d.DBName,
+		DBName:   d.DBName,
+	}
+}
+
+var (
+	//go:embed modelprice/deepseek.chat
+	defaultDeepSeekPricingScript string
+
+	//go:embed modelprice/dashscope.embedding
+	defaultDashScopeEmbeddingPricingScript string
+
+	//go:embed modelprice/dashscope.text2image
+	defaultDashScopeText2ImagePricingScript string
+
+	//go:embed modelprice/dashscope.text2audio
+	defaultDashScopeText2AudioPricingScript string
+)
+
+type ProviderBillingConfig struct {
+	DeepSeekScript            string
+	EmbeddingDashScopeScript  string
+	Text2ImageDashScopeScript string
+	Text2AudioDashScopeScript string
+	Text2AudioMiniMaxScript   string
+}
+
+func (c *ProviderBillingConfig) Init() {
+	if c.DeepSeekScript == "" {
+		c.DeepSeekScript = defaultDeepSeekPricingScript
+	}
+	if c.EmbeddingDashScopeScript == "" {
+		c.EmbeddingDashScopeScript = defaultDashScopeEmbeddingPricingScript
+	}
+	if c.Text2ImageDashScopeScript == "" {
+		c.Text2ImageDashScopeScript = defaultDashScopeText2ImagePricingScript
+	}
+	if c.Text2AudioDashScopeScript == "" {
+		c.Text2AudioDashScopeScript = defaultDashScopeText2AudioPricingScript
 	}
 }
 
 // InfraConfig 为 notelm / worker 共用的基础设施配置。
 type InfraConfig struct {
-	Database   DatabaseConfig                `toml:"database"`
-	VectorDB   vectordb.Config               `toml:"vectorDb"`
-	Storage    storageimpl.StorageTypeConfig `toml:"storage"`
-	Provider   chat.ProviderConfig           `toml:"provider"`
-	Embedding  embedding.EmbeddingConfig     `toml:"embedding"`
-	Text2Image text2image.Text2ImageConfig   `toml:"text2image"`
-	Text2Audio text2audio.Text2AudioConfig   `toml:"text2audio"`
-	Sandbox    sandboximpl.ProviderConfig    `toml:"sandbox"`
+	Database        DatabaseConfig                `toml:"database"`
+	VectorDB        vectordb.Config               `toml:"vectorDb"`
+	Storage         storageimpl.StorageTypeConfig `toml:"storage"`
+	Provider        llmchat.ProviderConfig        `toml:"provider"`
+	ProviderBilling ProviderBillingConfig         `toml:"providerBilling"`
+	Embedding       embedding.EmbeddingConfig     `toml:"embedding"`
+	Text2Image      text2image.Text2ImageConfig   `toml:"text2image"`
+	Text2Audio      text2audio.Text2AudioConfig   `toml:"text2audio"`
+	Sandbox         sandboximpl.ProviderConfig    `toml:"sandbox"`
+	DatabaseOlap    DatabaseConfig                `toml:"databaseOlap"`
 
 	Redis    cache.RedisCacheConfig `toml:"redis"`
 	MsgQueue mqimpl.Config          `toml:"msgQueue"`
 }
 
-func (c *InfraConfig) ApplyDefaults() {
+func (c *InfraConfig) Init() {
 	if c.Storage.Type == "" {
 		c.Storage.Type = storageimpl.Minio
 	}
@@ -88,6 +128,8 @@ func (c *InfraConfig) ApplyDefaults() {
 	if c.Embedding.MaxConcurrency <= 0 {
 		c.Embedding.MaxConcurrency = 4
 	}
+
+	c.ProviderBilling.Init()
 }
 
 func (c *InfraConfig) SQLConfig() *sql.Config {

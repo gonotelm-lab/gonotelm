@@ -16,7 +16,7 @@ func extractStoreKey(result []byte) string {
 	return sr.StoreKey
 }
 
-func materializeStorageResult(ctx context.Context, storage adapter.StorageGateway, result []byte) (url string, mime string) {
+func materializeStorageResult(ctx context.Context, storage adapter.StorageAdapter, result []byte) (url string, mime string) {
 	if storage == nil || len(result) == 0 {
 		return "", ""
 	}

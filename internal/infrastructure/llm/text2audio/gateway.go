@@ -12,17 +12,45 @@ type Text2AudioGateway struct {
 
 	cfg        *Text2AudioConfig
 	clientOpts []audios.ClientOption
+	recorder   Recorder
 	providers  map[Text2AudioProvider]audios.Generator
 }
 
-func NewText2AudioGateway(cfg *Text2AudioConfig, opts ...audios.ClientOption) (*Text2AudioGateway, error) {
+type gatewayOption struct {
+	recorder   Recorder
+	clientOpts []audios.ClientOption
+}
+
+type GatewayOption func(o *gatewayOption)
+
+func WithRecorder(r Recorder) GatewayOption {
+	return func(o *gatewayOption) {
+		o.recorder = r
+	}
+}
+
+func WithClientOptions(opts ...audios.ClientOption) GatewayOption {
+	return func(o *gatewayOption) {
+		o.clientOpts = append(o.clientOpts, opts...)
+	}
+}
+
+func NewText2AudioGateway(cfg *Text2AudioConfig, opts ...GatewayOption) (*Text2AudioGateway, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("text2audio config must not be nil")
 	}
 
+	opt := gatewayOption{}
+	for _, o := range opts {
+		if o != nil {
+			o(&opt)
+		}
+	}
+
 	return &Text2AudioGateway{
 		cfg:        cfg,
-		clientOpts: opts,
+		clientOpts: opt.clientOpts,
+		recorder:   opt.recorder,
 		providers:  make(map[Text2AudioProvider]audios.Generator),
 	}, nil
 }
@@ -54,7 +82,7 @@ func (g *Text2AudioGateway) initProvider(providerType Text2AudioProvider) (audio
 	if err != nil {
 		return nil, err
 	}
-	provider = &tracingGenerator{system: string(providerType), impl: impl}
+	provider = newWrappedGenerator(providerType, impl, g.recorder)
 
 	g.providers[providerType] = provider
 	return provider, nil

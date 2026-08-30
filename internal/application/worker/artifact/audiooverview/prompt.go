@@ -96,7 +96,7 @@ func RenderPodcastTranscript(
 	if tipMsg := types.BuildTipMessage(tips); tipMsg != nil {
 		msgs = append(msgs, tipMsg)
 	}
-	
+
 	return msgs, nil
 }
 

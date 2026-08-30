@@ -23,6 +23,8 @@ func newBaseHandler(chatRepo chatrepo.ChatRepository) *baseHandler {
 }
 
 // 所有handler都要先处理这个公共的操作
+// 1. 检查chat是否存在
+// 2. 检查用户是否是chat的owner
 func (h *baseHandler) commonHandle(ctx context.Context, chatId valobj.Id) (*chatentity.Chat, error) {
 	chat, err := h.chatRepo.FindById(ctx, chatId)
 	if err != nil {

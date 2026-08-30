@@ -5,7 +5,8 @@ const (
 )
 
 const (
-	ComponentKafkaGo = "kafka-go"
-	ComponentGorm    = "gorm"
-	ComponentHertz   = "hertz"
+	ComponentKafkaGo      = "kafka-go"
+	ComponentClickHouseGo = "clickhouse-go"
+	ComponentGorm         = "gorm"
+	ComponentHertz        = "hertz"
 )

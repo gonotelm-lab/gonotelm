@@ -63,3 +63,11 @@ func Open(ctx context.Context, cfg *sql.Config) (*olap.Dao, error) {
 		text2AudioLogStore,
 	), nil
 }
+
+func valueSliceToPtrSlice[T any](values []T) []*T {
+	ptrs := make([]*T, len(values))
+	for i := range values {
+		ptrs[i] = &values[i]
+	}
+	return ptrs
+}

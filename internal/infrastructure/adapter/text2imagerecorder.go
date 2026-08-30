@@ -35,10 +35,10 @@ func NewText2ImageRecorderAdapter(store olap.Text2ImageLogStore, billingMeter bi
 func (a *Text2ImageRecorderAdapter) Record(ctx context.Context, record *text2image.Record) error {
 	now := time.Now()
 	log := &schema.Text2ImageLog{
-		ID:             uuid.NewV7().String(),
-		GroupID:        pkgcontext.GetSceneGroupId(ctx),
-		TraceID:        pkgcontext.GetReqId(ctx).String(),
-		UserID:         pkgcontext.GetUserId(ctx).String(),
+		Id:             uuid.NewV7().String(),
+		GroupId:        pkgcontext.GetSceneGroupId(ctx),
+		TraceId:        pkgcontext.GetReqId(ctx).String(),
+		UserId:         pkgcontext.GetUserId(ctx).String(),
 		Scene:          string(record.Scene),
 		ModelProvider:  record.Provider.String(),
 		CallStartTime:  record.StartTime,

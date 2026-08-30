@@ -3,14 +3,15 @@ package schema
 import (
 	"time"
 
+	"github.com/gonotelm-lab/gonotelm/pkg/clickhouse/util"
 	"github.com/shopspring/decimal"
 )
 
 type LLMLog struct {
-	ID              string                     `ch:"id"`
-	GroupID         string                     `ch:"group_id"`
-	TraceID         string                     `ch:"trace_id"`
-	UserID          string                     `ch:"user_id"`
+	Id              string                     `ch:"id"`
+	GroupId         string                     `ch:"group_id"`
+	TraceId         string                     `ch:"trace_id"`
+	UserId          string                     `ch:"user_id"`
 	Scene           string                     `ch:"scene"`
 	Model           string                     `ch:"model"`
 	ModelProvider   string                     `ch:"model_provider"`
@@ -29,11 +30,40 @@ type LLMLog struct {
 	Error           *string                    `ch:"error"`
 }
 
+var LLMLogAllFields = util.GetFields(&LLMLog{})
+
+const (
+	LLMLogTableName = "llm_logs"
+	LLMLogSchema    = `
+CREATE TABLE IF NOT EXISTS llm_logs (
+	id String,
+	group_id String,
+	trace_id String,
+	user_id String,
+	scene LowCardinality(String),
+	model LowCardinality(String),
+	model_provider LowCardinality(String),
+	model_parameters Nullable(String),
+	call_start_time DateTime64(3),
+	call_finish_time DateTime64(3),
+	input Nullable(String),
+	output Nullable(String),
+	tool_definitions Map(LowCardinality(String), String),
+	tool_calls Array(Tuple(name LowCardinality(String), arguments String)),
+	usage_details Map(LowCardinality(String), UInt64),
+	cost_details Map(LowCardinality(String), Decimal64(12)),
+	total_cost Nullable(Decimal64(12)),
+	create_time DateTime64(3),
+	metadata Map(LowCardinality(String), String),
+	error Nullable(String)
+) ENGINE = Memory`
+)
+
 type LLMLogToolCall struct {
 	Name      string `ch:"name"`
 	Arguments string `ch:"arguments"`
 }
 
 func (LLMLog) TableName() string {
-	return "llm_logs"
+	return LLMLogTableName
 }

@@ -9,18 +9,22 @@ import (
 
 type LLMLogStore interface {
 	Create(ctx context.Context, log *schema.LLMLog) error
+	Query(ctx context.Context, userId string, timeRange schema.TimeRange, extra *schema.ExtraQueryConditions) ([]*schema.LLMLog, error)
 }
 
 type EmbeddingLogStore interface {
 	Create(ctx context.Context, log *schema.EmbeddingLog) error
+	Query(ctx context.Context, userId string, timeRange schema.TimeRange, extra *schema.ExtraQueryConditions) ([]*schema.EmbeddingLog, error)
 }
 
 type Text2ImageLogStore interface {
 	Create(ctx context.Context, log *schema.Text2ImageLog) error
+	Query(ctx context.Context, userId string, timeRange schema.TimeRange, extra *schema.ExtraQueryConditions) ([]*schema.Text2ImageLog, error)
 }
 
 type Text2AudioLogStore interface {
 	Create(ctx context.Context, log *schema.Text2AudioLog) error
+	Query(ctx context.Context, userId string, timeRange schema.TimeRange, extra *schema.ExtraQueryConditions) ([]*schema.Text2AudioLog, error)
 }
 
 type Dao struct {

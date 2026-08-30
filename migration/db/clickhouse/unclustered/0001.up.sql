@@ -23,14 +23,14 @@ CREATE TABLE IF NOT EXISTS gonotelm.llm_logs (
 	`error` Nullable(String),
 
 	INDEX idx_id id TYPE bloom_filter(0.01) GRANULARITY 4,
+	INDEX idx_group_id group_id TYPE bloom_filter(0.01) GRANULARITY 4,
 	INDEX idx_trace_id trace_id TYPE bloom_filter(0.01) GRANULARITY 4,
-	INDEX idx_user_id user_id TYPE bloom_filter(0.01) GRANULARITY 4,
 	INDEX idx_scene scene TYPE set(0) GRANULARITY 4,
 	INDEX idx_model model TYPE set(0) GRANULARITY 4
 ) ENGINE = MergeTree()
-PARTITION BY toYYYYMMDD(create_time)
-ORDER BY (group_id, create_time, trace_id, id)
-PRIMARY KEY (group_id, create_time, trace_id)
+PARTITION BY toYYYYMMDD(call_start_time)
+ORDER BY (user_id, call_start_time, id)
+PRIMARY KEY (user_id, call_start_time)
 SETTINGS index_granularity = 8192;
 
 CREATE TABLE IF NOT EXISTS gonotelm.embedding_logs (
@@ -51,18 +51,18 @@ CREATE TABLE IF NOT EXISTS gonotelm.embedding_logs (
 	`cost_details` Map(LowCardinality(String), Decimal64(12)),
 	`total_cost` Nullable(Decimal64(12)),
 	`create_time` DateTime64(3) DEFAULT now64(3),
-	`metadata` Nullable(Map(LowCardinality(String), String)),
+	`metadata` Map(LowCardinality(String), String),
 	`error` Nullable(String),
 
 	INDEX idx_id id TYPE bloom_filter(0.01) GRANULARITY 4,
+	INDEX idx_group_id group_id TYPE bloom_filter(0.01) GRANULARITY 4,
 	INDEX idx_trace_id trace_id TYPE bloom_filter(0.01) GRANULARITY 4,
-	INDEX idx_user_id user_id TYPE bloom_filter(0.01) GRANULARITY 4,
 	INDEX idx_scene scene TYPE set(0) GRANULARITY 4,
 	INDEX idx_model model TYPE set(0) GRANULARITY 4
 ) ENGINE = MergeTree()
-PARTITION BY toYYYYMMDD(create_time)
-ORDER BY (group_id, create_time, trace_id, id)
-PRIMARY KEY (group_id, create_time, trace_id)
+PARTITION BY toYYYYMMDD(call_start_time)
+ORDER BY (user_id, call_start_time, id)
+PRIMARY KEY (user_id, call_start_time)
 SETTINGS index_granularity = 8192;
 
 CREATE TABLE IF NOT EXISTS gonotelm.text2image_logs (
@@ -85,14 +85,14 @@ CREATE TABLE IF NOT EXISTS gonotelm.text2image_logs (
 	`error` Nullable(String),
 
 	INDEX idx_id id TYPE bloom_filter(0.01) GRANULARITY 4,
+	INDEX idx_group_id group_id TYPE bloom_filter(0.01) GRANULARITY 4,
 	INDEX idx_trace_id trace_id TYPE bloom_filter(0.01) GRANULARITY 4,
-	INDEX idx_user_id user_id TYPE bloom_filter(0.01) GRANULARITY 4,
 	INDEX idx_scene scene TYPE set(0) GRANULARITY 4,
 	INDEX idx_model model TYPE set(0) GRANULARITY 4
 ) ENGINE = MergeTree()
-PARTITION BY toYYYYMMDD(create_time)
-ORDER BY (group_id, create_time, trace_id, id)
-PRIMARY KEY (group_id, create_time, trace_id)
+PARTITION BY toYYYYMMDD(call_start_time)
+ORDER BY (user_id, call_start_time, id)
+PRIMARY KEY (user_id, call_start_time)
 SETTINGS index_granularity = 8192;
 
 CREATE TABLE IF NOT EXISTS gonotelm.text2audio_logs (
@@ -115,12 +115,12 @@ CREATE TABLE IF NOT EXISTS gonotelm.text2audio_logs (
 	`error` Nullable(String),
 
 	INDEX idx_id id TYPE bloom_filter(0.01) GRANULARITY 4,
+	INDEX idx_group_id group_id TYPE bloom_filter(0.01) GRANULARITY 4,
 	INDEX idx_trace_id trace_id TYPE bloom_filter(0.01) GRANULARITY 4,
-	INDEX idx_user_id user_id TYPE bloom_filter(0.01) GRANULARITY 4,
 	INDEX idx_scene scene TYPE set(0) GRANULARITY 4,
 	INDEX idx_model model TYPE set(0) GRANULARITY 4
 ) ENGINE = MergeTree()
-PARTITION BY toYYYYMMDD(create_time)
-ORDER BY (group_id, create_time, trace_id, id)
-PRIMARY KEY (group_id, create_time, trace_id)
+PARTITION BY toYYYYMMDD(call_start_time)
+ORDER BY (user_id, call_start_time, id)
+PRIMARY KEY (user_id, call_start_time)
 SETTINGS index_granularity = 8192;

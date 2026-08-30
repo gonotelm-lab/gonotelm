@@ -43,10 +43,10 @@ func NewLLMRecorderAdapter(store olap.LLMLogStore, billingMeter billing.Meter) c
 func (a *LLMRecorderAdapter) Record(ctx context.Context, record *chat.Record) error {
 	now := time.Now()
 	log := &schema.LLMLog{
-		ID:             uuid.NewV7().String(),
-		GroupID:        pkgcontext.GetSceneGroupId(ctx),
-		TraceID:        pkgcontext.GetReqId(ctx).String(),
-		UserID:         pkgcontext.GetUserId(ctx).String(),
+		Id:             uuid.NewV7().String(),
+		GroupId:        pkgcontext.GetSceneGroupId(ctx),
+		TraceId:        pkgcontext.GetReqId(ctx).String(),
+		UserId:         pkgcontext.GetUserId(ctx).String(),
 		Scene:          string(record.Scene),
 		ModelProvider:  record.Provider.String(),
 		CallStartTime:  record.StartTime,

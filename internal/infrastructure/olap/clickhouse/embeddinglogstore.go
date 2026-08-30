@@ -36,8 +36,8 @@ func (s *EmbeddingLogStoreImpl) Create(ctx context.Context, log *schema.Embeddin
 		return nil
 	}
 
-	if log.ID == "" {
-		log.ID = uuid.NewV7().String()
+	if log.Id == "" {
+		log.Id = uuid.NewV7().String()
 	}
 	now := time.Now()
 	if log.CreateTime.IsZero() {
@@ -50,4 +50,21 @@ func (s *EmbeddingLogStoreImpl) Create(ctx context.Context, log *schema.Embeddin
 	}
 
 	return nil
+}
+
+func (s *EmbeddingLogStoreImpl) Query(
+	ctx context.Context,
+	userId string,
+	timeRange schema.TimeRange,
+	extra *schema.ExtraQueryConditions,
+) ([]*schema.EmbeddingLog, error) {
+	return selectLogsByUserTime[schema.EmbeddingLog](
+		ctx,
+		s.ch,
+		schema.EmbeddingLogAllFields,
+		schema.EmbeddingLogTableName,
+		userId,
+		timeRange,
+		extra,
+	)
 }

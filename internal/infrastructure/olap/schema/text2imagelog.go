@@ -3,14 +3,15 @@ package schema
 import (
 	"time"
 
+	"github.com/gonotelm-lab/gonotelm/pkg/clickhouse/util"
 	"github.com/shopspring/decimal"
 )
 
 type Text2ImageLog struct {
-	ID              string                     `ch:"id"`
-	GroupID         string                     `ch:"group_id"`
-	TraceID         string                     `ch:"trace_id"`
-	UserID          string                     `ch:"user_id"`
+	Id              string                     `ch:"id"`
+	GroupId         string                     `ch:"group_id"`
+	TraceId         string                     `ch:"trace_id"`
+	UserId          string                     `ch:"user_id"`
 	Scene           string                     `ch:"scene"`
 	Model           string                     `ch:"model"`
 	ModelProvider   string                     `ch:"model_provider"`
@@ -26,6 +27,32 @@ type Text2ImageLog struct {
 	Error           *string                    `ch:"error"`
 }
 
+var Text2ImageLogAllFields = util.GetFields(&Text2ImageLog{})
+
+const (
+	Text2ImageLogTableName = "text2image_logs"
+	Text2ImageLogSchema    = `
+CREATE TABLE IF NOT EXISTS text2image_logs (
+	id String,
+	group_id String,
+	trace_id String,
+	user_id String,
+	scene LowCardinality(String),
+	model LowCardinality(String),
+	model_provider LowCardinality(String),
+	model_parameters Nullable(String),
+	call_start_time DateTime64(3),
+	call_finish_time DateTime64(3),
+	prompt Nullable(String),
+	usage_details Map(LowCardinality(String), UInt64),
+	cost_details Map(LowCardinality(String), Decimal64(12)),
+	total_cost Nullable(Decimal64(12)),
+	create_time DateTime64(3),
+	metadata Map(LowCardinality(String), String),
+	error Nullable(String)
+) ENGINE = Memory`
+)
+
 func (Text2ImageLog) TableName() string {
-	return "text2image_logs"
+	return Text2ImageLogTableName
 }

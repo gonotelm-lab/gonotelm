@@ -39,8 +39,8 @@ func (s *LLMLogStoreImpl) Create(ctx context.Context, log *schema.LLMLog) error 
 		return nil
 	}
 
-	if log.ID == "" {
-		log.ID = uuid.NewV7().String()
+	if log.Id == "" {
+		log.Id = uuid.NewV7().String()
 	}
 	now := time.Now()
 	if log.CreateTime.IsZero() {
@@ -53,4 +53,21 @@ func (s *LLMLogStoreImpl) Create(ctx context.Context, log *schema.LLMLog) error 
 	}
 
 	return nil
+}
+
+func (s *LLMLogStoreImpl) Query(
+	ctx context.Context,
+	userId string,
+	timeRange schema.TimeRange,
+	extra *schema.ExtraQueryConditions,
+) ([]*schema.LLMLog, error) {
+	return selectLogsByUserTime[schema.LLMLog](
+		ctx,
+		s.ch,
+		schema.LLMLogAllFields,
+		schema.LLMLogTableName,
+		userId,
+		timeRange,
+		extra,
+	)
 }

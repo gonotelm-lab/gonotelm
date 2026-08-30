@@ -39,10 +39,10 @@ func NewText2AudioRecorderAdapter(store olap.Text2AudioLogStore, billingMeter bi
 func (a *Text2AudioRecorderAdapter) Record(ctx context.Context, record *text2audio.Record) error {
 	now := time.Now()
 	log := &schema.Text2AudioLog{
-		ID:             uuid.NewV7().String(),
-		GroupID:        pkgcontext.GetSceneGroupId(ctx),
-		TraceID:        pkgcontext.GetReqId(ctx).String(),
-		UserID:         pkgcontext.GetUserId(ctx).String(),
+		Id:             uuid.NewV7().String(),
+		GroupId:        pkgcontext.GetSceneGroupId(ctx),
+		TraceId:        pkgcontext.GetReqId(ctx).String(),
+		UserId:         pkgcontext.GetUserId(ctx).String(),
 		Scene:          string(record.Scene),
 		ModelProvider:  record.Provider.String(),
 		CallStartTime:  record.StartTime,

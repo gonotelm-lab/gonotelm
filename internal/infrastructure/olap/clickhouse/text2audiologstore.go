@@ -36,8 +36,8 @@ func (s *Text2AudioLogStoreImpl) Create(ctx context.Context, log *schema.Text2Au
 		return nil
 	}
 
-	if log.ID == "" {
-		log.ID = uuid.NewV7().String()
+	if log.Id == "" {
+		log.Id = uuid.NewV7().String()
 	}
 	now := time.Now()
 	if log.CreateTime.IsZero() {
@@ -50,4 +50,21 @@ func (s *Text2AudioLogStoreImpl) Create(ctx context.Context, log *schema.Text2Au
 	}
 
 	return nil
+}
+
+func (s *Text2AudioLogStoreImpl) Query(
+	ctx context.Context,
+	userId string,
+	timeRange schema.TimeRange,
+	extra *schema.ExtraQueryConditions,
+) ([]*schema.Text2AudioLog, error) {
+	return selectLogsByUserTime[schema.Text2AudioLog](
+		ctx,
+		s.ch,
+		schema.Text2AudioLogAllFields,
+		schema.Text2AudioLogTableName,
+		userId,
+		timeRange,
+		extra,
+	)
 }

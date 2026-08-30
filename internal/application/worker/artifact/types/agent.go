@@ -17,7 +17,7 @@ import (
 type Agent = pkgagent.Agent[*SessionState]
 
 func BuildSourceExploreAgent(
-	deps *ServiceDeps,
+	deps *WorkerDeps,
 	modelProvider llmchat.Provider,
 	model string,
 	maxRound int,

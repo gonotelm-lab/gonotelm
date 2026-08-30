@@ -6,14 +6,15 @@ import (
 	"log/slog"
 	"strings"
 
-	flowworker "github.com/gonotelm-lab/flow/client/worker"
-	artifactgeneration "github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact"
-	generatetypes "github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
+	workertypes "github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	bootshared "github.com/gonotelm-lab/gonotelm/internal/bootstrap/shared"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/service/agentize"
-	infrarepo "github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository"
+	workerentry "github.com/gonotelm-lab/gonotelm/internal/interfaces/entrypoint/worker"
 	"github.com/gonotelm-lab/gonotelm/pkg/trace"
+
+	flowworker "github.com/gonotelm-lab/flow/client/worker"
 
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
@@ -59,28 +60,28 @@ func NewWorker(ctx context.Context, cfg *conf.WorkerConfig) (*Worker, error) {
 		return nil, err
 	}
 
-	sourceRepo := infrarepo.NewSourceRepository(shared.Database.SourceStore)
-	storageRepo := infrarepo.NewSourceStorageRepository(shared.Storage)
-	sourceDocRepo := infrarepo.NewSourceDocRepository(
+	sourceRepo := repository.NewSourceRepository(shared.Database.SourceStore)
+	storageRepo := repository.NewSourceStorageRepository(shared.Storage)
+	sourceDocRepo := repository.NewSourceDocRepository(
 		shared.Embedder,
 		shared.VectorDatabase.SourceDocStore,
-		infrarepo.SourceDocRepositoryConfig{
+		repository.SourceDocRepositoryConfig{
 			EmbedBatchSize:      cfg.Embedding.BatchSize,
 			EmbedMaxConcurrency: cfg.Embedding.MaxConcurrency,
 		},
 	)
 	agentizeService := agentize.NewService(agentize.Config{}, sourceRepo, storageRepo, sourceDocRepo)
 
-	deps := &generatetypes.ServiceDeps{
+	deps := &workertypes.WorkerDeps{
 		Agentize:             agentizeService,
 		LLMGateway:           shared.LLMGateway,
 		Text2Image:           shared.Text2Image,
 		Text2Audio:           shared.Text2Audio,
 		Sandbox:              shared.SandboxGateway,
-		SandboxRepository:    infrarepo.NewSandboxRepository(shared.Cache.SandboxCache),
+		SandboxRepository:    repository.NewSandboxRepository(shared.Cache.SandboxCache),
 		DistLock:             shared.DistLock,
 		ObjectStorage:        shared.Storage,
-		CheckpointRepository: infrarepo.NewCheckpointRepository(shared.Database.WorkerCheckpointStore),
+		CheckpointRepository: repository.NewCheckpointRepository(shared.Database.WorkerCheckpointStore),
 	}
 
 	app := &Worker{shared: shared}
@@ -93,7 +94,7 @@ func NewWorker(ctx context.Context, cfg *conf.WorkerConfig) (*Worker, error) {
 			HeartbeatInterval: cfg.Worker.Heartbeat,
 		})
 		c := flowworker.NewWithConn(conn, wcfg)
-		artifactgeneration.RegisterTypedWorker(c, deps)
+		workerentry.Register(c, deps)
 		app.clients = append(app.clients, c)
 	}
 	return app, nil

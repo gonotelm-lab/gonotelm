@@ -1,4 +1,4 @@
-package artifact
+package worker
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"log/slog"
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/shared/contract"
-	generatetypes "github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
+	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
@@ -20,8 +20,12 @@ import (
 	"github.com/bytedance/sonic"
 )
 
-func RegisterTypedWorker(client *flow.Client, deps *generatetypes.ServiceDeps) {
-	flow.RegisterTypedResult(client, func(ctx context.Context, in contract.WorkerInput) (flow.Result, error) {
+func Register(client *flow.Client, deps *types.WorkerDeps) {
+	flow.RegisterTypedResult(client, workerFn(deps))
+}
+
+func workerFn(deps *types.WorkerDeps) func(ctx context.Context, in contract.WorkerInput) (flow.Result, error) {
+	return func(ctx context.Context, in contract.WorkerInput) (flow.Result, error) {
 		kind := artifactentity.Kind(in.Kind)
 		if !kind.Supported() {
 			return paramErrorResult("unsupported artifact kind: %s", kind), nil
@@ -48,7 +52,7 @@ func RegisterTypedWorker(client *flow.Client, deps *generatetypes.ServiceDeps) {
 			return paramErrorResult("payload: %v", err), nil
 		}
 
-		req := &generatetypes.Request{
+		req := &types.Request{
 			ArtifactId: artifactId,
 			NotebookId: notebookId,
 			UserId:     userId,
@@ -59,11 +63,13 @@ func RegisterTypedWorker(client *flow.Client, deps *generatetypes.ServiceDeps) {
 
 		ctx = trace.RestoreReqIdFromTrace(ctx)
 		ctx = pkgcontext.WithUserId(ctx, userId)
-		resp, err := Run(ctx, deps, req)
+		resp, err := run(ctx, deps, req)
 		if err != nil {
 			errMsg := err.Error()
-			slog.ErrorContext(ctx, "worker generate artifact failed",
+			slog.ErrorContext(ctx,
+				"worker generate artifact failed",
 				slog.Any("err", err),
+				slog.String("kind", string(kind)),
 				slog.String("artifact_id", artifactId.String()),
 				slog.String("notebook_id", notebookId.String()),
 			)
@@ -86,7 +92,7 @@ func RegisterTypedWorker(client *flow.Client, deps *generatetypes.ServiceDeps) {
 			}, nil
 		}
 		return flow.OkResult{Data: data}, nil
-	})
+	}
 }
 
 func paramErrorResult(format string, args ...any) flow.Result {

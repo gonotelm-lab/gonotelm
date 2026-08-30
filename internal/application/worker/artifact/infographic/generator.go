@@ -35,13 +35,13 @@ import (
 )
 
 type Generator struct {
-	deps           *types.ServiceDeps
+	deps           *types.WorkerDeps
 	downloadClient *http.Client
 }
 
 var _ types.Generator = &Generator{}
 
-func New(deps *types.ServiceDeps) *Generator {
+func New(deps *types.WorkerDeps) *Generator {
 	return &Generator{
 		deps:           deps,
 		downloadClient: httpclient.NewBuilder(nil).WithTimeout(5 * time.Minute).Build(),

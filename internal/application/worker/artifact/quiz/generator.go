@@ -43,12 +43,12 @@ type quizExpectation struct {
 }
 
 type Generator struct {
-	deps *types.ServiceDeps
+	deps *types.WorkerDeps
 }
 
 var _ types.Generator = &Generator{}
 
-func New(deps *types.ServiceDeps) *Generator {
+func New(deps *types.WorkerDeps) *Generator {
 	return &Generator{deps: deps}
 }
 

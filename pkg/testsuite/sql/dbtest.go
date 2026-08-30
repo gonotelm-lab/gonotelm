@@ -19,11 +19,10 @@ import (
 var pgIdentifierPattern = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]{0,62}$`)
 
 const (
-	EnvGonotelmDBHost   = "GONOTELM_DB_HOST"
-	EnvGonotelmDBPort   = "GONOTELM_DB_PORT"
-	EnvGonotelmDBUser   = "GONOTELM_DB_USER"
-	EnvGonotelmDBPass   = "GONOTELM_DB_PASS"
-	EnvGonotelmDBDBName = "GONOTELM_DB_DBNAME"
+	EnvGonotelmTestDBHost = "TEST_GONOTELM_DB_HOST"
+	EnvGonotelmTestDBPort = "TEST_GONOTELM_DB_PORT"
+	EnvGonotelmTestDBUser = "TEST_GONOTELM_DB_USER"
+	EnvGonotelmTestDBPass = "TEST_GONOTELM_DB_PASS"
 )
 
 type TestDb struct {
@@ -45,6 +44,10 @@ func NewTestGormDB(driver string, config *sql.Config) (*TestDb, error) {
 	}
 
 	cfg := *config
+	if normalizedDriver == "pgsql" {
+		// DB name is never caller-specified: Setup always creates an ephemeral test_* database.
+		cfg.DBName = ""
+	}
 	if err := validateConfig(normalizedDriver, &cfg); err != nil {
 		return nil, err
 	}
@@ -66,25 +69,21 @@ func NewTestGormDBFromEnv(driver string) (*TestDb, error) {
 	case "pgsql":
 		missing := make([]string, 0, 5)
 
-		host := strings.TrimSpace(os.Getenv(EnvGonotelmDBHost))
+		host := strings.TrimSpace(os.Getenv(EnvGonotelmTestDBHost))
 		if host == "" {
-			missing = append(missing, EnvGonotelmDBHost)
+			missing = append(missing, EnvGonotelmTestDBHost)
 		}
-		portStr := strings.TrimSpace(os.Getenv(EnvGonotelmDBPort))
+		portStr := strings.TrimSpace(os.Getenv(EnvGonotelmTestDBPort))
 		if portStr == "" {
-			missing = append(missing, EnvGonotelmDBPort)
+			missing = append(missing, EnvGonotelmTestDBPort)
 		}
-		user := strings.TrimSpace(os.Getenv(EnvGonotelmDBUser))
+		user := strings.TrimSpace(os.Getenv(EnvGonotelmTestDBUser))
 		if user == "" {
-			missing = append(missing, EnvGonotelmDBUser)
+			missing = append(missing, EnvGonotelmTestDBUser)
 		}
-		pass := strings.TrimSpace(os.Getenv(EnvGonotelmDBPass))
+		pass := strings.TrimSpace(os.Getenv(EnvGonotelmTestDBPass))
 		if pass == "" {
-			missing = append(missing, EnvGonotelmDBPass)
-		}
-		dbName := strings.TrimSpace(os.Getenv(EnvGonotelmDBDBName))
-		if dbName == "" {
-			missing = append(missing, EnvGonotelmDBDBName)
+			missing = append(missing, EnvGonotelmTestDBPass)
 		}
 
 		if len(missing) > 0 {
@@ -93,7 +92,7 @@ func NewTestGormDBFromEnv(driver string) (*TestDb, error) {
 
 		port, err := strconv.Atoi(portStr)
 		if err != nil {
-			return nil, fmt.Errorf("invalid env %s=%q: %w", EnvGonotelmDBPort, portStr, err)
+			return nil, fmt.Errorf("invalid env %s=%q: %w", EnvGonotelmTestDBPort, portStr, err)
 		}
 
 		return NewTestGormDB("pgsql", &sql.Config{
@@ -101,7 +100,6 @@ func NewTestGormDBFromEnv(driver string) (*TestDb, error) {
 			Port:     port,
 			User:     user,
 			Password: pass,
-			DBName:   dbName,
 		})
 	default:
 		return nil, fmt.Errorf("driver %s env loader is not implemented yet", normalizedDriver)
@@ -189,7 +187,7 @@ func (t *TestDb) cleanupPgsql() error {
 	t.db = nil
 
 	if t.testDBName != "" {
-		errs = append(errs, dropTestTables(&t.config, t.testDBName, t.logger))
+		// Ephemeral test_* databases are dropped entirely; no need to drop tables first.
 		errs = append(errs, dropPgDatabase(&t.config, t.testDBName, t.logger))
 	}
 	t.testDBName = ""
@@ -238,27 +236,6 @@ func dropPgDatabase(config *sql.Config, dbName string, gormLogger gormlogger.Int
 		if fallbackErr := adminDB.Exec(dropSQL).Error; fallbackErr != nil {
 			return fmt.Errorf("drop test db failed, force=%v fallback=%v", err, fallbackErr)
 		}
-	}
-	return nil
-}
-
-func dropTestTables(adminConfig *sql.Config, testDBName string, gormLogger gormlogger.Interface) error {
-	testConfig := *adminConfig
-	testConfig.DBName = testDBName
-
-	testDB, err := sql.OpenPgSqlWithLogger(&testConfig, gormLogger)
-	if err != nil {
-		return fmt.Errorf("open test db for dropping tables failed: %w", err)
-	}
-	defer func() {
-		_ = closeGormDB(testDB)
-	}()
-
-	if err := testDB.Exec(`DROP TABLE IF EXISTS sources`).Error; err != nil {
-		return fmt.Errorf("drop table sources failed: %w", err)
-	}
-	if err := testDB.Exec(`DROP TABLE IF EXISTS notebooks`).Error; err != nil {
-		return fmt.Errorf("drop table notebooks failed: %w", err)
 	}
 	return nil
 }
@@ -331,9 +308,7 @@ func validateConfig(driver string, config *sql.Config) error {
 		if strings.TrimSpace(config.Password) == "" {
 			return fmt.Errorf("db password is empty")
 		}
-		if strings.TrimSpace(config.DBName) == "" {
-			return fmt.Errorf("db name is empty")
-		}
+		// DBName is unused for pgsql tests: Setup always creates an ephemeral test_* database.
 		return nil
 	case "sqlite":
 		if strings.TrimSpace(config.DBName) == "" {
@@ -369,7 +344,7 @@ func newRandomTestDBName() (string, error) {
 		return "", fmt.Errorf("read random bytes failed: %w", err)
 	}
 
-	name := fmt.Sprintf("gonotelm_test_%d_%x", time.Now().UnixNano(), randBytes)
+	name := fmt.Sprintf("test_%d_%x", time.Now().UnixNano(), randBytes)
 	if len(name) > 63 {
 		name = name[:63]
 	}
@@ -385,11 +360,7 @@ func openPgAdminDB(config *sql.Config, gormLogger gormlogger.Interface) (*gorm.D
 		return nil, fmt.Errorf("db config is nil")
 	}
 
-	candidates := make([]string, 0, 3)
-	candidates = append(candidates, "postgres", "template1")
-	if dbName := strings.TrimSpace(config.DBName); dbName != "" {
-		candidates = append(candidates, dbName)
-	}
+	candidates := []string{"postgres", "template1"}
 
 	var errs []error
 	for _, dbName := range candidates {

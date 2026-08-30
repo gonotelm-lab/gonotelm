@@ -16,7 +16,7 @@ import (
 
 func newStore(t *testing.T) (*LLMLogStoreImpl, *pkgch.Conn) {
 	t.Helper()
-	driver, err := openTestConn("default")
+	driver, err := testDB.OpenConn()
 	require.NoError(t, err)
 	conn := pkgch.NewConn(driver)
 	t.Cleanup(func() { _ = conn.Close() })

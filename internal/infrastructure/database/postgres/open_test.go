@@ -6,22 +6,22 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/gonotelm-lab/gonotelm/pkg/sql"
-	"github.com/gonotelm-lab/gonotelm/pkg/sql/testsuite"
+	pkgsql "github.com/gonotelm-lab/gonotelm/pkg/sql"
+	sqltestsuite "github.com/gonotelm-lab/gonotelm/pkg/testsuite/sql"
 )
 
 func TestOpen(t *testing.T) {
-	port, err := strconv.Atoi(os.Getenv(testsuite.EnvGonotelmDBPort))
+	port, err := strconv.Atoi(os.Getenv(sqltestsuite.EnvGonotelmTestDBPort))
 	if err != nil {
-		t.Fatalf("invalid %s: %v", testsuite.EnvGonotelmDBPort, err)
+		t.Fatalf("invalid %s: %v", sqltestsuite.EnvGonotelmTestDBPort, err)
 	}
 
-	dao, err := Open(&sql.Config{
-		Host:     os.Getenv(testsuite.EnvGonotelmDBHost),
+	dao, err := Open(&pkgsql.Config{
+		Host:     os.Getenv(sqltestsuite.EnvGonotelmTestDBHost),
 		Port:     port,
-		User:     os.Getenv(testsuite.EnvGonotelmDBUser),
-		Password: os.Getenv(testsuite.EnvGonotelmDBPass),
-		DBName:   os.Getenv(testsuite.EnvGonotelmDBDBName),
+		User:     os.Getenv(sqltestsuite.EnvGonotelmTestDBUser),
+		Password: os.Getenv(sqltestsuite.EnvGonotelmTestDBPass),
+		DBName:   "postgres",
 	})
 	if err != nil {
 		t.Fatalf("Open() failed: %v", err)

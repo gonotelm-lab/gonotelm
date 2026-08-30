@@ -1,6 +1,6 @@
 CREATE DATABASE IF NOT EXISTS gonotelm;
 
-CREATE TABLE IF NOT EXISTS gonotelm.llm_logs (
+CREATE TABLE IF NOT EXISTS llm_logs (
 	`id` String,
 	`group_id` String,
 	`trace_id` String,
@@ -33,7 +33,7 @@ ORDER BY (user_id, call_start_time, id)
 PRIMARY KEY (user_id, call_start_time)
 SETTINGS index_granularity = 8192;
 
-CREATE TABLE IF NOT EXISTS gonotelm.embedding_logs (
+CREATE TABLE IF NOT EXISTS embedding_logs (
 	`id` String,
 	`group_id` String,
 	`trace_id` String,
@@ -65,7 +65,7 @@ ORDER BY (user_id, call_start_time, id)
 PRIMARY KEY (user_id, call_start_time)
 SETTINGS index_granularity = 8192;
 
-CREATE TABLE IF NOT EXISTS gonotelm.text2image_logs (
+CREATE TABLE IF NOT EXISTS text2image_logs (
 	`id` String,
 	`group_id` String,
 	`trace_id` String,
@@ -95,7 +95,7 @@ ORDER BY (user_id, call_start_time, id)
 PRIMARY KEY (user_id, call_start_time)
 SETTINGS index_granularity = 8192;
 
-CREATE TABLE IF NOT EXISTS gonotelm.text2audio_logs (
+CREATE TABLE IF NOT EXISTS text2audio_logs (
 	`id` String,
 	`group_id` String,
 	`trace_id` String,

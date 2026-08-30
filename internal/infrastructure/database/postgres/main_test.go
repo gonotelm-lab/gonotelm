@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/gonotelm-lab/gonotelm/pkg/sql/testsuite"
+	sqltestsuite "github.com/gonotelm-lab/gonotelm/pkg/testsuite/sql"
 
 	"gorm.io/gorm"
 )
@@ -20,11 +20,9 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	const migrationFilePath = "../../../../migration/db/postgres18.sql"
+	const migrationFilePath = "../../../../migration/db/postgres18/0001.sql"
 
-	var testDatabase *testsuite.TestDb
-	var err error
-	testDatabase, err = testsuite.NewTestGormDBFromEnv("pgsql")
+	testDatabase, err := sqltestsuite.NewTestGormDBFromEnv("pgsql")
 	if err != nil {
 		panic(err)
 	}
@@ -40,9 +38,7 @@ func TestMain(m *testing.M) {
 
 	m.Run()
 
-	if testDatabase != nil {
-		if err := testDatabase.Cleanup(); err != nil {
-			fmt.Fprintf(os.Stderr, "cleanup test database failed: %v\n", err)
-		}
+	if err := testDatabase.Cleanup(); err != nil {
+		fmt.Fprintf(os.Stderr, "cleanup test database failed: %v\n", err)
 	}
 }

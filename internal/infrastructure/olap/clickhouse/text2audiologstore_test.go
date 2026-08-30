@@ -14,7 +14,7 @@ import (
 
 func newText2AudioStore(t *testing.T) (*Text2AudioLogStoreImpl, *pkgch.Conn) {
 	t.Helper()
-	driver, err := openTestConn("default")
+	driver, err := testDB.OpenConn()
 	require.NoError(t, err)
 	conn := pkgch.NewConn(driver)
 	t.Cleanup(func() { _ = conn.Close() })

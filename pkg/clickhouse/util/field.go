@@ -10,7 +10,7 @@ func getFields(v any, keep func(v string) bool) (string, []string) {
 	var tags []string
 	val := reflect.TypeOf(v)
 
-	if val.Kind() == reflect.Ptr {
+	if val.Kind() == reflect.Pointer {
 		val = val.Elem()
 	}
 

@@ -3,10 +3,10 @@ package notelm
 import (
 	"context"
 
-	artifacteventhandle "github.com/gonotelm-lab/gonotelm/internal/application/notelm/artifact/eventhandle"
-	chateventhandle "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/eventhandle"
-	chatsuggest "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/suggestion"
-	sourceeventhandle "github.com/gonotelm-lab/gonotelm/internal/application/notelm/source/eventhandle"
+	artifact "github.com/gonotelm-lab/gonotelm/internal/application/notelm/artifact/eventhandle"
+	chat "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/eventhandle"
+	"github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/suggestion"
+	source "github.com/gonotelm-lab/gonotelm/internal/application/notelm/source/eventhandle"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
@@ -28,7 +28,7 @@ type EventDeps struct {
 	ChatMessageRepo        chatrepo.MessageRepository
 	ChatContextMessageRepo chatrepo.ContextMessageRepository
 	ChatSuggestionRepo     chatrepo.SuggestionRepository
-	ChatSuggestService     *chatsuggest.Service
+	ChatSuggestService     *suggestion.Service
 
 	ArtifactTaskRepo artifactrepo.Repository
 
@@ -51,9 +51,9 @@ func Init(ctx context.Context, deps *EventDeps) {
 }
 
 func initSourceEventConsumers(ctx context.Context, deps *EventDeps) error {
-	if err := sourceeventhandle.RegisterSourceDeletedConsumer(ctx,
+	if err := source.RegisterSourceDeletedConsumer(ctx,
 		deps.EventBus,
-		sourceeventhandle.NewOnSourceDeletedEventHandler(
+		source.NewOnSourceDeletedEventHandler(
 			deps.SourceDocRepo,
 			deps.SourceStorageRepo,
 		),
@@ -65,9 +65,9 @@ func initSourceEventConsumers(ctx context.Context, deps *EventDeps) error {
 }
 
 func initNotebookEventConsumers(ctx context.Context, deps *EventDeps) error {
-	if err := chateventhandle.RegisterNotebookEventConsumer(ctx,
+	if err := chat.RegisterNotebookEventConsumer(ctx,
 		deps.EventBus,
-		chateventhandle.NewOnNotebookEventHandler(
+		chat.NewOnNotebookEventHandler(
 			deps.ChatRepo,
 			deps.ChatMessageRepo,
 			deps.ChatContextMessageRepo,
@@ -76,9 +76,9 @@ func initNotebookEventConsumers(ctx context.Context, deps *EventDeps) error {
 		return err
 	}
 
-	if err := sourceeventhandle.RegisterNotebookEventConsumer(ctx,
+	if err := source.RegisterNotebookEventConsumer(ctx,
 		deps.EventBus,
-		sourceeventhandle.NewOnNotebookEventHandler(
+		source.NewOnNotebookEventHandler(
 			deps.SourceRepo,
 			deps.SourceDocRepo,
 			deps.SourceStorageRepo,
@@ -87,16 +87,16 @@ func initNotebookEventConsumers(ctx context.Context, deps *EventDeps) error {
 		return err
 	}
 
-	return artifacteventhandle.RegisterNotebookEventConsumer(ctx,
+	return artifact.RegisterNotebookEventConsumer(ctx,
 		deps.EventBus,
-		artifacteventhandle.NewOnNotebookEventHandler(deps.ArtifactTaskRepo),
+		artifact.NewOnNotebookEventHandler(deps.ArtifactTaskRepo),
 	)
 }
 
 func initStreamTaskEventConsumers(ctx context.Context, deps *EventDeps) error {
-	if err := chateventhandle.RegisterStreamTaskEventConsumer(ctx,
+	if err := chat.RegisterStreamTaskEventConsumer(ctx,
 		deps.EventBus,
-		chateventhandle.NewOnStreamTaskEventHandler(
+		chat.NewOnStreamTaskEventHandler(
 			deps.RootCtx,
 			deps.ChatRepo,
 			deps.ChatSuggestService,

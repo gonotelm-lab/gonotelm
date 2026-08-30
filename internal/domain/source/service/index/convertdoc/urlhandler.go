@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
+	sourceerr "github.com/gonotelm-lab/gonotelm/internal/domain/source/errors"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/service/index/convertdoc/transformer"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/httpclient"
@@ -64,11 +65,16 @@ func (h *UrlHandler) Handle(
 
 	targetUrl, err := url.Parse(urlContent.Url)
 	if err != nil {
-		return nil, errors.Wrapf(err, "parse url failed, url=%s", urlContent.Url)
+		return nil, errors.Wrapf(
+			sourceerr.ErrSourceInvalidURL,
+			"parse url failed, url=%s, err=%v",
+			urlContent.Url,
+			err,
+		)
 	}
 
 	if targetUrl.Scheme != "http" && targetUrl.Scheme != "https" {
-		return nil, errors.ErrParams.Msgf("invalid url scheme, url=%s", urlContent.Url)
+		return nil, sourceerr.ErrSourceInvalidURL.Msgf("invalid url scheme, url=%s", urlContent.Url)
 	}
 
 	content, err := h.defaultUrlFetcher(ctx, targetUrl)
@@ -128,22 +134,32 @@ func (h *UrlHandler) defaultUrlFetcher(ctx context.Context, url *url.URL) ([]byt
 			return nil, errors.Wrap(err, "parse content length failed")
 		}
 		if contentLength > maxFetchContentLength {
-			return nil, errors.ErrParams.Msgf("content length too large, contentLength=%d", contentLength)
+			return nil, errors.Wrapf(
+				sourceerr.ErrSourceContentTooLarge,
+				"content length too large, contentLength=%d",
+				contentLength,
+			)
 		}
 	}
 
 	contentType := resp.Header.Get("Content-Type")
 	parts := strings.Split(contentType, ";")
 	if len(parts) == 0 {
-		return nil, errors.ErrParams.Msgf("invalid content type, contentType=%s", contentType)
+		return nil, sourceerr.ErrSourceUnsupportedContentType.Msgf(
+			"invalid content type, contentType=%s", contentType,
+		)
 	}
 	mimeType := strings.ToLower(parts[0])
 	if isImageAttachment(mimeType) {
-		return nil, errors.ErrParams.Msgf("image attachment not supported, contentType=%s", contentType)
+		return nil, sourceerr.ErrSourceUnsupportedContentType.Msgf(
+			"image attachment not supported, contentType=%s", contentType,
+		)
 	}
 
 	if !isTextMime(mimeType) {
-		return nil, errors.ErrParams.Msgf("not text mime type, contentType=%s", contentType)
+		return nil, sourceerr.ErrSourceUnsupportedContentType.Msgf(
+			"not text mime type, contentType=%s", contentType,
+		)
 	}
 
 	bodyReader := io.LimitReader(resp.Body, maxFetchContentLength)

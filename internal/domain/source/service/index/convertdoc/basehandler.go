@@ -217,7 +217,10 @@ func (h *baseHandler) transform(
 		if err != nil {
 			slog.WarnContext(ctx,
 				fmt.Sprintf("source handle pipeline %s transformer[%d] failed", h.name, idx),
-				"source_id", source.Id, "err", err, "pipeline_name", h.name)
+				slog.Any("err", err),
+				slog.String("source_id", source.Id.String()),
+				slog.String("pipeline_name", h.name),
+			)
 			continue
 		}
 

@@ -84,7 +84,7 @@ func (s *Service) IndexSource(
 
 	estimatedToken := token.Estimate(pkgstring.FromBytes(handleResult.ParsedContent))
 	if estimatedToken > entity.MaxSourceTextContentToken {
-		return nil, errors.Wrapf(domainerr.ErrSourceContentTooLong, "estimated token is %d", estimatedToken)
+		return nil, errors.Wrapf(domainerr.ErrSourceContentTooLarge, "estimated token is %d", estimatedToken)
 	}
 
 	slog.DebugContext(ctx, "prepare source indices",

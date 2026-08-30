@@ -2,6 +2,8 @@ package worker
 
 import "github.com/gonotelm-lab/gonotelm/pkg/errors"
 
-var (
-	ErrCheckpointNotFound = errors.ErrNoRecord.Msg("checkpoint not found")
+const (
+	CodeCheckpointNotFound = 104001
 )
+
+var ErrCheckpointNotFound = errors.ErrNoRecord.ErrCode(CodeCheckpointNotFound).Msg("checkpoint not found")

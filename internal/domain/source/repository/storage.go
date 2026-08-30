@@ -18,6 +18,12 @@ type PresignGetResult struct {
 	Url string
 }
 
+type ObjectInfo struct {
+	Key         string
+	Size        int64
+	ContentType string
+}
+
 type StorageRepository interface {
 	FileObjectGetter
 	FileObjectDeleter
@@ -33,7 +39,9 @@ var ErrObjectNotFound = errors.ErrNoRecord.Msg("file object not found")
 type FileObjectGetter interface {
 	// 返回 ErrObjectNotFound 表示对象不存在
 	// 一次性获取对象全部内容
-	GetObject(ctx context.Context, storeKey string) ([]byte, int64, error)
+	GetObject(ctx context.Context, storeKey string) ([]byte, *ObjectInfo, error)
+
+	GetPartialObject(ctx context.Context, storeKey string, offset int64, length int64) ([]byte, *ObjectInfo, error)
 }
 
 type FileObjectDeleter interface {

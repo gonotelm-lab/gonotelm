@@ -2,14 +2,17 @@ package minio
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
+	pkgerrors "github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"go.opentelemetry.io/otel"
@@ -340,4 +343,183 @@ func assertSpanIntAttr(t *testing.T, sp tracetest.SpanStub, key string, want int
 		}
 	}
 	t.Fatalf("attr %s not found", key)
+}
+
+func newTestLiveMinioStorage(t *testing.T) *Storage {
+	t.Helper()
+
+	accessKey := os.Getenv("GONOTELM_MINIO_ACCESS_KEY")
+	secretKey := os.Getenv("GONOTELM_MINIO_SECRET_KEY")
+	if accessKey == "" || secretKey == "" {
+		t.Fatal("GONOTELM_MINIO_ACCESS_KEY / GONOTELM_MINIO_SECRET_KEY 未设置")
+	}
+
+	endpoint := os.Getenv("GONOTELM_MINIO_ENDPOINT")
+	if endpoint == "" {
+		endpoint = "127.0.0.1:9000"
+	}
+	region := os.Getenv("GONOTELM_MINIO_REGION")
+	if region == "" {
+		region = "us-east-1"
+	}
+	const bucket = "gonotelm-test"
+
+	s, err := New(&storage.Config{
+		Endpoint:  endpoint,
+		Region:    region,
+		Bucket:    bucket,
+		AccessKey: accessKey,
+		SecretKey: secretKey,
+		Secure:    os.Getenv("GONOTELM_MINIO_SECURE") == "true",
+	})
+	if err != nil {
+		t.Fatalf("create live minio storage: %v", err)
+	}
+
+	ctx := context.Background()
+	exists, err := s.client.BucketExists(ctx, s.bucket)
+	if err != nil {
+		t.Fatalf("bucket exists: %v", err)
+	}
+	if !exists {
+		if err := s.client.MakeBucket(ctx, s.bucket, minio.MakeBucketOptions{Region: s.region}); err != nil {
+			t.Fatalf("make bucket: %v", err)
+		}
+	}
+
+	return s
+}
+
+func TestGetPartialObject(t *testing.T) {
+	ctx := context.Background()
+	s := newTestLiveMinioStorage(t)
+
+	key := fmt.Sprintf("test/get-partial-object/%d", time.Now().UnixNano())
+	payload := []byte("abcdefghijklmnopqrstuvwxyz")
+	const offset int64 = 3
+	const length int64 = 5
+
+	t.Cleanup(func() {
+		_ = s.DeleteObject(context.Background(), &storage.DeleteObjectRequest{Key: key})
+	})
+
+	if err := s.UploadObject(ctx, &storage.UploadObjectRequest{
+		Key:         key,
+		Body:        payload,
+		ContentType: "text/plain",
+	}); err != nil {
+		t.Fatalf("upload: %v", err)
+	}
+
+	resp, err := s.GetPartialObject(ctx, &storage.GetPartialObjectRequest{
+		Key:    key,
+		Offset: offset,
+		Length: length,
+	})
+	if err != nil {
+		t.Fatalf("GetPartialObject: %v", err)
+	}
+
+	t.Logf("total = %s\n", string(payload))
+	t.Logf("partial = %s\n", string(resp.Body))
+	t.Logf("bytesRead = %d\n", resp.BytesRead)
+	t.Logf("info.size = %d\n", resp.Info.Size)
+	t.Logf("info.key = %s\n", resp.Info.Key)
+
+	want := payload[offset : offset+length]
+	if string(resp.Body) != string(want) {
+		t.Fatalf("body: got %q want %q", resp.Body, want)
+	}
+	if resp.BytesRead != len(want) {
+		t.Fatalf("bytesRead: got %d want %d", resp.BytesRead, len(want))
+	}
+	if resp.Info.Size != int64(len(payload)) {
+		t.Fatalf("info.size: got %d want %d", resp.Info.Size, len(payload))
+	}
+	if resp.Info.Key != key {
+		t.Fatalf("info.key: got %q want %q", resp.Info.Key, key)
+	}
+}
+
+func uploadTestObject(t *testing.T, s *Storage, payload []byte) string {
+	t.Helper()
+	key := fmt.Sprintf("test/get-partial-object/%d", time.Now().UnixNano())
+	t.Cleanup(func() {
+		_ = s.DeleteObject(context.Background(), &storage.DeleteObjectRequest{Key: key})
+	})
+	if err := s.UploadObject(context.Background(), &storage.UploadObjectRequest{
+		Key:         key,
+		Body:        payload,
+		ContentType: "text/plain",
+	}); err != nil {
+		t.Fatalf("upload: %v", err)
+	}
+	return key
+}
+
+func TestGetPartialObjectReadToEnd(t *testing.T) {
+	s := newTestLiveMinioStorage(t)
+	payload := []byte("abcdefghijklmnopqrstuvwxyz")
+	key := uploadTestObject(t, s, payload)
+
+	const offset int64 = 20
+	resp, err := s.GetPartialObject(context.Background(), &storage.GetPartialObjectRequest{
+		Key:    key,
+		Offset: offset,
+		Length: 20,
+	})
+	if err != nil {
+		t.Fatalf("GetPartialObject: %v", err)
+	}
+
+	want := payload[offset:]
+	if string(resp.Body) != string(want) {
+		t.Fatalf("body: got %q want %q", resp.Body, want)
+	}
+	if resp.BytesRead != len(want) {
+		t.Fatalf("bytesRead: got %d want %d", resp.BytesRead, len(want))
+	}
+}
+
+func TestGetPartialObjectOffsetBeyondSize(t *testing.T) {
+	s := newTestLiveMinioStorage(t)
+	payload := []byte("abcdefghijklmnopqrstuvwxyz")
+	key := uploadTestObject(t, s, payload)
+
+	_, err := s.GetPartialObject(context.Background(), &storage.GetPartialObjectRequest{
+		Key:    key,
+		Offset: int64(len(payload)),
+		Length: 1,
+	})
+	if err == nil {
+		t.Fatal("want error when offset is at/beyond object size")
+	}
+}
+
+func TestGetPartialObjectInvalidRequest(t *testing.T) {
+	s := &Storage{}
+	ctx := context.Background()
+
+	tests := []struct {
+		name string
+		req  *storage.GetPartialObjectRequest
+	}{
+		{name: "nil request"},
+		{name: "empty key", req: &storage.GetPartialObjectRequest{Offset: 0, Length: 1}},
+		{name: "negative offset", req: &storage.GetPartialObjectRequest{Key: "k", Offset: -1, Length: 1}},
+		{name: "zero length", req: &storage.GetPartialObjectRequest{Key: "k", Offset: 0, Length: 0}},
+		{name: "negative length", req: &storage.GetPartialObjectRequest{Key: "k", Offset: 0, Length: -1}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := s.GetPartialObject(ctx, tt.req)
+			if err == nil {
+				t.Fatal("want error")
+			}
+			if !stderrors.Is(err, pkgerrors.ErrParams) {
+				t.Fatalf("want ErrParams, got %v", err)
+			}
+		})
+	}
 }

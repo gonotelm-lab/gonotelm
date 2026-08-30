@@ -15,12 +15,12 @@ import (
 var _ Handler = (*TextHandler)(nil)
 
 type TextHandler struct {
-	impl *baseHandler
+	baseHandler *baseHandler
 }
 
 func NewTextHandler(c HandlerConfig) *TextHandler {
 	return &TextHandler{
-		impl: newBaseHandler("text-pipe", parser.TextParser{}, c),
+		baseHandler: newBaseHandler("text-pipe", parser.TextParser{}, c),
 	}
 }
 
@@ -39,7 +39,7 @@ func (e *TextHandler) Handle(
 		splitMethod = transformer.ChunkMarkdownSplitMethod
 	}
 
-	docs, converted, err := e.impl.doHandle(
+	docs, converted, err := e.baseHandler.doHandle(
 		ctx,
 		src,
 		strings.NewReader(textContent.Text),

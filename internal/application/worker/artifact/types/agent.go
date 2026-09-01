@@ -26,14 +26,14 @@ func BuildSourceExploreAgent(
 	sourceIds []valobj.Id,
 	bindAllTools bool,
 ) (*Agent, error) {
-	llmModel, err := deps.LLMGateway.GetProvider(modelProvider)
+	tcm, err := deps.LLMGateway.GetChatModel(modelProvider)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrParams, "get source explore llm model failed: %v", err)
 	}
 
 	agConfig := pkgagent.Config[*SessionState]{
 		MaxRound: maxRound,
-		BaseLLM:  llmModel,
+		BaseLLM:  tcm,
 		Options:  options,
 		Verbose:  false,
 	}

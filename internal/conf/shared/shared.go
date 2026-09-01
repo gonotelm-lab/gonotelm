@@ -20,7 +20,7 @@ type LoggingConfig struct {
 	Level string `toml:"level"`
 }
 
-func (c *LoggingConfig) ApplyDefaults() {
+func (c *LoggingConfig) Init() {
 	if c.Level == "" {
 		c.Level = "debug"
 	}
@@ -33,7 +33,7 @@ type FlowConfig struct {
 	DialTimeout time.Duration `toml:"dialTimeout"`
 }
 
-func (c *FlowConfig) ApplyDefaults() {
+func (c *FlowConfig) Init() {
 	if c.MaxRetry <= 0 {
 		c.MaxRetry = 3
 	}
@@ -98,7 +98,7 @@ func (c *ProviderBillingConfig) Init() {
 	}
 }
 
-// InfraConfig 为 notelm / worker 共用的基础设施配置。
+// InfraConfig 共用的基础设施配置。
 type InfraConfig struct {
 	Database        DatabaseConfig                `toml:"database"`
 	VectorDB        vectordb.Config               `toml:"vectorDb"`
@@ -110,12 +110,11 @@ type InfraConfig struct {
 	Text2Audio      text2audio.Text2AudioConfig   `toml:"text2audio"`
 	Sandbox         sandboximpl.ProviderConfig    `toml:"sandbox"`
 	DatabaseOlap    DatabaseConfig                `toml:"databaseOlap"`
-
-	Redis    cache.RedisCacheConfig `toml:"redis"`
-	MsgQueue mqimpl.Config          `toml:"msgQueue"`
+	Redis           cache.RedisCacheConfig        `toml:"redis"`
+	MessageQueue    mqimpl.Config                 `toml:"messageQueue"`
 }
 
-func (c *InfraConfig) Init() {
+func (c *InfraConfig) InitInfra() {
 	if c.Storage.Type == "" {
 		c.Storage.Type = storageimpl.Minio
 	}

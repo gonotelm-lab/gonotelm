@@ -76,17 +76,17 @@ func (s *SummarizerImpl) Summarize(
 		prompt = fmt.Sprintf(summarizePromptTemplate, opt.MinWord, opt.MaxWord, text)
 	}
 
-	llmModel, err := s.llm.GetProvider(provider)
+	tcm, err := s.llm.GetChatModel(provider)
 	if err != nil {
 		return "", errors.Wrapf(errors.ErrParams, "get provider failed, err=%v", err)
 	}
 
-	result, err := llmModel.Generate(ctx, []*einoschema.Message{
+	result, err := tcm.Generate(ctx, []*einoschema.Message{
 		{
 			Role:    einoschema.User,
 			Content: prompt,
 		},
-	}, chat.WithModel(model))
+	}, chat.WithModel(model), chat.WithThinking(provider, false))
 	if err != nil {
 		return "", errors.WithMessagef(err, "generate summary failed, err=%v", err)
 	}

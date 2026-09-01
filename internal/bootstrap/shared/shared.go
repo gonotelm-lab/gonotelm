@@ -127,11 +127,11 @@ func initRedis(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) err
 }
 
 func initMessageQueue(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
-	if cfg.MsgQueue.Type == "" {
+	if cfg.MessageQueue.Type == "" {
 		return nil
 	}
 
-	mqInst, err := newMessageQueue(&cfg.MsgQueue)
+	mqInst, err := newMessageQueue(&cfg.MessageQueue)
 	if err != nil {
 		return fmt.Errorf("mq: %w", err)
 	}

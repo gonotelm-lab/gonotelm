@@ -6,6 +6,7 @@ import (
 	"time"
 
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
+	pkgstr "github.com/gonotelm-lab/gonotelm/pkg/string"
 
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
@@ -15,6 +16,10 @@ const (
 	RecordMetaStreaming  = "streaming"
 	RecordMetaThinking   = "thinking"
 	RecordMetaJSONObject = "json_object"
+)
+
+const (
+	maxRecordToolResultRune = 300
 )
 
 type RecordTokenUsage struct {
@@ -77,7 +82,7 @@ type Record struct {
 type RecordInputMessage struct {
 	Role             string                   `json:"role"`
 	Content          string                   `json:"content,omitempty"`
-	ReasoningContent string                   `json:"reasoning_content"`
+	ReasoningContent string                   `json:"reasoning_content,omitempty"`
 	ToolCalls        []*RecordMessageToolCall `json:"tool_calls,omitempty"`
 	ToolCallId       string                   `json:"tool_call_id,omitempty"`
 	ToolCallName     string                   `json:"tool_call_name,omitempty"`
@@ -92,6 +97,15 @@ func toRecordInputMessages(msgs []*schema.Message) []*RecordInputMessage {
 			ToolCallId:   m.ToolCallID,
 			ToolCallName: m.ToolName,
 			ToolCalls:    toToolCalls(m.ToolCalls),
+		}
+		// truncate tool call results
+		if m.Role == schema.Tool {
+			// truncate tool call result content
+			var truncated bool
+			im.Content, truncated = pkgstr.TruncateRuneV2(m.Content, maxRecordToolResultRune)
+			if truncated {
+				im.Content = im.Content + " (...truncated)"
+			}
 		}
 
 		inputs = append(inputs, im)
@@ -134,17 +148,20 @@ type RecordMessageToolCall struct {
 }
 
 type FunctionCall struct {
-	Name      string `json:"name"`
-	Arguments string `json:"arguments"`
+	Name      string `json:"name,omitempty"`
+	Arguments string `json:"arguments,omitempty"`
 }
 
 func toToolCalls(fcs []schema.ToolCall) []*RecordMessageToolCall {
 	rfcs := make([]*RecordMessageToolCall, 0, len(fcs))
 	for _, toolCall := range fcs {
 		rfc := &RecordMessageToolCall{
-			Id:       toolCall.ID,
-			Type:     toolCall.Type,
-			Function: FunctionCall{Name: toolCall.Function.Name, Arguments: toolCall.Function.Arguments},
+			Id:   toolCall.ID,
+			Type: toolCall.Type,
+			Function: FunctionCall{
+				Name:      toolCall.Function.Name,
+				Arguments: toolCall.Function.Arguments,
+			},
 		}
 
 		rfcs = append(rfcs, rfc)

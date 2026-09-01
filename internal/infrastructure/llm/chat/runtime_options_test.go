@@ -1,9 +1,13 @@
 package chat
 
 import (
+	"encoding/json"
+	"fmt"
+	"os"
 	"testing"
 
 	einomodel "github.com/cloudwego/eino/components/model"
+	einoschema "github.com/cloudwego/eino/schema"
 	openaiext "github.com/gonotelm-lab/gonotelm/pkg/eino-ext/openai"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -122,4 +126,30 @@ func deepSeekFieldsForTest(streaming bool, enableThinking bool, responseFormat b
 		fields = mergeExtraFields(fields, openaiext.ResponseFormatJSONObject)
 	}
 	return fields
+}
+
+func TestDeepSeekUsingOpenAI(t *testing.T) {
+	model, err := newChatModel(t.Context(), ProviderDeepSeek, &ProviderConfig{
+		DeepSeek: DeepSeekChatConfig{
+			ApiKey:       os.Getenv("GONOTELM_OPENAI_API_KEY"),
+			BaseURL:      "https://api.deepseek.com",
+			DefaultModel: "deepseek-v4-flash",
+		},
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	output, err := model.Generate(t.Context(), []*einoschema.Message{
+		{
+			Role:    "user",
+			Content: "Hello, how are you?",
+		},
+	}, WithThinking(ProviderDeepSeek, true))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c, _ := json.MarshalIndent(output, "", "  ")
+	fmt.Println(string(c))
 }

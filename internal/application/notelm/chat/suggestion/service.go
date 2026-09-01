@@ -28,7 +28,7 @@ import (
 	einoschema "github.com/cloudwego/eino/schema"
 )
 
-const maxMessageForSuggestionLimit = 100
+const maxMessageForSuggestionLimit = 30
 
 const suggestionLockKeyPrefix = "gonotelm:suggestion:lock:"
 
@@ -295,12 +295,12 @@ func (h *Service) getChatSuggestModel() (einomodel.ToolCallingChatModel, []einom
 		llmchat.WithResponseJsonObject(providerType),
 	}
 
-	chatModel, err := h.chatGateway.GetProvider(providerType)
+	tcm, err := h.chatGateway.GetChatModel(providerType)
 	if err != nil {
 		return nil, nil, errors.Wrapf(errors.ErrInner, "model_provider=%s not found", providerType)
 	}
 
-	return chatModel, opts, nil
+	return tcm, opts, nil
 }
 
 func parseChatModelOutput(s string) ([]string, error) {

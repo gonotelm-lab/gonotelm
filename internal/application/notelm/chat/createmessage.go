@@ -114,7 +114,7 @@ func (h *CreateMessageHandler) Handle(
 		return nil, err
 	}
 
-	ctx = pkgcontext.WithScene(ctx, pkgcontext.ChatScene, cmd.ChatId.String())
+	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.ChatScene)
 	userId := pkgcontext.GetUserId(ctx)
 	targetSources, err := shared.FilterReadySources(ctx, h.sourceRepo, targetChat.NotebookId, cmd.SourceIds, userId)
 	if err != nil {
@@ -182,6 +182,8 @@ func (h *CreateMessageHandler) Handle(
 		targetSources:  targetSources,
 		eventChan:      eventChan,
 	}
+	// assistant msg id as groupId
+	taskCtx = pkgcontext.WithSceneGroupId(taskCtx, bundle.assistantMsg.Id.String())
 	h.wg.Go(func() { h.beginStreamTask(taskCtx, cmd, bundle) })
 
 	return &CreateMessageResult{

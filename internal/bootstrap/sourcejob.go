@@ -21,8 +21,8 @@ type SourceJob struct {
 }
 
 func NewSourceJob(ctx context.Context, cfg *conf.SourceJobConfig) (*SourceJob, error) {
-	if cfg.MsgQueue.Type == "" {
-		return nil, fmt.Errorf("sourcejob requires msgQueue")
+	if cfg.MessageQueue.Type == "" {
+		return nil, fmt.Errorf("sourcejob requires messageQueue")
 	}
 
 	if err := trace.Init(ctx, cfg.OtelTrace); err != nil {

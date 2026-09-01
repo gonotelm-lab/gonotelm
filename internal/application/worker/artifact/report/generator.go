@@ -95,11 +95,11 @@ func (r *Generator) generateTitle(ctx context.Context, report string, req *types
 		slog.ErrorContext(ctx, "generate title maker message failed", slog.String("artifact_id", req.ArtifactId.String()), slog.Any("err", err))
 	} else {
 		modelOption := chat.WithModel(conf.WorkerGlobal().Studio.Report.Model)
-		llmModel, err := r.deps.LLMGateway.GetProvider(conf.WorkerGlobal().Studio.Report.ModelProvider)
+		tcm, err := r.deps.LLMGateway.GetChatModel(conf.WorkerGlobal().Studio.Report.ModelProvider)
 		if err != nil {
 			slog.ErrorContext(ctx, "get llm provider for title generation failed", slog.Any("err", err))
 		} else {
-			result, err := llmModel.Generate(ctx, titleMakerMsgs, modelOption)
+			result, err := tcm.Generate(ctx, titleMakerMsgs, modelOption)
 			if err == nil {
 				title = strings.TrimSpace(result.Content)
 			} else {

@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/util"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/safe"
 
@@ -48,7 +47,7 @@ func (i *Interceptor) OnStart(
 	info *callbacks.RunInfo,
 	src callbacks.CallbackInput,
 ) context.Context {
-	slog.DebugContext(ctx, "[chat.Interceptor] OnStart", slog.Any("info", util.RenameRunInfo(info)))
+	slog.DebugContext(ctx, "[chat.Interceptor] OnStart")
 	input := model.ConvCallbackInput(src)
 	start := time.Now()
 	ctx = withOnStartInput(ctx, input)
@@ -61,10 +60,10 @@ func (i *Interceptor) OnEnd(
 	info *callbacks.RunInfo,
 	src callbacks.CallbackOutput,
 ) context.Context {
-	slog.DebugContext(ctx, "[chat.Interceptor] OnEnd", slog.Any("info", util.RenameRunInfo(info)))
+	slog.DebugContext(ctx, "[chat.Interceptor] OnEnd")
 	output := model.ConvCallbackOutput(src)
 	if output == nil {
-		slog.WarnContext(ctx, "[chat.Interceptor] OnEnd empty callback output", slog.Any("info", util.RenameRunInfo(info)))
+		slog.WarnContext(ctx, "[chat.Interceptor] OnEnd empty callback output")
 		return ctx
 	}
 
@@ -82,7 +81,7 @@ func (i *Interceptor) OnError(
 	runSemRelease(ctx)
 
 	slog.ErrorContext(ctx, "[chat.Interceptor] OnError",
-		slog.Any("info", util.RenameRunInfo(info)), slog.Bool("streaming", getStreaming(ctx)), slog.Any("err", err),
+		slog.Bool("streaming", getStreaming(ctx)), slog.Any("err", err),
 	)
 
 	i.recordError(ctx, err)
@@ -137,7 +136,6 @@ func (i *Interceptor) OnEndWithStreamOutput(
 
 			if err != nil {
 				slog.ErrorContext(ctx, "[chat.Interceptor] OnEndWithStreamOutput Recv error",
-					slog.Any("info", util.RenameRunInfo(info)),
 					slog.Any("err", err),
 				)
 

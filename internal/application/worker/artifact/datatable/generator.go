@@ -142,11 +142,11 @@ func (g *Generator) generateTitle(ctx context.Context, tableText string, req *ty
 		slog.ErrorContext(ctx, "generate title maker message failed", slog.Any("err", err))
 	} else {
 		modelOption := chat.WithModel(conf.WorkerGlobal().Studio.DataTable.Model)
-		llmModel, llmErr := g.deps.LLMGateway.GetProvider(conf.WorkerGlobal().Studio.DataTable.ModelProvider)
+		tcm, llmErr := g.deps.LLMGateway.GetChatModel(conf.WorkerGlobal().Studio.DataTable.ModelProvider)
 		if llmErr != nil {
 			slog.ErrorContext(ctx, "get llm provider for title generation failed", slog.Any("err", llmErr))
 		} else {
-			result, genErr := llmModel.Generate(ctx, titleMakerMsgs, modelOption)
+			result, genErr := tcm.Generate(ctx, titleMakerMsgs, modelOption)
 			if genErr == nil {
 				title = strings.TrimSpace(result.Content)
 			} else {

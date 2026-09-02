@@ -15,6 +15,7 @@ type EventDeps struct {
 	SourceDocRepo     sourcerepo.SourceDocRepository
 	EventBus          eventbus.EventBus
 	Summarizer        adapterdefine.Summarizer
+	ImageInterpreter  adapterdefine.ImageInterpreter
 }
 
 func Init(ctx context.Context, deps *EventDeps) {
@@ -26,6 +27,7 @@ func Init(ctx context.Context, deps *EventDeps) {
 			deps.SourceDocRepo,
 			deps.Summarizer,
 			deps.EventBus,
+			deps.ImageInterpreter,
 		),
 	); err != nil {
 		panic(err)

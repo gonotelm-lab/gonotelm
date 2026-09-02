@@ -172,6 +172,26 @@ temperature = ${GONOTELM_QWEN_TEMPERATURE:-1.0}
 topP = ${GONOTELM_QWEN_TOP_P:-1.0}
 enableThinking = ${GONOTELM_QWEN_ENABLE_THINKING:-false}
 
+[provider.qwen.models."qwen3.8-flash"]
+name = "qwen3.8-flash"
+modalities = {input = ["text", "image", "audio"], output = ["text"]}
+
+[provider.qwen.models."qwen3.8-max"]
+name = "qwen3.8-max"
+modalities = {input = ["text", "image", "audio"], output = ["text"]}
+
+[provider.qwen.models."qwen3.7-max"]
+name = "qwen3.7-max"
+modalities = {input = ["text"], output = ["text"]}
+
+[provider.qwen.models."qwen3.7-plus"]
+name = "qwen3.7-plus"
+modalities = {input = ["text", "image", "audio"], output = ["text"]}
+
+[provider.qwen.models."qwen3.7-flash"]
+name = "qwen3.7-flash"
+modalities = {input = ["text", "image", "audio"], output = ["text"]}
+
 [provider.agnes]
 apiKey = "${GONOTELM_AGNES_API_KEY:-}"
 baseUrl = "${GONOTELM_AGNES_BASE_URL:-https://apihub.agnes-ai.com/v1}"
@@ -180,7 +200,7 @@ timeout = "${GONOTELM_AGNES_TIMEOUT:-5m}"
 temperature = ${GONOTELM_AGNES_TEMPERATURE:-1.0}
 topP = ${GONOTELM_AGNES_TOP_P:-1.0}
 
-[provider.agnes.models.agnes-2.5-flash]
+[provider.agnes.models."agnes-2.5-flash"]
 name = "agnes-2.5-flash"
 modalities = {input = ["text", "image"], output = ["text"]}
 

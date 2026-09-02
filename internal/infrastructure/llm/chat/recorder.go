@@ -3,6 +3,7 @@ package chat
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
@@ -43,8 +44,8 @@ func toRecordTokenUsage(u *model.TokenUsage) *RecordTokenUsage {
 
 type ModelParameters struct {
 	Model       string   `json:"model"`
-	Temperature float32  `json:"temperature"`
-	TopP        float32  `json:"top_p"`
+	Temperature float32  `json:"temperature,omitempty"`
+	TopP        float32  `json:"top_p,omitempty"`
 	Stop        []string `json:"stop,omitempty"`
 	MaxTokens   int      `json:"max_tokens,omitempty"`
 }
@@ -86,27 +87,64 @@ type RecordInputMessage struct {
 	ToolCalls        []*RecordMessageToolCall `json:"tool_calls,omitempty"`
 	ToolCallId       string                   `json:"tool_call_id,omitempty"`
 	ToolCallName     string                   `json:"tool_call_name,omitempty"`
+	InputParts       []*RecordInputPart       `json:"input_parts,omitempty"`
+}
+
+type RecordInputPart struct {
+	Text  string `json:"text,omitempty"`
+	Image string `json:"image,omitempty"`
+}
+
+func toRecordInputPart(part schema.MessageInputPart) *RecordInputPart {
+	r := &RecordInputPart{}
+	switch part.Type {
+	case schema.ChatMessagePartTypeText:
+		r.Text = part.Text
+	case schema.ChatMessagePartTypeImageURL:
+		if part.Image != nil {
+			if part.Image.URL != nil {
+				r.Image = "[Image URL]"
+			} else if part.Image.Base64Data != nil {
+				r.Image = fmt.Sprintf("[Image Base64 Of Length %d]", len(*part.Image.Base64Data))
+			}
+		}
+	}
+
+	return r
+}
+
+func toRecordInputParts(parts []schema.MessageInputPart) []*RecordInputPart {
+	if len(parts) == 0 {
+		return nil
+	}
+
+	ips := make([]*RecordInputPart, 0, len(parts))
+	for _, part := range parts {
+		ips = append(ips, toRecordInputPart(part))
+	}
+	return ips
 }
 
 func toRecordInputMessages(msgs []*schema.Message) []*RecordInputMessage {
 	inputs := make([]*RecordInputMessage, 0, len(msgs))
-	for _, m := range msgs {
+	for _, msg := range msgs {
 		im := &RecordInputMessage{
-			Role:         string(m.Role),
-			Content:      m.Content,
-			ToolCallId:   m.ToolCallID,
-			ToolCallName: m.ToolName,
-			ToolCalls:    toToolCalls(m.ToolCalls),
+			Role:         string(msg.Role),
+			Content:      msg.Content,
+			ToolCallId:   msg.ToolCallID,
+			ToolCallName: msg.ToolName,
+			ToolCalls:    toToolCalls(msg.ToolCalls),
 		}
-		// truncate tool call results
-		if m.Role == schema.Tool {
-			// truncate tool call result content
-			var truncated bool
-			im.Content, truncated = pkgstr.TruncateRuneV2(m.Content, maxRecordToolResultRune)
+		// truncate content if too long
+		var truncated bool
+		if im.Content != "" {
+			im.Content, truncated = pkgstr.TruncateRuneV2(msg.Content, maxRecordToolResultRune)
 			if truncated {
 				im.Content = im.Content + " (...truncated)"
 			}
 		}
+
+		im.InputParts = toRecordInputParts(msg.UserInputMultiContent)
 
 		inputs = append(inputs, im)
 	}

@@ -37,6 +37,7 @@ type ModalityType string
 const (
 	ModalityText  ModalityType = "text"
 	ModalityImage ModalityType = "image"
+	ModalityAudio ModalityType = "audio"
 )
 
 type Modality struct {
@@ -46,6 +47,10 @@ type Modality struct {
 
 func (m *Modality) SupportImageInput() bool {
 	return slices.Contains(m.Input, ModalityImage)
+}
+
+func (m *Modality) SupportAudioInput() bool {
+	return slices.Contains(m.Input, ModalityAudio)
 }
 
 type Model struct {

@@ -3,6 +3,7 @@ package adapter
 import (
 	"context"
 	"encoding/base64"
+	"net/url"
 	"os"
 	"testing"
 
@@ -69,4 +70,32 @@ func TestImageInterpreter_InterpretBase64(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Log(result)
+}
+
+func TestImageInterpreter_InterpretBytes(t *testing.T) {
+	ctx := t.Context()
+	itpr, err := NewImageInterpreter(testGateway, chat.ProviderDeepSeek, "deepseek-v4-flash-vision-exp")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	imageData, err := os.ReadFile("./testdata/image.png")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := itpr.InterpretBytes(ctx, imageData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log(result)
+}	
+
+func TestImageDataUrlParse(t *testing.T) {
+	u, err := url.Parse("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIA...")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log(u) // it works
+	t.Log(u.Scheme)
 }

@@ -18,7 +18,7 @@ import (
 
 const (
 	MaxSourceTitleLength   = 255
-	MaxUploadFileSizeBytes = 100 * 1024 * 1024 // 100MB
+	MaxUploadFileSizeBytes = 50 * 1024 * 1024 // 50MB
 
 	// 一篇来源最大允许token数量
 	MaxSourceTextContentToken = 1_000_000 // 100k
@@ -31,20 +31,30 @@ const (
 	MimeTypeMarkdown = "text/markdown; charset=utf-8"
 	MimeTypeCSV      = "text/csv; charset=utf-8"
 	MimeTypeEPUB     = "application/epub+zip"
-	MimeTypeWord     = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-	MimeTypeXLSX     = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-	MimeTypePPTX     = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
+	// ms office mime types
+	MimeTypeWord = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+	MimeTypeXLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+	MimeTypePPTX = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
+	// image mime type jpeg, png, webp
+	MimeTypeJPEG = "image/jpeg"
+	MimeTypePNG  = "image/png"
+	MimeTypeWebP = "image/webp"
 )
 
-var supportedFileMimeTypesMap = map[string]struct{}{
-	MimeTypePDF:      {},
-	MimeTypeText:     {},
-	MimeTypeMarkdown: {},
-	MimeTypeCSV:      {},
-	MimeTypeEPUB:     {},
-	MimeTypeWord:     {},
-	MimeTypeXLSX:     {},
-	MimeTypePPTX:     {},
+var supportedFileMimeTypesMap = map[string]bool{
+	MimeTypePDF:      true,
+	MimeTypeText:     true,
+	MimeTypeMarkdown: true,
+	MimeTypeCSV:      true,
+	MimeTypeEPUB:     true,
+	MimeTypeWord:     true,
+	MimeTypeXLSX:     true,
+	MimeTypePPTX:     true,
+	MimeTypeJPEG:     true,
+	MimeTypePNG:      true,
+	MimeTypeWebP:     true,
 }
 
 func SupportedFileMimeType(mimeType string) bool {
@@ -52,7 +62,7 @@ func SupportedFileMimeType(mimeType string) bool {
 	return ok
 }
 
-func supportedFileMimeType2(target *mimetype.MIME) bool {
+func fileMimeTypeSupported(target *mimetype.MIME) bool {
 	for st := range supportedFileMimeTypesMap {
 		if target.Is(st) {
 			return true
@@ -212,7 +222,7 @@ func (s *Source) CheckProcessable(p *CheckProcessableParams) error {
 		return errors.ErrParams.Msgf("file size is too large: %d", p.TotalSize)
 	}
 
-	if !supportedFileMimeType2(p.ContentType) {
+	if !fileMimeTypeSupported(p.ContentType) {
 		return errors.ErrParams.Msgf("unsupported mime type: %s", p.ContentType)
 	}
 

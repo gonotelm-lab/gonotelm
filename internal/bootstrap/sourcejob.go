@@ -59,12 +59,22 @@ func NewSourceJob(ctx context.Context, cfg *conf.SourceJobConfig) (*SourceJob, e
 		cfg.Source.Model,
 	)
 
+	imageInterpreter, err := adapter.NewImageInterpreter(
+		infra.LLMGateway,
+		cfg.Source.ImageUnderstandModelProvider,
+		cfg.Source.ImageUnderstandModel,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	eventsourcejob.Init(ctx, &eventsourcejob.EventDeps{
 		SourceRepo:        sourceRepo,
 		SourceStorageRepo: sourceStorageRepo,
 		SourceDocRepo:     sourceDocRepo,
 		EventBus:          bus,
 		Summarizer:        summarizer,
+		ImageInterpreter:  imageInterpreter,
 	})
 
 	return &SourceJob{

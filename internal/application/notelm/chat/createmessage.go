@@ -140,7 +140,13 @@ func (h *CreateMessageHandler) Handle(
 	}
 
 	// 1. add user task
-	task, eventChan, err := h.initStreamTask(taskCtx, taskCancel, cmd.ChatId, cmd.SourceIds, userId)
+	task, eventChan, consumerDone, err := h.initStreamTask(
+		taskCtx,
+		taskCancel,
+		cmd.ChatId,
+		cmd.SourceIds,
+		userId,
+	)
 	if err != nil {
 		_ = h.distLock.Unlock(ctx, lockKey)
 		taskCancel()
@@ -181,6 +187,7 @@ func (h *CreateMessageHandler) Handle(
 		targetChat:     targetChat,
 		targetSources:  targetSources,
 		eventChan:      eventChan,
+		consumerDone:   consumerDone,
 	}
 	// assistant msg id as groupId
 	taskCtx = pkgcontext.WithSceneGroupId(taskCtx, bundle.assistantMsg.Id.String())
@@ -203,7 +210,8 @@ type streamTaskBundle struct {
 	targetChat     *chatentity.Chat
 	targetSources  []*sourceentity.Source
 
-	eventChan chan *chatentity.StreamTaskEvent
+	eventChan    chan *chatentity.StreamTaskEvent
+	consumerDone <-chan struct{}
 }
 
 func (b *streamTaskBundle) consumeEvents() {
@@ -262,6 +270,7 @@ func (h *CreateMessageHandler) beginStreamTask(
 
 		h.finishStreamTask(ctx, taskId)
 		close(bundle.eventChan)
+		<-bundle.consumerDone // drain Done/Error before cancel so emit still has a live ctx
 		bundle.cancel()
 	}()
 
@@ -448,32 +457,34 @@ func (h *CreateMessageHandler) initStreamTask(
 	chatId valobj.Id,
 	sourceIds []valobj.Id,
 	userId valobj.Uid,
-) (*chatentity.StreamTask, chan *chatentity.StreamTaskEvent, error) {
+) (*chatentity.StreamTask, chan *chatentity.StreamTaskEvent, <-chan struct{}, error) {
 	// first we check if there is a running task for this chat and user
 	runningTask, err := h.streamTaskRepo.FindByUserAndChat(ctx, userId, chatId)
 	if err != nil {
 		if !errors.Is(err, chaterrors.ErrStreamTaskNotFound) {
-			return nil, nil, errors.WithMessagef(err, "failed to find running stream task, chat_id=%s", chatId)
+			return nil, nil, nil, errors.WithMessagef(err, "failed to find running stream task, chat_id=%s", chatId)
 		}
 	}
 
 	if runningTask != nil && runningTask.Status.IsRunning() {
-		return nil, nil, errors.ErrParams.Msgf("running stream task already exists, chat_id=%s", chatId)
+		return nil, nil, nil, errors.ErrParams.Msgf("running stream task already exists, chat_id=%s", chatId)
 	}
 
 	const streamTaskBufferSize = 1024
 
 	newTask := chatentity.NewStreamTask(chatId, sourceIds, userId)
 	eventChan := make(chan *chatentity.StreamTaskEvent, streamTaskBufferSize)
+	consumerDone := make(chan struct{})
 
 	h.wg.Go(func() {
+		defer close(consumerDone)
 		safe.Do(ctx, func() error {
 			h.consumeStreamTaskEvents(ctx, cancel, newTask.Id, eventChan)
 			return nil
 		})()
 	})
 
-	return newTask, eventChan, nil
+	return newTask, eventChan, consumerDone, nil
 }
 
 func (h *CreateMessageHandler) consumeStreamTaskEvents(

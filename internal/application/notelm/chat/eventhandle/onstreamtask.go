@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/suggestion"
+	"github.com/gonotelm-lab/gonotelm/internal/core/event"
 	chatevent "github.com/gonotelm-lab/gonotelm/internal/domain/chat/event"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
@@ -108,5 +109,18 @@ func RegisterStreamTaskEventConsumer(
 	bus eventbus.EventBus,
 	handler *OnStreamTaskEventHandler,
 ) error {
-	return eventbus.SubscribeStreamTaskEvent(ctx, bus, handler.Handle)
+	composite, err := eventbus.AsComposite(bus)
+	if err != nil {
+		return err
+	}
+
+	return composite.SubscribeInner(ctx, chatevent.StreamTaskTopic,
+		func(ctx context.Context, evt event.Event) error {
+			streamTaskEvt, err := eventbus.AssertEvent[*chatevent.StreamTaskEvent](evt)
+			if err != nil {
+				return err
+			}
+			return handler.Handle(ctx, streamTaskEvt)
+		},
+	)
 }

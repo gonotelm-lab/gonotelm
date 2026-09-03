@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/gonotelm-lab/gonotelm/internal/core/event"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	notebookevent "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/event"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
@@ -47,5 +48,18 @@ func RegisterNotebookEventConsumer(
 	bus eventbus.EventBus,
 	handler *OnNotebookEventHandler,
 ) error {
-	return eventbus.SubscribeNotebookEvent(ctx, bus, handler.Handle)
+	composite, err := eventbus.AsComposite(bus)
+	if err != nil {
+		return err
+	}
+
+	return composite.SubscribeInner(ctx, notebookevent.TopicNotebookEvent,
+		func(ctx context.Context, evt event.Event) error {
+			nbEvt, err := eventbus.AssertEvent[*notebookevent.Event](evt)
+			if err != nil {
+				return err
+			}
+			return handler.Handle(ctx, nbEvt)
+		},
+	)
 }

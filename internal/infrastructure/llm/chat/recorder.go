@@ -3,9 +3,12 @@ package chat
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"strings"
 	"time"
 
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
+	pkgstr "github.com/gonotelm-lab/gonotelm/pkg/string"
 
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
@@ -15,6 +18,10 @@ const (
 	RecordMetaStreaming  = "streaming"
 	RecordMetaThinking   = "thinking"
 	RecordMetaJSONObject = "json_object"
+)
+
+const (
+	maxRecordToolResultRune = 300
 )
 
 type RecordTokenUsage struct {
@@ -38,8 +45,8 @@ func toRecordTokenUsage(u *model.TokenUsage) *RecordTokenUsage {
 
 type ModelParameters struct {
 	Model       string   `json:"model"`
-	Temperature float32  `json:"temperature"`
-	TopP        float32  `json:"top_p"`
+	Temperature float32  `json:"temperature,omitempty"`
+	TopP        float32  `json:"top_p,omitempty"`
 	Stop        []string `json:"stop,omitempty"`
 	MaxTokens   int      `json:"max_tokens,omitempty"`
 }
@@ -77,22 +84,74 @@ type Record struct {
 type RecordInputMessage struct {
 	Role             string                   `json:"role"`
 	Content          string                   `json:"content,omitempty"`
-	ReasoningContent string                   `json:"reasoning_content"`
+	ReasoningContent string                   `json:"reasoning_content,omitempty"`
 	ToolCalls        []*RecordMessageToolCall `json:"tool_calls,omitempty"`
 	ToolCallId       string                   `json:"tool_call_id,omitempty"`
 	ToolCallName     string                   `json:"tool_call_name,omitempty"`
+	InputParts       []*RecordInputPart       `json:"input_parts,omitempty"`
+}
+
+type RecordInputPart struct {
+	Text  string `json:"text,omitempty"`
+	Image string `json:"image,omitempty"`
+}
+
+func toRecordInputPart(part schema.MessageInputPart) *RecordInputPart {
+	r := &RecordInputPart{}
+	switch part.Type {
+	case schema.ChatMessagePartTypeText:
+		r.Text = part.Text
+	case schema.ChatMessagePartTypeImageURL:
+		if part.Image != nil {
+			if part.Image.URL != nil {
+				if strings.HasPrefix(*part.Image.URL, "https") || strings.HasPrefix(*part.Image.URL, "http") {
+					r.Image = "[Image URL]"
+				} else if strings.HasPrefix(*part.Image.URL, "data") {
+					r.Image = fmt.Sprintf("[Image Base64 Of Length %d]", len(*part.Image.URL))
+				} else {
+					r.Image = "[Unknown Image URL]"
+				}
+			} else if part.Image.Base64Data != nil {
+				r.Image = fmt.Sprintf("[Image Base64 Of Length %d]", len(*part.Image.Base64Data))
+			}
+		}
+	}
+
+	return r
+}
+
+func toRecordInputParts(parts []schema.MessageInputPart) []*RecordInputPart {
+	if len(parts) == 0 {
+		return nil
+	}
+
+	ips := make([]*RecordInputPart, 0, len(parts))
+	for _, part := range parts {
+		ips = append(ips, toRecordInputPart(part))
+	}
+	return ips
 }
 
 func toRecordInputMessages(msgs []*schema.Message) []*RecordInputMessage {
 	inputs := make([]*RecordInputMessage, 0, len(msgs))
-	for _, m := range msgs {
+	for _, msg := range msgs {
 		im := &RecordInputMessage{
-			Role:         string(m.Role),
-			Content:      m.Content,
-			ToolCallId:   m.ToolCallID,
-			ToolCallName: m.ToolName,
-			ToolCalls:    toToolCalls(m.ToolCalls),
+			Role:         string(msg.Role),
+			Content:      msg.Content,
+			ToolCallId:   msg.ToolCallID,
+			ToolCallName: msg.ToolName,
+			ToolCalls:    toToolCalls(msg.ToolCalls),
 		}
+		// truncate content if too long
+		var truncated bool
+		if im.Content != "" {
+			im.Content, truncated = pkgstr.TruncateRuneV2(msg.Content, maxRecordToolResultRune)
+			if truncated {
+				im.Content = im.Content + " (...truncated)"
+			}
+		}
+
+		im.InputParts = toRecordInputParts(msg.UserInputMultiContent)
 
 		inputs = append(inputs, im)
 	}
@@ -134,17 +193,20 @@ type RecordMessageToolCall struct {
 }
 
 type FunctionCall struct {
-	Name      string `json:"name"`
-	Arguments string `json:"arguments"`
+	Name      string `json:"name,omitempty"`
+	Arguments string `json:"arguments,omitempty"`
 }
 
 func toToolCalls(fcs []schema.ToolCall) []*RecordMessageToolCall {
 	rfcs := make([]*RecordMessageToolCall, 0, len(fcs))
 	for _, toolCall := range fcs {
 		rfc := &RecordMessageToolCall{
-			Id:       toolCall.ID,
-			Type:     toolCall.Type,
-			Function: FunctionCall{Name: toolCall.Function.Name, Arguments: toolCall.Function.Arguments},
+			Id:   toolCall.ID,
+			Type: toolCall.Type,
+			Function: FunctionCall{
+				Name:      toolCall.Function.Name,
+				Arguments: toolCall.Function.Arguments,
+			},
 		}
 
 		rfcs = append(rfcs, rfc)
@@ -204,17 +266,30 @@ func buildEndRecord(
 	endTime time.Time,
 ) *Record {
 	r := buildRecord(ctx, endTime)
-	r.Input = toRecordInputMessages(input.Messages)
-	r.InputTools = toRecordInputTool(input.Tools)
-	r.Parameters = toModelParameters(input.Config) // same as output.Config
-	r.Output = toRecordOutputMessage(output.Message)
-	r.Usage = toRecordTokenUsage(output.TokenUsage)
-
+	if input != nil {
+		r.Input = toRecordInputMessages(input.Messages)
+		r.InputTools = toRecordInputTool(input.Tools)
+		r.Parameters = toModelParameters(input.Config) // same as output.Config
+	}
+	if output != nil {
+		r.Output = toRecordOutputMessage(output.Message)
+		r.Usage = toRecordTokenUsage(output.TokenUsage)
+	}
 	return r
 }
 
-func buildErrorRecord(ctx context.Context, err error, endTime time.Time) *Record {
+func buildErrorRecord(
+	ctx context.Context,
+	err error,
+	input *model.CallbackInput,
+	endTime time.Time,
+) *Record {
 	r := buildRecord(ctx, endTime)
+	if input != nil {
+		r.Input = toRecordInputMessages(input.Messages)
+		r.InputTools = toRecordInputTool(input.Tools)
+		r.Parameters = toModelParameters(input.Config)
+	}
 	r.Error = err
 
 	return r

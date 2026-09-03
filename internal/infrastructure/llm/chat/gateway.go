@@ -28,11 +28,30 @@ const (
 
 type Gateway struct {
 	rootCtx context.Context
-	mu      sync.RWMutex
 
-	providers map[Provider]einomodel.ToolCallingChatModel
+	mu        sync.RWMutex
+	providers map[Provider]*ModelProvider
 
 	recorder Recorder
+}
+
+type ModelProvider struct {
+	provider Provider
+	models   map[string]Model
+	tc       einomodel.ToolCallingChatModel
+}
+
+func (m *ModelProvider) ToolCallingChatModel() einomodel.ToolCallingChatModel {
+	return m.tc
+}
+
+func (m *ModelProvider) Provider() Provider {
+	return m.provider
+}
+
+func (m *ModelProvider) Model(name string) (Model, bool) {
+	mm, ok := m.models[name]
+	return mm, ok
 }
 
 type gatewayOption struct {
@@ -57,7 +76,7 @@ func New(ctx context.Context, cfg *ProviderConfig, opts ...GatewayOption) (*Gate
 
 	g := &Gateway{
 		rootCtx:   ctx,
-		providers: make(map[Provider]einomodel.ToolCallingChatModel),
+		providers: make(map[Provider]*ModelProvider),
 		recorder:  opt.recorder,
 	}
 
@@ -70,48 +89,68 @@ func New(ctx context.Context, cfg *ProviderConfig, opts ...GatewayOption) (*Gate
 }
 
 func (g *Gateway) initProviders(cfg *ProviderConfig) error {
-	deepseekModel, err := NewChatModel(g.rootCtx, ProviderDeepSeek, cfg)
+	deepseekModel, err := newChatModel(g.rootCtx, ProviderDeepSeek, cfg, g.recorder)
 	if err != nil {
 		return err
 	}
-	g.providers[ProviderDeepSeek] = newWrappedChatModel(g.rootCtx, deepseekModel, ProviderDeepSeek,
-		cfg.DeepSeek.MaxConcurrency, g.recorder,
-	)
+	g.providers[ProviderDeepSeek] = &ModelProvider{
+		provider: ProviderDeepSeek,
+		models:   cfg.DeepSeek.Models,
+		tc:       deepseekModel,
+	}
 
-	openaiModel, err := NewChatModel(g.rootCtx, ProviderOpenAI, cfg)
+	openaiModel, err := newChatModel(g.rootCtx, ProviderOpenAI, cfg, g.recorder)
 	if err != nil {
 		return err
 	}
-	g.providers[ProviderOpenAI] = newWrappedChatModel(g.rootCtx, openaiModel, ProviderOpenAI,
-		cfg.OpenAI.MaxConcurrency, g.recorder,
-	)
+	g.providers[ProviderOpenAI] = &ModelProvider{
+		provider: ProviderOpenAI,
+		models:   cfg.OpenAI.Models,
+		tc:       openaiModel,
+	}
 
-	qwenModel, err := NewChatModel(g.rootCtx, ProviderQwen, cfg)
+	qwenModel, err := newChatModel(g.rootCtx, ProviderQwen, cfg, g.recorder)
 	if err != nil {
 		return err
 	}
-	g.providers[ProviderQwen] = newWrappedChatModel(g.rootCtx, qwenModel, ProviderQwen,
-		cfg.Qwen.MaxConcurrency, g.recorder,
-	)
+	g.providers[ProviderQwen] = &ModelProvider{
+		provider: ProviderQwen,
+		models:   cfg.Qwen.Models,
+		tc:       qwenModel,
+	}
 
-	agnesModel, err := NewChatModel(g.rootCtx, ProviderAgnes, cfg)
+	agnesModel, err := newChatModel(g.rootCtx, ProviderAgnes, cfg, g.recorder)
 	if err != nil {
 		return err
 	}
-	g.providers[ProviderAgnes] = newWrappedChatModel(g.rootCtx, agnesModel, ProviderAgnes,
-		cfg.Agnes.MaxConcurrency, g.recorder,
-	)
+	g.providers[ProviderAgnes] = &ModelProvider{
+		provider: ProviderAgnes,
+		models:   cfg.Agnes.Models,
+		tc:       agnesModel,
+	}
 
 	return nil
 }
 
-func (g *Gateway) GetProvider(providerType Provider) (einomodel.ToolCallingChatModel, error) {
+func (g *Gateway) GetChatModel(providerName Provider) (einomodel.ToolCallingChatModel, error) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 
-	provider, ok := g.providers[providerType]
+	provider, ok := g.providers[providerName]
 	if !ok {
-		return nil, fmt.Errorf("provider %s not found", providerType)
+		return nil, fmt.Errorf("provider %s not found", providerName)
+	}
+
+	return provider.ToolCallingChatModel(), nil
+}
+
+func (g *Gateway) GetModelProvider(providerName Provider) (*ModelProvider, error) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	provider, ok := g.providers[providerName]
+	if !ok {
+		return nil, fmt.Errorf("provider %s not found", providerName)
 	}
 
 	return provider, nil

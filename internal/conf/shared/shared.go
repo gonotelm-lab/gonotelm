@@ -20,7 +20,7 @@ type LoggingConfig struct {
 	Level string `toml:"level"`
 }
 
-func (c *LoggingConfig) ApplyDefaults() {
+func (c *LoggingConfig) Init() {
 	if c.Level == "" {
 		c.Level = "debug"
 	}
@@ -33,7 +33,7 @@ type FlowConfig struct {
 	DialTimeout time.Duration `toml:"dialTimeout"`
 }
 
-func (c *FlowConfig) ApplyDefaults() {
+func (c *FlowConfig) Init() {
 	if c.MaxRetry <= 0 {
 		c.MaxRetry = 3
 	}
@@ -65,40 +65,47 @@ var (
 	//go:embed modelprice/deepseek.chat
 	defaultDeepSeekPricingScript string
 
-	//go:embed modelprice/dashscope.embedding
-	defaultDashScopeEmbeddingPricingScript string
+	//go:embed modelprice/qwen.chat
+	defaultQwenChatPricingScript string
 
-	//go:embed modelprice/dashscope.text2image
-	defaultDashScopeText2ImagePricingScript string
+	//go:embed modelprice/qwen.embedding
+	defaultQwenEmbeddingPricingScript string
 
-	//go:embed modelprice/dashscope.text2audio
-	defaultDashScopeText2AudioPricingScript string
+	//go:embed modelprice/qwen.text2image
+	defaultQwenText2ImagePricingScript string
+
+	//go:embed modelprice/qwen.text2audio
+	defaultQwenText2AudioPricingScript string
 )
 
 type ProviderBillingConfig struct {
-	DeepSeekScript            string
-	EmbeddingDashScopeScript  string
-	Text2ImageDashScopeScript string
-	Text2AudioDashScopeScript string
-	Text2AudioMiniMaxScript   string
+	DeepSeekScript          string
+	ChatQwenScript          string
+	EmbeddingQwenScript     string
+	Text2ImageQwenScript    string
+	Text2AudioQwenScript    string
+	Text2AudioMiniMaxScript string
 }
 
 func (c *ProviderBillingConfig) Init() {
 	if c.DeepSeekScript == "" {
 		c.DeepSeekScript = defaultDeepSeekPricingScript
 	}
-	if c.EmbeddingDashScopeScript == "" {
-		c.EmbeddingDashScopeScript = defaultDashScopeEmbeddingPricingScript
+	if c.ChatQwenScript == "" {
+		c.ChatQwenScript = defaultQwenChatPricingScript
 	}
-	if c.Text2ImageDashScopeScript == "" {
-		c.Text2ImageDashScopeScript = defaultDashScopeText2ImagePricingScript
+	if c.EmbeddingQwenScript == "" {
+		c.EmbeddingQwenScript = defaultQwenEmbeddingPricingScript
 	}
-	if c.Text2AudioDashScopeScript == "" {
-		c.Text2AudioDashScopeScript = defaultDashScopeText2AudioPricingScript
+	if c.Text2ImageQwenScript == "" {
+		c.Text2ImageQwenScript = defaultQwenText2ImagePricingScript
+	}
+	if c.Text2AudioQwenScript == "" {
+		c.Text2AudioQwenScript = defaultQwenText2AudioPricingScript
 	}
 }
 
-// InfraConfig 为 notelm / worker 共用的基础设施配置。
+// InfraConfig 共用的基础设施配置。
 type InfraConfig struct {
 	Database        DatabaseConfig                `toml:"database"`
 	VectorDB        vectordb.Config               `toml:"vectorDb"`
@@ -110,17 +117,16 @@ type InfraConfig struct {
 	Text2Audio      text2audio.Text2AudioConfig   `toml:"text2audio"`
 	Sandbox         sandboximpl.ProviderConfig    `toml:"sandbox"`
 	DatabaseOlap    DatabaseConfig                `toml:"databaseOlap"`
-
-	Redis    cache.RedisCacheConfig `toml:"redis"`
-	MsgQueue mqimpl.Config          `toml:"msgQueue"`
+	Redis           cache.RedisCacheConfig        `toml:"redis"`
+	MessageQueue    mqimpl.Config                 `toml:"messageQueue"`
 }
 
-func (c *InfraConfig) Init() {
+func (c *InfraConfig) InitInfra() {
 	if c.Storage.Type == "" {
 		c.Storage.Type = storageimpl.Minio
 	}
 	if c.Embedding.Type == "" {
-		c.Embedding.Type = embedding.EmbeddingDashScope
+		c.Embedding.Type = embedding.EmbeddingQwen
 	}
 	if c.Embedding.BatchSize <= 0 {
 		c.Embedding.BatchSize = 10

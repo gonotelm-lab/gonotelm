@@ -75,18 +75,19 @@ func (t *TitleMakerImpl) MakeTitle(
 		prompt = fmt.Sprintf(titleMakerPromptTemplate, opt.MinLen, opt.MaxLen, text)
 	}
 
-	llmModel, err := t.llm.GetProvider(provider)
+	tcm, err := t.llm.GetChatModel(provider)
 	if err != nil {
 		return "", errors.Wrapf(errors.ErrParams, "get provider failed, err=%v", err)
 	}
 
-	result, err := llmModel.Generate(ctx,
+	result, err := tcm.Generate(ctx,
 		[]*einoschema.Message{
 			{
 				Role:    einoschema.User,
 				Content: prompt,
 			},
-		}, chat.WithModel(model),
+		},
+		chat.WithModel(model),
 		chat.WithThinking(provider, false),
 	)
 	if err != nil {

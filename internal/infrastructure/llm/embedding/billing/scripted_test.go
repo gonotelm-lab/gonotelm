@@ -12,12 +12,12 @@ import (
 )
 
 var (
-	//go:embed testdata/dashscope.embedding
-	testDashscopeEmbeddingScript string
+	//go:embed testdata/qwen.embedding
+	testQwenEmbeddingScript string
 )
 
 func TestNewScriptedPriceProvider_CompilesModelPriceScripts(t *testing.T) {
-	_, err := NewScriptedPriceProvider(testDashscopeEmbeddingScript)
+	_, err := NewScriptedPriceProvider(testQwenEmbeddingScript)
 	require.NoError(t, err)
 }
 
@@ -27,8 +27,8 @@ func TestNewScriptedPriceProvider_InvalidScript(t *testing.T) {
 	assert.Contains(t, err.Error(), "compile")
 }
 
-func TestScriptedPriceProvider_DashScopeEmbedding(t *testing.T) {
-	p, err := NewScriptedPriceProvider(testDashscopeEmbeddingScript)
+func TestScriptedPriceProvider_QwenEmbedding(t *testing.T) {
+	p, err := NewScriptedPriceProvider(testQwenEmbeddingScript)
 	require.NoError(t, err)
 
 	cases := []struct {

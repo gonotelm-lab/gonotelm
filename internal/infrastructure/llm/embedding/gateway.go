@@ -55,7 +55,7 @@ func NewEmbeddingGateway(
 
 	defaultProvider := cfg.Type
 	if defaultProvider == "" {
-		defaultProvider = EmbeddingDashScope
+		defaultProvider = EmbeddingQwen
 	}
 
 	if _, err := gw.initProvider(defaultProvider); err != nil {

@@ -8,11 +8,11 @@ import (
 	"fmt"
 	stdhtml "html"
 	"io"
-	"maps"
 	"path"
 	"strconv"
 	"strings"
 
+	"github.com/gonotelm-lab/gonotelm/pkg/eino-ext/util"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 
 	htmltomarkdown "github.com/JohannesKaufmann/html-to-markdown/v2"
@@ -126,7 +126,7 @@ func (p *EPUBParser) Parse(
 
 	contentType := "text/html"
 	commonOpts := einoparser.GetCommonOptions(nil, opts...)
-	baseMeta := copyMeta(commonOpts.ExtraMeta)
+	baseMeta := util.CopyMeta(commonOpts.ExtraMeta)
 	if commonOpts.URI != "" {
 		baseMeta[einoparser.MetaKeySource] = commonOpts.URI
 	}
@@ -146,7 +146,7 @@ func (p *EPUBParser) Parse(
 				}
 			}
 
-			meta := copyMeta(baseMeta)
+			meta := util.CopyMeta(baseMeta)
 			meta["content_type"] = contentType
 			meta["epub_section_index"] = idx + 1
 			meta["epub_section_source"] = section.sourcePath
@@ -168,7 +168,7 @@ func (p *EPUBParser) Parse(
 		}
 	}
 
-	meta := copyMeta(baseMeta)
+	meta := util.CopyMeta(baseMeta)
 	meta["content_type"] = contentType
 
 	return []*schema.Document{
@@ -400,14 +400,4 @@ func buildEPUBHTMLSectionDocument(section epubSection, sectionIndex int) string 
 	builder.WriteString("</section>")
 	builder.WriteString("</body></html>")
 	return builder.String()
-}
-
-func copyMeta(src map[string]any) map[string]any {
-	if len(src) == 0 {
-		return map[string]any{}
-	}
-
-	dst := make(map[string]any, len(src))
-	maps.Copy(dst, src)
-	return dst
 }

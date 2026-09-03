@@ -47,10 +47,10 @@ region = "${GONOTELM_MINIO_REGION:-us-east-1}"
 secure = ${GONOTELM_MINIO_SECURE:-false}
 presignExpiry = "${GONOTELM_MINIO_PRESIGN_EXPIRY:-15m}"
 
-[msgQueue]
+[messageQueue]
 type = "kafka"
 
-[msgQueue.kafka]
+[messageQueue.kafka]
 brokers = ["${GONOTELM_KAFKA_BROKER:-127.0.0.1:9094}"]
 username = "${GONOTELM_KAFKA_USERNAME:-kafka}"
 password = "${GONOTELM_KAFKA_PASSWORD:-kafka}"
@@ -65,7 +65,7 @@ modelProvider = "${GONOTELM_CHAT_PROVIDER:-qwen}"
 model = "${GONOTELM_CHAT_MODEL:-glm-5.1}"
 maxRound = ${GONOTELM_CHAT_MAX_ROUND:-30}
 rerankEnabled = ${GONOTELM_CHAT_RERANK_ENABLED:-false}
-rerankProvider = "${GONOTELM_RERANK_PROVIDER:-dashscope}"
+rerankProvider = "${GONOTELM_RERANK_PROVIDER:-qwen}"
 rerankTopN = ${GONOTELM_CHAT_RERANK_TOP_N:-30}
 rerankModel = "${GONOTELM_CHAT_RERANK_MODEL:-qwen3-rerank}"
 
@@ -83,7 +83,7 @@ size = ${GONOTELM_CHUNKING_SIZE:-500}
 overlapSize = ${GONOTELM_CHUNKING_OVERLAP_SIZE:-75}
 
 [embedding]
-type = "${GONOTELM_EMBEDDING_TYPE:-dashscope}"
+type = "${GONOTELM_EMBEDDING_TYPE:-qwen}"
 batchSize = ${GONOTELM_EMBEDDING_BATCH_SIZE:-10}
 maxConcurrency = ${GONOTELM_EMBEDDING_MAX_CONCURRENCY:-4}
 
@@ -99,11 +99,11 @@ timeout = "${GONOTELM_ARK_TIMEOUT:-10m}"
 retryTimes = ${GONOTELM_ARK_RETRY_TIMES:-2}
 maxConcurrentRequests = ${GONOTELM_ARK_MAX_CONCURRENT_REQUESTS:-5}
 
-[embedding.dashscope]
-apiKey = "${GONOTELM_DASHSCOPE_API_KEY:-}"
-model = "${GONOTELM_DASHSCOPE_MODEL:-text-embedding-v4}"
-timeout = "${GONOTELM_DASHSCOPE_TIMEOUT:-30s}"
-dimensions = ${GONOTELM_DASHSCOPE_DIMENSIONS:-1024}
+[embedding.qwen]
+apiKey = "${GONOTELM_QWEN_API_KEY:-}"
+model = "${GONOTELM_QWEN_EMBEDDING_MODEL:-text-embedding-v4}"
+timeout = "${GONOTELM_QWEN_EMBEDDING_TIMEOUT:-30s}"
+dimensions = ${GONOTELM_QWEN_EMBEDDING_DIMENSIONS:-1024}
 
 [embedding.gemini]
 apiKey = "${GONOTELM_GEMINI_API_KEY:-}"
@@ -149,11 +149,11 @@ secretId = "${GONOTELM_TENCENTCLOUD_SECRET_ID:-}"
 secretKey = "${GONOTELM_TENCENTCLOUD_SECRET_KEY:-}"
 region = "${GONOTELM_TENCENTCLOUD_REGION:-ap-guangzhou}"
 
-[rerank.dashscope]
-apiKey = "${GONOTELM_DASHSCOPE_API_KEY:-}"
-baseUrl = "${GONOTELM_RERANK_DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/compatible-api/v1/reranks}"
-model = "${GONOTELM_RERANK_DASHSCOPE_MODEL:-qwen3-rerank}"
-timeout = "${GONOTELM_RERANK_DASHSCOPE_TIMEOUT:-30s}"
+[rerank.qwen]
+apiKey = "${GONOTELM_QWEN_API_KEY:-}"
+baseUrl = "${GONOTELM_RERANK_QWEN_BASE_URL:-https://dashscope.aliyuncs.com/compatible-api/v1/reranks}"
+model = "${GONOTELM_RERANK_QWEN_MODEL:-qwen3-rerank}"
+timeout = "${GONOTELM_RERANK_QWEN_TIMEOUT:-30s}"
 
 [provider]
 
@@ -161,38 +161,87 @@ timeout = "${GONOTELM_RERANK_DASHSCOPE_TIMEOUT:-30s}"
 apiKey = "${GONOTELM_DEEPSEEK_API_KEY}"
 timeout = "${GONOTELM_DEEPSEEK_TIMEOUT:-5m}"
 baseUrl = "${GONOTELM_DEEPSEEK_BASE_URL:-https://api.deepseek.com}"
-model = "${GONOTELM_DEEPSEEK_MODEL:-deepseek-v4-flash}"
+defaultModel = "${GONOTELM_DEEPSEEK_MODEL:-deepseek-v4-flash}"
 thinkingEnabled = false
+
+[provider.deepseek.models.deepseek-v4-flash]
+name = "deepseek-v4-flash"
+modalities = {input = ["text"], output = ["text"]}
+
+[provider.deepseek.models.deepseek-v4-pro]
+name = "deepseek-v4-pro"
+modalities = {input = ["text"], output = ["text"]}
+
+[provider.deepseek.models.deepseek-v4-flash-vision-exp]
+name = "deepseek-v4-flash-vision-exp"
+modalities = {input = ["text", "image"], output = ["text"]}
 
 [provider.openai]
 apiKey = "${GONOTELM_OPENAI_API_KEY:-}"
 baseUrl = "${GONOTELM_OPENAI_BASE_URL:-https://api.openai.com/v1}"
-model = "${GONOTELM_OPENAI_MODEL:-gpt-4o-mini}"
+defaultModel = "${GONOTELM_OPENAI_MODEL:-gpt-4o-mini}"
 timeout = "${GONOTELM_OPENAI_TIMEOUT:-5m}"
 temperature = ${GONOTELM_OPENAI_TEMPERATURE:-1.0}
 reasoningEffort = "${GONOTELM_OPENAI_REASONING_EFFORT:-}"
 
 [provider.qwen]
-apiKey = "${GONOTELM_DASHSCOPE_API_KEY:-}"
+apiKey = "${GONOTELM_QWEN_API_KEY:-}"
 baseUrl = "${GONOTELM_QWEN_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}"
-model = "${GONOTELM_QWEN_MODEL:-glm-5.1}"
+defaultModel = "${GONOTELM_QWEN_MODEL:-glm-5.1}"
 timeout = "${GONOTELM_QWEN_TIMEOUT:-5m}"
 temperature = ${GONOTELM_QWEN_TEMPERATURE:-1.0}
 topP = ${GONOTELM_QWEN_TOP_P:-1.0}
 enableThinking = ${GONOTELM_QWEN_ENABLE_THINKING:-false}
 
+[provider.qwen.models."qwen3.8-flash"]
+name = "qwen3.8-flash"
+modalities = {input = ["text", "image"], output = ["text"]}
+
+[provider.qwen.models."qwen3.8-max"]
+name = "qwen3.8-max"
+modalities = {input = ["text", "image"], output = ["text"]}
+
+[provider.qwen.models."qwen3.7-max"]
+name = "qwen3.7-max"
+modalities = {input = ["text"], output = ["text"]}
+
+[provider.qwen.models."qwen3.7-plus"]
+name = "qwen3.7-plus"
+modalities = {input = ["text", "image"], output = ["text"]}
+
+[provider.qwen.models."qwen3.7-flash"]
+name = "qwen3.7-flash"
+modalities = {input = ["text", "image"], output = ["text"]}
+
+[provider.qwen.models."qwen3.6-flash"]
+name = "qwen3.6-flash"
+modalities = {input = ["text", "image"], output = ["text"]}
+
+[provider.qwen.models."qwen3.6-max"]
+name = "qwen3.6-flash"
+modalities = {input = ["text"], output = ["text"]}
+
+[provider.qwen.models."qwen3.6-plus"]
+name = "qwen3.6-flash"
+modalities = {input = ["text", "image"], output = ["text"]}
+
 [provider.agnes]
 apiKey = "${GONOTELM_AGNES_API_KEY:-}"
 baseUrl = "${GONOTELM_AGNES_BASE_URL:-https://apihub.agnes-ai.com/v1}"
-model = "${GONOTELM_AGNES_MODEL:-agnes-2.0-flash}"
+defaultModel = "${GONOTELM_AGNES_MODEL:-agnes-2.5-flash}"
 timeout = "${GONOTELM_AGNES_TIMEOUT:-5m}"
 temperature = ${GONOTELM_AGNES_TEMPERATURE:-1.0}
 topP = ${GONOTELM_AGNES_TOP_P:-1.0}
 
+[provider.agnes.models."agnes-2.5-flash"]
+name = "agnes-2.5-flash"
+modalities = {input = ["text", "image"], output = ["text"]}
+
 [providerBilling]
 deepSeekScript = ""
-embeddingDashScopeScript = ""
-text2ImageDashScopeScript = ""
+chatQwenScript = ""
+embeddingQwenScript = ""
+text2ImageQwenScript = ""
 
 [flow]
 addr        = "${GONOTELM_FLOW_ADDR:-localhost:7091}"

@@ -7,7 +7,7 @@ speakers:
     gender: female
     bio: "擅长层层推演，每一条结论都建立在可追溯的证据之上，凡是引述必标出处。适合深度研究报告类播客。"
     voices:
-      dashscope:
+      qwen:
         zh-CN: Elias
         en-US: Elias
       mimo:
@@ -20,7 +20,7 @@ speakers:
     gender: male
     bio: "能把最抽象的理论转化成有画面感的故事，让听众在情感共鸣中理解复杂概念。适合面向大众的知识科普。"
     voices:
-      dashscope:
+      qwen:
         zh-CN: Ethan
         en-US: Ethan
       mimo:
@@ -33,7 +33,7 @@ speakers:
     gender: male
     bio: "善于把庞大话题拆解为有层次的知识模块，每一段结束都让听众清楚地知道「刚才讲了什么、接下来要讲什么」。适合深度讲解类播客。"
     voices:
-      dashscope:
+      qwen:
         zh-CN: Neil
         en-US: Neil
       mimo:
@@ -46,7 +46,7 @@ speakers:
     gender: female
     bio: "总能根据嘉宾的回答即兴调整方向，在观点的两极之间架设沟通之桥，问出那个让人「不得不认真回答」的问题。适合多人对谈类播客。"
     voices:
-      dashscope:
+      qwen:
         zh-CN: Cherry
         en-US: Cherry
       mimo:

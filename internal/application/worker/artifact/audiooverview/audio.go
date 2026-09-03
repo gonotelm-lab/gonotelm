@@ -126,8 +126,8 @@ func resolveVoice(langMap map[string]string, lang artifactentity.Language) strin
 
 func wavOptionForProvider(provider text2audio.Text2AudioProvider) audios.Option {
 	switch provider {
-	case text2audio.Text2AudioDashScope:
-		// dashscope 已默认返回 WAV
+	case text2audio.Text2AudioQwen:
+		// qwen 已默认返回 WAV
 		return nil
 	case text2audio.Text2AudioMimo:
 		return mimopkg.WithFormat(mimopkg.FormatWAV)

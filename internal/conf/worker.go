@@ -1,13 +1,10 @@
 package conf
 
 import (
-	"regexp"
-	"sync"
 	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/conf/shared"
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
-	rerank "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/rerank"
 	text2audio "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio"
 	text2image "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/sandbox"
@@ -38,74 +35,6 @@ type WorkerConfig struct {
 type WorkerPoolConfig struct {
 	MaxConcurrency int           `toml:"maxConcurrency"`
 	Heartbeat      time.Duration `toml:"heartbeat"`
-}
-
-type ChatConfig struct {
-	MaxRound              int                   `toml:"maxRound"`
-	ModelProvider         llmchat.Provider      `toml:"modelProvider"`
-	Model                 string                `toml:"model"` // 对话使用的模型
-	SourceDocsRecallCount int                   `toml:"sourceDocsRecallCount"`
-	TaskTimeout           time.Duration         `toml:"taskTimeout"`    // 流式任务超时时间
-	RerankProvider        rerank.RerankProvider `toml:"rerankProvider"` // 重排序提供商
-	RerankEnabled         bool                  `toml:"rerankEnabled"`
-	RerankTopN            int                   `toml:"rerankTopN"`
-	RerankModel           string                `toml:"rerankModel"`
-}
-
-func (c *ChatConfig) GetSourceDocsRecallCount() int {
-	if c.SourceDocsRecallCount == 0 {
-		return DefaultSourceDocsRecallCount
-	}
-
-	return c.SourceDocsRecallCount
-}
-
-func (c *ChatConfig) GetTaskTimeout() time.Duration {
-	if c.TaskTimeout == 0 {
-		return DefaultTaskTimeout
-	}
-
-	return c.TaskTimeout
-}
-
-func (c *ChatConfig) GetMaxRound() int {
-	if c.MaxRound == 0 {
-		return DefaultMaxRound
-	}
-
-	return c.MaxRound
-}
-
-func (c *ChatConfig) GetRerankTopN() int {
-	if c.RerankTopN == 0 {
-		return RerankDefaultTopN
-	}
-
-	return c.RerankTopN
-}
-
-var sourceUrlBlacklistRegex *regexp.Regexp
-
-type SourceConfig struct {
-	ModelProvider llmchat.Provider `toml:"modelProvider"`
-	Model         string           `toml:"model"`
-
-	UrlBlacklistRegex string `toml:"urlBlacklistRegex"`
-
-	BizCache struct {
-		Eviction time.Duration `toml:"eviction"`
-		MaxMB    int           `toml:"maxMB"`
-	} `toml:"bizCache"`
-}
-
-func (c *SourceConfig) init() {
-	sync.OnceFunc(func() {
-		sourceUrlBlacklistRegex = regexp.MustCompile(c.UrlBlacklistRegex)
-	})()
-}
-
-func (c *SourceConfig) GetURLBlacklistRegex() *regexp.Regexp {
-	return sourceUrlBlacklistRegex
 }
 
 type StudioConfig struct {
@@ -174,20 +103,20 @@ type StudioConfig struct {
 
 func LoadWorkerConfig(path string) (*WorkerConfig, error) {
 	cfg := &WorkerConfig{}
-	if err := loadTOML(path, cfg); err != nil {
+	if err := LoadTOML(path, cfg); err != nil {
 		return nil, err
 	}
 
-	cfg.applyDefaults()
+	cfg.init()
 
 	workerGlobal = cfg
 	return cfg, nil
 }
 
-func (c *WorkerConfig) applyDefaults() {
-	c.Init()
-	c.Logging.ApplyDefaults()
-	c.Flow.ApplyDefaults()
+func (c *WorkerConfig) init() {
+	c.InitInfra()
+	c.Logging.Init()
+	c.Flow.Init()
 
 	if c.Worker.MaxConcurrency <= 0 {
 		c.Worker.MaxConcurrency = 4

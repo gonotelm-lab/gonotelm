@@ -1,8 +1,11 @@
 package conf
 
 import (
+	"fmt"
+
 	"github.com/gonotelm-lab/gonotelm/internal/conf/shared"
-	mqimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
 	"github.com/gonotelm-lab/gonotelm/pkg/trace"
 )
 
@@ -12,38 +15,80 @@ var sourceJobGlobal *SourceJobConfig
 type SourceJobConfig struct {
 	shared.InfraConfig
 
-	DeployEnv string               `toml:"deployEnv"`
-	Source    SourceConfig         `toml:"source"`
-	Logging   shared.LoggingConfig `toml:"logging"`
-	Chunking  ChunkingConfig       `toml:"chunking"`
-	OtelTrace trace.Config         `toml:"otelTrace"`
+	DeployEnv string                `toml:"deployEnv"`
+	Source    SourceJobSourceConfig `toml:"source"`
+	Logging   shared.LoggingConfig  `toml:"logging"`
+	Chunking  ChunkingConfig        `toml:"chunking"`
+	OtelTrace trace.Config          `toml:"otelTrace"`
 }
 
 func (c *SourceJobConfig) IsDev() bool {
 	return shared.IsDevEnv(c.DeployEnv)
 }
 
+// SourceJobSourceConfig is the [source] section for cmd/sourcejob.
+type SourceJobSourceConfig struct {
+	ModelProvider      chat.Provider `toml:"modelProvider"`
+	Model              string        `toml:"model"`
+	ImageModelProvider chat.Provider `toml:"imageModelProvider"`
+	ImageModel         string        `toml:"imageModel"`
+}
+
+type ChunkingConfig struct {
+	Size        int `toml:"size"`
+	OverlapSize int `toml:"overlapSize"`
+}
+
 func LoadSourceJobConfig(path string) (*SourceJobConfig, error) {
 	cfg := &SourceJobConfig{}
-	if err := loadTOML(path, cfg); err != nil {
+	if err := LoadTOML(path, cfg); err != nil {
 		return nil, err
 	}
 
-	cfg.applyDefaults()
+	cfg.init()
 
 	sourceJobGlobal = cfg
 	return cfg, nil
 }
 
-func (c *SourceJobConfig) applyDefaults() {
-	c.Init()
-	c.Logging.ApplyDefaults()
+func (c *SourceJobConfig) init() {
+	c.InitInfra()
+	c.Logging.Init()
 
-	if c.MsgQueue.Type == "" {
-		c.MsgQueue.Type = mqimpl.Kafka
+	if c.MessageQueue.Type == "" {
+		c.MessageQueue.Type = mq.Kafka
 	}
+
+	c.examinateSourceConfig()
 }
 
 func SourceJobGlobal() *SourceJobConfig {
 	return sourceJobGlobal
+}
+
+func (c *SourceJobConfig) examinateSourceConfig() {
+	// check source config
+	var (
+		chatModel chat.Model
+		models    map[string]chat.Model
+	)
+	switch c.Source.ImageModelProvider {
+	case chat.ProviderDeepSeek:
+		models = c.Provider.DeepSeek.Models
+	case chat.ProviderOpenAI:
+		models = c.Provider.OpenAI.Models
+	case chat.ProviderQwen:
+		models = c.Provider.Qwen.Models
+	case chat.ProviderAgnes:
+		models = c.Provider.Agnes.Models
+	default:
+		panic(fmt.Sprintf("unknown image understand model provider %s", c.Source.ImageModelProvider))
+	}
+	chatModel, ok := models[c.Source.ImageModel]
+	if !ok {
+		panic(fmt.Sprintf("image model %s not found", c.Source.ImageModel))
+	}
+	if !chatModel.Modalities.SupportImageInput() {
+		panic(fmt.Sprintf("image model %s does not support image input", c.Source.ImageModel))
+	}
 }

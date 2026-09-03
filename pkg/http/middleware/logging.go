@@ -84,6 +84,9 @@ func Logging(opts ...LoggingOption) app.HandlerFunc {
 			if elapsed > duration && !skip {
 				basicMsg := fmt.Sprintf("[SLOW HTTP][%d](%dms) %s:%s", status, elapsed.Milliseconds(), method, path)
 				slog.WarnContext(ctx, basicMsg)
+			} else {
+				basicMsg := fmt.Sprintf("[HTTP][%d](%dms) %s:%s", status, elapsed.Milliseconds(), method, path)
+				slog.DebugContext(ctx, basicMsg)
 			}
 		}
 	}

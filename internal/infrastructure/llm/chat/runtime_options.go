@@ -40,11 +40,11 @@ type callOptions struct {
 
 func WithThinking(
 	providerType Provider,
-	enableThinking bool,
+	enabled bool,
 ) einomodel.Option {
-	enabled := enableThinking
+	enableThinking := enabled
 	return einomodel.WrapImplSpecificOptFn(func(o *callOptions) {
-		o.EnableThinking = &enabled
+		o.EnableThinking = &enableThinking
 	})
 }
 
@@ -87,6 +87,8 @@ func applyProviderCallOptions(
 				thinkingType = "enabled"
 			}
 			fields["thinking"] = map[string]string{"type": thinkingType}
+		} else {
+			fields["thinking"] = map[string]string{"type": "disabled"}
 		}
 		if callOpts.ResponseFormatJSONObject {
 			fields = mergeExtraFields(fields, openaiext.ResponseFormatJSONObject)
@@ -94,6 +96,7 @@ func applyProviderCallOptions(
 		if len(fields) > 0 {
 			// Append last so this map wins over any earlier deepseek.WithExtraFields.
 			opts = append(opts, deepseek.WithExtraFields(fields))
+			opts = append(opts, openai.WithExtraFields(fields)) // for deepseek using openai
 		}
 	case ProviderQwen:
 		fields := map[string]any{}
@@ -102,6 +105,8 @@ func applyProviderCallOptions(
 		}
 		if callOpts.EnableThinking != nil {
 			opts = append(opts, qwen.WithEnableThinking(*callOpts.EnableThinking))
+		} else {
+			opts = append(opts, qwen.WithEnableThinking(false))
 		}
 		if callOpts.ResponseFormatJSONObject {
 			fields = mergeExtraFields(fields, openaiext.ResponseFormatJSONObject)
@@ -113,6 +118,8 @@ func applyProviderCallOptions(
 		chatTemplateKwargs := map[string]any{}
 		if callOpts.EnableThinking != nil {
 			chatTemplateKwargs["enable_thinking"] = *callOpts.EnableThinking
+		} else {
+			chatTemplateKwargs["enable_thinking"] = false
 		}
 		if callOpts.ResponseFormatJSONObject {
 			chatTemplateKwargs["response_format"] = map[string]string{"type": "json_object"}

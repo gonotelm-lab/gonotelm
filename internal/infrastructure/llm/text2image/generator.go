@@ -24,8 +24,9 @@ func newText2ImageGenerator(
 	}
 
 	switch provider {
-	case Text2ImageDashScope:
-		return dashscope.New(cfg.DashScope, withImageHTTPClient(opts, cfg.DashScope.Timeout)...)
+	case Text2ImageQwen:
+		// multimodal SDK 包名仍为 dashscope
+		return dashscope.New(cfg.Qwen, withImageHTTPClient(opts, cfg.Qwen.Timeout)...)
 	case Text2ImageAgnes:
 		return agnes.New(cfg.Agnes, withImageHTTPClient(opts, cfg.Agnes.Timeout)...)
 	default:

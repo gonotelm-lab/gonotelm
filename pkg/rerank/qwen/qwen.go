@@ -1,4 +1,4 @@
-package dashscope
+package qwen
 
 import (
 	"bytes"
@@ -27,7 +27,7 @@ type Reranker struct {
 
 func New(cfg Config, opts ...rerank.ClientOption) (*Reranker, error) {
 	if strings.TrimSpace(cfg.APIKey) == "" {
-		return nil, fmt.Errorf("dashscope api key is required")
+		return nil, fmt.Errorf("qwen api key is required")
 	}
 	if strings.TrimSpace(cfg.BaseUrl) == "" {
 		cfg.BaseUrl = defaultBaseUrl
@@ -88,13 +88,13 @@ func (r *Reranker) Rerank(ctx context.Context, req *schema.Request, opts ...rera
 
 	bodyBytes, err := json.Marshal(payload)
 	if err != nil {
-		return schema.Response{}, fmt.Errorf("marshal dashscope rerank request failed: %w", err)
+		return schema.Response{}, fmt.Errorf("marshal qwen rerank request failed: %w", err)
 	}
 
 	url := r.cfg.BaseUrl
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyBytes))
 	if err != nil {
-		return schema.Response{}, fmt.Errorf("build dashscope rerank request failed: %w", err)
+		return schema.Response{}, fmt.Errorf("build qwen rerank request failed: %w", err)
 	}
 	httpReq.Header.Set("Authorization", "Bearer "+r.cfg.APIKey)
 	httpReq.Header.Set("Content-Type", "application/json")
@@ -102,17 +102,17 @@ func (r *Reranker) Rerank(ctx context.Context, req *schema.Request, opts ...rera
 
 	httpResp, err := r.httpClient.Do(httpReq)
 	if err != nil {
-		return schema.Response{}, fmt.Errorf("call dashscope rerank failed: %w", err)
+		return schema.Response{}, fmt.Errorf("call qwen rerank failed: %w", err)
 	}
 	defer httpResp.Body.Close()
 
 	respBody, err := io.ReadAll(httpResp.Body)
 	if err != nil {
-		return schema.Response{}, fmt.Errorf("read dashscope rerank response failed: %w", err)
+		return schema.Response{}, fmt.Errorf("read qwen rerank response failed: %w", err)
 	}
 
 	if httpResp.StatusCode < http.StatusOK || httpResp.StatusCode >= http.StatusMultipleChoices {
-		return schema.Response{}, fmt.Errorf("dashscope rerank request failed: status=%d body=%s", httpResp.StatusCode, string(respBody))
+		return schema.Response{}, fmt.Errorf("qwen rerank request failed: status=%d body=%s", httpResp.StatusCode, string(respBody))
 	}
 
 	return parseResponse(respBody)
@@ -267,7 +267,7 @@ type apiUsage struct {
 func parseResponse(respBody []byte) (schema.Response, error) {
 	var apiResp apiResponse
 	if err := json.Unmarshal(respBody, &apiResp); err != nil {
-		return schema.Response{}, fmt.Errorf("decode dashscope rerank response failed: %w", err)
+		return schema.Response{}, fmt.Errorf("decode qwen rerank response failed: %w", err)
 	}
 
 	results := make([]schema.Result, 0, len(apiResp.Results))

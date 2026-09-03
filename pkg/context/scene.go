@@ -32,6 +32,6 @@ func (s SceneType) String() string {
 // 分组定义如下：
 //
 //  1. studio生成artifact过程中 那么这些LLM调用属于同一组 artifactId为分组id
-//  2. 同一个会话下的所有调用属于同一个分组 chatId作为分组id
+//  2. 一条消息回复过程下的所有调用属于同一个分组 msgId作为分组id
 //  3. 来源处理时同一个来源下的所有调用属于同一个分组 sourceId 作为分组id
 type SceneGroupId = string

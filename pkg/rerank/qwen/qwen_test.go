@@ -1,4 +1,4 @@
-package dashscope
+package qwen
 
 import (
 	"encoding/json"
@@ -11,9 +11,9 @@ import (
 
 func getAPIKey(t *testing.T) string {
 	t.Helper()
-	key := os.Getenv("GONOTELM_DASHSCOPE_APIKEY")
+	key := os.Getenv("GONOTELM_QWEN_API_KEY")
 	if key == "" {
-		t.Skip("GONOTELM_DASHSCOPE_APIKEY not set, skipping integration test")
+		t.Skip("GONOTELM_QWEN_API_KEY not set, skipping integration test")
 	}
 	return key
 }

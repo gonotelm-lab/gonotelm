@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/entity/vo"
 	domainerr "github.com/gonotelm-lab/gonotelm/internal/domain/source/errors"
@@ -36,6 +37,7 @@ func New(
 	c ServiceConfig,
 	objectStorage repository.FileObjectGetter,
 	sourceDocRepo repository.SourceDocRepository,
+	imageInterpreter adapter.ImageInterpreter,
 ) *Service {
 	if c.DefaultChunkSize <= 0 {
 		c.DefaultChunkSize = defaultChunkSize
@@ -57,7 +59,7 @@ func New(
 		sourceConverters: map[vo.SourceKind]convertdoc.Handler{
 			vo.SourceKindText: convertdoc.NewTextHandler(hc),
 			vo.SourceKindUrl:  convertdoc.NewUrlHandler(hc),
-			vo.SourceKindFile: convertdoc.NewFileObjectHandler(hc, objectStorage),
+			vo.SourceKindFile: convertdoc.NewFileObjectHandler(hc, objectStorage, imageInterpreter),
 		},
 		objectStorage: objectStorage,
 		sourceDocRepo: sourceDocRepo,

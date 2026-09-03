@@ -15,7 +15,7 @@ type StandardMeter struct {
 }
 
 type StandardMeterConfig struct {
-	DashScopeScript string
+	QwenScript string
 }
 
 func NewStandardMeter(c StandardMeterConfig) (Meter, error) {
@@ -23,12 +23,12 @@ func NewStandardMeter(c StandardMeterConfig) (Meter, error) {
 		providers: make(map[text2image.Text2ImageProvider]ImagePricesProvider, 8),
 	}
 
-	if len(c.DashScopeScript) > 0 {
-		dashScope, err := NewScriptedPriceProvider(c.DashScopeScript)
+	if len(c.QwenScript) > 0 {
+		qwen, err := NewScriptedPriceProvider(c.QwenScript)
 		if err != nil {
-			return nil, fmt.Errorf("init dashscope script err: %w", err)
+			return nil, fmt.Errorf("init qwen script err: %w", err)
 		}
-		meter.SetProvider(text2image.Text2ImageDashScope, dashScope)
+		meter.SetProvider(text2image.Text2ImageQwen, qwen)
 	}
 
 	return meter, nil

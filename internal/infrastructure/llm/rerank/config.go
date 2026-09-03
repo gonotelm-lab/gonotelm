@@ -1,6 +1,6 @@
 package rerank
 
-import "github.com/gonotelm-lab/gonotelm/pkg/rerank/dashscope"
+import "github.com/gonotelm-lab/gonotelm/pkg/rerank/qwen"
 
 type RerankProvider string
 
@@ -9,9 +9,9 @@ func (t RerankProvider) String() string {
 }
 
 const (
-	RerankDashScope RerankProvider = "dashscope"
+	RerankQwen RerankProvider = "qwen"
 )
 
 type RerankConfig struct {
-	DashScope dashscope.Config `toml:"dashscope"`
+	Qwen qwen.Config `toml:"qwen"`
 }

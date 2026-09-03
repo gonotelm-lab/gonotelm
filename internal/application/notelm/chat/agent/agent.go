@@ -141,7 +141,7 @@ type (
 type ChatAgent = pkgagt.Agent[*SessionState]
 
 func (a *Agent) prepareRun(req *RunRequest) (*ChatAgent, *SessionState, error) {
-	toolCallingChatModel, err := a.gateway.GetProvider(chat.Provider(req.ModelProvider))
+	tcm, err := a.gateway.GetChatModel(chat.Provider(req.ModelProvider))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -159,7 +159,7 @@ func (a *Agent) prepareRun(req *RunRequest) (*ChatAgent, *SessionState, error) {
 	}
 	domainAgent := pkgagt.New(pkgagt.Config[*SessionState]{
 		MaxRound: conf.NotelmGlobal().Chat.GetMaxRound(),
-		BaseLLM:  toolCallingChatModel,
+		BaseLLM:  tcm,
 		Options:  options,
 		Verbose:  false,
 	}, session)

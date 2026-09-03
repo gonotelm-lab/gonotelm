@@ -12,12 +12,12 @@ import (
 )
 
 var (
-	//go:embed testdata/dashscope.text2image
-	testDashscopeText2ImageScript string
+	//go:embed testdata/qwen.text2image
+	testQwenText2ImageScript string
 )
 
 func TestNewScriptedPriceProvider_CompilesModelPriceScripts(t *testing.T) {
-	_, err := NewScriptedPriceProvider(testDashscopeText2ImageScript)
+	_, err := NewScriptedPriceProvider(testQwenText2ImageScript)
 	require.NoError(t, err)
 }
 
@@ -27,8 +27,8 @@ func TestNewScriptedPriceProvider_InvalidScript(t *testing.T) {
 	assert.Contains(t, err.Error(), "compile")
 }
 
-func TestScriptedPriceProvider_DashScopeText2Image(t *testing.T) {
-	p, err := NewScriptedPriceProvider(testDashscopeText2ImageScript)
+func TestScriptedPriceProvider_QwenText2Image(t *testing.T) {
+	p, err := NewScriptedPriceProvider(testQwenText2ImageScript)
 	require.NoError(t, err)
 
 	cases := []struct {
@@ -52,12 +52,12 @@ func TestScriptedPriceProvider_DashScopeText2Image(t *testing.T) {
 }
 
 func TestStandardMeter_CalculateByOutputCount(t *testing.T) {
-	meter, err := NewStandardMeter(StandardMeterConfig{DashScopeScript: testDashscopeText2ImageScript})
+	meter, err := NewStandardMeter(StandardMeterConfig{QwenScript: testQwenText2ImageScript})
 	require.NoError(t, err)
 
 	total, details, err := meter.Calculate(
 		context.Background(),
-		text2image.Text2ImageDashScope,
+		text2image.Text2ImageQwen,
 		"qwen-image-3.0",
 		text2image.RecordUsage{OutputCount: 2},
 	)
@@ -68,7 +68,7 @@ func TestStandardMeter_CalculateByOutputCount(t *testing.T) {
 }
 
 func TestScriptedPriceProvider_UnknownModel(t *testing.T) {
-	p, err := NewScriptedPriceProvider(testDashscopeText2ImageScript)
+	p, err := NewScriptedPriceProvider(testQwenText2ImageScript)
 	require.NoError(t, err)
 
 	_, err = p.Provide(context.Background(), "unknown-model", text2image.RecordUsage{OutputCount: 1})

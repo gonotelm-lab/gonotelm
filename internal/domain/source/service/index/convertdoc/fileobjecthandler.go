@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"path/filepath"
 
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourceerr "github.com/gonotelm-lab/gonotelm/internal/domain/source/errors"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
@@ -26,11 +27,15 @@ type FileObjectHandler struct {
 	c HandlerConfig
 }
 
-func NewFileObjectHandler(c HandlerConfig, objGetter repository.FileObjectGetter) *FileObjectHandler {
+func NewFileObjectHandler(
+	hc HandlerConfig,
+	objGetter repository.FileObjectGetter,
+	imageInterpreter adapter.ImageInterpreter,
+) *FileObjectHandler {
 	return &FileObjectHandler{
-		c:             c,
+		c:             hc,
 		objectStorage: objGetter,
-		baseHandler:   newBaseHandler("file-object-pipe", &myparser.FileObjectParser{}, c),
+		baseHandler:   newBaseHandler("file-object-pipe", myparser.NewFileObjectHandler(imageInterpreter), hc),
 	}
 }
 

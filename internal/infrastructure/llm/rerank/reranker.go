@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	pkgrerank "github.com/gonotelm-lab/gonotelm/pkg/rerank"
-	"github.com/gonotelm-lab/gonotelm/pkg/rerank/dashscope"
+	"github.com/gonotelm-lab/gonotelm/pkg/rerank/qwen"
 )
 
 func newReranker(
@@ -17,8 +17,8 @@ func newReranker(
 	}
 
 	switch provider {
-	case RerankDashScope:
-		return dashscope.New(cfg.DashScope, opts...)
+	case RerankQwen:
+		return qwen.New(cfg.Qwen, opts...)
 	default:
 		return nil, fmt.Errorf("rerank provider %q is not supported", provider)
 	}

@@ -12,7 +12,7 @@ import (
 // StandardMeter routes providers to a concrete billing meter.
 //
 // Current routing:
-//   - dashscope / minimax → character-based
+//   - qwen / minimax → character-based
 //   - mimo → token-based?
 type StandardMeter struct {
 	mu     sync.RWMutex
@@ -21,21 +21,21 @@ type StandardMeter struct {
 
 type StandardMeterConfig struct {
 	// Character-based provider scripts (key: character_10k)
-	DashScopeScript string
-	MiniMaxScript   string
+	QwenScript    string
+	MiniMaxScript string
 }
 
 func NewStandardMeter(c StandardMeterConfig) (Meter, error) {
 	characterMeter := NewCharacterBasedMeter()
 	routes := make(map[text2audio.Text2AudioProvider]Meter, 4)
 
-	if len(c.DashScopeScript) > 0 {
-		dashScope, err := NewScriptedCharacterPriceProvider(c.DashScopeScript)
+	if len(c.QwenScript) > 0 {
+		qwen, err := NewScriptedCharacterPriceProvider(c.QwenScript)
 		if err != nil {
-			return nil, fmt.Errorf("init dashscope character script err: %w", err)
+			return nil, fmt.Errorf("init qwen character script err: %w", err)
 		}
-		characterMeter.SetProvider(text2audio.Text2AudioDashScope, dashScope)
-		routes[text2audio.Text2AudioDashScope] = characterMeter
+		characterMeter.SetProvider(text2audio.Text2AudioQwen, qwen)
+		routes[text2audio.Text2AudioQwen] = characterMeter
 	}
 	if len(c.MiniMaxScript) > 0 {
 		miniMax, err := NewScriptedCharacterPriceProvider(c.MiniMaxScript)

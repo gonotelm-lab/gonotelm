@@ -61,14 +61,14 @@ model = "${GONOTELM_STUDIO_REPORT_MODEL:-deepseek-v4-flash}"
 maxRound = ${GONOTELM_STUDIO_INFOGRAPHIC_MAX_ROUND:-50}
 modelProvider = "${GONOTELM_STUDIO_INFOGRAPHIC_PROVIDER:-deepseek}"
 model = "${GONOTELM_STUDIO_INFOGRAPHIC_MODEL:-deepseek-v4-flash}"
-imageModelProvider = "${GONOTELM_STUDIO_INFOGRAPHIC_IMAGE_MODEL_PROVIDER:-dashscope}"
+imageModelProvider = "${GONOTELM_STUDIO_INFOGRAPHIC_IMAGE_MODEL_PROVIDER:-qwen}"
 imageModel = "${GONOTELM_STUDIO_INFOGRAPHIC_IMAGE_MODEL:-qwen-image-2.0-pro}"
 
 [studio.audioOverview]
 maxRound = ${GONOTELM_STUDIO_AUDIOOVERVIEW_MAX_ROUND:-50}
 modelProvider = "${GONOTELM_STUDIO_AUDIOOVERVIEW_PROVIDER:-deepseek}"
 model = "${GONOTELM_STUDIO_AUDIOOVERVIEW_MODEL:-deepseek-v4-flash}"
-audioModelProvider = "${GONOTELM_STUDIO_AUDIOOVERVIEW_AUDIO_MODEL_PROVIDER:-dashscope}"
+audioModelProvider = "${GONOTELM_STUDIO_AUDIOOVERVIEW_AUDIO_MODEL_PROVIDER:-qwen}"
 audioModel = "${GONOTELM_STUDIO_AUDIOOVERVIEW_AUDIO_MODEL:-qwen3-tts-instruct-flash}"
 audioSynthConcurrency = ${GONOTELM_STUDIO_AUDIOOVERVIEW_AUDIO_SYNTH_CONCURRENCY:-1}
 
@@ -95,15 +95,15 @@ model = "${GONOTELM_STUDIO_SLIDES_MODEL:-deepseek-v4-flash}"
 sandboxProvider = "${GONOTELM_STUDIO_SLIDES_SANDBOX_PROVIDER:-opensandbox}"
 
 [embedding]
-type = "${GONOTELM_EMBEDDING_TYPE:-dashscope}"
+type = "${GONOTELM_EMBEDDING_TYPE:-qwen}"
 batchSize = ${GONOTELM_EMBEDDING_BATCH_SIZE:-10}
 maxConcurrency = ${GONOTELM_EMBEDDING_MAX_CONCURRENCY:-4}
 
-[embedding.dashscope]
-apiKey = "${GONOTELM_DASHSCOPE_API_KEY:-}"
-model = "${GONOTELM_DASHSCOPE_MODEL:-text-embedding-v4}"
-timeout = "${GONOTELM_DASHSCOPE_TIMEOUT:-30s}"
-dimensions = ${GONOTELM_DASHSCOPE_DIMENSIONS:-1024}
+[embedding.qwen]
+apiKey = "${GONOTELM_QWEN_API_KEY:-}"
+model = "${GONOTELM_QWEN_EMBEDDING_MODEL:-text-embedding-v4}"
+timeout = "${GONOTELM_QWEN_EMBEDDING_TIMEOUT:-30s}"
+dimensions = ${GONOTELM_QWEN_EMBEDDING_DIMENSIONS:-1024}
 
 [embedding.openai]
 apiKey = "${GONOTELM_OPENAI_API_KEY:-}"
@@ -122,31 +122,87 @@ apiVersion = "${GONOTELM_OPENAI_API_VERSION:-}"
 apiKey = "${GONOTELM_DEEPSEEK_API_KEY}"
 timeout = "${GONOTELM_DEEPSEEK_TIMEOUT:-5m}"
 baseUrl = "${GONOTELM_DEEPSEEK_BASE_URL:-https://api.deepseek.com}"
-model = "${GONOTELM_DEEPSEEK_MODEL:-deepseek-v4-flash}"
+defaultModel = "${GONOTELM_DEEPSEEK_MODEL:-deepseek-v4-flash}"
 thinkingEnabled = false
 
+[provider.deepseek.models.deepseek-v4-flash]
+name = "deepseek-v4-flash"
+modalities = {input = ["text"], output = ["text"]}
+
+[provider.deepseek.models.deepseek-v4-pro]
+name = "deepseek-v4-pro"
+modalities = {input = ["text"], output = ["text"]}
+
+[provider.deepseek.models.deepseek-v4-flash-vision-exp]
+name = "deepseek-v4-flash-vision-exp"
+modalities = {input = ["text", "image"], output = ["text"]}
+
+[provider.openai]
+apiKey = "${GONOTELM_OPENAI_API_KEY:-}"
+baseUrl = "${GONOTELM_OPENAI_BASE_URL:-https://api.openai.com/v1}"
+defaultModel = "${GONOTELM_OPENAI_MODEL:-gpt-4o-mini}"
+timeout = "${GONOTELM_OPENAI_TIMEOUT:-5m}"
+temperature = ${GONOTELM_OPENAI_TEMPERATURE:-1.0}
+reasoningEffort = "${GONOTELM_OPENAI_REASONING_EFFORT:-}"
+
 [provider.qwen]
-apiKey = "${GONOTELM_DASHSCOPE_API_KEY:-}"
+apiKey = "${GONOTELM_QWEN_API_KEY:-}"
 baseUrl = "${GONOTELM_QWEN_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}"
-model = "${GONOTELM_QWEN_MODEL:-glm-5.1}"
+defaultModel = "${GONOTELM_QWEN_MODEL:-glm-5.1}"
 timeout = "${GONOTELM_QWEN_TIMEOUT:-5m}"
 temperature = ${GONOTELM_QWEN_TEMPERATURE:-1.0}
 topP = ${GONOTELM_QWEN_TOP_P:-1.0}
 enableThinking = ${GONOTELM_QWEN_ENABLE_THINKING:-false}
 
+[provider.qwen.models."qwen3.8-flash"]
+name = "qwen3.8-flash"
+modalities = {input = ["text", "image"], output = ["text"]}
+
+[provider.qwen.models."qwen3.8-max"]
+name = "qwen3.8-max"
+modalities = {input = ["text", "image"], output = ["text"]}
+
+[provider.qwen.models."qwen3.7-max"]
+name = "qwen3.7-max"
+modalities = {input = ["text"], output = ["text"]}
+
+[provider.qwen.models."qwen3.7-plus"]
+name = "qwen3.7-plus"
+modalities = {input = ["text", "image"], output = ["text"]}
+
+[provider.qwen.models."qwen3.7-flash"]
+name = "qwen3.7-flash"
+modalities = {input = ["text", "image"], output = ["text"]}
+
+[provider.qwen.models."qwen3.6-flash"]
+name = "qwen3.6-flash"
+modalities = {input = ["text", "image"], output = ["text"]}
+
+[provider.qwen.models."qwen3.6-max"]
+name = "qwen3.6-flash"
+modalities = {input = ["text"], output = ["text"]}
+
+[provider.qwen.models."qwen3.6-plus"]
+name = "qwen3.6-flash"
+modalities = {input = ["text", "image"], output = ["text"]}
+
 [provider.agnes]
 apiKey = "${GONOTELM_AGNES_API_KEY:-}"
 baseUrl = "${GONOTELM_AGNES_BASE_URL:-https://apihub.agnes-ai.com/v1}"
-model = "${GONOTELM_AGNES_MODEL:-agnes-2.5-pro}"
+defaultModel = "${GONOTELM_AGNES_MODEL:-agnes-2.5-flash}"
 timeout = "${GONOTELM_AGNES_TIMEOUT:-5m}"
 temperature = ${GONOTELM_AGNES_TEMPERATURE:-1.0}
 topP = ${GONOTELM_AGNES_TOP_P:-1.0}
 
-[text2image.dashscope]
-apiKey = "${GONOTELM_DASHSCOPE_API_KEY:-}"
-baseUrl = "${GONOTELM_TEXT2IMAGE_DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation}"
-model = "${GONOTELM_TEXT2IMAGE_DASHSCOPE_MODEL:-qwen-image-2.0-pro}"
-timeout = "${GONOTELM_TEXT2IMAGE_DASHSCOPE_TIMEOUT:-10m}"
+[provider.agnes.models."agnes-2.5-flash"]
+name = "agnes-2.5-flash"
+modalities = {input = ["text", "image"], output = ["text"]}
+
+[text2image.qwen]
+apiKey = "${GONOTELM_QWEN_API_KEY:-}"
+baseUrl = "${GONOTELM_TEXT2IMAGE_QWEN_BASE_URL:-https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation}"
+model = "${GONOTELM_TEXT2IMAGE_QWEN_MODEL:-qwen-image-2.0-pro}"
+timeout = "${GONOTELM_TEXT2IMAGE_QWEN_TIMEOUT:-10m}"
 
 [text2image.agnes]
 apiKey = "${GONOTELM_AGNES_API_KEY:-}"
@@ -154,11 +210,11 @@ baseUrl = "${GONOTELM_TEXT2IMAGE_AGNES_BASE_URL:-https://apihub.agnes-ai.com/v1/
 model = "${GONOTELM_TEXT2IMAGE_AGNES_MODEL:-agnes-image-2.1-flash}"
 timeout = "${GONOTELM_TEXT2IMAGE_AGNES_TIMEOUT:-10m}"
 
-[text2audio.dashscope]
-apiKey = "${GONOTELM_DASHSCOPE_API_KEY:-}"
-baseUrl = "${GONOTELM_TEXT2AUDIO_DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation}"
-model = "${GONOTELM_TEXT2AUDIO_DASHSCOPE_MODEL:-qwen3-tts-flash}"
-timeout = "${GONOTELM_TEXT2AUDIO_DASHSCOPE_TIMEOUT:-10m}"
+[text2audio.qwen]
+apiKey = "${GONOTELM_QWEN_API_KEY:-}"
+baseUrl = "${GONOTELM_TEXT2AUDIO_QWEN_BASE_URL:-https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation}"
+model = "${GONOTELM_TEXT2AUDIO_QWEN_MODEL:-qwen3-tts-flash}"
+timeout = "${GONOTELM_TEXT2AUDIO_QWEN_TIMEOUT:-10m}"
 
 [text2audio.mimo]
 apiKey = "${GONOTELM_MIMO_API_KEY:-}"

@@ -13,13 +13,13 @@ func (t Text2AudioProvider) String() string {
 }
 
 const (
-	Text2AudioDashScope Text2AudioProvider = "dashscope"
-	Text2AudioMimo      Text2AudioProvider = "mimo"
-	Text2AudioMiniMax   Text2AudioProvider = "minimax"
+	Text2AudioQwen    Text2AudioProvider = "qwen"
+	Text2AudioMimo    Text2AudioProvider = "mimo"
+	Text2AudioMiniMax Text2AudioProvider = "minimax"
 )
 
 type Text2AudioConfig struct {
-	DashScope dashscope.Config `toml:"dashscope"`
-	Mimo      mimo.Config      `toml:"mimo"`
-	MiniMax   minimax.Config   `toml:"minimax"`
+	Qwen    dashscope.Config `toml:"qwen"`
+	Mimo    mimo.Config      `toml:"mimo"`
+	MiniMax minimax.Config   `toml:"minimax"`
 }

@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"maps"
 
 	einoparser "github.com/cloudwego/eino/components/document/parser"
 	"github.com/cloudwego/eino/schema"
+	"github.com/gonotelm-lab/gonotelm/pkg/eino-ext/util"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 
@@ -49,7 +49,7 @@ func (p *Parser) Parse(
 	}
 
 	commonOpts := einoparser.GetCommonOptions(nil, opts...)
-	baseMeta := copyMeta(commonOpts.ExtraMeta)
+	baseMeta := util.CopyMeta(commonOpts.ExtraMeta)
 	baseMeta["content_type"] = markdownContentType
 	if commonOpts.URI != "" {
 		baseMeta[einoparser.MetaKeySource] = commonOpts.URI
@@ -62,14 +62,4 @@ func (p *Parser) Parse(
 			MetaData: baseMeta,
 		},
 	}, nil
-}
-
-func copyMeta(src map[string]any) map[string]any {
-	if len(src) == 0 {
-		return map[string]any{}
-	}
-
-	dst := make(map[string]any, len(src))
-	maps.Copy(dst, src)
-	return dst
 }

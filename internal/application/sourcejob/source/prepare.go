@@ -40,12 +40,13 @@ func NewPrepareSourceHandler(
 	sourceDocRepo sourcerepo.SourceDocRepository,
 	summarizer adapter.Summarizer,
 	eventBus eventbus.EventBus,
+	imageInterpreter adapter.ImageInterpreter,
 ) *PrepareSourceHandler {
 	return &PrepareSourceHandler{
 		sourceRepo: sourceRepo,
 		sourceIndexService: index.New(index.ServiceConfig{
 			DefaultMaxSourceFileSizeBytes: entity.MaxUploadFileSizeBytes,
-		}, sourceStorageRepo, sourceDocRepo),
+		}, sourceStorageRepo, sourceDocRepo, imageInterpreter),
 		sourceStorageRepo: sourceStorageRepo,
 		sourceDocRepo:     sourceDocRepo,
 		summarizer:        summarizer,
@@ -107,11 +108,13 @@ func (h *PrepareSourceHandler) Handle(
 			)
 		}
 
-		if err := h.sourceStorageRepo.DeleteObject(ctx, targetSource.ParsedContentKey); err != nil {
-			slog.ErrorContext(ctx, "delete parsed content failed",
-				slog.String("source_id", sourceId.String()),
-				slog.Any("err", err),
-			)
+		if targetSource.ParsedContentKey != "" {
+			if err := h.sourceStorageRepo.DeleteObject(ctx, targetSource.ParsedContentKey); err != nil {
+				slog.ErrorContext(ctx, "delete parsed content failed",
+					slog.String("source_id", sourceId.String()),
+					slog.Any("err", err),
+				)
+			}
 		}
 	}
 

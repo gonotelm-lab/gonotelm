@@ -15,6 +15,19 @@ func TruncateRune(s string, maxRuneCount int) string {
 	return string(runes[:maxRuneCount])
 }
 
+func TruncateRuneV2(s string, maxRuneCount int) (string, bool) {
+	if maxRuneCount <= 0 {
+		return "", false
+	}
+
+	runes := []rune(s)
+	if len(runes) <= maxRuneCount {
+		return s, false
+	}
+
+	return string(runes[:maxRuneCount]), true
+}
+
 // TruncateHeadTail keeps the head and tail of s for logs; middle is omitted with a length marker.
 func TruncateHeadTail(s string, head, tail int) string {
 	if head < 0 {

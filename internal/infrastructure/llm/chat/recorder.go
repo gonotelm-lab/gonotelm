@@ -104,7 +104,7 @@ func toRecordInputPart(part schema.MessageInputPart) *RecordInputPart {
 	case schema.ChatMessagePartTypeImageURL:
 		if part.Image != nil {
 			if part.Image.URL != nil {
-				if strings.HasPrefix(*part.Image.URL, "https") || strings.HasPrefix(*part.Image.URL, "https") {
+				if strings.HasPrefix(*part.Image.URL, "https") || strings.HasPrefix(*part.Image.URL, "http") {
 					r.Image = "[Image URL]"
 				} else if strings.HasPrefix(*part.Image.URL, "data") {
 					r.Image = fmt.Sprintf("[Image Base64 Of Length %d]", len(*part.Image.URL))

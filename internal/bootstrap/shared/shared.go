@@ -168,6 +168,7 @@ func initLLMGateway(ctx context.Context, cfg *confshared.InfraConfig, infra *Inf
 func initLLMBillingMeters(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
 	meter, err := llmchatbilling.NewStandardMeter(llmchatbilling.StandardMeterConfig{
 		DeepSeekScript: cfg.ProviderBilling.DeepSeekScript,
+		QwenScript:     cfg.ProviderBilling.ChatQwenScript,
 	})
 	if err != nil {
 		return fmt.Errorf("llm chat billing: %w", err)
@@ -179,7 +180,7 @@ func initLLMBillingMeters(_ context.Context, cfg *confshared.InfraConfig, infra 
 
 func initEmbeddingBillingMeter(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
 	meter, err := embbilling.NewStandardMeter(embbilling.StandardMeterConfig{
-		DashScopeScript: cfg.ProviderBilling.EmbeddingDashScopeScript,
+		QwenScript: cfg.ProviderBilling.EmbeddingQwenScript,
 	})
 	if err != nil {
 		return fmt.Errorf("llm embedding billing: %w", err)
@@ -191,7 +192,7 @@ func initEmbeddingBillingMeter(_ context.Context, cfg *confshared.InfraConfig, i
 
 func initText2ImageBillingMeter(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
 	meter, err := t2ibilling.NewStandardMeter(t2ibilling.StandardMeterConfig{
-		DashScopeScript: cfg.ProviderBilling.Text2ImageDashScopeScript,
+		QwenScript: cfg.ProviderBilling.Text2ImageQwenScript,
 	})
 	if err != nil {
 		return fmt.Errorf("llm text2image billing: %w", err)
@@ -203,8 +204,8 @@ func initText2ImageBillingMeter(_ context.Context, cfg *confshared.InfraConfig, 
 
 func initText2AudioBillingMeter(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
 	meter, err := t2abilling.NewStandardMeter(t2abilling.StandardMeterConfig{
-		DashScopeScript: cfg.ProviderBilling.Text2AudioDashScopeScript,
-		MiniMaxScript:   cfg.ProviderBilling.Text2AudioMiniMaxScript,
+		QwenScript:    cfg.ProviderBilling.Text2AudioQwenScript,
+		MiniMaxScript: cfg.ProviderBilling.Text2AudioMiniMaxScript,
 	})
 	if err != nil {
 		return fmt.Errorf("llm text2audio billing: %w", err)

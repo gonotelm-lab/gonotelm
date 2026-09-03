@@ -11,18 +11,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-//go:embed testdata/dashscope.text2audio
-var testDashscopeText2AudioScript string
+//go:embed testdata/qwen.text2audio
+var testQwenText2AudioScript string
 
 func ptrInt64(v int64) *int64 { return &v }
 
-func TestNewScriptedCharacterPriceProvider_CompilesDashScopeScript(t *testing.T) {
-	_, err := NewScriptedCharacterPriceProvider(testDashscopeText2AudioScript)
+func TestNewScriptedCharacterPriceProvider_CompilesQwenScript(t *testing.T) {
+	_, err := NewScriptedCharacterPriceProvider(testQwenText2AudioScript)
 	require.NoError(t, err)
 }
 
-func TestScriptedCharacterPriceProvider_DashScopeModels(t *testing.T) {
-	p, err := NewScriptedCharacterPriceProvider(testDashscopeText2AudioScript)
+func TestScriptedCharacterPriceProvider_QwenModels(t *testing.T) {
+	p, err := NewScriptedCharacterPriceProvider(testQwenText2AudioScript)
 	require.NoError(t, err)
 
 	cases := []struct {
@@ -48,7 +48,7 @@ func TestScriptedCharacterPriceProvider_DashScopeModels(t *testing.T) {
 }
 
 func TestScriptedCharacterPriceProvider_UnknownModel(t *testing.T) {
-	p, err := NewScriptedCharacterPriceProvider(testDashscopeText2AudioScript)
+	p, err := NewScriptedCharacterPriceProvider(testQwenText2AudioScript)
 	require.NoError(t, err)
 
 	_, err = p.Provide(context.Background(), "unknown-model", text2audio.RecordUsage{})
@@ -58,14 +58,14 @@ func TestScriptedCharacterPriceProvider_UnknownModel(t *testing.T) {
 
 func TestCharacterBasedMeter_CalculateBy10kCharacters(t *testing.T) {
 	meter := NewCharacterBasedMeter()
-	p, err := NewScriptedCharacterPriceProvider(testDashscopeText2AudioScript)
+	p, err := NewScriptedCharacterPriceProvider(testQwenText2AudioScript)
 	require.NoError(t, err)
-	meter.SetProvider(text2audio.Text2AudioDashScope, p)
+	meter.SetProvider(text2audio.Text2AudioQwen, p)
 
 	// 10000 chars * ¥1 / 万字符 = ¥1
 	total, details, err := meter.Calculate(
 		context.Background(),
-		text2audio.Text2AudioDashScope,
+		text2audio.Text2AudioQwen,
 		"qwen-audio-3.0-tts-flash",
 		text2audio.RecordUsage{Characters: ptrInt64(10_000)},
 	)
@@ -79,11 +79,11 @@ func TestCharacterBasedMeter_MissingCharacters(t *testing.T) {
 	meter := NewCharacterBasedMeter()
 	p, err := NewScriptedCharacterPriceProvider(`{character_10k: "1"}`)
 	require.NoError(t, err)
-	meter.SetProvider(text2audio.Text2AudioDashScope, p)
+	meter.SetProvider(text2audio.Text2AudioQwen, p)
 
 	_, _, err = meter.Calculate(
 		context.Background(),
-		text2audio.Text2AudioDashScope,
+		text2audio.Text2AudioQwen,
 		"any",
 		text2audio.RecordUsage{},
 	)
@@ -123,14 +123,14 @@ func TestTokenBasedMeter_Calculate(t *testing.T) {
 
 func TestStandardMeter_RoutesCharacterProviders(t *testing.T) {
 	meter, err := NewStandardMeter(StandardMeterConfig{
-		DashScopeScript: testDashscopeText2AudioScript,
+		QwenScript: testQwenText2AudioScript,
 		MiniMaxScript:   `{character_10k: "2"}`,
 	})
 	require.NoError(t, err)
 
 	total, _, err := meter.Calculate(
 		context.Background(),
-		text2audio.Text2AudioDashScope,
+		text2audio.Text2AudioQwen,
 		"cosyvoice-v3.5-plus",
 		text2audio.RecordUsage{Characters: ptrInt64(10_000)},
 	)
@@ -149,7 +149,7 @@ func TestStandardMeter_RoutesCharacterProviders(t *testing.T) {
 
 func TestStandardMeter_MimoNotBilled(t *testing.T) {
 	meter, err := NewStandardMeter(StandardMeterConfig{
-		DashScopeScript: testDashscopeText2AudioScript,
+		QwenScript: testQwenText2AudioScript,
 	})
 	require.NoError(t, err)
 

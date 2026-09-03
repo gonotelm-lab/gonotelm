@@ -24,8 +24,9 @@ func newText2AudioGenerator(
 	}
 
 	switch provider {
-	case Text2AudioDashScope:
-		return dashscope.New(cfg.DashScope, withAudioHTTPClient(opts, cfg.DashScope.Timeout)...)
+	case Text2AudioQwen:
+		// multimodal SDK 包名仍为 dashscope
+		return dashscope.New(cfg.Qwen, withAudioHTTPClient(opts, cfg.Qwen.Timeout)...)
 	case Text2AudioMimo:
 		return mimo.New(cfg.Mimo, withAudioHTTPClient(opts, cfg.Mimo.Timeout)...)
 	case Text2AudioMiniMax:

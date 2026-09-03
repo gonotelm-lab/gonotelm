@@ -108,11 +108,13 @@ func (h *PrepareSourceHandler) Handle(
 			)
 		}
 
-		if err := h.sourceStorageRepo.DeleteObject(ctx, targetSource.ParsedContentKey); err != nil {
-			slog.ErrorContext(ctx, "delete parsed content failed",
-				slog.String("source_id", sourceId.String()),
-				slog.Any("err", err),
-			)
+		if targetSource.ParsedContentKey != "" {
+			if err := h.sourceStorageRepo.DeleteObject(ctx, targetSource.ParsedContentKey); err != nil {
+				slog.ErrorContext(ctx, "delete parsed content failed",
+					slog.String("source_id", sourceId.String()),
+					slog.Any("err", err),
+				)
+			}
 		}
 	}
 

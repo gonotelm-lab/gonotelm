@@ -8,7 +8,7 @@ func (t EmbeddingType) String() string { return string(t) }
 
 const (
 	Ark                EmbeddingType = "ark"
-	EmbeddingDashScope EmbeddingType = "dashscope"
+	EmbeddingQwen EmbeddingType = "qwen"
 	Gemini             EmbeddingType = "gemini"
 	Ollama             EmbeddingType = "ollama"
 	OpenAI             EmbeddingType = "openai"
@@ -22,7 +22,7 @@ type EmbeddingConfig struct {
 	MaxConcurrency int           `toml:"maxConcurrency"`
 
 	Ark          ArkConfig          `toml:"ark"`
-	DashScope    DashScopeConfig    `toml:"dashscope"`
+	Qwen         QwenConfig         `toml:"qwen"`
 	Gemini       GeminiConfig       `toml:"gemini"`
 	Ollama       OllamaConfig       `toml:"ollama"`
 	OpenAI       OpenAIConfig       `toml:"openai"`
@@ -43,7 +43,7 @@ type ArkConfig struct {
 	MaxConcurrentRequests *int           `toml:"maxConcurrentRequests"`
 }
 
-type DashScopeConfig struct {
+type QwenConfig struct {
 	APIKey     string        `toml:"apiKey"`
 	Timeout    time.Duration `toml:"timeout"`
 	Model      string        `toml:"model"`

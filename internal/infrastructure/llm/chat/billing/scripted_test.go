@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	//go:embed testdata/dashscope.chat
-	testDashscopeChatScript string
+	//go:embed testdata/qwen.chat
+	testQwenChatScript string
 
 	//go:embed testdata/deepseek.chat
 	testDeepseekChatScript string
@@ -41,7 +41,7 @@ func TestNewScriptedPriceProvider_CompilesModelPriceScripts(t *testing.T) {
 		name   string
 		script string
 	}{
-		{"dashscope.chat", testDashscopeChatScript},
+		{"qwen.chat", testQwenChatScript},
 		{"deepseek.chat", testDeepseekChatScript},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -57,8 +57,8 @@ func TestNewScriptedPriceProvider_InvalidScript(t *testing.T) {
 	assert.Contains(t, err.Error(), "compile")
 }
 
-func TestScriptedPriceProvider_DashScopeChat(t *testing.T) {
-	p, err := NewScriptedPriceProvider(testDashscopeChatScript)
+func TestScriptedPriceProvider_QwenChat(t *testing.T) {
+	p, err := NewScriptedPriceProvider(testQwenChatScript)
 	require.NoError(t, err)
 
 	cases := []struct {
@@ -89,8 +89,8 @@ func TestScriptedPriceProvider_DashScopeChat(t *testing.T) {
 	}
 }
 
-func TestScriptedPriceProvider_DashScopeChat_UnsupportedModel(t *testing.T) {
-	p, err := NewScriptedPriceProvider(testDashscopeChatScript)
+func TestScriptedPriceProvider_QwenChat_UnsupportedModel(t *testing.T) {
+	p, err := NewScriptedPriceProvider(testQwenChatScript)
 	require.NoError(t, err)
 
 	_, err = p.Provide(context.Background(), "unknown-model", chat.RecordTokenUsage{})

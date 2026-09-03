@@ -41,12 +41,13 @@ func newEmbedder(
 			return nil, err
 		}
 		embedder, err = ark.NewEmbedder(ctx, arkCfg)
-	case EmbeddingDashScope:
+	case EmbeddingQwen:
+		// eino SDK 包名仍为 dashscope，应用侧统一为 qwen
 		embedder, err = dashscope.NewEmbedder(ctx, &dashscope.EmbeddingConfig{
-			APIKey:     cfg.DashScope.APIKey,
-			Timeout:    cfg.DashScope.Timeout,
-			Model:      cfg.DashScope.Model,
-			Dimensions: cfg.DashScope.Dimensions,
+			APIKey:     cfg.Qwen.APIKey,
+			Timeout:    cfg.Qwen.Timeout,
+			Model:      cfg.Qwen.Model,
+			Dimensions: cfg.Qwen.Dimensions,
 		})
 	case Gemini:
 		embedder, err = newGeminiEmbedder(ctx, cfg.Gemini)

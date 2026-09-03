@@ -266,17 +266,30 @@ func buildEndRecord(
 	endTime time.Time,
 ) *Record {
 	r := buildRecord(ctx, endTime)
-	r.Input = toRecordInputMessages(input.Messages)
-	r.InputTools = toRecordInputTool(input.Tools)
-	r.Parameters = toModelParameters(input.Config) // same as output.Config
-	r.Output = toRecordOutputMessage(output.Message)
-	r.Usage = toRecordTokenUsage(output.TokenUsage)
-
+	if input != nil {
+		r.Input = toRecordInputMessages(input.Messages)
+		r.InputTools = toRecordInputTool(input.Tools)
+		r.Parameters = toModelParameters(input.Config) // same as output.Config
+	}
+	if output != nil {
+		r.Output = toRecordOutputMessage(output.Message)
+		r.Usage = toRecordTokenUsage(output.TokenUsage)
+	}
 	return r
 }
 
-func buildErrorRecord(ctx context.Context, err error, endTime time.Time) *Record {
+func buildErrorRecord(
+	ctx context.Context,
+	err error,
+	input *model.CallbackInput,
+	endTime time.Time,
+) *Record {
 	r := buildRecord(ctx, endTime)
+	if input != nil {
+		r.Input = toRecordInputMessages(input.Messages)
+		r.InputTools = toRecordInputTool(input.Tools)
+		r.Parameters = toModelParameters(input.Config)
+	}
 	r.Error = err
 
 	return r

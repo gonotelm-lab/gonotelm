@@ -151,7 +151,7 @@ func (i *Interceptor) OnEndWithStreamOutput(
 
 func (i *Interceptor) recordError(ctx context.Context, err error) {
 	if i.recorder != nil {
-		if rErr := i.recorder.Record(ctx, buildErrorRecord(ctx, err, time.Now())); rErr != nil {
+		if rErr := i.recorder.Record(ctx, buildErrorRecord(ctx, err, getOnStartInput(ctx), time.Now())); rErr != nil {
 			slog.ErrorContext(ctx, "[chat.Interceptor] record error failed", slog.Any("err", rErr))
 		}
 	}

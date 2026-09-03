@@ -1,4 +1,4 @@
-package dashscope
+package qwen
 
 import "time"
 

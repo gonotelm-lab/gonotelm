@@ -65,36 +65,43 @@ var (
 	//go:embed modelprice/deepseek.chat
 	defaultDeepSeekPricingScript string
 
-	//go:embed modelprice/dashscope.embedding
-	defaultDashScopeEmbeddingPricingScript string
+	//go:embed modelprice/qwen.chat
+	defaultQwenChatPricingScript string
 
-	//go:embed modelprice/dashscope.text2image
-	defaultDashScopeText2ImagePricingScript string
+	//go:embed modelprice/qwen.embedding
+	defaultQwenEmbeddingPricingScript string
 
-	//go:embed modelprice/dashscope.text2audio
-	defaultDashScopeText2AudioPricingScript string
+	//go:embed modelprice/qwen.text2image
+	defaultQwenText2ImagePricingScript string
+
+	//go:embed modelprice/qwen.text2audio
+	defaultQwenText2AudioPricingScript string
 )
 
 type ProviderBillingConfig struct {
-	DeepSeekScript            string
-	EmbeddingDashScopeScript  string
-	Text2ImageDashScopeScript string
-	Text2AudioDashScopeScript string
-	Text2AudioMiniMaxScript   string
+	DeepSeekScript          string
+	ChatQwenScript          string
+	EmbeddingQwenScript     string
+	Text2ImageQwenScript    string
+	Text2AudioQwenScript    string
+	Text2AudioMiniMaxScript string
 }
 
 func (c *ProviderBillingConfig) Init() {
 	if c.DeepSeekScript == "" {
 		c.DeepSeekScript = defaultDeepSeekPricingScript
 	}
-	if c.EmbeddingDashScopeScript == "" {
-		c.EmbeddingDashScopeScript = defaultDashScopeEmbeddingPricingScript
+	if c.ChatQwenScript == "" {
+		c.ChatQwenScript = defaultQwenChatPricingScript
 	}
-	if c.Text2ImageDashScopeScript == "" {
-		c.Text2ImageDashScopeScript = defaultDashScopeText2ImagePricingScript
+	if c.EmbeddingQwenScript == "" {
+		c.EmbeddingQwenScript = defaultQwenEmbeddingPricingScript
 	}
-	if c.Text2AudioDashScopeScript == "" {
-		c.Text2AudioDashScopeScript = defaultDashScopeText2AudioPricingScript
+	if c.Text2ImageQwenScript == "" {
+		c.Text2ImageQwenScript = defaultQwenText2ImagePricingScript
+	}
+	if c.Text2AudioQwenScript == "" {
+		c.Text2AudioQwenScript = defaultQwenText2AudioPricingScript
 	}
 }
 
@@ -119,7 +126,7 @@ func (c *InfraConfig) InitInfra() {
 		c.Storage.Type = storageimpl.Minio
 	}
 	if c.Embedding.Type == "" {
-		c.Embedding.Type = embedding.EmbeddingDashScope
+		c.Embedding.Type = embedding.EmbeddingQwen
 	}
 	if c.Embedding.BatchSize <= 0 {
 		c.Embedding.BatchSize = 10

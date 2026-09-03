@@ -65,7 +65,7 @@ modelProvider = "${GONOTELM_CHAT_PROVIDER:-qwen}"
 model = "${GONOTELM_CHAT_MODEL:-glm-5.1}"
 maxRound = ${GONOTELM_CHAT_MAX_ROUND:-30}
 rerankEnabled = ${GONOTELM_CHAT_RERANK_ENABLED:-false}
-rerankProvider = "${GONOTELM_RERANK_PROVIDER:-dashscope}"
+rerankProvider = "${GONOTELM_RERANK_PROVIDER:-qwen}"
 rerankTopN = ${GONOTELM_CHAT_RERANK_TOP_N:-30}
 rerankModel = "${GONOTELM_CHAT_RERANK_MODEL:-qwen3-rerank}"
 
@@ -83,7 +83,7 @@ size = ${GONOTELM_CHUNKING_SIZE:-500}
 overlapSize = ${GONOTELM_CHUNKING_OVERLAP_SIZE:-75}
 
 [embedding]
-type = "${GONOTELM_EMBEDDING_TYPE:-dashscope}"
+type = "${GONOTELM_EMBEDDING_TYPE:-qwen}"
 batchSize = ${GONOTELM_EMBEDDING_BATCH_SIZE:-10}
 maxConcurrency = ${GONOTELM_EMBEDDING_MAX_CONCURRENCY:-4}
 
@@ -99,11 +99,11 @@ timeout = "${GONOTELM_ARK_TIMEOUT:-10m}"
 retryTimes = ${GONOTELM_ARK_RETRY_TIMES:-2}
 maxConcurrentRequests = ${GONOTELM_ARK_MAX_CONCURRENT_REQUESTS:-5}
 
-[embedding.dashscope]
-apiKey = "${GONOTELM_DASHSCOPE_API_KEY:-}"
-model = "${GONOTELM_DASHSCOPE_MODEL:-text-embedding-v4}"
-timeout = "${GONOTELM_DASHSCOPE_TIMEOUT:-30s}"
-dimensions = ${GONOTELM_DASHSCOPE_DIMENSIONS:-1024}
+[embedding.qwen]
+apiKey = "${GONOTELM_QWEN_API_KEY:-}"
+model = "${GONOTELM_QWEN_EMBEDDING_MODEL:-text-embedding-v4}"
+timeout = "${GONOTELM_QWEN_EMBEDDING_TIMEOUT:-30s}"
+dimensions = ${GONOTELM_QWEN_EMBEDDING_DIMENSIONS:-1024}
 
 [embedding.gemini]
 apiKey = "${GONOTELM_GEMINI_API_KEY:-}"
@@ -149,11 +149,11 @@ secretId = "${GONOTELM_TENCENTCLOUD_SECRET_ID:-}"
 secretKey = "${GONOTELM_TENCENTCLOUD_SECRET_KEY:-}"
 region = "${GONOTELM_TENCENTCLOUD_REGION:-ap-guangzhou}"
 
-[rerank.dashscope]
-apiKey = "${GONOTELM_DASHSCOPE_API_KEY:-}"
-baseUrl = "${GONOTELM_RERANK_DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/compatible-api/v1/reranks}"
-model = "${GONOTELM_RERANK_DASHSCOPE_MODEL:-qwen3-rerank}"
-timeout = "${GONOTELM_RERANK_DASHSCOPE_TIMEOUT:-30s}"
+[rerank.qwen]
+apiKey = "${GONOTELM_QWEN_API_KEY:-}"
+baseUrl = "${GONOTELM_RERANK_QWEN_BASE_URL:-https://dashscope.aliyuncs.com/compatible-api/v1/reranks}"
+model = "${GONOTELM_RERANK_QWEN_MODEL:-qwen3-rerank}"
+timeout = "${GONOTELM_RERANK_QWEN_TIMEOUT:-30s}"
 
 [provider]
 
@@ -185,7 +185,7 @@ temperature = ${GONOTELM_OPENAI_TEMPERATURE:-1.0}
 reasoningEffort = "${GONOTELM_OPENAI_REASONING_EFFORT:-}"
 
 [provider.qwen]
-apiKey = "${GONOTELM_DASHSCOPE_API_KEY:-}"
+apiKey = "${GONOTELM_QWEN_API_KEY:-}"
 baseUrl = "${GONOTELM_QWEN_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}"
 defaultModel = "${GONOTELM_QWEN_MODEL:-glm-5.1}"
 timeout = "${GONOTELM_QWEN_TIMEOUT:-5m}"
@@ -195,11 +195,11 @@ enableThinking = ${GONOTELM_QWEN_ENABLE_THINKING:-false}
 
 [provider.qwen.models."qwen3.8-flash"]
 name = "qwen3.8-flash"
-modalities = {input = ["text", "image", "audio"], output = ["text"]}
+modalities = {input = ["text", "image"], output = ["text"]}
 
 [provider.qwen.models."qwen3.8-max"]
 name = "qwen3.8-max"
-modalities = {input = ["text", "image", "audio"], output = ["text"]}
+modalities = {input = ["text", "image"], output = ["text"]}
 
 [provider.qwen.models."qwen3.7-max"]
 name = "qwen3.7-max"
@@ -207,11 +207,23 @@ modalities = {input = ["text"], output = ["text"]}
 
 [provider.qwen.models."qwen3.7-plus"]
 name = "qwen3.7-plus"
-modalities = {input = ["text", "image", "audio"], output = ["text"]}
+modalities = {input = ["text", "image"], output = ["text"]}
 
 [provider.qwen.models."qwen3.7-flash"]
 name = "qwen3.7-flash"
-modalities = {input = ["text", "image", "audio"], output = ["text"]}
+modalities = {input = ["text", "image"], output = ["text"]}
+
+[provider.qwen.models."qwen3.6-flash"]
+name = "qwen3.6-flash"
+modalities = {input = ["text", "image"], output = ["text"]}
+
+[provider.qwen.models."qwen3.6-max"]
+name = "qwen3.6-flash"
+modalities = {input = ["text"], output = ["text"]}
+
+[provider.qwen.models."qwen3.6-plus"]
+name = "qwen3.6-flash"
+modalities = {input = ["text", "image"], output = ["text"]}
 
 [provider.agnes]
 apiKey = "${GONOTELM_AGNES_API_KEY:-}"
@@ -227,8 +239,9 @@ modalities = {input = ["text", "image"], output = ["text"]}
 
 [providerBilling]
 deepSeekScript = ""
-embeddingDashScopeScript = ""
-text2ImageDashScopeScript = ""
+chatQwenScript = ""
+embeddingQwenScript = ""
+text2ImageQwenScript = ""
 
 [flow]
 addr        = "${GONOTELM_FLOW_ADDR:-localhost:7091}"

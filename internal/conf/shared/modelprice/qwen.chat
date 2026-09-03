@@ -20,6 +20,18 @@ if model == 'qwen3.8-flash' {
   } else {
     {cache_hit_1m: "0.24", cache_miss_1m: "1.2", output_1m: "4.8"}
   }
+} else if model == 'qwen3.6-plus' {
+  if usage.prompt_tokens <= 256000 {
+    {cache_hit_1m: "0.2", cache_miss_1m: "2.0", output_1m: "12"}
+  } else {
+    {cache_hit_1m: "0.8", cache_miss_1m: "8.0", output_1m: "48"}
+  }
+} else if model == 'qwen3.6-flash' {
+  if usage.prompt_tokens <= 256000 {
+    {cache_hit_1m: "0.12", cache_miss_1m: "1.2", output_1m: "7.2"}
+  } else {
+    {cache_hit_1m: "0.48", cache_miss_1m: "4.8", output_1m: "28.8"}
+  }
 } else {
   'model not supported to provide price'
 }

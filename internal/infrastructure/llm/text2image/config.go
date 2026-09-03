@@ -12,11 +12,11 @@ func (t Text2ImageProvider) String() string {
 }
 
 const (
-	Text2ImageDashScope Text2ImageProvider = "dashscope"
-	Text2ImageAgnes     Text2ImageProvider = "agnes"
+	Text2ImageQwen  Text2ImageProvider = "qwen"
+	Text2ImageAgnes Text2ImageProvider = "agnes"
 )
 
 type Text2ImageConfig struct {
-	DashScope dashscope.Config `toml:"dashscope"`
-	Agnes     agnes.Config     `toml:"agnes"`
+	Qwen  dashscope.Config `toml:"qwen"`
+	Agnes agnes.Config     `toml:"agnes"`
 }

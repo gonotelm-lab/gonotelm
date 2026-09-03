@@ -139,7 +139,7 @@ type OpenAIChatConfig struct {
 	ApiKey           string           `toml:"apiKey"`
 	Timeout          time.Duration    `toml:"timeout"`
 	BaseUrl          string           `toml:"baseUrl"`
-	Model            string           `toml:"model"`
+	DefaultModel     string           `toml:"defaultModel"`
 	Temperature      *float32         `toml:"temperature"`
 	TopP             *float32         `toml:"topP"`
 	PresencePenalty  *float32         `toml:"presencePenalty"`
@@ -156,7 +156,7 @@ func (c *OpenAIChatConfig) ToEino() *openai.ChatModelConfig {
 		Timeout:          c.Timeout,
 		HTTPClient:       httpclient.NewBuilder(nil).WithTimeout(c.Timeout).Build(),
 		BaseURL:          c.BaseUrl,
-		Model:            c.Model,
+		Model:            c.DefaultModel,
 		Temperature:      c.Temperature,
 		TopP:             c.TopP,
 		PresencePenalty:  c.PresencePenalty,

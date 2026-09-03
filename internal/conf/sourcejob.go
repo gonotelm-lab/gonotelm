@@ -15,15 +15,23 @@ var sourceJobGlobal *SourceJobConfig
 type SourceJobConfig struct {
 	shared.InfraConfig
 
-	DeployEnv string               `toml:"deployEnv"`
-	Source    SourceConfig         `toml:"source"`
-	Logging   shared.LoggingConfig `toml:"logging"`
-	Chunking  ChunkingConfig       `toml:"chunking"`
-	OtelTrace trace.Config         `toml:"otelTrace"`
+	DeployEnv string                `toml:"deployEnv"`
+	Source    SourceJobSourceConfig `toml:"source"`
+	Logging   shared.LoggingConfig  `toml:"logging"`
+	Chunking  ChunkingConfig        `toml:"chunking"`
+	OtelTrace trace.Config          `toml:"otelTrace"`
 }
 
 func (c *SourceJobConfig) IsDev() bool {
 	return shared.IsDevEnv(c.DeployEnv)
+}
+
+// SourceJobSourceConfig is the [source] section for cmd/sourcejob.
+type SourceJobSourceConfig struct {
+	ModelProvider      chat.Provider `toml:"modelProvider"`
+	Model              string        `toml:"model"`
+	ImageModelProvider chat.Provider `toml:"imageModelProvider"`
+	ImageModel         string        `toml:"imageModel"`
 }
 
 type ChunkingConfig struct {
@@ -64,7 +72,7 @@ func (c *SourceJobConfig) examinateSourceConfig() {
 		chatModel chat.Model
 		models    map[string]chat.Model
 	)
-	switch c.Source.ImageUnderstandModelProvider {
+	switch c.Source.ImageModelProvider {
 	case chat.ProviderDeepSeek:
 		models = c.Provider.DeepSeek.Models
 	case chat.ProviderOpenAI:
@@ -74,13 +82,13 @@ func (c *SourceJobConfig) examinateSourceConfig() {
 	case chat.ProviderAgnes:
 		models = c.Provider.Agnes.Models
 	default:
-		panic(fmt.Sprintf("unknown image understand model provider %s", c.Source.ImageUnderstandModelProvider))
+		panic(fmt.Sprintf("unknown image understand model provider %s", c.Source.ImageModelProvider))
 	}
-	chatModel, ok := models[c.Source.ImageUnderstandModel]
+	chatModel, ok := models[c.Source.ImageModel]
 	if !ok {
-		panic(fmt.Sprintf("image understand model %s not found", c.Source.ImageUnderstandModel))
+		panic(fmt.Sprintf("image model %s not found", c.Source.ImageModel))
 	}
 	if !chatModel.Modalities.SupportImageInput() {
-		panic(fmt.Sprintf("image understand model %s does not support image input", c.Source.ImageUnderstandModel))
+		panic(fmt.Sprintf("image model %s does not support image input", c.Source.ImageModel))
 	}
 }

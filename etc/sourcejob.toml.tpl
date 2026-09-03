@@ -59,9 +59,8 @@ level = "${GONOTELM_LOG_LEVEL:-debug}"
 [source]
 modelProvider = "${GONOTELM_SOURCE_PROVIDER:-deepseek}"
 model = "${GONOTELM_SOURCE_MODEL:-deepseek-v4-flash}"
-urlBlacklistRegex = "${GONOTELM_SOURCE_URL_BLACKLIST_REGEX:-(127\\.0\\.0\\.1|localhost)}"
-imageUnderstandModelProvider = "${GONOTELM_SOURCE_IMAGE_UNDERSTAND_PROVIDER:-deepseek}"
-imageUnderstandModel = "${GONOTELM_SOURCE_IMAGE_UNDERSTAND_MODEL:-deepseek-v4-flash-vision-exp}"
+imageModelProvider = "${GONOTELM_SOURCE_IMAGE_MODEL_PROVIDER:-deepseek}"
+imageModel = "${GONOTELM_SOURCE_IMAGE_MODEL:-deepseek-v4-flash-vision-exp}"
 
 [chunking]
 size = ${GONOTELM_CHUNKING_SIZE:-500}

@@ -38,13 +38,9 @@ type NotelmConfig struct {
 var sourceUrlBlacklistRegex *regexp.Regexp
 
 type SourceConfig struct {
-	ModelProvider llmchat.Provider `toml:"modelProvider"`
-	Model         string           `toml:"model"`
-
-	ImageUnderstandModelProvider llmchat.Provider `toml:"imageUnderstandModelProvider"`
-	ImageUnderstandModel         string           `toml:"imageUnderstandModel"`
-
-	UrlBlacklistRegex string `toml:"urlBlacklistRegex"`
+	ModelProvider     llmchat.Provider `toml:"modelProvider"`
+	Model             string           `toml:"model"`
+	UrlBlacklistRegex string           `toml:"urlBlacklistRegex"`
 }
 
 func (c *SourceConfig) init() {

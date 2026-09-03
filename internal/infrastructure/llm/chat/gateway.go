@@ -132,25 +132,25 @@ func (g *Gateway) initProviders(cfg *ProviderConfig) error {
 	return nil
 }
 
-func (g *Gateway) GetChatModel(providerType Provider) (einomodel.ToolCallingChatModel, error) {
+func (g *Gateway) GetChatModel(providerName Provider) (einomodel.ToolCallingChatModel, error) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 
-	provider, ok := g.providers[providerType]
+	provider, ok := g.providers[providerName]
 	if !ok {
-		return nil, fmt.Errorf("provider %s not found", providerType)
+		return nil, fmt.Errorf("provider %s not found", providerName)
 	}
 
 	return provider.ToolCallingChatModel(), nil
 }
 
-func (g *Gateway) GetModelProvider(providerType Provider) (*ModelProvider, error) {
+func (g *Gateway) GetModelProvider(providerName Provider) (*ModelProvider, error) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 
-	provider, ok := g.providers[providerType]
+	provider, ok := g.providers[providerName]
 	if !ok {
-		return nil, fmt.Errorf("provider %s not found", providerType)
+		return nil, fmt.Errorf("provider %s not found", providerName)
 	}
 
 	return provider, nil

@@ -61,8 +61,8 @@ func NewSourceJob(ctx context.Context, cfg *conf.SourceJobConfig) (*SourceJob, e
 
 	imageInterpreter, err := adapter.NewImageInterpreter(
 		infra.LLMGateway,
-		cfg.Source.ImageUnderstandModelProvider,
-		cfg.Source.ImageUnderstandModel,
+		cfg.Source.ImageModelProvider,
+		cfg.Source.ImageModel,
 	)
 	if err != nil {
 		return nil, err

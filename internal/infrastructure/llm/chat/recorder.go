@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
@@ -103,7 +104,13 @@ func toRecordInputPart(part schema.MessageInputPart) *RecordInputPart {
 	case schema.ChatMessagePartTypeImageURL:
 		if part.Image != nil {
 			if part.Image.URL != nil {
-				r.Image = "[Image URL]"
+				if strings.HasPrefix(*part.Image.URL, "https") || strings.HasPrefix(*part.Image.URL, "https") {
+					r.Image = "[Image URL]"
+				} else if strings.HasPrefix(*part.Image.URL, "data") {
+					r.Image = fmt.Sprintf("[Image Base64 Of Length %d]", len(*part.Image.URL))
+				} else {
+					r.Image = "[Unknown Image URL]"
+				}
 			} else if part.Image.Base64Data != nil {
 				r.Image = fmt.Sprintf("[Image Base64 Of Length %d]", len(*part.Image.Base64Data))
 			}

@@ -151,7 +151,7 @@ func NewServer(
 			deps.ChatRepo,
 			deps.ChatMessageRepo,
 		),
-		getChatStreamHandler:   chatapp.NewGetStreamHandler(deps.ChatStreamTaskRepo),
+		getChatStreamHandler: chatapp.NewGetStreamHandler(deps.ChatStreamTaskRepo),
 		getChatRunningTaskHandler: chatapp.NewGetRunningTaskHandler(
 			deps.ChatRepo,
 			deps.ChatStreamTaskRepo,

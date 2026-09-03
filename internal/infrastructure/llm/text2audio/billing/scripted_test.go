@@ -123,8 +123,8 @@ func TestTokenBasedMeter_Calculate(t *testing.T) {
 
 func TestStandardMeter_RoutesCharacterProviders(t *testing.T) {
 	meter, err := NewStandardMeter(StandardMeterConfig{
-		QwenScript: testQwenText2AudioScript,
-		MiniMaxScript:   `{character_10k: "2"}`,
+		QwenScript:    testQwenText2AudioScript,
+		MiniMaxScript: `{character_10k: "2"}`,
 	})
 	require.NoError(t, err)
 

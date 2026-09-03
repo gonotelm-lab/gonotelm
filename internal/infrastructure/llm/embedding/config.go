@@ -7,13 +7,13 @@ type EmbeddingType string
 func (t EmbeddingType) String() string { return string(t) }
 
 const (
-	Ark                EmbeddingType = "ark"
+	Ark           EmbeddingType = "ark"
 	EmbeddingQwen EmbeddingType = "qwen"
-	Gemini             EmbeddingType = "gemini"
-	Ollama             EmbeddingType = "ollama"
-	OpenAI             EmbeddingType = "openai"
-	Qianfan            EmbeddingType = "qianfan"
-	TencentCloud       EmbeddingType = "tencentcloud"
+	Gemini        EmbeddingType = "gemini"
+	Ollama        EmbeddingType = "ollama"
+	OpenAI        EmbeddingType = "openai"
+	Qianfan       EmbeddingType = "qianfan"
+	TencentCloud  EmbeddingType = "tencentcloud"
 )
 
 type EmbeddingConfig struct {

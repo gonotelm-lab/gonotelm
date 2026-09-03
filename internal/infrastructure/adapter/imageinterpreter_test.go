@@ -89,7 +89,7 @@ func TestImageInterpreter_InterpretBytes(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Log(result)
-}	
+}
 
 func TestImageDataUrlParse(t *testing.T) {
 	u, err := url.Parse("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIA...")

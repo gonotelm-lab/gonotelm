@@ -3,6 +3,7 @@ package exchange
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/panjf2000/ants/v2"
@@ -40,6 +41,9 @@ var (
 	ErrInvalidHandle = errors.New("invalid handle")
 )
 
+// newPool is an indirection over ants.NewPool so tests can inject failures.
+var newPool = ants.NewPool
+
 // options holds the runtime configuration of an Exchange.
 type options struct {
 	maxConcurrency int
@@ -49,11 +53,11 @@ type options struct {
 type Option func(*options)
 
 // WithMaxConcurrency caps the number of event handlers running
-// concurrently, enforced by the internal ants goroutine pool that
-// executes every handler. While all workers are busy, Publish blocks,
-// which provides back pressure. The value is passed straight to
-// ants.NewPool: non-positive values mean unlimited, in which case the
-// pool spawns a new worker for every event.
+// concurrently per topic, enforced by the ants goroutine pool that each
+// topic gets on its first subscription. While a topic's workers are all
+// busy, Publish blocks for that topic only — other topics are unaffected.
+// The value is passed straight to ants.NewPool: non-positive values mean
+// unlimited, in which case the pool spawns a new worker for every event.
 func WithMaxConcurrency(n int) Option {
 	return func(o *options) { o.maxConcurrency = n }
 }
@@ -88,7 +92,15 @@ type Exchange[E any] struct {
 	state int // lifecycle state: running / terminating / terminated
 
 	done chan struct{} // closed once no handler is running after Terminate
-	pool *ants.Pool    // executes every handler; size -1 means unlimited
+
+	// One goroutine pool per topic, created lazily on the topic's first
+	// subscription. Entries live until Terminate even if the topic's last
+	// subscription is cancelled, so that queued tasks are never rejected
+	// mid-flight.
+	pools map[Topic]*ants.Pool
+	// Cap passed to every topic pool; ants maps non-positive sizes to
+	// "unlimited".
+	maxConcurrency int
 
 	wg sync.WaitGroup // tracks the number of running handlers
 }
@@ -101,24 +113,18 @@ type Exchange[E any] struct {
 //
 //	ex := exchange.New[any]()
 func New[E any](opts ...Option) *Exchange[E] {
-	e := &Exchange[E]{
-		subsByTopic:  make(map[Topic][]*subscription[E]),
-		subsByHandle: make(map[Handle]*subscription[E]),
-		done:         make(chan struct{}),
-	}
-
 	var cfg options
 	for _, opt := range opts {
 		opt(&cfg)
 	}
 
-	// Every handler runs on the pool; maxConcurrency is passed straight
-	// through, with ants mapping non-positive sizes to "unlimited".
-	pool, err := ants.NewPool(cfg.maxConcurrency)
-	if err != nil {
-		panic("exchange: failed to create pool: " + err.Error())
+	e := &Exchange[E]{
+		subsByTopic:    make(map[Topic][]*subscription[E]),
+		subsByHandle:   make(map[Handle]*subscription[E]),
+		done:           make(chan struct{}),
+		pools:          make(map[Topic]*ants.Pool),
+		maxConcurrency: cfg.maxConcurrency,
 	}
-	e.pool = pool
 	return e
 }
 
@@ -126,7 +132,8 @@ func New[E any](opts ...Option) *Exchange[E] {
 // topic.
 //
 // The returned handle can be passed to Unsubscribe to cancel the
-// subscription. Subscribe returns ErrClosed once Terminate has been called.
+// subscription. Subscribe returns ErrClosed once Terminate has been
+// called, and an error if the topic's goroutine pool cannot be created.
 func (e *Exchange[E]) Subscribe(topic Topic, handler EventHandler[E]) (Handle, error) {
 	if handler == nil {
 		return 0, errors.New("exchange: nil handler")
@@ -137,6 +144,17 @@ func (e *Exchange[E]) Subscribe(topic Topic, handler EventHandler[E]) (Handle, e
 
 	if e.state != stateRunning {
 		return 0, ErrClosed
+	}
+
+	// Give the topic its own pool on first subscription so its back
+	// pressure can never block other topics. Create it before recording
+	// the subscription so a failure leaves no state behind.
+	if _, ok := e.pools[topic]; !ok {
+		pool, err := newPool(e.maxConcurrency)
+		if err != nil {
+			return 0, fmt.Errorf("exchange: create pool for topic %q: %w", topic, err)
+		}
+		e.pools[topic] = pool
 	}
 
 	sub := &subscription[E]{
@@ -198,9 +216,11 @@ func (e *Exchange[E]) Unsubscribe(handle Handle) error {
 // delivery. Handlers are free to re-enter Subscribe, Unsubscribe and
 // Publish; doing so cannot deadlock.
 //
-// If the pool rejects a task (for instance after the pool has been
-// released), the affected handler is not invoked and the returned error
-// reports the failure; the remaining handlers still run.
+// Delivery runs on the topic's own goroutine pool, so back pressure on one
+// topic never blocks publishes to another topic. If the pool rejects a
+// task (for instance after the pool has been released), the affected
+// handler is not invoked and the returned error reports the failure; the
+// remaining handlers still run.
 //
 // Publish returns ErrClosed once Terminate has been called.
 func (e *Exchange[E]) Publish(topic Topic, event E) error {
@@ -209,15 +229,16 @@ func (e *Exchange[E]) Publish(topic Topic, event E) error {
 		e.mu.RUnlock()
 		return ErrClosed
 	}
-	// Snapshot the handlers and count them in the WaitGroup while still
-	// holding the read lock: Terminate acquires the write lock before it
-	// waits on the WaitGroup, so every handler counted here is guaranteed
-	// to be waited for.
+	// Snapshot the handlers — and the topic pool they run on — and count
+	// them in the WaitGroup while still holding the read lock: Terminate
+	// acquires the write lock before it waits on the WaitGroup, so every
+	// handler counted here is guaranteed to be waited for.
 	subs := e.subsByTopic[topic]
 	handlers := make([]EventHandler[E], len(subs))
 	for i, sub := range subs {
 		handlers[i] = sub.handler
 	}
+	pool := e.pools[topic] // non-nil whenever the topic has subscriptions
 	e.wg.Add(len(handlers))
 	e.mu.RUnlock()
 
@@ -226,7 +247,7 @@ func (e *Exchange[E]) Publish(topic Topic, event E) error {
 	// not deadlock against the read lock held here.
 	var err error
 	for _, handler := range handlers {
-		if serr := e.submit(handler, topic, event); serr != nil {
+		if serr := e.submit(pool, handler, topic, event); serr != nil {
 			err = errors.Join(err, serr)
 		}
 	}
@@ -288,9 +309,9 @@ func (e *Exchange[E]) WaitContext(ctx context.Context) error {
 //
 // If ctx expires before all handlers have finished, Terminate returns
 // ctx.Err(). The exchange is closed to new events either way, but the
-// internal goroutine pool is only released once a Terminate call runs to
-// completion, so a timed-out Terminate must be retried (with a fresh
-// context) until it returns nil.
+// topic pools are only released once a Terminate call runs to completion,
+// so a timed-out Terminate must be retried (with a fresh context) until it
+// returns nil.
 func (e *Exchange[E]) Terminate(ctx context.Context) error {
 	e.mu.Lock()
 	switch e.state {
@@ -319,23 +340,31 @@ func (e *Exchange[E]) Terminate(ctx context.Context) error {
 	if e.state == stateTerminating {
 		e.state = stateTerminated
 	}
+	// All handlers have finished; snapshot the topic pools and stop their
+	// background purgers. No pool can be created from now on (state is
+	// terminated), and Release is idempotent for repeated Terminate calls.
+	pools := make([]*ants.Pool, 0, len(e.pools))
+	for _, p := range e.pools {
+		pools = append(pools, p)
+	}
 	e.mu.Unlock()
 
-	// All handlers have finished; stop the pool's background purger.
-	e.pool.Release()
+	for _, p := range pools {
+		p.Release()
+	}
 	return nil
 }
 
-// submit runs handler on the goroutine pool that executes every event
-// handler. With MaxConcurrency set, Submit blocks while all workers are
-// busy, which is what provides the back pressure.
+// submit runs handler on the topic's goroutine pool. While all of the
+// topic's workers are busy, Submit blocks, which is what provides the back
+// pressure — for this topic only.
 //
 // The caller must already have counted the handler in the WaitGroup, under
 // the read lock, so that the count cannot race with the WaitGroup.Wait in
 // Terminate. If the pool rejects the task, submit releases the count again
 // and returns the error.
-func (e *Exchange[E]) submit(handler EventHandler[E], topic Topic, event E) error {
-	if err := e.pool.Submit(func() {
+func (e *Exchange[E]) submit(pool *ants.Pool, handler EventHandler[E], topic Topic, event E) error {
+	if err := pool.Submit(func() {
 		defer e.wg.Done()
 		e.runHandler(handler, topic, event)
 	}); err != nil {

@@ -7,6 +7,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/panjf2000/ants/v2"
 )
 
 // newTestExchange creates a plain exchange for tests that do not care
@@ -514,7 +516,7 @@ func TestTerminate_TimeoutThenRetryReleasesPool(t *testing.T) {
 	if err := ex.Terminate(ctx); !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("Terminate = %v, want context.DeadlineExceeded", err)
 	}
-	if ex.pool.IsClosed() {
+	if ex.pools["t"].IsClosed() {
 		t.Error("pool released while handlers were still running")
 	}
 
@@ -522,7 +524,7 @@ func TestTerminate_TimeoutThenRetryReleasesPool(t *testing.T) {
 	if err := ex.Terminate(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if !ex.pool.IsClosed() {
+	if !ex.pools["t"].IsClosed() {
 		t.Error("pool not released after the retried Terminate completed")
 	}
 }
@@ -563,12 +565,11 @@ func TestPublish_ReportsSubmitFailure(t *testing.T) {
 	// Regression: a rejected pool task silently dropped the event while
 	// Publish reported success to the caller.
 	ex := New[any]()
-	ex.pool.Release() // force every Submit to fail
-
 	var called atomic.Bool
 	if _, err := ex.Subscribe("t", func(Topic, any) { called.Store(true) }); err != nil {
 		t.Fatal(err)
 	}
+	ex.pools["t"].Release() // force every Submit on this topic to fail
 
 	if err := ex.Publish("t", nil); err == nil {
 		t.Fatal("Publish = nil, want an error when the pool rejects the task")
@@ -624,6 +625,83 @@ func TestPublish_Backpressure_BlocksWhenPoolFull(t *testing.T) {
 	}
 	if got := ran.Load(); got != 2 {
 		t.Errorf("handlers ran %d times, want 2", got)
+	}
+}
+
+func TestPublish_TopicIsolation(t *testing.T) {
+	// Each topic gets its own goroutine pool: a saturated topic must not
+	// block publishes to other topics.
+	ex := New[any](WithMaxConcurrency(1))
+
+	block := make(chan struct{})
+	started := make(chan struct{})
+	var once sync.Once
+	ex.Subscribe("slow", func(Topic, any) {
+		once.Do(func() { close(started) })
+		<-block
+	})
+	fastRan := make(chan struct{}, 1)
+	ex.Subscribe("fast", func(Topic, any) { fastRan <- struct{}{} })
+
+	// Saturate the "slow" topic's pool.
+	if err := ex.Publish("slow", nil); err != nil {
+		t.Fatal(err)
+	}
+	<-started
+
+	// "fast" must still deliver immediately.
+	done := make(chan error, 1)
+	go func() { done <- ex.Publish("fast", nil) }()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal(`topic isolation broken: Publish to "fast" blocked behind the saturated "slow" topic`)
+	}
+	select {
+	case <-fastRan:
+	case <-time.After(time.Second):
+		t.Fatal(`"fast" handler never invoked`)
+	}
+
+	close(block)
+	if err := ex.Terminate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSubscribe_PoolCreationFailure(t *testing.T) {
+	// Subscribe must report a topic pool creation failure instead of
+	// panicking, and leave no state behind.
+	orig := newPool
+	t.Cleanup(func() { newPool = orig })
+	newPool = func(size int, opts ...ants.Option) (*ants.Pool, error) {
+		return nil, errors.New("boom")
+	}
+
+	ex := New[any]()
+	h, err := ex.Subscribe("t", func(Topic, any) {})
+	if err == nil {
+		t.Fatal("Subscribe = nil error, want the pool creation failure")
+	}
+	if h != 0 {
+		t.Errorf("handle = %d, want 0 on failure", h)
+	}
+
+	ex.mu.Lock()
+	_, hasSubs := ex.subsByTopic["t"]
+	_, hasPool := ex.pools["t"]
+	ex.mu.Unlock()
+	if hasSubs || hasPool {
+		t.Error("failed Subscribe left subscription or pool state behind")
+	}
+
+	// With the failure removed, retrying on the same topic works.
+	newPool = orig
+	if _, err := ex.Subscribe("t", func(Topic, any) {}); err != nil {
+		t.Fatalf("retry Subscribe = %v, want nil", err)
 	}
 }
 

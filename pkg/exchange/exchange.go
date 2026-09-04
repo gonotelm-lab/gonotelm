@@ -23,8 +23,12 @@ type Topic = string
 type Handle uint64
 
 // EventHandler is invoked for every event published to the topic the
-// handler was subscribed to.
-type EventHandler[E any] func(topic Topic, event E)
+// handler was subscribed to. The ctx comes from the publishing call:
+// Publish detaches it via context.WithoutCancel (handlers outlive the
+// publisher, so they must not be aborted when it is cancelled, while
+// values such as trace metadata still propagate), PublishSync passes it
+// through as-is.
+type EventHandler[E any] func(ctx context.Context, topic Topic, event E)
 
 // Exchange lifecycle states.
 const (
@@ -138,7 +142,12 @@ func New[E any](opts ...Option) *Exchange[E] {
 // The returned handle can be passed to Unsubscribe to cancel the
 // subscription. Subscribe returns ErrClosed once Terminate has been
 // called, and an error if the topic's goroutine pool cannot be created.
-func (e *Exchange[E]) Subscribe(topic Topic, handler EventHandler[E]) (Handle, error) {
+// The in-process implementation never blocks, so ctx is only checked up
+// front: an already-cancelled ctx fails the call.
+func (e *Exchange[E]) Subscribe(ctx context.Context, topic Topic, handler EventHandler[E]) (Handle, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
 	if handler == nil {
 		return 0, errors.New("exchange: nil handler")
 	}
@@ -215,6 +224,11 @@ func (e *Exchange[E]) Unsubscribe(handle Handle) error {
 // handlers to complete — unless WithMaxConcurrency is set and the cap is
 // reached, in which case Publish blocks until a worker frees up.
 //
+// Handlers receive ctx detached via context.WithoutCancel: values such as
+// trace metadata propagate, but cancellation does not — delivery is
+// asynchronous and outlives the publishing call, so a cancelled publisher
+// must not abort handlers that are already running or queued.
+//
 // The subscribed handlers are snapshotted before delivery starts: handlers
 // subscribed or unsubscribed concurrently may or may not take part in this
 // delivery. Handlers are free to re-enter Subscribe, Unsubscribe and
@@ -227,7 +241,7 @@ func (e *Exchange[E]) Unsubscribe(handle Handle) error {
 // remaining handlers still run.
 //
 // Publish returns ErrClosed once Terminate has been called.
-func (e *Exchange[E]) Publish(topic Topic, event E) error {
+func (e *Exchange[E]) Publish(ctx context.Context, topic Topic, event E) error {
 	e.mu.RLock()
 	if e.state != stateRunning {
 		e.mu.RUnlock()
@@ -246,12 +260,16 @@ func (e *Exchange[E]) Publish(topic Topic, event E) error {
 	e.wg.Add(len(handlers))
 	e.mu.RUnlock()
 
+	// Handlers outlive the publishing call: strip the cancellation but
+	// keep the values.
+	hctx := context.WithoutCancel(ctx)
+
 	// Submit outside the lock: the back pressure of a saturated pool must
 	// not block subscription changes, and re-entrant handler calls must
 	// not deadlock against the read lock held here.
 	var err error
 	for _, handler := range handlers {
-		if serr := e.submit(pool, handler, topic, event); serr != nil {
+		if serr := e.submit(hctx, pool, handler, topic, event); serr != nil {
 			err = errors.Join(err, serr)
 		}
 	}
@@ -262,11 +280,15 @@ func (e *Exchange[E]) Publish(topic Topic, event E) error {
 // after another, synchronously in the calling goroutine, and returns only
 // once they have all completed. Handler panics are recovered.
 //
+// Unlike Publish, the ctx is passed through to the handlers as-is: a
+// synchronous handler is part of the calling call chain and honours its
+// cancellation.
+//
 // PublishSync holds the exchange's read lock while the handlers run, so a
 // concurrent Terminate waits for it to complete.
 //
 // PublishSync returns ErrClosed once Terminate has been called.
-func (e *Exchange[E]) PublishSync(topic Topic, event E) error {
+func (e *Exchange[E]) PublishSync(ctx context.Context, topic Topic, event E) error {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
@@ -275,7 +297,7 @@ func (e *Exchange[E]) PublishSync(topic Topic, event E) error {
 	}
 
 	for _, sub := range e.subsByTopic[topic] {
-		e.runHandler(sub.handler, topic, event)
+		e.runHandler(ctx, sub.handler, topic, event)
 	}
 	return nil
 }
@@ -398,10 +420,10 @@ func (e *Exchange[E]) releasePools(ctx context.Context, pools []*ants.Pool) erro
 // the read lock, so that the count cannot race with the WaitGroup.Wait in
 // Terminate. If the pool rejects the task, submit releases the count again
 // and returns the error.
-func (e *Exchange[E]) submit(pool *ants.Pool, handler EventHandler[E], topic Topic, event E) error {
+func (e *Exchange[E]) submit(ctx context.Context, pool *ants.Pool, handler EventHandler[E], topic Topic, event E) error {
 	if err := pool.Submit(func() {
 		defer e.wg.Done()
-		e.runHandler(handler, topic, event)
+		e.runHandler(ctx, handler, topic, event)
 	}); err != nil {
 		// The task never ran; release the counter again.
 		e.wg.Done()
@@ -412,14 +434,14 @@ func (e *Exchange[E]) submit(pool *ants.Pool, handler EventHandler[E], topic Top
 
 // runHandler invokes handler, recovering from a panic: a faulty handler
 // must not take down the pool worker or the PublishSync caller.
-func (e *Exchange[E]) runHandler(handler EventHandler[E], topic Topic, event E) {
+func (e *Exchange[E]) runHandler(ctx context.Context, handler EventHandler[E], topic Topic, event E) {
 	defer func() {
 		if r := recover(); r != nil {
-			slog.Error("exchange: event handler panic",
+			slog.ErrorContext(ctx, "exchange: event handler panic",
 				"topic", topic,
 				"panic", r,
 				"stack", string(debug.Stack()))
 		}
 	}()
-	handler(topic, event)
+	handler(ctx, topic, event)
 }

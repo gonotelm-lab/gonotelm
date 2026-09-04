@@ -4,8 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
+	"runtime/debug"
 	"sync"
+	"time"
 
+	pkglog "github.com/gonotelm-lab/gonotelm/pkg/log"
 	"github.com/panjf2000/ants/v2"
 )
 
@@ -150,7 +154,7 @@ func (e *Exchange[E]) Subscribe(topic Topic, handler EventHandler[E]) (Handle, e
 	// pressure can never block other topics. Create it before recording
 	// the subscription so a failure leaves no state behind.
 	if _, ok := e.pools[topic]; !ok {
-		pool, err := newPool(e.maxConcurrency)
+		pool, err := newPool(e.maxConcurrency, ants.WithLogger(pkglog.NewAntsLogger(nil)))
 		if err != nil {
 			return 0, fmt.Errorf("exchange: create pool for topic %q: %w", topic, err)
 		}
@@ -312,6 +316,12 @@ func (e *Exchange[E]) WaitContext(ctx context.Context) error {
 // topic pools are only released once a Terminate call runs to completion,
 // so a timed-out Terminate must be retried (with a fresh context) until it
 // returns nil.
+//
+// When ctx carries a deadline, the pools are torn down with
+// ReleaseTimeout within the remaining budget, so a nil return additionally
+// guarantees that every worker goroutine has exited. If that wait times
+// out, Terminate reports it as the error result — the exchange is closed
+// and all handlers have run to completion either way.
 func (e *Exchange[E]) Terminate(ctx context.Context) error {
 	e.mu.Lock()
 	switch e.state {
@@ -341,18 +351,43 @@ func (e *Exchange[E]) Terminate(ctx context.Context) error {
 		e.state = stateTerminated
 	}
 	// All handlers have finished; snapshot the topic pools and stop their
-	// background purgers. No pool can be created from now on (state is
-	// terminated), and Release is idempotent for repeated Terminate calls.
+	// background purgers outside the lock. No pool can be created from
+	// now on (state is terminated), so the map is frozen and the teardown
+	// cannot race with Subscribe.
 	pools := make([]*ants.Pool, 0, len(e.pools))
 	for _, p := range e.pools {
 		pools = append(pools, p)
 	}
 	e.mu.Unlock()
 
-	for _, p := range pools {
-		p.Release()
+	return e.releasePools(ctx, pools)
+}
+
+// releasePools tears the topic pools down after every handler has
+// finished. With a deadline on ctx it uses ReleaseTimeout, so that a nil
+// return guarantees the worker goroutines exited within the remaining
+// budget; otherwise plain Release closes the pools and lets the workers
+// exit on their own. ErrPoolClosed — a pool already closed by a concurrent
+// or repeated teardown — is treated as success.
+func (e *Exchange[E]) releasePools(ctx context.Context, pools []*ants.Pool) error {
+	var timeout time.Duration
+	if deadline, ok := ctx.Deadline(); ok {
+		if timeout = time.Until(deadline); timeout < 0 {
+			timeout = 0
+		}
 	}
-	return nil
+
+	var err error
+	for _, p := range pools {
+		if timeout == 0 {
+			p.Release()
+			continue
+		}
+		if rerr := p.ReleaseTimeout(timeout); rerr != nil && !errors.Is(rerr, ants.ErrPoolClosed) {
+			err = errors.Join(err, rerr)
+		}
+	}
+	return err
 }
 
 // submit runs handler on the topic's goroutine pool. While all of the
@@ -376,9 +411,15 @@ func (e *Exchange[E]) submit(pool *ants.Pool, handler EventHandler[E], topic Top
 }
 
 // runHandler invokes handler, recovering from a panic: a faulty handler
-// must not take down the pool worker or the PublishSync caller. The panic
-// value is deliberately discarded.
+// must not take down the pool worker or the PublishSync caller.
 func (e *Exchange[E]) runHandler(handler EventHandler[E], topic Topic, event E) {
-	defer func() { _ = recover() }()
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("exchange: event handler panic",
+				"topic", topic,
+				"panic", r,
+				"stack", string(debug.Stack()))
+		}
+	}()
 	handler(topic, event)
 }

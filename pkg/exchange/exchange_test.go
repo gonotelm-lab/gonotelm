@@ -1,8 +1,11 @@
 package exchange
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -702,6 +705,37 @@ func TestSubscribe_PoolCreationFailure(t *testing.T) {
 	newPool = orig
 	if _, err := ex.Subscribe("t", func(Topic, any) {}); err != nil {
 		t.Fatalf("retry Subscribe = %v, want nil", err)
+	}
+}
+
+func captureSlog(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+	return &buf
+}
+
+func TestRunHandler_PanicIsLogged(t *testing.T) {
+	// A handler panic must be recovered AND reported through slog with the
+	// topic and the panic value.
+	buf := captureSlog(t)
+
+	ex := New[int]()
+	ex.Subscribe("boom", func(Topic, int) { panic("kaboom") })
+	if err := ex.Publish("boom", 7); err != nil {
+		t.Fatal(err)
+	}
+	if err := ex.Terminate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	out := buf.String()
+	for _, want := range []string{"event handler panic", "topic=boom", "kaboom"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("log output missing %q:\n%s", want, out)
+		}
 	}
 }
 

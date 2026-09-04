@@ -51,8 +51,8 @@ func NewConsumer(c ConsumerConfig) *Consumer {
 		Topic:          c.Topic,
 		QueueCapacity:  c.QueueCapacity,
 		CommitInterval: c.CommitInterval,
-		// Logger:         kafka.LoggerFunc(kafkaLogger), // too many info logs
-		ErrorLogger: kafka.LoggerFunc(kafkaErrorLogger),
+		Logger:         kafka.LoggerFunc(kafkaLogger),
+		ErrorLogger:    kafka.LoggerFunc(kafkaErrorLogger),
 		Dialer: &kafka.Dialer{
 			DualStack: true,
 			SASLMechanism: plain.Mechanism{
@@ -150,21 +150,14 @@ func (c *Consumer) Subscribe(ctx context.Context, topic string, handler mq.Messa
 	return nil
 }
 
-// handlerRetryBackoff 是 handler 失败重试之间的等待时长。
-const handlerRetryBackoff = 200 * time.Millisecond
+const (
+	handlerRetryBackoff = 200 * time.Millisecond
+	handlerMaxAttempts  = 3
+)
 
-// handlerMaxAttempts 是单条消息的 handler 总尝试次数（首次 + 重试次数）。
-const handlerMaxAttempts = 3
-
-// processMessage dispatches one fetched message to the handler and commits the
-// offset afterwards. The handler is retried up to handlerMaxAttempts; after
-// exhaustion the message is committed anyway so a permanently failing message
-// cannot block the partition. A handler panic is recovered here so the fetch
-// loop keeps running; the message is not committed in that case.
 func (c *Consumer) processMessage(ctx context.Context, msg kafka.Message, handler mq.MessageHandler) processResult {
-	// 从 kafka header 中提取 trace 上下文，并创建 consumer span
 	carrier := propagation.NewKafkaHeaderCarrier(msg.Headers)
-	propCtx := pkgtrace.GetTextMapPropagator().Extract(ctx, carrier) // 复原span
+	propCtx := pkgtrace.GetTextMapPropagator().Extract(ctx, carrier)
 	tracer := pkgtrace.GetOtelTracer()
 	reqCtx, span := tracer.Start(
 		propCtx,
@@ -179,7 +172,6 @@ func (c *Consumer) processMessage(ctx context.Context, msg kafka.Message, handle
 			},
 		)...),
 	)
-	defer span.End()
 
 	defer func() {
 		if rec := recover(); rec != nil {
@@ -195,9 +187,9 @@ func (c *Consumer) processMessage(ctx context.Context, msg kafka.Message, handle
 				slog.String("key", string(msg.Key)),
 			)
 		}
+		span.End()
 	}()
 
-	// 从 kafka header 中还原请求上下文
 	reqCtx = restoreRequestContext(reqCtx, msg.Headers)
 	kafkaMsg := &KafkaMessage{
 		topic:   msg.Topic,
@@ -239,18 +231,10 @@ func (c *Consumer) processMessage(ctx context.Context, msg kafka.Message, handle
 			slog.String("value", string(msg.Value)),
 			slog.Int("attempts", handlerMaxAttempts),
 		)
-		return processContinue
 	}
 
-	// handler success, commit offset
-	err = c.r.CommitMessages(ctx, msg)
-	if err != nil {
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			slog.WarnContext(ctx, "kafka commit canceled by context", slog.Any("err", err))
-			return processStop
-		}
-
-		slog.ErrorContext(ctx, "kafka commit messages failed", slog.Any("err", err))
+	if cerr := c.r.CommitMessages(ctx, msg); cerr != nil {
+		slog.ErrorContext(ctx, "kafka commit messages failed", slog.Any("err", cerr))
 	}
 
 	return processContinue

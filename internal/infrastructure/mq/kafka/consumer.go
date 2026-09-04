@@ -51,8 +51,8 @@ func NewConsumer(c ConsumerConfig) *Consumer {
 		Topic:          c.Topic,
 		QueueCapacity:  c.QueueCapacity,
 		CommitInterval: c.CommitInterval,
-		Logger:         kafka.LoggerFunc(kafkaLogger),
-		ErrorLogger:    kafka.LoggerFunc(kafkaErrorLogger),
+		// Logger:         kafka.LoggerFunc(kafkaLogger), // too many logs
+		ErrorLogger: kafka.LoggerFunc(kafkaErrorLogger),
 		Dialer: &kafka.Dialer{
 			DualStack: true,
 			SASLMechanism: plain.Mechanism{
@@ -262,30 +262,6 @@ func (c *Consumer) Close(ctx context.Context) error {
 	})
 
 	return closeErr
-}
-
-type KafkaMessage struct {
-	topic      string
-	key, value []byte
-	headers    []kafka.Header
-}
-
-var _ mq.Message = (*KafkaMessage)(nil)
-
-func (m *KafkaMessage) Topic() string {
-	return m.topic
-}
-
-func (m *KafkaMessage) Key() []byte {
-	return m.key
-}
-
-func (m *KafkaMessage) Value() []byte {
-	return m.value
-}
-
-func (m *KafkaMessage) Headers() []mq.MessageHeader {
-	return fromKafkaHeaders(m.headers)
 }
 
 func fetchUnknownErrBackoff(attempt int) time.Duration {

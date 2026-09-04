@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/shared"
+	"github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/util"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
@@ -192,7 +192,7 @@ func (h *Service) Generate(ctx context.Context, cmd *GenerateSuggestionsCommand)
 
 	var targetSources []*sourceentity.Source
 	if len(sourceIds) > 0 {
-		targetSources, err = shared.FilterReadySources(ctx, h.sourceRepo, notebookId, sourceIds, userId)
+		targetSources, err = util.FilterReadySources(ctx, h.sourceRepo, notebookId, sourceIds, userId)
 		if err != nil {
 			return nil, errors.WithMessagef(err, "suggestion failed to get sources, notebook_id: %s, source_ids: %v",
 				notebookId.String(),

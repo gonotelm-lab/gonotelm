@@ -19,5 +19,5 @@ type Deps struct {
 	FlowClient   flow.TaskClient
 	NotebookRepo notebookrepo.Repository
 	Poller       Poller
-	EventBus     eventbus.EventBus
+	EventBus     eventbus.Publisher
 }

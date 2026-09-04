@@ -48,7 +48,7 @@ type CreateMessageHandler struct {
 	sourceDocRepo          sourcerepo.SourceDocRepository
 	sourceAgentizeService  *agentize.Service
 	chatGateway            *llmchat.Gateway
-	eventBus               eventbus.EventBus
+	eventBus               eventbus.Publisher
 
 	agentService *agentize.Service
 }
@@ -65,7 +65,7 @@ func NewCreateMessageHandler(
 	sourceStorageRepo sourcerepo.StorageRepository,
 	sourceDocRepo sourcerepo.SourceDocRepository,
 	chatGateway *llmchat.Gateway,
-	eventBus eventbus.EventBus,
+	eventBus eventbus.Publisher,
 ) *CreateMessageHandler {
 	sourceAgentizeService := agentize.NewService(
 		agentize.Config{},

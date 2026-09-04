@@ -105,16 +105,10 @@ func (h *OnStreamTaskEventHandler) handleAbort(ctx context.Context, evt *chateve
 }
 
 func RegisterStreamTaskEventConsumer(
-	ctx context.Context,
-	bus eventbus.EventBus,
+	bus eventbus.InProcessEventBus,
 	handler *OnStreamTaskEventHandler,
 ) error {
-	composite, err := eventbus.AsComposite(bus)
-	if err != nil {
-		return err
-	}
-
-	return composite.SubscribeInner(ctx, chatevent.StreamTaskTopic,
+	return bus.Subscribe(chatevent.StreamTaskTopic,
 		func(ctx context.Context, evt event.Event) error {
 			streamTaskEvt, err := eventbus.AssertEvent[*chatevent.StreamTaskEvent](evt)
 			if err != nil {

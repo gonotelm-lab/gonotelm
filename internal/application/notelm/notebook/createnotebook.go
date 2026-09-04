@@ -13,10 +13,10 @@ import (
 
 type CreateNotebookHandler struct {
 	notebookRepo notebookrepo.Repository
-	eventBus     eventbus.EventBus
+	eventBus     eventbus.Publisher
 }
 
-func NewCreateNotebookHandler(notebookRepo notebookrepo.Repository, eventBus eventbus.EventBus) *CreateNotebookHandler {
+func NewCreateNotebookHandler(notebookRepo notebookrepo.Repository, eventBus eventbus.Publisher) *CreateNotebookHandler {
 	return &CreateNotebookHandler{
 		notebookRepo: notebookRepo,
 		eventBus:     eventBus,

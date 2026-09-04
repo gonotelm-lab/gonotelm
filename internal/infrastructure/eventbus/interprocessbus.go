@@ -2,6 +2,7 @@ package eventbus
 
 import (
 	"context"
+	stderr "errors"
 	"sync"
 
 	"github.com/bytedance/sonic"
@@ -10,7 +11,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
-type outerEventBus struct {
+type interProcessEventBus struct {
 	producer  mq.Producer
 	mqFactory *mq.MessageQueue
 
@@ -18,17 +19,17 @@ type outerEventBus struct {
 	consumers []mq.Consumer
 }
 
-func NewOuterEventBus(mqFactory *mq.MessageQueue) EventBus {
-	evbus := &outerEventBus{
+func NewInterProcessEventBus(mqFactory *mq.MessageQueue) InterProcessEventBus {
+	bus := &interProcessEventBus{
 		mqFactory: mqFactory,
 	}
-	evbus.producer = evbus.mqFactory.NewProducer()
-	return evbus
+	bus.producer = bus.mqFactory.NewProducer()
+	return bus
 }
 
-func (b *outerEventBus) Publish(ctx context.Context, evt event.Event) error {
-	if evt.Category() != event.CategoryOuter {
-		return errors.New("event category is not outer")
+func (b *interProcessEventBus) Publish(ctx context.Context, evt event.Event) error {
+	if evt.Category() != event.CategoryInterProcess {
+		return errors.New("event category is not interprocess")
 	}
 
 	val, err := sonic.Marshal(evt.Value())
@@ -52,10 +53,10 @@ func (b *outerEventBus) Publish(ctx context.Context, evt event.Event) error {
 	})
 }
 
-func (b *outerEventBus) Subscribe(
+func (b *interProcessEventBus) Subscribe(
 	ctx context.Context,
 	topic, groupID string,
-	handler EventBusMessageHandler,
+	handler InterProcessEventHandler,
 ) error {
 	if handler == nil {
 		return errors.New("handler is nil")
@@ -85,7 +86,7 @@ func (b *outerEventBus) Subscribe(
 	})
 }
 
-func (b *outerEventBus) Close(ctx context.Context) error {
+func (b *interProcessEventBus) Close(ctx context.Context) error {
 	b.mu.Lock()
 	consumers := b.consumers
 	b.consumers = nil
@@ -93,13 +94,13 @@ func (b *outerEventBus) Close(ctx context.Context) error {
 
 	var closeErr error
 	for _, consumer := range consumers {
-		if err := consumer.Close(ctx); err != nil && closeErr == nil {
-			closeErr = err
+		if err := consumer.Close(ctx); err != nil {
+			closeErr = stderr.Join(closeErr, err)
 		}
 	}
 	if b.producer != nil {
-		if err := b.producer.Close(ctx); err != nil && closeErr == nil {
-			closeErr = err
+		if err := b.producer.Close(ctx); err != nil {
+			closeErr = stderr.Join(closeErr, err)
 		}
 	}
 

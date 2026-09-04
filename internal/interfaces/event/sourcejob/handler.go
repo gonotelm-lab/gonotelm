@@ -13,14 +13,14 @@ type EventDeps struct {
 	SourceRepo        sourcerepo.Repository
 	SourceStorageRepo sourcerepo.StorageRepository
 	SourceDocRepo     sourcerepo.SourceDocRepository
-	EventBus          eventbus.EventBus
+	EventBus          *eventbus.CompositeEventBus
 	Summarizer        adapterdefine.Summarizer
 	ImageInterpreter  adapterdefine.ImageInterpreter
 }
 
 func Init(ctx context.Context, deps *EventDeps) {
 	if err := source.RegisterPreparationConsumer(ctx,
-		deps.EventBus,
+		deps.EventBus.InterProcess,
 		source.NewPrepareSourceHandler(
 			deps.SourceRepo,
 			deps.SourceStorageRepo,

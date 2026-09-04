@@ -13,10 +13,10 @@ import (
 
 type DeleteSourceHandler struct {
 	*baseHandler
-	eventBus eventbus.EventBus
+	eventBus eventbus.Publisher
 }
 
-func NewDeleteSourceHandler(sourceRepo sourcerepo.Repository, eventBus eventbus.EventBus) *DeleteSourceHandler {
+func NewDeleteSourceHandler(sourceRepo sourcerepo.Repository, eventBus eventbus.Publisher) *DeleteSourceHandler {
 	return &DeleteSourceHandler{
 		baseHandler: newBaseHandler(sourceRepo),
 		eventBus:    eventBus,

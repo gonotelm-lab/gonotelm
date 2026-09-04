@@ -11,12 +11,12 @@ import (
 
 type RetrySourcePreparationHandler struct {
 	*baseHandler
-	eventBus eventbus.EventBus
+	eventBus eventbus.Publisher
 }
 
 func NewRetrySourcePreparationHandler(
 	sourceRepo sourcerepo.Repository,
-	eventBus eventbus.EventBus,
+	eventBus eventbus.Publisher,
 ) *RetrySourcePreparationHandler {
 	return &RetrySourcePreparationHandler{
 		baseHandler: newBaseHandler(sourceRepo),

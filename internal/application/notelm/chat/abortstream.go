@@ -16,12 +16,12 @@ const defaultStreamTaskTTL = 100 * time.Minute
 
 type AbortStreamHandler struct {
 	streamTaskRepo chatrepo.StreamTaskRepository
-	eventBus       eventbus.EventBus
+	eventBus       eventbus.Publisher
 }
 
 func NewAbortStreamHandler(
 	streamTaskRepo chatrepo.StreamTaskRepository,
-	eventBus eventbus.EventBus,
+	eventBus eventbus.Publisher,
 ) *AbortStreamHandler {
 	return &AbortStreamHandler{
 		streamTaskRepo: streamTaskRepo,

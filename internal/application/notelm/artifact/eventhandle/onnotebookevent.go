@@ -44,16 +44,10 @@ func (h *OnNotebookEventHandler) Handle(
 }
 
 func RegisterNotebookEventConsumer(
-	ctx context.Context,
-	bus eventbus.EventBus,
+	bus eventbus.InProcessEventBus,
 	handler *OnNotebookEventHandler,
 ) error {
-	composite, err := eventbus.AsComposite(bus)
-	if err != nil {
-		return err
-	}
-
-	return composite.SubscribeInner(ctx, notebookevent.TopicNotebookEvent,
+	return bus.Subscribe(notebookevent.TopicNotebookEvent,
 		func(ctx context.Context, evt event.Event) error {
 			nbEvt, err := eventbus.AssertEvent[*notebookevent.Event](evt)
 			if err != nil {

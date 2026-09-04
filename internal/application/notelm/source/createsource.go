@@ -20,13 +20,13 @@ import (
 type CreateSourceHandler struct {
 	notebookRepo notebookrepo.Repository
 	sourceRepo   sourcerepo.Repository
-	eventBus     eventbus.EventBus
+	eventBus     eventbus.Publisher
 }
 
 func NewCreateSourceHandler(
 	sourceRepo sourcerepo.Repository,
 	notebookRepo notebookrepo.Repository,
-	eventBus eventbus.EventBus,
+	eventBus eventbus.Publisher,
 ) *CreateSourceHandler {
 	return &CreateSourceHandler{
 		notebookRepo: notebookRepo,

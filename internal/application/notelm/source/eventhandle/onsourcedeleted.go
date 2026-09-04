@@ -54,16 +54,10 @@ func (h *OnSourceDeletedEventHandler) Handle(ctx context.Context, evt *sourceeve
 }
 
 func RegisterSourceDeletedConsumer(
-	ctx context.Context,
-	bus eventbus.EventBus,
+	bus eventbus.InProcessEventBus,
 	handler *OnSourceDeletedEventHandler,
 ) error {
-	composite, err := eventbus.AsComposite(bus)
-	if err != nil {
-		return err
-	}
-
-	return composite.SubscribeInner(ctx, sourceevent.DeleteTopic,
+	return bus.Subscribe(sourceevent.DeleteTopic,
 		func(ctx context.Context, evt event.Event) error {
 			delEvt, err := eventbus.AssertEvent[*sourceevent.DeleteEvent](evt)
 			if err != nil {

@@ -33,10 +33,10 @@ type RetryArtifactHandler struct {
 	*baseHandler
 	flowc    flow.TaskClient
 	poller   Poller
-	eventBus eventbus.EventBus
+	eventBus eventbus.Publisher
 }
 
-func NewRetryArtifactHandler(repo artifactrepo.Repository, flowc flow.TaskClient, poller Poller, eventBus eventbus.EventBus) *RetryArtifactHandler {
+func NewRetryArtifactHandler(repo artifactrepo.Repository, flowc flow.TaskClient, poller Poller, eventBus eventbus.Publisher) *RetryArtifactHandler {
 	return &RetryArtifactHandler{
 		baseHandler: newBaseHandler(repo),
 		flowc:       flowc,

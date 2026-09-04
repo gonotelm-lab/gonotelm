@@ -32,27 +32,27 @@ type EventDeps struct {
 
 	ArtifactTaskRepo artifactrepo.Repository
 
-	EventBus    eventbus.EventBus
+	EventBus    *eventbus.CompositeEventBus
 	ChatGateway *llmchat.Gateway
 }
 
 func Init(ctx context.Context, deps *EventDeps) {
-	if err := initSourceEventConsumers(ctx, deps); err != nil {
+	if err := initSourceEventConsumers(deps); err != nil {
 		panic(err)
 	}
 
-	if err := initNotebookEventConsumers(ctx, deps); err != nil {
+	if err := initNotebookEventConsumers(deps); err != nil {
 		panic(err)
 	}
 
-	if err := initStreamTaskEventConsumers(ctx, deps); err != nil {
+	if err := initStreamTaskEventConsumers(deps); err != nil {
 		panic(err)
 	}
 }
 
-func initSourceEventConsumers(ctx context.Context, deps *EventDeps) error {
-	if err := source.RegisterSourceDeletedConsumer(ctx,
-		deps.EventBus,
+func initSourceEventConsumers(deps *EventDeps) error {
+	if err := source.RegisterSourceDeletedConsumer(
+		deps.EventBus.InProcess,
 		source.NewOnSourceDeletedEventHandler(
 			deps.SourceDocRepo,
 			deps.SourceStorageRepo,
@@ -64,9 +64,9 @@ func initSourceEventConsumers(ctx context.Context, deps *EventDeps) error {
 	return nil
 }
 
-func initNotebookEventConsumers(ctx context.Context, deps *EventDeps) error {
-	if err := chat.RegisterNotebookEventConsumer(ctx,
-		deps.EventBus,
+func initNotebookEventConsumers(deps *EventDeps) error {
+	if err := chat.RegisterNotebookEventConsumer(
+		deps.EventBus.InProcess,
 		chat.NewOnNotebookEventHandler(
 			deps.ChatRepo,
 			deps.ChatMessageRepo,
@@ -76,8 +76,8 @@ func initNotebookEventConsumers(ctx context.Context, deps *EventDeps) error {
 		return err
 	}
 
-	if err := source.RegisterNotebookEventConsumer(ctx,
-		deps.EventBus,
+	if err := source.RegisterNotebookEventConsumer(
+		deps.EventBus.InProcess,
 		source.NewOnNotebookEventHandler(
 			deps.SourceRepo,
 			deps.SourceDocRepo,
@@ -87,15 +87,15 @@ func initNotebookEventConsumers(ctx context.Context, deps *EventDeps) error {
 		return err
 	}
 
-	return artifact.RegisterNotebookEventConsumer(ctx,
-		deps.EventBus,
+	return artifact.RegisterNotebookEventConsumer(
+		deps.EventBus.InProcess,
 		artifact.NewOnNotebookEventHandler(deps.ArtifactTaskRepo),
 	)
 }
 
-func initStreamTaskEventConsumers(ctx context.Context, deps *EventDeps) error {
-	if err := chat.RegisterStreamTaskEventConsumer(ctx,
-		deps.EventBus,
+func initStreamTaskEventConsumers(deps *EventDeps) error {
+	if err := chat.RegisterStreamTaskEventConsumer(
+		deps.EventBus.InProcess,
 		chat.NewOnStreamTaskEventHandler(
 			deps.RootCtx,
 			deps.ChatRepo,

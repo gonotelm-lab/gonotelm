@@ -89,9 +89,9 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 	suggestionRepo := repository.NewSuggestionRepository(infra.Cache.ChatSuggestionCache)
 
 	// ── 3. Event Bus ──
-	innerBus := eventbus.NewInnerEventBus()
-	outerBus := eventbus.NewOuterEventBus(infra.MessageQueue)
-	eventBus := eventbus.NewCompositeEventBus(innerBus, outerBus)
+	inprocessBus := eventbus.NewInProcessEventBus()
+	interprocessBus := eventbus.NewInterProcessEventBus(infra.MessageQueue)
+	eventBus := eventbus.NewCompositeEventBus(inprocessBus, interprocessBus)
 
 	// ── 4. Adapters ──
 	titleMaker := adapter.NewTitleMaker(

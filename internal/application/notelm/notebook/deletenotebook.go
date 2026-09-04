@@ -13,10 +13,10 @@ import (
 
 type DeleteNotebookHandler struct {
 	*baseHandler
-	eventBus eventbus.EventBus
+	eventBus eventbus.Publisher
 }
 
-func NewDeleteNotebookHandler(notebookRepo notebookrepo.Repository, eventBus eventbus.EventBus) *DeleteNotebookHandler {
+func NewDeleteNotebookHandler(notebookRepo notebookrepo.Repository, eventBus eventbus.Publisher) *DeleteNotebookHandler {
 	return &DeleteNotebookHandler{
 		baseHandler: newBaseHandler(notebookRepo),
 		eventBus:    eventBus,

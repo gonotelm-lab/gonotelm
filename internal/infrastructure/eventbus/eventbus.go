@@ -6,15 +6,12 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/event"
 )
 
-// Envelope is the transport boundary for subscribed messages.
-// Outer (MQ) consumers read Value bytes; inner consumers use Inner directly.
+// Envelope is the transport boundary for inter-process (MQ) messages.
 type Envelope struct {
 	Topic   string
 	Key     string
 	Value   []byte
 	Headers []event.Header
-
-	Inner event.Event // set by inner bus only; no serialization
 }
 
 func (e Envelope) Header(key string) ([]byte, bool) {
@@ -26,13 +23,28 @@ func (e Envelope) Header(key string) ([]byte, bool) {
 	return nil, false
 }
 
-type EventBusMessageHandler func(ctx context.Context, env Envelope) error
-
-// InnerEventHandler receives in-process events without serialization.
-type InnerEventHandler func(ctx context.Context, evt event.Event) error
-
-type EventBus interface {
+// Publisher publishes events; CompositeEventBus routes them by category.
+type Publisher interface {
 	Publish(ctx context.Context, evt event.Event) error
-	Subscribe(ctx context.Context, topic, groupID string, handler EventBusMessageHandler) error
+}
+
+// InProcessEventBus dispatches events to in-process handlers without serialization.
+type InProcessEventBus interface {
+	Publisher
+	Subscribe(topic string, handler InProcessEventHandler) error
 	Close(ctx context.Context) error
 }
+
+// InterProcessEventBus sends events through the message queue (MQ).
+type InterProcessEventBus interface {
+	Publisher
+	Subscribe(ctx context.Context, topic, groupID string, handler InterProcessEventHandler) error
+	Close(ctx context.Context) error
+}
+
+// InProcessEventHandler receives in-process events as strongly-typed event.Event
+// (use AssertEvent to unwrap concrete event types).
+type InProcessEventHandler func(ctx context.Context, evt event.Event) error
+
+// InterProcessEventHandler receives inter-process messages as Envelope.
+type InterProcessEventHandler func(ctx context.Context, env Envelope) error

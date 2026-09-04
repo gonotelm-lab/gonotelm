@@ -16,7 +16,7 @@ import (
 
 type SourceJob struct {
 	shared *bootshared.Infra
-	bus    eventbus.EventBus
+	bus    *eventbus.CompositeEventBus
 	cancel context.CancelFunc
 }
 
@@ -49,9 +49,9 @@ func NewSourceJob(ctx context.Context, cfg *conf.SourceJobConfig) (*SourceJob, e
 		},
 	)
 
-	innerBus := eventbus.NewInnerEventBus()
-	outerBus := eventbus.NewOuterEventBus(infra.MessageQueue)
-	bus := eventbus.NewCompositeEventBus(innerBus, outerBus)
+	inprocessBus := eventbus.NewInProcessEventBus()
+	interprocessBus := eventbus.NewInterProcessEventBus(infra.MessageQueue)
+	bus := eventbus.NewCompositeEventBus(inprocessBus, interprocessBus)
 
 	summarizer := adapter.NewSummarizer(
 		infra.LLMGateway,

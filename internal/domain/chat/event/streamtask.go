@@ -19,7 +19,7 @@ const (
 )
 
 type StreamTaskEvent struct {
-	event.BaseInnerEvent
+	event.BaseInProcessEvent
 
 	action    StreamTaskEventAction
 	taskId    valobj.Id

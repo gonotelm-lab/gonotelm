@@ -142,12 +142,8 @@ func New[E any](opts ...Option) *Exchange[E] {
 // The returned handle can be passed to Unsubscribe to cancel the
 // subscription. Subscribe returns ErrClosed once Terminate has been
 // called, and an error if the topic's goroutine pool cannot be created.
-// The in-process implementation never blocks, so ctx is only checked up
-// front: an already-cancelled ctx fails the call.
-func (e *Exchange[E]) Subscribe(ctx context.Context, topic Topic, handler EventHandler[E]) (Handle, error) {
-	if err := ctx.Err(); err != nil {
-		return 0, err
-	}
+// It never blocks.
+func (e *Exchange[E]) Subscribe(topic Topic, handler EventHandler[E]) (Handle, error) {
 	if handler == nil {
 		return 0, errors.New("exchange: nil handler")
 	}

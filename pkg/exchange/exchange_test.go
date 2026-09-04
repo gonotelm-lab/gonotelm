@@ -23,7 +23,7 @@ func newTestExchange() *Exchange[any] {
 func TestExchange_Subscribe(t *testing.T) {
 	t.Run("nil handler is rejected", func(t *testing.T) {
 		ex := newTestExchange()
-		if _, err := ex.Subscribe(context.Background(), "topic", nil); err == nil {
+		if _, err := ex.Subscribe("topic", nil); err == nil {
 			t.Fatal("Subscribe with a nil handler should fail")
 		}
 	})
@@ -33,7 +33,7 @@ func TestExchange_Subscribe(t *testing.T) {
 
 		seen := make(map[Handle]bool)
 		for range 3 {
-			h, err := ex.Subscribe(context.Background(), "topic", func(context.Context, Topic, any) {})
+			h, err := ex.Subscribe("topic", func(context.Context, Topic, any) {})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -55,7 +55,7 @@ func TestExchange_Publish(t *testing.T) {
 		)
 
 		got := make(chan string, 1)
-		if _, err := ex.Subscribe(context.Background(), topic, func(_ context.Context, tp Topic, e any) {
+		if _, err := ex.Subscribe(topic, func(_ context.Context, tp Topic, e any) {
 			if tp != topic {
 				t.Errorf("unexpected topic %q, want %q", tp, topic)
 			}
@@ -82,8 +82,8 @@ func TestExchange_Publish(t *testing.T) {
 		ex := newTestExchange()
 
 		var pushes, pulls atomic.Int32
-		ex.Subscribe(context.Background(), "git.push", func(context.Context, Topic, any) { pushes.Add(1) })
-		ex.Subscribe(context.Background(), "git.pull", func(context.Context, Topic, any) { pulls.Add(1) })
+		ex.Subscribe("git.push", func(context.Context, Topic, any) { pushes.Add(1) })
+		ex.Subscribe("git.pull", func(context.Context, Topic, any) { pulls.Add(1) })
 
 		// A longer topic must not trigger the "git.push" handler.
 		ex.Publish(context.Background(), "git.push.force", nil)
@@ -104,7 +104,7 @@ func TestExchange_Publish(t *testing.T) {
 
 		var count atomic.Int32
 		for range 5 {
-			if _, err := ex.Subscribe(context.Background(), "topic", func(context.Context, Topic, any) { count.Add(1) }); err != nil {
+			if _, err := ex.Subscribe("topic", func(context.Context, Topic, any) { count.Add(1) }); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -126,7 +126,7 @@ func TestExchange_Publish(t *testing.T) {
 
 		ex := New[event]()
 		got := make(chan event, 1)
-		ex.Subscribe(context.Background(), "users.created", func(_ context.Context, topic Topic, e event) {
+		ex.Subscribe("users.created", func(_ context.Context, topic Topic, e event) {
 			if topic != "users.created" {
 				t.Errorf("unexpected topic %q", topic)
 			}
@@ -157,9 +157,9 @@ func TestExchange_PublishSync(t *testing.T) {
 
 	// Handlers run in order, in the calling goroutine, even when one panics.
 	var order []string
-	ex.Subscribe(context.Background(), "topic", func(context.Context, Topic, any) { order = append(order, "a") })
-	ex.Subscribe(context.Background(), "topic", func(context.Context, Topic, any) { order = append(order, "b"); panic("ignored") })
-	ex.Subscribe(context.Background(), "topic", func(context.Context, Topic, any) { order = append(order, "c") })
+	ex.Subscribe("topic", func(context.Context, Topic, any) { order = append(order, "a") })
+	ex.Subscribe("topic", func(context.Context, Topic, any) { order = append(order, "b"); panic("ignored") })
+	ex.Subscribe("topic", func(context.Context, Topic, any) { order = append(order, "c") })
 
 	if err := ex.PublishSync(context.Background(), "topic", nil); err != nil {
 		t.Fatal(err)
@@ -180,11 +180,11 @@ func TestExchange_Unsubscribe(t *testing.T) {
 	ex := newTestExchange()
 
 	var count atomic.Int32
-	h1, err := ex.Subscribe(context.Background(), "topic", func(context.Context, Topic, any) { count.Add(1) })
+	h1, err := ex.Subscribe("topic", func(context.Context, Topic, any) { count.Add(1) })
 	if err != nil {
 		t.Fatal(err)
 	}
-	h2, err := ex.Subscribe(context.Background(), "topic", func(context.Context, Topic, any) { count.Add(1) })
+	h2, err := ex.Subscribe("topic", func(context.Context, Topic, any) { count.Add(1) })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,7 +212,7 @@ func TestExchange_Unsubscribe(t *testing.T) {
 
 	t.Run("last unsubscribe removes the topic entry", func(t *testing.T) {
 		ex2 := newTestExchange()
-		h, _ := ex2.Subscribe(context.Background(), "topic", func(context.Context, Topic, any) {})
+		h, _ := ex2.Subscribe("topic", func(context.Context, Topic, any) {})
 		ex2.Unsubscribe(h)
 
 		ex2.mu.Lock()
@@ -227,7 +227,7 @@ func TestExchange_Unsubscribe(t *testing.T) {
 func TestExchange_Terminate(t *testing.T) {
 	t.Run("publish and subscribe fail after terminate", func(t *testing.T) {
 		ex := newTestExchange()
-		ex.Subscribe(context.Background(), "topic", func(context.Context, Topic, any) {})
+		ex.Subscribe("topic", func(context.Context, Topic, any) {})
 
 		if err := ex.Terminate(context.Background()); err != nil {
 			t.Fatal(err)
@@ -235,7 +235,7 @@ func TestExchange_Terminate(t *testing.T) {
 		if err := ex.Publish(context.Background(), "topic", nil); !errors.Is(err, ErrClosed) {
 			t.Errorf("Publish after Terminate = %v, want ErrClosed", err)
 		}
-		if _, err := ex.Subscribe(context.Background(), "topic", func(context.Context, Topic, any) {}); !errors.Is(err, ErrClosed) {
+		if _, err := ex.Subscribe("topic", func(context.Context, Topic, any) {}); !errors.Is(err, ErrClosed) {
 			t.Errorf("Subscribe after Terminate = %v, want ErrClosed", err)
 		}
 		// Terminate must be idempotent.
@@ -247,7 +247,7 @@ func TestExchange_Terminate(t *testing.T) {
 	t.Run("waits for running handlers", func(t *testing.T) {
 		ex := newTestExchange()
 		var finished atomic.Bool
-		ex.Subscribe(context.Background(), "topic", func(context.Context, Topic, any) {
+		ex.Subscribe("topic", func(context.Context, Topic, any) {
 			time.Sleep(50 * time.Millisecond)
 			finished.Store(true)
 		})
@@ -264,7 +264,7 @@ func TestExchange_Terminate(t *testing.T) {
 	t.Run("respects context deadline", func(t *testing.T) {
 		ex := newTestExchange()
 		block := make(chan struct{})
-		ex.Subscribe(context.Background(), "topic", func(context.Context, Topic, any) { <-block })
+		ex.Subscribe("topic", func(context.Context, Topic, any) { <-block })
 		ex.Publish(context.Background(), "topic", nil)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
@@ -288,7 +288,7 @@ func TestExchange_Terminate(t *testing.T) {
 func TestExchange_Wait(t *testing.T) {
 	ex := newTestExchange()
 	var count atomic.Int32
-	ex.Subscribe(context.Background(), "topic", func(context.Context, Topic, any) {
+	ex.Subscribe("topic", func(context.Context, Topic, any) {
 		time.Sleep(50 * time.Millisecond)
 		count.Add(1)
 	})
@@ -312,7 +312,7 @@ func TestExchange_Wait(t *testing.T) {
 func TestExchange_WaitContext(t *testing.T) {
 	ex := newTestExchange()
 	block := make(chan struct{})
-	ex.Subscribe(context.Background(), "topic", func(context.Context, Topic, any) { <-block })
+	ex.Subscribe("topic", func(context.Context, Topic, any) { <-block })
 	ex.Publish(context.Background(), "topic", nil)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
@@ -331,8 +331,8 @@ func TestExchange_PanicRecovery(t *testing.T) {
 	var reported atomic.Int32
 	ex := New[panicEvt]()
 
-	ex.Subscribe(context.Background(), "boom", func(context.Context, Topic, panicEvt) { panic("kaboom") })
-	ex.Subscribe(context.Background(), "boom", func(context.Context, Topic, panicEvt) { reported.Add(1000) })
+	ex.Subscribe("boom", func(context.Context, Topic, panicEvt) { panic("kaboom") })
+	ex.Subscribe("boom", func(context.Context, Topic, panicEvt) { reported.Add(1000) })
 
 	if err := ex.Publish(context.Background(), "boom", panicEvt{n: 42}); err != nil {
 		t.Fatal(err)
@@ -352,7 +352,7 @@ func TestExchange_MaxConcurrency(t *testing.T) {
 
 	var running, maxRunning atomic.Int32
 	var wg sync.WaitGroup
-	ex.Subscribe(context.Background(), "topic", func(context.Context, Topic, any) {
+	ex.Subscribe("topic", func(context.Context, Topic, any) {
 		cur := running.Add(1)
 		for {
 			old := maxRunning.Load()
@@ -386,7 +386,7 @@ func TestExchange_ConcurrentStress(t *testing.T) {
 	ex := New[int]()
 	handles := make([]Handle, 8)
 	for i := range handles {
-		h, err := ex.Subscribe(context.Background(), "topic", func(context.Context, Topic, int) { time.Sleep(time.Microsecond) })
+		h, err := ex.Subscribe("topic", func(context.Context, Topic, int) { time.Sleep(time.Microsecond) })
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -412,7 +412,7 @@ func TestExchange_ConcurrentStress(t *testing.T) {
 	wg.Wait()
 
 	// Subscribing again must still work.
-	if _, err := ex.Subscribe(context.Background(), "topic", func(context.Context, Topic, int) {}); err != nil {
+	if _, err := ex.Subscribe("topic", func(context.Context, Topic, int) {}); err != nil {
 		t.Fatal(err)
 	}
 	if err := ex.Terminate(context.Background()); err != nil {
@@ -433,7 +433,7 @@ func TestPublish_HandlerReentrancy_DoesNotDeadlock(t *testing.T) {
 	var once sync.Once
 	var unsubscribed atomic.Bool
 	var h Handle
-	h, err := ex.Subscribe(context.Background(), "t", func(context.Context, Topic, any) {
+	h, err := ex.Subscribe("t", func(context.Context, Topic, any) {
 		once.Do(func() { close(started) })
 		<-release
 		// May run twice after the fix (the snapshot delivers to the
@@ -487,7 +487,7 @@ func TestTerminate_WaitsForConcurrentPublishSync(t *testing.T) {
 	ex := newTestExchange()
 
 	finished := atomic.Bool{}
-	ex.Subscribe(context.Background(), "t", func(context.Context, Topic, any) {
+	ex.Subscribe("t", func(context.Context, Topic, any) {
 		time.Sleep(300 * time.Millisecond)
 		finished.Store(true)
 	})
@@ -509,7 +509,7 @@ func TestTerminate_TimeoutThenRetryReleasesPool(t *testing.T) {
 	// eventually release it.
 	ex := New[any]()
 	block := make(chan struct{})
-	ex.Subscribe(context.Background(), "t", func(context.Context, Topic, any) { <-block })
+	ex.Subscribe("t", func(context.Context, Topic, any) { <-block })
 	if err := ex.Publish(context.Background(), "t", nil); err != nil {
 		t.Fatal(err)
 	}
@@ -538,7 +538,7 @@ func TestTerminate_SecondCallWaitsForOngoing(t *testing.T) {
 	// immediately.
 	ex := newTestExchange()
 	block := make(chan struct{})
-	ex.Subscribe(context.Background(), "t", func(context.Context, Topic, any) { <-block })
+	ex.Subscribe("t", func(context.Context, Topic, any) { <-block })
 	if err := ex.Publish(context.Background(), "t", nil); err != nil {
 		t.Fatal(err)
 	}
@@ -569,7 +569,7 @@ func TestPublish_ReportsSubmitFailure(t *testing.T) {
 	// Publish reported success to the caller.
 	ex := New[any]()
 	var called atomic.Bool
-	if _, err := ex.Subscribe(context.Background(), "t", func(context.Context, Topic, any) { called.Store(true) }); err != nil {
+	if _, err := ex.Subscribe("t", func(context.Context, Topic, any) { called.Store(true) }); err != nil {
 		t.Fatal(err)
 	}
 	ex.pools["t"].Release() // force every Submit on this topic to fail
@@ -592,7 +592,7 @@ func TestPublish_Backpressure_BlocksWhenPoolFull(t *testing.T) {
 	release := make(chan struct{})
 	var once sync.Once
 	var ran atomic.Int32
-	ex.Subscribe(context.Background(), "t", func(context.Context, Topic, any) {
+	ex.Subscribe("t", func(context.Context, Topic, any) {
 		once.Do(func() { close(started) })
 		<-release
 		ran.Add(1)
@@ -639,12 +639,12 @@ func TestPublish_TopicIsolation(t *testing.T) {
 	block := make(chan struct{})
 	started := make(chan struct{})
 	var once sync.Once
-	ex.Subscribe(context.Background(), "slow", func(context.Context, Topic, any) {
+	ex.Subscribe("slow", func(context.Context, Topic, any) {
 		once.Do(func() { close(started) })
 		<-block
 	})
 	fastRan := make(chan struct{}, 1)
-	ex.Subscribe(context.Background(), "fast", func(context.Context, Topic, any) { fastRan <- struct{}{} })
+	ex.Subscribe("fast", func(context.Context, Topic, any) { fastRan <- struct{}{} })
 
 	// Saturate the "slow" topic's pool.
 	if err := ex.Publish(context.Background(), "slow", nil); err != nil {
@@ -685,7 +685,7 @@ func TestSubscribe_PoolCreationFailure(t *testing.T) {
 	}
 
 	ex := New[any]()
-	h, err := ex.Subscribe(context.Background(), "t", func(context.Context, Topic, any) {})
+	h, err := ex.Subscribe("t", func(context.Context, Topic, any) {})
 	if err == nil {
 		t.Fatal("Subscribe = nil error, want the pool creation failure")
 	}
@@ -703,7 +703,7 @@ func TestSubscribe_PoolCreationFailure(t *testing.T) {
 
 	// With the failure removed, retrying on the same topic works.
 	newPool = orig
-	if _, err := ex.Subscribe(context.Background(), "t", func(context.Context, Topic, any) {}); err != nil {
+	if _, err := ex.Subscribe("t", func(context.Context, Topic, any) {}); err != nil {
 		t.Fatalf("retry Subscribe = %v, want nil", err)
 	}
 }
@@ -723,7 +723,7 @@ func TestRunHandler_PanicIsLogged(t *testing.T) {
 	buf := captureSlog(t)
 
 	ex := New[int]()
-	ex.Subscribe(context.Background(), "boom", func(context.Context, Topic, int) { panic("kaboom") })
+	ex.Subscribe("boom", func(context.Context, Topic, int) { panic("kaboom") })
 	if err := ex.Publish(context.Background(), "boom", 7); err != nil {
 		t.Fatal(err)
 	}
@@ -747,7 +747,7 @@ func TestPublish_HandlerReceivesDetachedContext(t *testing.T) {
 	ex := newTestExchange()
 
 	got := make(chan context.Context, 1)
-	ex.Subscribe(context.Background(), "t", func(ctx context.Context, _ Topic, _ any) { got <- ctx })
+	ex.Subscribe("t", func(ctx context.Context, _ Topic, _ any) { got <- ctx })
 
 	ctx, cancel := context.WithCancel(context.WithValue(context.Background(), ctxKey{}, "v"))
 	if err := ex.Publish(ctx, "t", nil); err != nil {
@@ -778,7 +778,7 @@ func TestPublishSync_HandlerReceivesSameContext(t *testing.T) {
 	ex := newTestExchange()
 
 	var got context.Context
-	ex.Subscribe(context.Background(), "t", func(ctx context.Context, _ Topic, _ any) { got = ctx })
+	ex.Subscribe("t", func(ctx context.Context, _ Topic, _ any) { got = ctx })
 
 	ctx, cancel := context.WithCancel(context.WithValue(context.Background(), ctxKey{}, "v"))
 	defer cancel()
@@ -795,7 +795,7 @@ func TestPublishSync_HandlerReceivesSameContext(t *testing.T) {
 
 func BenchmarkExchange_Publish(b *testing.B) {
 	ex := New[any]()
-	ex.Subscribe(context.Background(), "git.push", func(context.Context, Topic, any) {})
+	ex.Subscribe("git.push", func(context.Context, Topic, any) {})
 
 	for b.Loop() {
 		ex.Publish(context.Background(), "git.push", "b839dc65")
@@ -806,7 +806,7 @@ func BenchmarkExchange_Publish(b *testing.B) {
 
 func BenchmarkExchange_PublishSync(b *testing.B) {
 	ex := New[any]()
-	ex.Subscribe(context.Background(), "git.push", func(context.Context, Topic, any) {})
+	ex.Subscribe("git.push", func(context.Context, Topic, any) {})
 
 	for b.Loop() {
 		ex.PublishSync(context.Background(), "git.push", "b839dc65")
@@ -818,7 +818,7 @@ func BenchmarkExchange_SubscribeUnsubscribe(b *testing.B) {
 	handler := func(context.Context, Topic, any) {}
 
 	for b.Loop() {
-		h, err := ex.Subscribe(context.Background(), "git.push", handler)
+		h, err := ex.Subscribe("git.push", handler)
 		if err != nil {
 			b.Fatal(err)
 		}

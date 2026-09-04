@@ -30,7 +30,7 @@ func (e *Event) Action() EventAction {
 }
 
 func (e *Event) Category() event.Category {
-	return event.CategoryInner // processed in-process via CompositeEventBus.Inner
+	return event.CategoryInProcess // processed in-process via CompositeEventBus.InProcess
 }
 
 func (e *Event) Topic() string {

@@ -24,7 +24,7 @@ type PreparationEvent struct {
 }
 
 func (e *PreparationEvent) Category() event.Category {
-	return event.CategoryOuter // the only event routed to MQ
+	return event.CategoryInterProcess // the only event routed to MQ
 }
 
 func (e *PreparationEvent) Topic() string {

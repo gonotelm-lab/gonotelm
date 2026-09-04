@@ -14,10 +14,10 @@ import (
 type CancelArtifactHandler struct {
 	*baseHandler
 	flowc    flow.TaskClient
-	eventBus eventbus.EventBus
+	eventBus eventbus.Publisher
 }
 
-func NewCancelArtifactHandler(repo artifactrepo.Repository, flowc flow.TaskClient, eventBus eventbus.EventBus) *CancelArtifactHandler {
+func NewCancelArtifactHandler(repo artifactrepo.Repository, flowc flow.TaskClient, eventBus eventbus.Publisher) *CancelArtifactHandler {
 	return &CancelArtifactHandler{baseHandler: newBaseHandler(repo), flowc: flowc, eventBus: eventBus}
 }
 

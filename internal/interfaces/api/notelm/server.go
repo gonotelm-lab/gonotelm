@@ -37,7 +37,7 @@ type ServerDeps struct {
 	ChatStreamTaskRepo     chatrepo.StreamTaskRepository
 	ChatSuggestionRepo     chatrepo.SuggestionRepository
 	ChatSuggestService     *chatsuggest.Service
-	EventBus               eventbus.EventBus
+	EventBus               eventbus.Publisher
 	WaitGroup              *sync.WaitGroup
 	LLMGateway             *chat.Gateway
 	DistLock               adapter.DistributedLock

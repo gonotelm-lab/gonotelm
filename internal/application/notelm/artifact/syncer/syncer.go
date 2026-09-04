@@ -38,10 +38,10 @@ type Syncer struct {
 	cfg      Config
 	wg       sync.WaitGroup
 	stop     chan struct{}
-	eventBus eventbus.EventBus
+	eventBus eventbus.Publisher
 }
 
-func NewSyncer(repo artifactrepo.Repository, flowc flow.TaskClient, cfg Config, eventBus eventbus.EventBus) *Syncer {
+func NewSyncer(repo artifactrepo.Repository, flowc flow.TaskClient, cfg Config, eventBus eventbus.Publisher) *Syncer {
 	cfg = ConfigWithDefaults(cfg)
 	return &Syncer{
 		repo:     repo,

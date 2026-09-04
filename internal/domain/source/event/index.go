@@ -8,7 +8,7 @@ import (
 const IndexTopic = "inner.gonotelm.source.indexed"
 
 type IndexEvent struct {
-	event.BaseInnerEvent
+	event.BaseInProcessEvent
 
 	sourceId   valobj.Id
 	notebookId valobj.Id

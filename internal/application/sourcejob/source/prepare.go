@@ -24,14 +24,14 @@ import (
 
 const PreparationConsumerGroup = "gonotelm.source.preparation.group"
 
-// PrepareSourceHandler handles source preparation events consumed from the outer bus.
+// PrepareSourceHandler handles source preparation events consumed from the inter-process bus (MQ).
 type PrepareSourceHandler struct {
 	sourceRepo         sourcerepo.Repository
 	sourceIndexService *index.Service
 	sourceStorageRepo  sourcerepo.StorageRepository
 	sourceDocRepo      sourcerepo.SourceDocRepository
 	summarizer         adapter.Summarizer
-	eventBus           eventbus.EventBus
+	eventBus           eventbus.Publisher
 }
 
 func NewPrepareSourceHandler(
@@ -39,7 +39,7 @@ func NewPrepareSourceHandler(
 	sourceStorageRepo sourcerepo.StorageRepository,
 	sourceDocRepo sourcerepo.SourceDocRepository,
 	summarizer adapter.Summarizer,
-	eventBus eventbus.EventBus,
+	eventBus eventbus.Publisher,
 	imageInterpreter adapter.ImageInterpreter,
 ) *PrepareSourceHandler {
 	return &PrepareSourceHandler{
@@ -265,10 +265,10 @@ func (h *PrepareSourceHandler) updateSourceAbstract(
 	return nil
 }
 
-// RegisterPreparationConsumer registers the outer (MQ) consumer for source preparation.
+// RegisterPreparationConsumer registers the inter-process (MQ) consumer for source preparation.
 func RegisterPreparationConsumer(
 	ctx context.Context,
-	bus eventbus.EventBus,
+	bus eventbus.InterProcessEventBus,
 	handler *PrepareSourceHandler,
 ) error {
 	return bus.Subscribe(ctx, sourceevent.PreparationTopic, PreparationConsumerGroup,

@@ -33,7 +33,7 @@ type ConvertNoteToSourceHandler struct {
 	notebookRepo notebookrepo.Repository
 	sourceRepo   sourcerepo.Repository
 	storageRepo  sourcerepo.StorageRepository
-	eventBus     eventbus.EventBus
+	eventBus     eventbus.Publisher
 }
 
 func NewConvertNoteToSourceHandler(
@@ -41,7 +41,7 @@ func NewConvertNoteToSourceHandler(
 	sourceRepo sourcerepo.Repository,
 	notebookRepo notebookrepo.Repository,
 	storageRepo sourcerepo.StorageRepository,
-	eventBus eventbus.EventBus,
+	eventBus eventbus.Publisher,
 ) *ConvertNoteToSourceHandler {
 	return &ConvertNoteToSourceHandler{
 		baseHandler:  newBaseHandler(artifactRepo),

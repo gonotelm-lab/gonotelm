@@ -13,7 +13,7 @@ func TestCompletedEvent(t *testing.T) {
 	evt := NewCompletedEvent(id, nbId)
 	assert.Equal(t, TopicArtifactEvent, evt.Topic())
 	assert.Equal(t, id.String(), evt.Key())
-	assert.Equal(t, event.CategoryInner, evt.Category())
+	assert.Equal(t, event.CategoryInProcess, evt.Category())
 	assert.Equal(t, ActionCompleted, evt.Action())
 	assert.Equal(t, id, evt.ArtifactId())
 	assert.Equal(t, nbId, evt.NotebookId())

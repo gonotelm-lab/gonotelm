@@ -85,12 +85,8 @@ var _ artifactrepo.Repository = &syncTestRepo{}
 type stubEventBus struct{}
 
 func (s *stubEventBus) Publish(ctx context.Context, evt event.Event) error { return nil }
-func (s *stubEventBus) Subscribe(ctx context.Context, topic, groupID string, handler eventbus.EventBusMessageHandler) error {
-	return nil
-}
-func (s *stubEventBus) Close(ctx context.Context) error { return nil }
 
-var _ eventbus.EventBus = &stubEventBus{}
+var _ eventbus.Publisher = &stubEventBus{}
 
 type syncTestFlow struct {
 	mu     sync.Mutex

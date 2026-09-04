@@ -40,7 +40,7 @@ func (h *baseHandler) commonHandle(ctx context.Context, chatId valobj.Id) (*chat
 	return chat, nil
 }
 
-func publishStreamTaskDomainEvents(ctx context.Context, bus eventbus.EventBus, task *chatentity.StreamTask) {
+func publishStreamTaskDomainEvents(ctx context.Context, bus eventbus.Publisher, task *chatentity.StreamTask) {
 	for _, evt := range task.PullEvents() {
 		if err := bus.Publish(ctx, evt); err != nil {
 			slog.ErrorContext(ctx, "publish stream task event failed",

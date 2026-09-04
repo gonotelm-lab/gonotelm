@@ -2,80 +2,44 @@ package eventbus
 
 import (
 	"context"
+	stderr "errors"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/event"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 // CompositeEventBus routes publish by event category:
-//   - inner -> in-process handlers (notebook.deleted, source.index, source.deleted, ...)
-//   - outer -> MQ (source.preparation only; consumed by cmd/sourcejob)
+//   - inprocess -> in-process handlers (notebook events, source.deleted, source.indexed, ...)
+//   - interprocess -> MQ (source.preparation only; consumed by cmd/sourcejob)
 //
-// Subscribe registers outer (MQ) consumers; use SubscribeInner for in-process consumers.
+// Register in-process consumers via InProcess.Subscribe; register MQ consumers
+// via InterProcess.Subscribe.
 type CompositeEventBus struct {
-	Inner EventBus
-	outer EventBus
+	InProcess    InProcessEventBus
+	InterProcess InterProcessEventBus
 }
 
-func NewCompositeEventBus(inner, outer EventBus) *CompositeEventBus {
-	if inner == nil {
-		inner = NewInnerEventBus()
+func NewCompositeEventBus(inprocess InProcessEventBus, interprocess InterProcessEventBus) *CompositeEventBus {
+	if inprocess == nil {
+		inprocess = NewInProcessEventBus()
 	}
 	return &CompositeEventBus{
-		Inner: inner,
-		outer: outer,
+		InProcess:    inprocess,
+		InterProcess: interprocess,
 	}
 }
 
 func (b *CompositeEventBus) Publish(ctx context.Context, evt event.Event) error {
 	switch evt.Category() {
-	case event.CategoryInner:
-		return b.Inner.Publish(ctx, evt)
-	case event.CategoryOuter:
-		return b.outer.Publish(ctx, evt)
+	case event.CategoryInProcess:
+		return b.InProcess.Publish(ctx, evt)
+	case event.CategoryInterProcess:
+		return b.InterProcess.Publish(ctx, evt)
 	default:
 		return errors.Errorf("unknown event category: %s", evt.Category())
 	}
 }
 
-// Subscribe registers an outer (MQ) consumer. source.preparation is consumed by cmd/sourcejob.
-func (b *CompositeEventBus) Subscribe(
-	ctx context.Context,
-	topic, groupID string,
-	handler EventBusMessageHandler,
-) error {
-	return b.outer.Subscribe(ctx, topic, groupID, handler)
-}
-
-// SubscribeInner registers an in-process consumer on the inner bus.
-func (b *CompositeEventBus) SubscribeInner(
-	ctx context.Context,
-	topic string,
-	handler InnerEventHandler,
-) error {
-	inner, ok := b.Inner.(*innerEventBus)
-	if !ok {
-		return errors.New("inner event bus does not support direct subscription")
-	}
-	return inner.subscribeInner(topic, handler)
-}
-
 func (b *CompositeEventBus) Close(ctx context.Context) error {
-	var closeErr error
-	if err := b.Inner.Close(ctx); err != nil {
-		closeErr = err
-	}
-	if err := b.outer.Close(ctx); err != nil && closeErr == nil {
-		closeErr = err
-	}
-	return closeErr
-}
-
-// AsComposite returns the composite bus when bus is one; used at composition roots.
-func AsComposite(bus EventBus) (*CompositeEventBus, error) {
-	composite, ok := bus.(*CompositeEventBus)
-	if !ok {
-		return nil, errors.New("event bus is not composite")
-	}
-	return composite, nil
+	return stderr.Join(b.InProcess.Close(ctx), b.InterProcess.Close(ctx))
 }

@@ -50,7 +50,7 @@ type GenerateArtifactHandler struct {
 	sourceRepo   sourcerepo.Repository
 	flow         flow.TaskClient
 	poller       Poller
-	eventBus     eventbus.EventBus
+	eventBus     eventbus.Publisher
 	titleMaker   adapter.TitleMaker
 }
 
@@ -63,7 +63,7 @@ func NewGenerateArtifactHandler(
 	chatMsgRepo chatrepo.MessageRepository,
 	flowc flow.TaskClient,
 	poller Poller,
-	eventBus eventbus.EventBus,
+	eventBus eventbus.Publisher,
 	titleMaker adapter.TitleMaker,
 ) *GenerateArtifactHandler {
 	return &GenerateArtifactHandler{

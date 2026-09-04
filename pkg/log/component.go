@@ -9,4 +9,5 @@ const (
 	ComponentClickHouseGo = "clickhouse-go"
 	ComponentGorm         = "gorm"
 	ComponentHertz        = "hertz"
+	ComponentAnts         = "ants"
 )

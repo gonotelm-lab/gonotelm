@@ -17,7 +17,7 @@ const (
 )
 
 type Event struct {
-	event.BaseInnerEvent
+	event.BaseInProcessEvent
 
 	artifactId    valobj.Id
 	notebookId    valobj.Id

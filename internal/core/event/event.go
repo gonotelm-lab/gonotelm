@@ -3,8 +3,8 @@ package event
 type Category string
 
 const (
-	CategoryInner Category = "inner"
-	CategoryOuter Category = "outer"
+	CategoryInProcess    Category = "inprocess"
+	CategoryInterProcess Category = "interprocess"
 )
 
 type Header struct {
@@ -20,24 +20,24 @@ type Event interface {
 	Headers() []Header
 }
 
-type BaseInnerEvent struct{}
+type BaseInProcessEvent struct{}
 
-func (e *BaseInnerEvent) Category() Category {
-	return CategoryInner
+func (e *BaseInProcessEvent) Category() Category {
+	return CategoryInProcess
 }
 
-func (e *BaseInnerEvent) Topic() string {
+func (e *BaseInProcessEvent) Topic() string {
 	return ""
 }
 
-func (e *BaseInnerEvent) Key() string {
+func (e *BaseInProcessEvent) Key() string {
 	return ""
 }
 
-func (e *BaseInnerEvent) Value() any {
+func (e *BaseInProcessEvent) Value() any {
 	return nil
 }
 
-func (e *BaseInnerEvent) Headers() []Header {
+func (e *BaseInProcessEvent) Headers() []Header {
 	return nil
 }

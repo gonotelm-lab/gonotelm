@@ -15,13 +15,13 @@ import (
 type PollSourceStatusHandler struct {
 	*baseHandler
 	storageRepo repo.StorageRepository
-	eventBus    eventbus.EventBus
+	eventBus    eventbus.Publisher
 }
 
 func NewPollSourceStatusHandler(
 	sourceRepo repo.Repository,
 	storageRepo repo.StorageRepository,
-	eventBus eventbus.EventBus,
+	eventBus eventbus.Publisher,
 ) *PollSourceStatusHandler {
 	return &PollSourceStatusHandler{
 		baseHandler: newBaseHandler(sourceRepo),

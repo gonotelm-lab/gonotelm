@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	chatagent "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/agent"
-	"github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/shared"
+	"github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/util"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
@@ -48,7 +48,7 @@ type CreateMessageHandler struct {
 	sourceDocRepo          sourcerepo.SourceDocRepository
 	sourceAgentizeService  *agentize.Service
 	chatGateway            *llmchat.Gateway
-	eventBus               eventbus.EventBus
+	eventBus               eventbus.Publisher
 
 	agentService *agentize.Service
 }
@@ -65,7 +65,7 @@ func NewCreateMessageHandler(
 	sourceStorageRepo sourcerepo.StorageRepository,
 	sourceDocRepo sourcerepo.SourceDocRepository,
 	chatGateway *llmchat.Gateway,
-	eventBus eventbus.EventBus,
+	eventBus eventbus.Publisher,
 ) *CreateMessageHandler {
 	sourceAgentizeService := agentize.NewService(
 		agentize.Config{},
@@ -116,7 +116,7 @@ func (h *CreateMessageHandler) Handle(
 
 	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.ChatScene)
 	userId := pkgcontext.GetUserId(ctx)
-	targetSources, err := shared.FilterReadySources(ctx, h.sourceRepo, targetChat.NotebookId, cmd.SourceIds, userId)
+	targetSources, err := util.FilterReadySources(ctx, h.sourceRepo, targetChat.NotebookId, cmd.SourceIds, userId)
 	if err != nil {
 		return nil, errors.WithMessagef(err,
 			"failed to filter ready sources, chat_id=%s, source_ids=%v",

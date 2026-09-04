@@ -8,7 +8,7 @@ import (
 const DeleteTopic = "inner.gonotelm.source.deleted"
 
 type DeleteEvent struct {
-	event.BaseInnerEvent
+	event.BaseInProcessEvent
 
 	sourceId   valobj.Id
 	notebookId valobj.Id

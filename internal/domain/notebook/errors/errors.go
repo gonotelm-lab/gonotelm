@@ -10,6 +10,7 @@ const (
 	CodeInvalidDescription  = 100003
 	CodeInvalidOwnerId      = 100004
 	CodeSourceCountExceeded = 100005
+	CodeNoSourcesForDesc    = 100006
 )
 
 var (
@@ -19,4 +20,5 @@ var (
 	ErrInvalidDescription  = errors.ErrParams.ErrCode(CodeInvalidDescription).Msg("invalid description")
 	ErrInvalidOwnerId      = errors.ErrParams.ErrCode(CodeInvalidOwnerId).Msg("invalid owner id")
 	ErrSourceCountExceeded = errors.ErrParams.ErrCode(CodeSourceCountExceeded).Msg("source count exceeded")
+	ErrNoSourcesForDesc    = errors.ErrParams.ErrCode(CodeNoSourcesForDesc).Msg("no ready sources available for description generation")
 )

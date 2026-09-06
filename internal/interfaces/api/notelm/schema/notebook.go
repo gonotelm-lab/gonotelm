@@ -127,3 +127,15 @@ type GetNotebookChatResponse struct {
 type DeleteNotebookRequest struct {
 	Id uuid.UUID `path:"id,required"`
 }
+
+type GenerateNotebookDescriptionRequest struct {
+	Id uuid.UUID `path:"id,required"`
+}
+
+func (r *GenerateNotebookDescriptionRequest) Validate() error {
+	return nil
+}
+
+type GenerateNotebookDescriptionResponse struct {
+	Desc string `json:"desc"`
+}

@@ -82,6 +82,17 @@ func (n *Notebook) UpdateName(name string) error {
 	return nil
 }
 
+func (n *Notebook) UpdateDescription(description string) error {
+	n.Description = description
+
+	if err := n.validate(); err != nil {
+		return err
+	}
+
+	n.UpdateTime = valobj.NewTime()
+	return nil
+}
+
 func (n *Notebook) AllowedToCreateSource() error {
 	if n.SourceCount >= MaxSourceCountAllowed {
 		return notebookerrors.ErrSourceCountExceeded

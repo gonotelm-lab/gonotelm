@@ -9,6 +9,8 @@ const (
 	ChatScene           = SceneType("chat")
 	ChatSuggestionScene = SceneType("chat.suggestion")
 
+	NotebookDescGenScene = SceneType("notebook.desc.gen")
+
 	// source scenario
 	SourcePrepareScene = SceneType("source.prepare")
 

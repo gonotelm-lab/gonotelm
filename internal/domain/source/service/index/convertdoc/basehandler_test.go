@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/cloudwego/eino/schema"
-	trfmer "github.com/gonotelm-lab/gonotelm/internal/domain/source/service/index/convertdoc/transformer"
+	service "github.com/gonotelm-lab/gonotelm/internal/domain/source/service/index/convertdoc/transformer"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -16,7 +16,7 @@ func testLenFn(s string) int {
 
 func TestChunkTransformer_Transform_LogHTML(t *testing.T) {
 	Convey("ChunkTransformer HTML split", t, func() {
-		transformer := trfmer.NewChunkTransformer(200, 20, testLenFn)
+		transformer := service.NewChunkTransformer(200, 20, testLenFn)
 		htmlContent := strings.Join([]string{
 			"<h1>GonoteLM 介绍</h1>",
 			"<p>这是一段用于测试 HTML 分块效果的文本。我们希望看到分块后每个 chunk 的 id、metadata 和内容预览。</p>",
@@ -39,7 +39,7 @@ func TestChunkTransformer_Transform_LogHTML(t *testing.T) {
 		chunks, err := transformer.Transform(
 			context.Background(),
 			[]*schema.Document{input},
-			trfmer.WithChunkSplitMethod(trfmer.ChunkHtmlSplitMethod),
+			service.WithChunkSplitMethod(service.ChunkHtmlSplitMethod),
 		)
 
 		So(err, ShouldBeNil)
@@ -68,7 +68,7 @@ func TestChunkTransformer_Transform_LogHTML(t *testing.T) {
 
 func TestChunkTransformer_Transform_LogMarkdown(t *testing.T) {
 	Convey("ChunkTransformer Markdown split", t, func() {
-		transformer := trfmer.NewChunkTransformer(200, 20, testLenFn)
+		transformer := service.NewChunkTransformer(200, 20, testLenFn)
 		markdownContent := strings.Join([]string{
 			"# 文档标题",
 			"这是一段 markdown 的正文内容，用于观察 header splitter 的分块情况。",
@@ -101,7 +101,7 @@ func TestChunkTransformer_Transform_LogMarkdown(t *testing.T) {
 		chunks, err := transformer.Transform(
 			context.Background(),
 			[]*schema.Document{input},
-			trfmer.WithChunkSplitMethod(trfmer.ChunkMarkdownSplitMethod),
+			service.WithChunkSplitMethod(service.ChunkMarkdownSplitMethod),
 		)
 
 		So(err, ShouldBeNil)
@@ -135,7 +135,7 @@ func TestChunkTransformer_Transform_LogMarkdown(t *testing.T) {
 
 func TestChunkTransformer_Transform_LogRecursiveFallback(t *testing.T) {
 	Convey("ChunkTransformer recursive fallback split", t, func() {
-		transformer := trfmer.NewChunkTransformer(120, 10, testLenFn)
+		transformer := service.NewChunkTransformer(120, 10, testLenFn)
 		input := &schema.Document{
 			ID:      "fallback_doc",
 			Content: strings.Repeat("没有显式设置分块方式时会走 recursive fallback。", 30),

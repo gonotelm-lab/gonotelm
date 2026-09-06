@@ -3,10 +3,12 @@ package convertdoc
 import (
 	"bytes"
 	"context"
+	"html"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -17,7 +19,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/httpclient"
 
-	"github.com/JohannesKaufmann/html-to-markdown/v2"
+	htmltomarkdown "github.com/JohannesKaufmann/html-to-markdown/v2"
 	"github.com/JohannesKaufmann/html-to-markdown/v2/converter"
 	"github.com/cloudwego/eino/components/document/parser"
 )
@@ -28,7 +30,19 @@ const (
 
 	maxHeaderBytes        = 1024 * 1024     // 1MB
 	maxFetchContentLength = 5 * 1024 * 1024 // 5MB
+
+	urlHandlerExtraWebTitleKey = "_url_webtitle"
 )
+
+func ExtractUrlWebTitle(extras map[string]any) string {
+	if extras == nil {
+		return ""
+	}
+	return extras[urlHandlerExtraWebTitleKey].(string)
+}
+
+// 从 <head> 中提取 <title>
+var htmlHeadTitleRegexp = regexp.MustCompile(`(?is)<head[^>]*>.*?<title[^>]*>(.*?)</title>`)
 
 var _ Handler = (*UrlHandler)(nil)
 
@@ -77,7 +91,7 @@ func (h *UrlHandler) Handle(
 		return nil, sourceerr.ErrSourceInvalidURL.Msgf("invalid url scheme, url=%s", urlContent.Url)
 	}
 
-	content, err := h.defaultUrlFetcher(ctx, targetUrl)
+	content, webTitle, err := h.defaultUrlFetcher(ctx, targetUrl)
 	if err != nil {
 		return nil, errors.Wrapf(err, "fetch url content failed, url=%s", urlContent.Url)
 	}
@@ -98,14 +112,17 @@ func (h *UrlHandler) Handle(
 		Docs:              docs,
 		ParsedContent:     converted,
 		ParsedContentType: entity.MimeTypeMarkdown,
+		Extras: map[string]any{
+			urlHandlerExtraWebTitleKey: webTitle,
+		},
 	}, nil
 }
 
 // TODO 区分targetUrl是什么来源 如果是支持的内置来源 进行特殊处理 如果不是就执行普通的webfetch
-func (h *UrlHandler) defaultUrlFetcher(ctx context.Context, url *url.URL) ([]byte, error) {
+func (h *UrlHandler) defaultUrlFetcher(ctx context.Context, url *url.URL) ([]byte, string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url.String(), nil)
 	if err != nil {
-		return nil, errors.Wrap(err, "new request failed")
+		return nil, "", errors.Wrap(err, "new request failed")
 	}
 	req.Header.Set("User-Agent", userAgent)
 	// 尽量限制接收的内容
@@ -113,7 +130,7 @@ func (h *UrlHandler) defaultUrlFetcher(ctx context.Context, url *url.URL) ([]byt
 
 	resp, err := h.httpClient.Do(req)
 	if err != nil {
-		return nil, errors.Wrap(err, "do request failed")
+		return nil, "", errors.Wrap(err, "do request failed")
 	}
 	defer resp.Body.Close()
 
@@ -124,17 +141,17 @@ func (h *UrlHandler) defaultUrlFetcher(ctx context.Context, url *url.URL) ([]byt
 			slog.Error("read response body failed", slog.Any("error", err))
 		}
 
-		return nil, errors.ErrParams.Msgf("request failed, status=%d, body=%s", resp.StatusCode, string(buf))
+		return nil, "", errors.ErrParams.Msgf("request failed, status=%d, body=%s", resp.StatusCode, string(buf))
 	}
 
 	contentLengthStr := resp.Header.Get("Content-Length")
 	if contentLengthStr != "" {
 		contentLength, err := strconv.ParseInt(contentLengthStr, 10, 64)
 		if err != nil {
-			return nil, errors.Wrap(err, "parse content length failed")
+			return nil, "", errors.Wrap(err, "parse content length failed")
 		}
 		if contentLength > maxFetchContentLength {
-			return nil, errors.Wrapf(
+			return nil, "", errors.Wrapf(
 				sourceerr.ErrSourceContentTooLarge,
 				"content length too large, contentLength=%d",
 				contentLength,
@@ -145,39 +162,56 @@ func (h *UrlHandler) defaultUrlFetcher(ctx context.Context, url *url.URL) ([]byt
 	contentType := resp.Header.Get("Content-Type")
 	parts := strings.Split(contentType, ";")
 	if len(parts) == 0 {
-		return nil, sourceerr.ErrSourceUnsupportedContentType.Msgf(
+		return nil, "", sourceerr.ErrSourceUnsupportedContentType.Msgf(
 			"invalid content type, contentType=%s", contentType,
 		)
 	}
 	mimeType := strings.ToLower(parts[0])
 	if isImageAttachment(mimeType) {
-		return nil, sourceerr.ErrSourceUnsupportedContentType.Msgf(
+		return nil, "", sourceerr.ErrSourceUnsupportedContentType.Msgf(
 			"image attachment not supported, contentType=%s", contentType,
 		)
 	}
 
 	if !isTextMime(mimeType) {
-		return nil, sourceerr.ErrSourceUnsupportedContentType.Msgf(
+		return nil, "", sourceerr.ErrSourceUnsupportedContentType.Msgf(
 			"not text mime type, contentType=%s", contentType,
 		)
 	}
 
 	bodyReader := io.LimitReader(resp.Body, maxFetchContentLength)
+	htmlBody, err := io.ReadAll(bodyReader)
+	if err != nil {
+		return nil, "", errors.Wrap(err, "read body failed")
+	}
+
+	webTitle := extractHTMLTitle(htmlBody)
+
 	// 直接转换 不区分html还是其它
 	markdownContent, err := htmltomarkdown.ConvertReader(
-		bodyReader,
+		bytes.NewReader(htmlBody),
 		converter.WithContext(ctx),
 		converter.WithDomain(req.URL.Host),
 	)
 	if err != nil {
-		return nil, errors.Wrap(err, "convert body to markdown failed")
+		return nil, "", errors.Wrap(err, "convert body to markdown failed")
 	}
 
-	return markdownContent, nil
+	return markdownContent, webTitle, nil
+}
+
+func extractHTMLTitle(htmlBody []byte) string {
+	m := htmlHeadTitleRegexp.FindSubmatch(htmlBody)
+	if len(m) < 2 {
+		return ""
+	}
+	return strings.TrimSpace(html.UnescapeString(string(m[1])))
 }
 
 func isImageAttachment(mimeType string) bool {
-	return strings.HasPrefix(mimeType, "image/") && mimeType != "image/svg+xml" && mimeType != "image/vnd.fastbidsheet"
+	return strings.HasPrefix(mimeType, "image/") &&
+		mimeType != "image/svg+xml" &&
+		mimeType != "image/vnd.fastbidsheet"
 }
 
 func isTextMime(mimeType string) bool {

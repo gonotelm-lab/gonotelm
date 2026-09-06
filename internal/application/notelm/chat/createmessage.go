@@ -31,7 +31,7 @@ import (
 )
 
 func streamTaskCreateLockKey(userId valobj.Uid, chatId valobj.Id) string {
-	return fmt.Sprintf("gonotelm:stream:task:lock:user:%s:chat:%s", userId, chatId)
+	return fmt.Sprintf("notelm:stream:task:lock:%s:%s", userId, chatId)
 }
 
 type CreateMessageHandler struct {

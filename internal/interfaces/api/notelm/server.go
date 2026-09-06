@@ -41,6 +41,7 @@ type ServerDeps struct {
 	WaitGroup              *sync.WaitGroup
 	LLMGateway             *chat.Gateway
 	DistLock               adapter.DistributedLock
+	Summarizer             adapter.Summarizer
 
 	ArtifactRepo   artifactrepo.Repository
 	FlowClient     flow.TaskClient
@@ -53,11 +54,12 @@ type ServerDeps struct {
 type Server struct {
 	h *server.Hertz
 
-	getNotebookHandler        *notebookapp.GetNotebookHandler
-	createNotebookHandler     *notebookapp.CreateNotebookHandler
-	listNotebooksHandler      *notebookapp.ListNotebooksHandler
-	deleteNotebookHandler     *notebookapp.DeleteNotebookHandler
-	updateNotebookNameHandler *notebookapp.UpdateNotebookNameHandler
+	getNotebookHandler                 *notebookapp.GetNotebookHandler
+	createNotebookHandler              *notebookapp.CreateNotebookHandler
+	listNotebooksHandler               *notebookapp.ListNotebooksHandler
+	deleteNotebookHandler              *notebookapp.DeleteNotebookHandler
+	updateNotebookNameHandler          *notebookapp.UpdateNotebookNameHandler
+	generateNotebookDescriptionHandler *notebookapp.GenerateDescriptionHandler
 
 	getSourceHandler              *sourceapp.GetSourceHandler
 	createSourceHandler           *sourceapp.CreateSourceHandler
@@ -114,6 +116,12 @@ func NewServer(
 		listNotebooksHandler:      notebookapp.NewListNotebooksHandler(deps.NotebookRepo),
 		deleteNotebookHandler:     notebookapp.NewDeleteNotebookHandler(deps.NotebookRepo, deps.EventBus),
 		updateNotebookNameHandler: notebookapp.NewUpdateNotebookNameHandler(deps.NotebookRepo),
+		generateNotebookDescriptionHandler: notebookapp.NewGenerateDescriptionHandler(
+			deps.NotebookRepo,
+			deps.SourceRepo,
+			deps.DistLock,
+			deps.Summarizer,
+		),
 
 		getSourceHandler:              sourceapp.NewGetSourceHandler(deps.SourceRepo, deps.SourceStorageRepo),
 		createSourceHandler:           sourceapp.NewCreateSourceHandler(deps.SourceRepo, deps.NotebookRepo, deps.EventBus),

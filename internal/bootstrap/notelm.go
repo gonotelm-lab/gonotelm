@@ -99,6 +99,11 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 		cfg.Source.ModelProvider,
 		cfg.Source.Model,
 	)
+	summarizer := adapter.NewSummarizer(
+		infra.LLMGateway,
+		cfg.Source.ModelProvider,
+		cfg.Source.Model,
+	)
 
 	// ── 4.1 Suggestion service (单例) ──
 	suggestionService := chatsuggest.NewService(
@@ -180,6 +185,7 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 			WaitGroup:  wg,
 			LLMGateway: infra.LLMGateway,
 			DistLock:   infra.DistLock,
+			Summarizer: summarizer,
 
 			FlowClient:     flowClient,
 			Poller:         syncerInst,

@@ -30,7 +30,7 @@ import (
 
 const maxMessageForSuggestionLimit = 30
 
-const suggestionLockKeyPrefix = "gonotelm:suggestion:lock:"
+const suggestionLockKeyPrefix = "notelm:suggestion:lock:"
 
 func suggestionLockKey(chatId valobj.Id) string {
 	return suggestionLockKeyPrefix + chatId.String()

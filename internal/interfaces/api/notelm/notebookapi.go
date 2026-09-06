@@ -37,6 +37,8 @@ func (s *Server) registerNotebooksRoutes(g *route.RouterGroup) {
 		notebookIdGroup.POST("/sources", s.CreateSource)
 		// POST /api/v1/notebooks/:id/chats
 		notebookIdGroup.POST("/chats", s.GetOrCreateNotebookChat)
+		// POST /api/v1/notebooks/:id/description/generation
+		notebookIdGroup.POST("/description/generation", s.GenerateNotebookDescription)
 	}
 }
 
@@ -211,4 +213,23 @@ func (s *Server) DeleteNotebook(ctx context.Context, c *app.RequestContext) {
 	}
 
 	http.OkRespNoContent(c)
+}
+
+func (s *Server) GenerateNotebookDescription(ctx context.Context, c *app.RequestContext) {
+	var req schema.GenerateNotebookDescriptionRequest
+	err := c.BindAndValidate(&req)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	desc, err := s.generateNotebookDescriptionHandler.Handle(ctx, req.Id)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	http.OkResp(c, schema.GenerateNotebookDescriptionResponse{
+		Desc: desc,
+	})
 }

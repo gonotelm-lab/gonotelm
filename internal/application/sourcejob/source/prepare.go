@@ -13,6 +13,7 @@ import (
 	sourceevent "github.com/gonotelm-lab/gonotelm/internal/domain/source/event"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/service/index"
+	"github.com/gonotelm-lab/gonotelm/internal/domain/source/service/index/convertdoc"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/pkg/batch"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
@@ -138,7 +139,6 @@ func (h *PrepareSourceHandler) Handle(
 			)
 		}
 
-		// 失败不要返回err 否则会导致无法提交
 		return nil
 	}
 
@@ -159,7 +159,11 @@ func (h *PrepareSourceHandler) Handle(
 		return nil
 	}
 
-	if err := h.updateSourceAbstract(ctx, targetSource, result); err != nil {
+	newTitle := ""
+	if targetSource.Kind.IsUrl() {
+		newTitle = convertdoc.ExtractUrlWebTitle(result.Extras)
+	}
+	if err := h.updateSourceAbstractTitle(ctx, targetSource, result, newTitle); err != nil {
 		slog.ErrorContext(ctx, "update source abstract failed",
 			slog.String("source_id", evt.Id.String()),
 			slog.Any("err", err),
@@ -209,10 +213,11 @@ func (h *PrepareSourceHandler) uploadParsedContent(
 	return nil
 }
 
-func (h *PrepareSourceHandler) updateSourceAbstract(
+func (h *PrepareSourceHandler) updateSourceAbstractTitle(
 	ctx context.Context,
 	source *entity.Source,
 	result *index.IndexSourceResult,
+	newTitle string,
 ) error {
 	if len(result.SourceDocs) == 0 {
 		return nil
@@ -261,6 +266,9 @@ func (h *PrepareSourceHandler) updateSourceAbstract(
 	}
 
 	source.UpdateAbstract(summary)
+	if newTitle != "" {
+		source.UpdateTitle(newTitle)
+	}
 
 	return nil
 }

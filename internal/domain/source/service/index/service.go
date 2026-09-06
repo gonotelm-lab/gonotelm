@@ -72,6 +72,7 @@ type IndexSourceResult struct {
 	SourceDocs        []*entity.SourceDoc
 	ParsedContent     []byte
 	ParsedContentType string
+	Extras            map[string]any
 }
 
 func (s *Service) IndexSource(
@@ -117,6 +118,7 @@ func (s *Service) IndexSource(
 		SourceDocs:        sourceDocs,
 		ParsedContent:     handleResult.ParsedContent,
 		ParsedContentType: handleResult.ParsedContentType,
+		Extras:            handleResult.Extras,
 	}, nil
 }
 

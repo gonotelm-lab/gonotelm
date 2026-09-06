@@ -38,6 +38,15 @@ type HandleResult struct {
 
 	ParsedContent     []byte
 	ParsedContentType string
+
+	Extras map[string]any // extra information extracted from the source
+}
+
+func (r *HandleResult) ExtractUrlWebTitle() string {
+	if r.Extras == nil {
+		return ""
+	}
+	return r.Extras[urlHandlerExtraWebTitleKey].(string)
 }
 
 // 一系列hook

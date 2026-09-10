@@ -17,15 +17,12 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/httpclient"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 
 	"github.com/bytedance/sonic"
-	einomodel "github.com/cloudwego/eino/components/model"
-	einoschema "github.com/cloudwego/eino/schema"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	workerentity "github.com/gonotelm-lab/gonotelm/internal/domain/worker/entity"
@@ -56,7 +53,7 @@ type infoGraphicExpectation struct {
 func (ig *Generator) Generate(ctx context.Context, req *types.Request) (*types.Response, error) {
 	payload := artifactentity.PayloadAs[*artifactentity.InfoGraphicPayload](req.Payload)
 
-	expect, storageResult, err := ig.generate(ctx, req.ArtifactId, payload)
+	expect, storageResult, err := ig.generate(ctx, req, payload)
 	if err != nil {
 		return nil, err
 	}
@@ -80,9 +77,11 @@ func (ig *Generator) Generate(ctx context.Context, req *types.Request) (*types.R
 
 func (ig *Generator) generate(
 	ctx context.Context,
-	artifactId valobj.Id,
+	req *types.Request,
 	payload *artifactentity.InfoGraphicPayload,
 ) (*infoGraphicExpectation, *StorageResult, error) {
+	artifactId := req.ArtifactId
+
 	ckpt, err := ig.deps.CheckpointRepository.FindByArtifactId(ctx, artifactId)
 	if err != nil {
 		if !errors.Is(err, workererrors.ErrCheckpointNotFound) {
@@ -98,7 +97,7 @@ func (ig *Generator) generate(
 	}
 
 	if expect == nil {
-		expect, err = ig.generateImagePrompt(ctx, payload)
+		expect, err = ig.generateImagePrompt(ctx, req, payload)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -128,30 +127,11 @@ func (ig *Generator) generate(
 
 func (ig *Generator) generateImagePrompt(
 	ctx context.Context,
+	req *types.Request,
 	payload *artifactentity.InfoGraphicPayload,
 ) (*infoGraphicExpectation, error) {
-	cfg := conf.WorkerGlobal().Studio.InfoGraphic
-	modelOption := chat.WithModel(cfg.Model)
-
-	bindAllTools := payload.DetailLevel != artifactentity.InfoGraphicDetailLevelConcise
-
-	ag, err := types.BuildSourceExploreAgent(
-		ig.deps,
-		cfg.ModelProvider,
-		cfg.Model,
-		cfg.MaxRound,
-		[]einomodel.Option{modelOption},
-		payload.NotebookId,
-		payload.SourceIds,
-		bindAllTools,
-	)
-	if err != nil {
-		return nil, errors.WithMessagef(err, "failed to build source explore agent for infographic")
-	}
-
-	sourceIds := types.SourceIDsToStrings(payload.SourceIds)
 	vars := TemplateVars{
-		SourceIds:    sourceIds,
+		SourceIds:    types.SourceIDsToStrings(req.SourceIds),
 		TextLanguage: payload.TextLanguage,
 		ExtraPrompt:  payload.ExtraPrompt,
 		Orientation:  payload.Orientation,
@@ -160,54 +140,27 @@ func (ig *Generator) generateImagePrompt(
 	}
 	msgs, err := RenderInfographic(ctx, vars)
 	if err != nil {
-		return nil, errors.Wrapf(errors.ErrInner, "render infographic prompt failed, err=%v", err)
+		return nil, errors.WithMessagef(err, "render infographic prompt failed")
 	}
 
-	output, err := ag.React(ctx, msgs)
+	ag, err := newInfoGraphicAgent(ig.deps, req, payload.DetailLevel != artifactentity.InfoGraphicDetailLevelConcise)
 	if err != nil {
-		return nil, errors.Wrapf(errors.ErrInner, "generate infographic prompt failed, err=%v", err)
+		return nil, err
 	}
 
-	slog.InfoContext(ctx, fmt.Sprintf("generate infographic agent usage: %+v", ag.TokenUsage()))
+	step := types.NewAgentStepBuilder[*infoGraphicExpectation](ag, "infographic").
+		WithParse(ig.parseAgentOutput).
+		WithRules(infoGraphicCompensateRules).
+		Build()
+	return step.Run(ctx, msgs)
+}
 
-	expect, err := ig.parseAgentOutput(ctx, output.Content)
-	if err == nil {
-		return expect, nil
-	}
-
-	slog.WarnContext(ctx, "infographic agent output invalid, compensating",
-		slog.String("notebook_id", payload.NotebookId.String()),
-		slog.String("output", output.Content),
-		slog.Any("usage", ag.TokenUsage()),
-		slog.Any("err", err),
-	)
-
-	msgs = append([]*einoschema.Message{}, ag.AccumulatedMessages()...)
-	msgs = append(msgs, types.BuildCompensateMessage(output.Content, []string{
+func infoGraphicCompensateRules(error) []string {
+	return []string{
 		"JSON must contain only `title` and `image_prompt`",
 		"`title` length must be 10-30 characters",
 		"`image_prompt` must be a complete text-to-image prompt string",
-	}))
-
-	llmResp, genErr := ag.BaseLLM().Generate(ctx, msgs, modelOption)
-	if genErr != nil {
-		return nil, errors.Wrapf(errors.ErrLLM,
-			"infographic compensate generate failed, err=%v",
-			genErr,
-		)
 	}
-
-	expect, err = ig.parseAgentOutput(ctx, llmResp.Content)
-	if err == nil {
-		return expect, nil
-	}
-
-	return nil, errors.Wrapf(errors.ErrLLM,
-		"infographic agent output invalid after compensation, first_output=%q, compensate_output=%q, err=%v",
-		output.Content,
-		llmResp.Content,
-		err,
-	)
 }
 
 func (ig *Generator) parseAgentOutput(

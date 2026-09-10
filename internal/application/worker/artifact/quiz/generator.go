@@ -7,8 +7,6 @@ import (
 	"strings"
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
-	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
@@ -16,8 +14,6 @@ import (
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 
 	"github.com/bytedance/sonic"
-	einomodel "github.com/cloudwego/eino/components/model"
-	einoschema "github.com/cloudwego/eino/schema"
 )
 
 const quizMaxCompensateRetry = 3
@@ -70,18 +66,6 @@ func (g *Generator) Generate(ctx context.Context, req *types.Request) (*types.Re
 	}, nil
 }
 
-func (g *Generator) llmOptions() []einomodel.Option {
-	var (
-		provider = conf.WorkerGlobal().Studio.Quiz.ModelProvider
-		model    = conf.WorkerGlobal().Studio.Quiz.Model
-	)
-	return []einomodel.Option{
-		chat.WithModel(model),
-		chat.WithResponseJsonObject(provider),
-		chat.WithThinking(provider, false),
-	}
-}
-
 func quizCompensateRules(validateErr error) []string {
 	rules := []string{
 		"JSON must contain only `title` and `quiz`",
@@ -102,8 +86,6 @@ func (g *Generator) generate(
 	ctx context.Context,
 	req *types.Request,
 ) (*quizExpectation, error) {
-	llmOptions := g.llmOptions()
-
 	p := artifactentity.PayloadAs[*artifactentity.QuizPayload](req.Payload)
 	count := artifactentity.QuizCountDefaultValue()
 	if p.Count.Supported() {
@@ -113,84 +95,23 @@ func (g *Generator) generate(
 	if p.Difficulty.Supported() {
 		difficulty = p.Difficulty
 	}
-	tip := p.GetTip()
 
-	ag, err := types.BuildSourceExploreAgent(
-		g.deps,
-		conf.WorkerGlobal().Studio.Quiz.ModelProvider,
-		conf.WorkerGlobal().Studio.Quiz.Model,
-		conf.WorkerGlobal().Studio.Quiz.MaxRound,
-		llmOptions,
-		req.NotebookId,
-		req.SourceIds,
-		true,
-	)
+	msgs, err := RenderQuiz(ctx, types.SourceIDsToStrings(req.SourceIds), count, difficulty, p.GetTip())
 	if err != nil {
-		return nil, errors.Wrapf(errors.ErrInner, "failed to build source explore agent for quiz, err=%v", err)
+		return nil, errors.WithMessagef(err, "generate quiz message failed")
 	}
 
-	sourceIds := types.SourceIDsToStrings(req.SourceIds)
-	msgs, err := RenderQuiz(ctx, sourceIds, count, difficulty, tip)
+	ag, err := newQuizAgent(g.deps, req)
 	if err != nil {
-		return nil, errors.Wrapf(errors.ErrInner, "generate quiz message failed, err=%v", err)
-	}
-	output, err := ag.React(ctx, msgs)
-	if err != nil {
-		return nil, errors.Wrapf(errors.ErrInner, "generate quiz output failed, err=%v", err)
+		return nil, err
 	}
 
-	slog.InfoContext(ctx, fmt.Sprintf("generate quiz agent usage: %+v", ag.TokenUsage()))
-
-	expect, parseErr := parseAgentOutput(ctx, output.Content)
-	if parseErr == nil {
-		return expect, nil
-	}
-
-	lastContent := output.Content
-	lastErr := parseErr
-	msgs = append([]*einoschema.Message{}, ag.AccumulatedMessages()...)
-
-	for attempt := 1; attempt <= quizMaxCompensateRetry; attempt++ {
-		slog.WarnContext(ctx, "quiz agent output invalid, compensating",
-			slog.String("notebook_id", req.NotebookId.String()),
-			slog.Int("attempt", attempt),
-			slog.Int("max_retry", quizMaxCompensateRetry),
-			slog.Any("err", lastErr),
-			slog.Any("usage", ag.TokenUsage()),
-		)
-
-		compensateMsgs := append([]*einoschema.Message{}, msgs...)
-		compensateMsgs = append(compensateMsgs, types.BuildCompensateMessage(lastContent, quizCompensateRules(lastErr)))
-
-		llmResp, genErr := ag.BaseLLM().Generate(ctx, compensateMsgs, llmOptions...)
-		if genErr != nil {
-			return nil, errors.Wrapf(errors.ErrLLM,
-				"quiz compensate generate failed on attempt %d, err=%v",
-				attempt,
-				genErr,
-			)
-		}
-
-		expect, parseErr = parseAgentOutput(ctx, llmResp.Content)
-		if parseErr == nil {
-			return expect, nil
-		}
-
-		lastContent = llmResp.Content
-		lastErr = parseErr
-		// Continue conversation: previous compensate request + model reply.
-		msgs = append(compensateMsgs, &einoschema.Message{
-			Role:    einoschema.Assistant,
-			Content: lastContent,
-		})
-	}
-
-	return nil, errors.Wrapf(errors.ErrLLM,
-		"quiz agent output invalid after %d retries, last_output=%q, err=%v",
-		quizMaxCompensateRetry,
-		lastContent,
-		lastErr,
-	)
+	step := types.NewAgentStepBuilder[*quizExpectation](ag, "quiz").
+		WithParse(parseAgentOutput).
+		WithRetry(quizMaxCompensateRetry).
+		WithRules(quizCompensateRules).
+		Build()
+	return step.Run(ctx, msgs)
 }
 
 func parseAgentOutput(ctx context.Context, content string) (*quizExpectation, error) {

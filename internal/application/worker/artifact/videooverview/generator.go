@@ -20,11 +20,10 @@ var _ types.Generator = &Generator{}
 
 func New(deps *types.WorkerDeps) *Generator {
 	checkpoints := newCheckpointStore(deps.CheckpointRepository)
-	agents := newVideoAgentFactory(deps)
 	return &Generator{
 		checkpoints: checkpoints,
-		outline:     newOutlineGenerator(agents, checkpoints),
-		storyboard:  newStoryboardGenerator(agents, checkpoints),
+		outline:     newOutlineGenerator(deps, checkpoints),
+		storyboard:  newStoryboardGenerator(deps, checkpoints),
 		audio:       newAudioSynthizer(deps, checkpoints),
 	}
 }

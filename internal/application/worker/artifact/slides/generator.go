@@ -10,7 +10,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
@@ -23,10 +22,8 @@ import (
 	workererrors "github.com/gonotelm-lab/gonotelm/internal/domain/worker/errors"
 
 	"github.com/bytedance/sonic"
-	einomodel "github.com/cloudwego/eino/components/model"
 	einotool "github.com/cloudwego/eino/components/tool"
 	einotoolutils "github.com/cloudwego/eino/components/tool/utils"
-	einoschema "github.com/cloudwego/eino/schema"
 )
 
 const slidesMaxCompensateRetry = 3
@@ -88,39 +85,6 @@ func (g *Generator) Generate(ctx context.Context, req *types.Request) (*types.Re
 	}, nil
 }
 
-func (g *Generator) llmOptions(jsonObject bool, thinking bool) []einomodel.Option {
-	var (
-		provider = conf.WorkerGlobal().Studio.Slides.ModelProvider
-		model    = conf.WorkerGlobal().Studio.Slides.Model
-	)
-	opts := []einomodel.Option{
-		chat.WithModel(model),
-		chat.WithThinking(provider, thinking),
-	}
-	if jsonObject {
-		opts = append(opts, chat.WithResponseJsonObject(provider))
-	}
-	return opts
-}
-
-func (g *Generator) buildAgent(req *types.Request, maxRound int, jsonObject bool, thinking bool) (*types.Agent, error) {
-	round := conf.WorkerGlobal().Studio.Slides.MaxRound
-	if maxRound > 0 {
-		round = maxRound
-	}
-
-	return types.BuildSourceExploreAgent(
-		g.deps,
-		conf.WorkerGlobal().Studio.Slides.ModelProvider,
-		conf.WorkerGlobal().Studio.Slides.Model,
-		round,
-		g.llmOptions(jsonObject, thinking),
-		req.NotebookId,
-		req.SourceIds,
-		true,
-	)
-}
-
 // ensureOutline 先尝试从 checkpoint 恢复大纲，否则生成并写入 checkpoint。
 func (g *Generator) ensureOutline(ctx context.Context, req *types.Request, sources []OutlineSource) (*slidesOutlineExpectation, error) {
 	ckpt := g.loadCheckpoint(ctx, req)
@@ -171,73 +135,23 @@ func (g *Generator) loadOutlineSources(ctx context.Context, sourceIds []valobj.I
 
 // 探索生成幻灯片大纲
 func (g *Generator) generateOutline(ctx context.Context, req *types.Request, sources []OutlineSource) (*slidesOutlineExpectation, error) {
-	agent, err := g.buildAgent(req, 0, true, false) // 大纲：关 thinking
-	if err != nil {
-		return nil, errors.Wrapf(err, "build source explore agent for slides outline failed, err=%v", err)
-	}
-
 	payload := artifactentity.PayloadAs[*artifactentity.SlidesPayload](req.Payload)
 	msgs, err := RenderSlidesOutline(ctx, sources, payload.GetLanguage(), payload.GetTip())
 	if err != nil {
-		return nil, errors.Wrapf(errors.ErrInner, "generate slides outline message failed, err=%v", err)
+		return nil, errors.WithMessagef(err, "generate slides outline message failed")
 	}
 
-	output, err := agent.React(ctx, msgs)
+	ag, err := newSlidesOutlineAgent(g.deps, req)
 	if err != nil {
-		return nil, errors.Wrap(err, "generate slides outline output failed")
+		return nil, err
 	}
 
-	slog.InfoContext(ctx, fmt.Sprintf("generate slides outline agent usage: %+v", agent.TokenUsage()))
-
-	expect, parseErr := parseAgentOutput(ctx, output.Content)
-	if parseErr == nil {
-		return expect, nil
-	}
-
-	// 失败重试
-	lastContent := output.Content
-	lastErr := parseErr
-	msgs = append([]*einoschema.Message{}, agent.AccumulatedMessages()...)
-
-	for attempt := 1; attempt <= slidesMaxCompensateRetry; attempt++ {
-		slog.WarnContext(ctx, "slides outline agent output invalid, compensating",
-			slog.String("notebook_id", req.NotebookId.String()),
-			slog.Int("attempt", attempt),
-			slog.Int("max_retry", slidesMaxCompensateRetry),
-			slog.Any("err", lastErr),
-			slog.Any("usage", agent.TokenUsage()),
-		)
-
-		compensateMsgs := append([]*einoschema.Message{}, msgs...)
-		compensateMsgs = append(compensateMsgs, types.BuildCompensateMessage(lastContent, slidesOutlineCompensateRules(lastErr)))
-
-		llmResp, genErr := agent.BaseLLM().Generate(ctx, compensateMsgs, g.llmOptions(true, false)...)
-		if genErr != nil {
-			return nil, errors.Wrapf(errors.ErrLLM,
-				"slides outline compensate generate failed on attempt %d, err=%v",
-				attempt,
-				genErr,
-			)
-		}
-
-		expect, parseErr = parseAgentOutput(ctx, llmResp.Content)
-		if parseErr == nil {
-			return expect, nil
-		}
-
-		lastContent = llmResp.Content
-		lastErr = parseErr
-		msgs = append(compensateMsgs, &einoschema.Message{
-			Role:    einoschema.Assistant,
-			Content: lastContent,
-		})
-	}
-
-	return nil, errors.Wrapf(errors.ErrLLM,
-		"slides outline agent output invalid after %d retries, err=%v",
-		slidesMaxCompensateRetry,
-		lastErr,
-	)
+	step := types.NewAgentStepBuilder[*slidesOutlineExpectation](ag, "slides outline").
+		WithParse(parseAgentOutput).
+		WithRetry(slidesMaxCompensateRetry).
+		WithRules(slidesOutlineCompensateRules).
+		Build()
+	return step.Run(ctx, msgs)
 }
 
 func slidesOutlineCompensateRules(validateErr error) []string {
@@ -398,9 +312,9 @@ func (g *Generator) generatePPTX(
 	sources []OutlineSource,
 ) (*SlidesStorageResult, error) {
 	// use thinking in pptx generation, it will take much longer
-	agent, err := g.buildAgent(req, conf.WorkerGlobal().Studio.Slides.GenerateMaxRound, false, true)
+	agent, err := newSlidesPptxAgent(g.deps, req)
 	if err != nil {
-		return nil, errors.WithMessage(err, "build generate pptx agent failed")
+		return nil, err
 	}
 
 	checkPPTXTool, err := einotoolutils.InferTool(

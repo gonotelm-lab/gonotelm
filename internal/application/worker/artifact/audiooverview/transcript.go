@@ -38,17 +38,17 @@ type podcastTranscriptExpectation struct {
 
 // transcriptGenerator 基于大纲生成/恢复播客文字稿，写入 checkpoint.field2。
 type transcriptGenerator struct {
-	agents        *types.AgentFactory
+	deps          *types.WorkerDeps
 	checkpoints   *checkpointStore
 	audioProvider text2audio.Text2AudioProvider
 }
 
 func newTranscriptGenerator(
-	agents *types.AgentFactory,
+	deps *types.WorkerDeps,
 	checkpoints *checkpointStore,
 	audioProvider text2audio.Text2AudioProvider,
 ) *transcriptGenerator {
-	return &transcriptGenerator{agents: agents, checkpoints: checkpoints, audioProvider: audioProvider}
+	return &transcriptGenerator{deps: deps, checkpoints: checkpoints, audioProvider: audioProvider}
 }
 
 func (g *transcriptGenerator) ensure(
@@ -91,16 +91,18 @@ func (g *transcriptGenerator) generate(
 		msgs = append(msgs, einoschema.UserMessage(skills))
 	}
 
-	step := types.Step[*podcastTranscriptExpectation]{
-		Factory:  g.agents,
-		Name:     "podcast transcript",
-		MaxRetry: 1,
-		Rules:    g.compensateRules,
-		Parse: func(ctx context.Context, content string) (*podcastTranscriptExpectation, error) {
-			return g.parse(ctx, content, outline)
-		},
+	ag, err := newAudioAgent(g.deps, req)
+	if err != nil {
+		return nil, err
 	}
-	return step.Run(ctx, req, msgs)
+
+	step := types.NewAgentStepBuilder[*podcastTranscriptExpectation](ag, "podcast transcript").
+		WithParse(func(ctx context.Context, content string) (*podcastTranscriptExpectation, error) {
+			return g.parse(ctx, content, outline)
+		}).
+		WithRules(g.compensateRules).
+		Build()
+	return step.Run(ctx, msgs)
 }
 
 func (g *transcriptGenerator) compensateRules(error) []string {

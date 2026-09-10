@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/shared/agent/tools"
+	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	pkgagent "github.com/gonotelm-lab/gonotelm/pkg/agent"
@@ -18,7 +19,7 @@ import (
 
 type Agent = pkgagent.Agent[*SessionState]
 
-func BuildSourceExploreAgent(
+func buildSourceExploreAgent(
 	deps *WorkerDeps,
 	modelProvider llmchat.Provider,
 	model string,
@@ -92,117 +93,187 @@ func SourceIDsToStrings(ids []valobj.Id) []string {
 	return strs
 }
 
-// AgentFactory 基于已解析的模型配置构造绑定了来源工具的 agent。
-// 参数由调用方注入（而非内部读取配置），保证与具体产物类型解耦。
-type AgentFactory struct {
-	deps     *WorkerDeps
-	provider llmchat.Provider
-	model    string
-	maxRound int
-	options  []einomodel.Option
+// ExploreAgentBuilder 逐步收集 source explore agent 的构造参数，未设置项使用默认值：
+// MaxRound=conf.DefaultMaxRound、BindAllTools=true。
+type ExploreAgentBuilder struct {
+	deps         *WorkerDeps
+	provider     llmchat.Provider
+	model        string
+	maxRound     int
+	bindAllTools bool
+	options      []einomodel.Option
 }
 
-func NewAgentFactory(
-	deps *WorkerDeps,
-	provider llmchat.Provider,
-	model string,
-	maxRound int,
-	options []einomodel.Option,
-) *AgentFactory {
-	return &AgentFactory{
-		deps:     deps,
-		provider: provider,
-		model:    model,
-		maxRound: maxRound,
-		options:  options,
+func NewExploreAgentBuilder(deps *WorkerDeps) *ExploreAgentBuilder {
+	return &ExploreAgentBuilder{deps: deps, maxRound: conf.DefaultMaxRound, bindAllTools: true}
+}
+
+func (b *ExploreAgentBuilder) WithModel(provider llmchat.Provider, model string) *ExploreAgentBuilder {
+	b.provider = provider
+	b.model = model
+	return b
+}
+
+func (b *ExploreAgentBuilder) WithMaxRound(round int) *ExploreAgentBuilder {
+	if round > 0 {
+		b.maxRound = round
 	}
+	return b
 }
 
-func (f *AgentFactory) Build(req *Request) (*Agent, error) {
-	ag, err := BuildSourceExploreAgent(
-		f.deps,
-		f.provider,
-		f.model,
-		f.maxRound,
-		f.options,
+// WithoutBindAllTools 关闭全量工具绑定，仅绑定 StatSource/GrepSource。
+func (b *ExploreAgentBuilder) WithoutBindAllTools() *ExploreAgentBuilder {
+	b.bindAllTools = false
+	return b
+}
+
+func (b *ExploreAgentBuilder) WithOptions(options ...einomodel.Option) *ExploreAgentBuilder {
+	b.options = append(b.options, options...)
+	return b
+}
+
+func (b *ExploreAgentBuilder) Build(req *Request) (*Agent, error) {
+	return buildSourceExploreAgent(
+		b.deps,
+		b.provider,
+		b.model,
+		b.maxRound,
+		b.options,
 		req.NotebookId,
 		req.SourceIds,
-		true,
+		b.bindAllTools,
 	)
-	if err != nil {
-		return nil, errors.WithMessagef(err, "build source explore agent failed")
-	}
-	return ag, nil
 }
 
-// Step 描述一个 agent 步骤的输出契约，并负责执行 React → 解析 → 补偿重试。
-type Step[T any] struct {
-	Factory  *AgentFactory
-	Name     string
-	MaxRetry int
-	Rules    func(error) []string
-	Parse    func(context.Context, string) (T, error)
+// AgentStep 描述一个 agent 步骤的输出契约，并负责执行 React → 解析 → 补偿重试。
+// 仅可通过 AgentStepBuilder 构造。
+type AgentStep[T any] struct {
+	agent       *Agent
+	name        string
+	maxRetry    int
+	plainOutput bool
+	rules       func(error) []string
+	parse       func(context.Context, string) (T, error)
 }
 
-func (s *Step[T]) Run(ctx context.Context, req *Request, msgs []*einoschema.Message) (T, error) {
-	ag, err := s.Factory.Build(req)
-	if err != nil {
-		var zero T
-		return zero, err
+// AgentStepBuilder 链式收集步骤配置，未设置项使用默认值：
+// Retry=1、PlainOutput=false、Rules=无额外约束。
+type AgentStepBuilder[T any] struct {
+	agent       *Agent
+	name        string
+	parse       func(context.Context, string) (T, error)
+	maxRetry    int
+	plainOutput bool
+	rules       func(error) []string
+}
+
+func NewAgentStepBuilder[T any](agent *Agent, name string) *AgentStepBuilder[T] {
+	return &AgentStepBuilder[T]{
+		agent:    agent,
+		name:     name,
+		maxRetry: 1,
+		rules:    func(error) []string { return nil },
+	}
+}
+
+func (b *AgentStepBuilder[T]) WithParse(parse func(context.Context, string) (T, error)) *AgentStepBuilder[T] {
+	b.parse = parse
+	return b
+}
+
+func (b *AgentStepBuilder[T]) WithRetry(retry int) *AgentStepBuilder[T] {
+	if retry >= 0 {
+		b.maxRetry = retry
+	}
+	return b
+}
+
+func (b *AgentStepBuilder[T]) WithPlainOutput(plain bool) *AgentStepBuilder[T] {
+	b.plainOutput = plain
+	return b
+}
+
+func (b *AgentStepBuilder[T]) WithRules(rules func(error) []string) *AgentStepBuilder[T] {
+	if rules != nil {
+		b.rules = rules
+	}
+	return b
+}
+
+func (b *AgentStepBuilder[T]) Build() AgentStep[T] {
+	return AgentStep[T]{
+		agent:       b.agent,
+		name:        b.name,
+		maxRetry:    b.maxRetry,
+		plainOutput: b.plainOutput,
+		rules:       b.rules,
+		parse:       b.parse,
+	}
+}
+
+func (s AgentStep[T]) Run(ctx context.Context, msgs []*einoschema.Message) (T, error) {
+	var zero T
+	if s.agent == nil {
+		return zero, errors.Errorf("agent step %s agent is not configured", s.name)
+	}
+	if s.parse == nil {
+		return zero, errors.Errorf("agent step %s parse is not configured", s.name)
 	}
 
-	output, err := ag.React(ctx, msgs)
+	output, err := s.agent.React(ctx, msgs)
 	if err != nil {
-		var zero T
-		return zero, errors.WithMessagef(err, "generate %s output failed", s.Name)
+		return zero, errors.WithMessagef(err, "generate %s output failed", s.name)
 	}
 
-	slog.InfoContext(ctx, fmt.Sprintf("generate %s agent usage: %+v", s.Name, ag.TokenUsage()))
+	slog.InfoContext(ctx, fmt.Sprintf("generate %s agent usage: %+v", s.name, s.agent.TokenUsage()))
 
-	parsed, parseErr := s.Parse(ctx, output.Content)
-	if parseErr == nil {
+	parsed, err := s.parse(ctx, output.Content)
+	if err == nil {
 		return parsed, nil
 	}
 
-	return s.compensate(ctx, ag, output.Content, parseErr)
+	return s.compensate(ctx, output.Content, err)
 }
 
 // compensate 解析失败后带着重新约束继续对话，直至解析成功或耗尽重试次数。
-func (s *Step[T]) compensate(ctx context.Context, ag *Agent, firstContent string, firstErr error) (T, error) {
+func (s AgentStep[T]) compensate(ctx context.Context, firstContent string, firstErr error) (T, error) {
+	var zero T
 	lastContent, lastErr := firstContent, firstErr
-	msgs := append([]*einoschema.Message{}, ag.AccumulatedMessages()...)
+	msgs := append([]*einoschema.Message{}, s.agent.AccumulatedMessages()...)
 
-	for attempt := 1; attempt <= s.MaxRetry; attempt++ {
+	for attempt := 1; attempt <= s.maxRetry; attempt++ {
 		slog.WarnContext(ctx, "agent output invalid, compensating",
-			slog.String("step", s.Name),
+			slog.String("step", s.name),
 			slog.Int("attempt", attempt),
-			slog.Int("max_retry", s.MaxRetry),
+			slog.Int("max_retry", s.maxRetry),
 			slog.Any("err", lastErr),
-			slog.Any("usage", ag.TokenUsage()),
+			slog.Any("usage", s.agent.TokenUsage()),
 		)
 
 		compensateMsgs := append([]*einoschema.Message{}, msgs...)
-		compensateMsgs = append(compensateMsgs, BuildCompensateMessage(lastContent, s.Rules(lastErr)))
-
-		llmResp, genErr := ag.BaseLLM().Generate(ctx, compensateMsgs, s.Factory.options...)
-		if genErr != nil {
-			var zero T
-			return zero, errors.WithMessagef(errors.ErrLLM, "%s compensate generate failed on attempt %d, err=%v", s.Name, attempt, genErr)
+		if s.plainOutput {
+			compensateMsgs = append(compensateMsgs, BuildCompensatePlainMessage(lastContent, s.rules(lastErr)))
+		} else {
+			compensateMsgs = append(compensateMsgs, BuildCompensateMessage(lastContent, s.rules(lastErr)))
 		}
 
-		parsed, parseErr := s.Parse(ctx, llmResp.Content)
-		if parseErr == nil {
+		llmResp, genErr := s.agent.BaseLLM().Generate(ctx, compensateMsgs, s.agent.Options()...)
+		if genErr != nil {
+			return zero, errors.WithMessagef(errors.ErrLLM, "%s compensate generate failed on attempt %d, err=%v", s.name, attempt, genErr)
+		}
+
+		parsed, err := s.parse(ctx, llmResp.Content)
+		if err == nil {
 			return parsed, nil
 		}
 
 		lastContent = llmResp.Content
-		lastErr = parseErr
+		lastErr = err
 		msgs = append(compensateMsgs, &einoschema.Message{
 			Role:    einoschema.Assistant,
 			Content: lastContent,
 		})
 	}
 
-	var zero T
-	return zero, errors.WithMessagef(errors.ErrLLM, "%s agent output invalid after %d retries, err=%v", s.Name, s.MaxRetry, lastErr)
+	return zero, errors.WithMessagef(errors.ErrLLM, "%s agent output invalid after %d retries, err=%v", s.name, s.maxRetry, lastErr)
 }

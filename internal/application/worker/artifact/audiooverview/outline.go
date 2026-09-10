@@ -29,12 +29,12 @@ type podcastOutlineExpectation struct {
 
 // outlineGenerator 生成/恢复播客大纲，写入 checkpoint.field1。
 type outlineGenerator struct {
-	agents      *types.AgentFactory
+	deps        *types.WorkerDeps
 	checkpoints *checkpointStore
 }
 
-func newOutlineGenerator(agents *types.AgentFactory, checkpoints *checkpointStore) *outlineGenerator {
-	return &outlineGenerator{agents: agents, checkpoints: checkpoints}
+func newOutlineGenerator(deps *types.WorkerDeps, checkpoints *checkpointStore) *outlineGenerator {
+	return &outlineGenerator{deps: deps, checkpoints: checkpoints}
 }
 
 func (g *outlineGenerator) ensure(
@@ -71,14 +71,16 @@ func (g *outlineGenerator) generate(
 		return nil, errors.WithMessagef(err, "render podcast outline prompt failed")
 	}
 
-	step := types.Step[*podcastOutlineExpectation]{
-		Factory:  g.agents,
-		Name:     "podcast outline",
-		MaxRetry: 1,
-		Rules:    g.compensateRules,
-		Parse:    g.parse,
+	ag, err := newAudioAgent(g.deps, req)
+	if err != nil {
+		return nil, err
 	}
-	return step.Run(ctx, req, msgs)
+
+	step := types.NewAgentStepBuilder[*podcastOutlineExpectation](ag, "podcast outline").
+		WithParse(g.parse).
+		WithRules(g.compensateRules).
+		Build()
+	return step.Run(ctx, msgs)
 }
 
 func (g *outlineGenerator) compensateRules(error) []string {

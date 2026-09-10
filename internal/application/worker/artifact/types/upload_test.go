@@ -163,8 +163,8 @@ func BenchmarkUploadLarge_Pipe(b *testing.B) {
 	up := discardUploader{}
 	b.SetBytes(size)
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		if err := UploadReader(ctx, up, "k", "application/octet-stream", newGenReader(size)); err != nil {
 			b.Fatal(err)
 		}
@@ -177,8 +177,8 @@ func BenchmarkUploadLarge_ReadAll(b *testing.B) {
 	up := discardUploader{}
 	b.SetBytes(size)
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		if err := uploadViaReadAll(ctx, up, "k", "application/octet-stream", newGenReader(size)); err != nil {
 			b.Fatal(err)
 		}
@@ -195,8 +195,8 @@ func BenchmarkUploadLarge_ReadAll_FromBytesBuffer(b *testing.B) {
 	up := discardUploader{}
 	b.SetBytes(size)
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		// 源已是整包时，ReadAll 仍会再拷一份。
 		if err := uploadViaReadAll(ctx, up, "k", "application/octet-stream", bytes.NewReader(payload)); err != nil {
 			b.Fatal(err)

@@ -12,11 +12,6 @@ func TestRenderReport(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestRenderTitleMaker(t *testing.T) {
-	_, err := RenderTitleMaker(t.Context(), "report content")
-	require.NoError(t, err)
-}
-
 func TestGenerator_ImplementsGenerator(t *testing.T) {
 	var _ = *New(nil)
 }

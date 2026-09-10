@@ -1,4 +1,4 @@
-package videooverview
+package quiz
 
 import (
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
@@ -6,9 +6,9 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 )
 
-// newVideoAgent 构造 videooverview 步骤的 source explore agent。
-func newVideoAgent(deps *types.WorkerDeps, req *types.Request) (*types.Agent, error) {
-	cfg := conf.WorkerGlobal().Studio.VideoOverview
+// newQuizAgent 构造 quiz 步骤的 source explore agent。
+func newQuizAgent(deps *types.WorkerDeps, req *types.Request) (*types.Agent, error) {
+	cfg := conf.WorkerGlobal().Studio.Quiz
 	return types.NewExploreAgentBuilder(deps).
 		WithModel(cfg.ModelProvider, cfg.Model).
 		WithMaxRound(cfg.MaxRound).

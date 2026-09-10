@@ -42,12 +42,12 @@ type videoStoryboard struct {
 
 // storyboardGenerator 基于大纲生成/恢复分镜脚本，写入 checkpoint.field2。
 type storyboardGenerator struct {
-	agents      *types.AgentFactory
+	deps        *types.WorkerDeps
 	checkpoints *checkpointStore
 }
 
-func newStoryboardGenerator(agents *types.AgentFactory, checkpoints *checkpointStore) *storyboardGenerator {
-	return &storyboardGenerator{agents: agents, checkpoints: checkpoints}
+func newStoryboardGenerator(deps *types.WorkerDeps, checkpoints *checkpointStore) *storyboardGenerator {
+	return &storyboardGenerator{deps: deps, checkpoints: checkpoints}
 }
 
 func (g *storyboardGenerator) ensure(
@@ -88,16 +88,19 @@ func (g *storyboardGenerator) generate(
 		return nil, errors.WithMessagef(err, "render video storyboard prompt failed")
 	}
 
-	step := types.Step[*videoStoryboard]{
-		Factory:  g.agents,
-		Name:     "video storyboard",
-		MaxRetry: storyboardCompensate,
-		Rules:    g.compensateRules,
-		Parse: func(ctx context.Context, content string) (*videoStoryboard, error) {
-			return g.parse(ctx, content, outline)
-		},
+	ag, err := newVideoAgent(g.deps, req)
+	if err != nil {
+		return nil, err
 	}
-	return step.Run(ctx, req, msgs)
+
+	step := types.NewAgentStepBuilder[*videoStoryboard](ag, "video storyboard").
+		WithParse(func(ctx context.Context, content string) (*videoStoryboard, error) {
+			return g.parse(ctx, content, outline)
+		}).
+		WithRetry(storyboardCompensate).
+		WithRules(g.compensateRules).
+		Build()
+	return step.Run(ctx, msgs)
 }
 
 func (g *storyboardGenerator) compensateRules(validateErr error) []string {

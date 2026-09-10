@@ -219,7 +219,6 @@ func (s *audioSynthizer) synthesizePendingScenes(
 			slog.DebugContext(gctx, "video scene audio synthesized",
 				slog.String("artifact_id", req.ArtifactId.String()),
 				slog.Int("scene", i),
-				slog.String("name", scene.Name),
 				slog.Int("pcm_bytes", len(pcm.Data)),
 			)
 			return nil

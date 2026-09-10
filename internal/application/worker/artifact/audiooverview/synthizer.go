@@ -448,10 +448,10 @@ func (s *audioSynthizer) synthesizePendingTurns(
 				slog.WarnContext(gctx, "snapshot audio checkpoint failed",
 					slog.String("artifact_id", artifactId.String()),
 					slog.Any("err", snapErr))
-			} else if saveErr := s.checkpoints.save(gctx, snap); saveErr != nil {
+			} else if err := s.checkpoints.save(gctx, snap); err != nil {
 				slog.WarnContext(gctx, "persist audio checkpoint failed",
 					slog.String("artifact_id", artifactId.String()),
-					slog.Any("err", saveErr))
+					slog.Any("err", err))
 				// checkpoint 失败不阻断本轮，但下次重试将重复上传这段；可接受。
 			}
 

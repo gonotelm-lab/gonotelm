@@ -19,7 +19,7 @@ func TestEinoDeepSeekGenerate(t *testing.T) {
 	ctx := context.Background()
 	cm, err := deepseek.NewChatModel(ctx, &deepseek.ChatModelConfig{
 		APIKey:  apiKey,
-		Model:   "deepseek-v4-flash",
+		Model:   "deepseek-flash",
 		Timeout: 60 * time.Second,
 	})
 	if err != nil {

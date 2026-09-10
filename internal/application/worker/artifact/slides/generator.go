@@ -300,10 +300,6 @@ func (g *Generator) getSandboxSerivce() (*sandboxservice.Service, error) {
 	return service, nil
 }
 
-type checkPPTXToolInput struct {
-	Filename string `json:"filename" jsonschema_description:"title=targe file path,description=The target file path"`
-}
-
 func (g *Generator) generatePPTX(
 	ctx context.Context,
 	req *types.Request,
@@ -312,26 +308,14 @@ func (g *Generator) generatePPTX(
 	sources []OutlineSource,
 ) (*SlidesStorageResult, error) {
 	// use thinking in pptx generation, it will take much longer
-	agent, err := newSlidesPptxAgent(g.deps, req)
+	agent, err := newSlidesPPTXAgent(g.deps, req)
 	if err != nil {
 		return nil, err
 	}
 
-	checkPPTXTool, err := einotoolutils.InferTool(
-		"CheckPPTX",
-		"Validate a PPTX file. Input is the filename of the PPTX you just generated. "+
-			"Always call this on your output file before finishing the task. "+
-			"Returns 'OK' if the file is a valid PPTX; otherwise it returns an error message describing what is wrong, "+
-			"and you must fix the file and validate again.",
-		func(ctx context.Context, input *checkPPTXToolInput) (output string, err error) {
-			if err := g.checkPPTXArtifactValid(ctx, sandbox, input.Filename); err != nil {
-				return "", err
-			}
-			return "OK", nil
-		},
-	)
+	checkPPTXTool, err := g.getCheckPPTXValidTool(sandbox)
 	if err != nil {
-		return nil, errors.Wrapf(errors.ErrInner, "infer check pptx tool failed, err=%v", err)
+		return nil, errors.WithMessage(err, "infer check pptx tool failed")
 	}
 
 	// 额外绑定沙箱工具
@@ -341,7 +325,7 @@ func (g *Generator) generatePPTX(
 		tools.WriteFileToolName: tools.NewWriteFileTool(sandbox),
 		tools.EditFileToolName:  tools.NewEditFileTool(sandbox),
 		tools.ListDirToolName:   tools.NewListDirTool(sandbox),
-		"CheckPPTX":             checkPPTXTool,
+		checkPPTXValidToolName:  checkPPTXTool,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "gen pptx agent append tools failed")
@@ -399,4 +383,31 @@ func (g *Generator) generatePPTX(
 
 func formatSlidesStoreKey(notebookId, artifactId valobj.Id) string {
 	return fmt.Sprintf("artifact/%s/%s.pptx", notebookId.String(), artifactId.String())
+}
+
+const checkPPTXValidToolName = "CheckPPTX"
+
+type checkPPTXToolInput struct {
+	Filename string `json:"filename" jsonschema_description:"title=targe file path,description=The target file path"`
+}
+
+func (g *Generator) getCheckPPTXValidTool(sandbox sandboxent.Sandbox) (einotool.InvokableTool, error) {
+	tool, err := einotoolutils.InferTool(
+		checkPPTXValidToolName,
+		"Validate a PPTX file. Input is the filename of the PPTX you just generated. "+
+			"Always call this on your output file before finishing the task. "+
+			"Returns 'OK' if the file is a valid PPTX; otherwise it returns an error message describing what is wrong, "+
+			"and you must fix the file and validate again.",
+		func(ctx context.Context, input *checkPPTXToolInput) (output string, err error) {
+			if err := g.checkPPTXArtifactValid(ctx, sandbox, input.Filename); err != nil {
+				return "", err
+			}
+			return "OK", nil
+		},
+	)
+	if err != nil {
+		return nil, errors.Wrapf(errors.ErrInner, "infer check pptx tool failed, err=%v", err)
+	}
+
+	return tool, nil
 }

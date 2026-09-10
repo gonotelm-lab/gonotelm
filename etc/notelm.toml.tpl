@@ -161,11 +161,11 @@ timeout = "${GONOTELM_RERANK_QWEN_TIMEOUT:-30s}"
 apiKey = "${GONOTELM_DEEPSEEK_API_KEY}"
 timeout = "${GONOTELM_DEEPSEEK_TIMEOUT:-5m}"
 baseUrl = "${GONOTELM_DEEPSEEK_BASE_URL:-https://api.deepseek.com}"
-defaultModel = "${GONOTELM_DEEPSEEK_MODEL:-deepseek-v4-flash}"
+defaultModel = "${GONOTELM_DEEPSEEK_MODEL:-deepseek-flash}"
 thinkingEnabled = false
 
-[provider.deepseek.models.deepseek-v4-flash]
-name = "deepseek-v4-flash"
+[provider.deepseek.models.deepseek-flash]
+name = "deepseek-flash"
 modalities = {input = ["text"], output = ["text"]}
 
 [provider.deepseek.models.deepseek-v4-pro]

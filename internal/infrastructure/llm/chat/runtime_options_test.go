@@ -133,7 +133,7 @@ func TestDeepSeekUsingOpenAI(t *testing.T) {
 		DeepSeek: DeepSeekChatConfig{
 			ApiKey:       os.Getenv("GONOTELM_OPENAI_API_KEY"),
 			BaseURL:      "https://api.deepseek.com",
-			DefaultModel: "deepseek-v4-flash",
+			DefaultModel: "deepseek-flash",
 		},
 	}, nil)
 	if err != nil {

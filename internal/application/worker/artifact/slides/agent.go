@@ -20,8 +20,8 @@ func newSlidesOutlineAgent(deps *types.WorkerDeps, req *types.Request) (*types.A
 		Build(req)
 }
 
-// newSlidesPptxAgent 构造 pptx 步骤的 agent（启用 thinking，生成耗时较长）。
-func newSlidesPptxAgent(deps *types.WorkerDeps, req *types.Request) (*types.Agent, error) {
+// newSlidesPPTXAgent 构造 PPTX 步骤的 agent（启用 thinking，生成耗时较长）。
+func newSlidesPPTXAgent(deps *types.WorkerDeps, req *types.Request) (*types.Agent, error) {
 	cfg := conf.WorkerGlobal().Studio.Slides
 	return types.NewExploreAgentBuilder(deps).
 		WithModel(cfg.ModelProvider, cfg.Model).

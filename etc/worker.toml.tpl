@@ -50,24 +50,24 @@ level = "${GONOTELM_LOG_LEVEL:-debug}"
 [studio.mindmap]
 maxRound = ${GONOTELM_STUDIO_MINDMAP_MAX_ROUND:-50}
 modelProvider = "${GONOTELM_STUDIO_MINDMAP_PROVIDER:-deepseek}"
-model = "${GONOTELM_STUDIO_MINDMAP_MODEL:-deepseek-v4-flash}"
+model = "${GONOTELM_STUDIO_MINDMAP_MODEL:-deepseek-flash}"
 
 [studio.report]
 maxRound = ${GONOTELM_STUDIO_REPORT_MAX_ROUND:-50}
 modelProvider = "${GONOTELM_STUDIO_REPORT_PROVIDER:-deepseek}"
-model = "${GONOTELM_STUDIO_REPORT_MODEL:-deepseek-v4-flash}"
+model = "${GONOTELM_STUDIO_REPORT_MODEL:-deepseek-flash}"
 
 [studio.infoGraphic]
 maxRound = ${GONOTELM_STUDIO_INFOGRAPHIC_MAX_ROUND:-50}
 modelProvider = "${GONOTELM_STUDIO_INFOGRAPHIC_PROVIDER:-deepseek}"
-model = "${GONOTELM_STUDIO_INFOGRAPHIC_MODEL:-deepseek-v4-flash}"
+model = "${GONOTELM_STUDIO_INFOGRAPHIC_MODEL:-deepseek-flash}"
 imageModelProvider = "${GONOTELM_STUDIO_INFOGRAPHIC_IMAGE_MODEL_PROVIDER:-qwen}"
 imageModel = "${GONOTELM_STUDIO_INFOGRAPHIC_IMAGE_MODEL:-qwen-image-2.0-pro}"
 
 [studio.audioOverview]
 maxRound = ${GONOTELM_STUDIO_AUDIOOVERVIEW_MAX_ROUND:-50}
 modelProvider = "${GONOTELM_STUDIO_AUDIOOVERVIEW_PROVIDER:-deepseek}"
-model = "${GONOTELM_STUDIO_AUDIOOVERVIEW_MODEL:-deepseek-v4-flash}"
+model = "${GONOTELM_STUDIO_AUDIOOVERVIEW_MODEL:-deepseek-flash}"
 audioModelProvider = "${GONOTELM_STUDIO_AUDIOOVERVIEW_AUDIO_MODEL_PROVIDER:-qwen}"
 audioModel = "${GONOTELM_STUDIO_AUDIOOVERVIEW_AUDIO_MODEL:-qwen3-tts-instruct-flash}"
 audioSynthConcurrency = ${GONOTELM_STUDIO_AUDIOOVERVIEW_AUDIO_SYNTH_CONCURRENCY:-1}
@@ -75,29 +75,29 @@ audioSynthConcurrency = ${GONOTELM_STUDIO_AUDIOOVERVIEW_AUDIO_SYNTH_CONCURRENCY:
 [studio.flashcard]
 maxRound = ${GONOTELM_STUDIO_FLASHCARD_MAX_ROUND:-50}
 modelProvider = "${GONOTELM_STUDIO_FLASHCARD_PROVIDER:-deepseek}"
-model = "${GONOTELM_STUDIO_FLASHCARD_MODEL:-deepseek-v4-flash}"
+model = "${GONOTELM_STUDIO_FLASHCARD_MODEL:-deepseek-flash}"
 
 [studio.quiz]
 maxRound = ${GONOTELM_STUDIO_QUIZ_MAX_ROUND:-50}
 modelProvider = "${GONOTELM_STUDIO_QUIZ_PROVIDER:-deepseek}"
-model = "${GONOTELM_STUDIO_QUIZ_MODEL:-deepseek-v4-flash}"
+model = "${GONOTELM_STUDIO_QUIZ_MODEL:-deepseek-flash}"
 
 [studio.dataTable]
 maxRound = ${GONOTELM_STUDIO_DATATABLE_MAX_ROUND:-50}
 modelProvider = "${GONOTELM_STUDIO_DATATABLE_PROVIDER:-deepseek}"
-model = "${GONOTELM_STUDIO_DATATABLE_MODEL:-deepseek-v4-flash}"
+model = "${GONOTELM_STUDIO_DATATABLE_MODEL:-deepseek-flash}"
 
 [studio.slides]
 maxRound = ${GONOTELM_STUDIO_SLIDES_MAX_ROUND:-50}
 modelProvider = "${GONOTELM_STUDIO_SLIDES_PROVIDER:-deepseek}"
 generateMaxRound = ${GONOTELM_STUDIO_SLIDES_GENERATE_MAX_ROUND:-100}
-model = "${GONOTELM_STUDIO_SLIDES_MODEL:-deepseek-v4-flash}"
+model = "${GONOTELM_STUDIO_SLIDES_MODEL:-deepseek-flash}"
 sandboxProvider = "${GONOTELM_STUDIO_SLIDES_SANDBOX_PROVIDER:-opensandbox}"
 
 [studio.videoOverview]
 maxRound = ${GONOTELM_STUDIO_VIDEOOVERVIEW_MAX_ROUND:-50}
 modelProvider = "${GONOTELM_STUDIO_VIDEOOVERVIEW_PROVIDER:-deepseek}"
-model = "${GONOTELM_STUDIO_VIDEOOVERVIEW_MODEL:-deepseek-v4-flash}"
+model = "${GONOTELM_STUDIO_VIDEOOVERVIEW_MODEL:-deepseek-flash}"
 audioModelProvider = "${GONOTELM_STUDIO_VIDEOOVERVIEW_AUDIO_MODEL_PROVIDER:-qwen}"
 audioModel = "${GONOTELM_STUDIO_VIDEOOVERVIEW_AUDIO_MODEL:-qwen3-tts-instruct-flash}"
 audioSynthConcurrency = ${GONOTELM_STUDIO_VIDEOOVERVIEW_AUDIO_SYNTH_CONCURRENCY:-1}
@@ -130,11 +130,11 @@ apiVersion = "${GONOTELM_OPENAI_API_VERSION:-}"
 apiKey = "${GONOTELM_DEEPSEEK_API_KEY}"
 timeout = "${GONOTELM_DEEPSEEK_TIMEOUT:-5m}"
 baseUrl = "${GONOTELM_DEEPSEEK_BASE_URL:-https://api.deepseek.com}"
-defaultModel = "${GONOTELM_DEEPSEEK_MODEL:-deepseek-v4-flash}"
+defaultModel = "${GONOTELM_DEEPSEEK_MODEL:-deepseek-flash}"
 thinkingEnabled = false
 
-[provider.deepseek.models.deepseek-v4-flash]
-name = "deepseek-v4-flash"
+[provider.deepseek.models.deepseek-flash]
+name = "deepseek-flash"
 modalities = {input = ["text"], output = ["text"]}
 
 [provider.deepseek.models.deepseek-v4-pro]

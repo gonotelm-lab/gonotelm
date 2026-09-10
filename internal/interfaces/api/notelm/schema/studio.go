@@ -38,6 +38,7 @@ type GenerateArtifactRequest struct {
 	Quiz          *GenerateQuizParameters          `json:"quiz,omitempty"`
 	DataTable     *GenerateDataTableParameters     `json:"data_table,omitempty"`
 	Slides        *GenerateSlidesParameters        `json:"slides,omitempty"`
+	VideoOverview *GenerateVideoOverviewParameters `json:"video_overview,omitempty"`
 
 	// 保存为笔记
 	Note *GenerateNoteParameters `json:"note,omitempty"`
@@ -60,6 +61,7 @@ func (r *GenerateArtifactRequest) Validate() error {
 		{artifactentity.KindQuiz, asPayload(r.Quiz)},
 		{artifactentity.KindDataTable, asPayload(r.DataTable)},
 		{artifactentity.KindSlides, asPayload(r.Slides)},
+		{artifactentity.KindVideoOverview, asPayload(r.VideoOverview)},
 		{artifactentity.KindNote, asPayload(r.Note)},
 	} {
 		if item.kind != r.Kind {
@@ -251,6 +253,22 @@ func (p *GenerateSlidesParameters) Validate() error {
 	return validateUserTip(p.Tip)
 }
 
+type GenerateVideoOverviewParameters struct {
+	Tip         string                            `json:"tip,omitempty"`
+	VisualStyle artifactentity.VideoOverviewStyle `json:"visual_style,omitempty"`
+	Language    artifactentity.Language           `json:"language,omitempty"`
+}
+
+func (p *GenerateVideoOverviewParameters) Validate() error {
+	if err := validateLanguage(p.Language, false); err != nil {
+		return err
+	}
+	if p.VisualStyle != "" && !p.VisualStyle.Supported() {
+		return errors.ErrParams.Msgf("unsupported video_overview visual_style: %s", p.VisualStyle)
+	}
+	return validateUserTip(p.Tip)
+}
+
 // 将对话内容保存为笔记
 type GenerateNoteParameters struct {
 	ChatId uuid.UUID `json:"chat_id,required"`
@@ -332,6 +350,12 @@ type SlidesExtras struct {
 	Language    string `json:"language"`
 }
 
+type VideoOverviewExtras struct {
+	Tip         string `json:"tip"`
+	VisualStyle string `json:"visual_style"`
+	Language    string `json:"language"`
+}
+
 type NoteExtras struct {
 	ChatId uuid.UUID `json:"chat_id"`
 	MsgId  uuid.UUID `json:"msg_id"`
@@ -399,6 +423,13 @@ func ToArtifactItem(a *artifactentity.Artifact) *ArtifactItem {
 	case *artifactentity.SlidesPayload:
 		r.SourceIds = p.SourceIds
 		r.Extras = &SlidesExtras{
+			Tip:         p.Tip,
+			VisualStyle: p.GetVisualStyle().String(),
+			Language:    string(p.GetLanguage()),
+		}
+	case *artifactentity.VideoOverviewPayload:
+		r.SourceIds = p.SourceIds
+		r.Extras = &VideoOverviewExtras{
 			Tip:         p.Tip,
 			VisualStyle: p.GetVisualStyle().String(),
 			Language:    string(p.GetLanguage()),
@@ -543,6 +574,18 @@ func (r *GenerateSlidesParameters) ToPayload() *artifactentity.SlidesPayload {
 	}
 
 	return &artifactentity.SlidesPayload{
+		Tip:         r.Tip,
+		VisualStyle: r.VisualStyle,
+		Language:    r.Language,
+	}
+}
+
+func (r *GenerateVideoOverviewParameters) ToPayload() *artifactentity.VideoOverviewPayload {
+	if r == nil {
+		return nil
+	}
+
+	return &artifactentity.VideoOverviewPayload{
 		Tip:         r.Tip,
 		VisualStyle: r.VisualStyle,
 		Language:    r.Language,

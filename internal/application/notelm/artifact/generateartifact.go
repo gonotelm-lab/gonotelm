@@ -34,6 +34,7 @@ type GenerateRequest struct {
 	Quiz          *artifactentity.QuizPayload
 	DataTable     *artifactentity.DataTablePayload
 	Slides        *artifactentity.SlidesPayload
+	VideoOverview *artifactentity.VideoOverviewPayload
 	Note          *artifactentity.NotePayload
 }
 
@@ -231,6 +232,13 @@ func (r *GenerateRequest) buildPayload() (artifactentity.Payload, error) {
 		r.Slides.NotebookId = r.NotebookId
 		r.Slides.SourceIds = r.SourceIds
 		return r.Slides, nil
+	case artifactentity.KindVideoOverview:
+		if r.VideoOverview == nil {
+			return nil, errors.ErrParams.Msgf("video_overview payload required")
+		}
+		r.VideoOverview.NotebookId = r.NotebookId
+		r.VideoOverview.SourceIds = r.SourceIds
+		return r.VideoOverview, nil
 	}
 
 	return nil, errors.ErrParams.Msgf("unsupported artifact kind: %s", r.Kind)

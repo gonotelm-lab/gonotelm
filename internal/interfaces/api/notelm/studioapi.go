@@ -52,6 +52,7 @@ func (s *Server) GenerateStudioArtifact(ctx context.Context, c *app.RequestConte
 			Quiz:          req.Quiz.ToPayload(),
 			DataTable:     req.DataTable.ToPayload(),
 			Slides:        req.Slides.ToPayload(),
+			VideoOverview: req.VideoOverview.ToPayload(),
 			Note:          req.Note.ToPayload(),
 		})
 	if err != nil {

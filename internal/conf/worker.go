@@ -99,6 +99,15 @@ type StudioConfig struct {
 		Model            string           `toml:"model"`
 		SandboxProvider  sandbox.Provider `toml:"sandboxProvider"`
 	} `toml:"slides"`
+
+	VideoOverview struct {
+		MaxRound              int                           `toml:"maxRound"`
+		ModelProvider         llmchat.Provider              `toml:"modelProvider"`
+		Model                 string                        `toml:"model"`
+		AudioModelProvider    text2audio.Text2AudioProvider `toml:"audioModelProvider"`
+		AudioModel            string                        `toml:"audioModel"`
+		AudioSynthConcurrency int                           `toml:"audioSynthConcurrency"`
+	} `toml:"videoOverview"`
 }
 
 func LoadWorkerConfig(path string) (*WorkerConfig, error) {

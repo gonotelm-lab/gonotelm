@@ -16,6 +16,18 @@ type PCM struct {
 	BitsPerSample uint16
 }
 
+// DurationMs 返回 PCM 的播放时长（毫秒），格式字段不完整时返回 0。
+func (p *PCM) DurationMs() int64 {
+	if p == nil || p.SampleRate == 0 || p.NumChannels == 0 || p.BitsPerSample == 0 {
+		return 0
+	}
+	bytesPerSecond := uint32(p.SampleRate) * uint32(p.NumChannels) * uint32(p.BitsPerSample) / 8
+	if bytesPerSecond == 0 {
+		return 0
+	}
+	return int64(float64(len(p.Data)) / float64(bytesPerSecond) * 1000)
+}
+
 func Parse(data []byte) (*PCM, error) {
 	if len(data) < 12 {
 		return nil, fmt.Errorf("wav too short: len=%d", len(data))

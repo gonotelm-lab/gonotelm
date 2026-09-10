@@ -94,6 +94,14 @@ generateMaxRound = ${GONOTELM_STUDIO_SLIDES_GENERATE_MAX_ROUND:-100}
 model = "${GONOTELM_STUDIO_SLIDES_MODEL:-deepseek-v4-flash}"
 sandboxProvider = "${GONOTELM_STUDIO_SLIDES_SANDBOX_PROVIDER:-opensandbox}"
 
+[studio.videoOverview]
+maxRound = ${GONOTELM_STUDIO_VIDEOOVERVIEW_MAX_ROUND:-50}
+modelProvider = "${GONOTELM_STUDIO_VIDEOOVERVIEW_PROVIDER:-deepseek}"
+model = "${GONOTELM_STUDIO_VIDEOOVERVIEW_MODEL:-deepseek-v4-flash}"
+audioModelProvider = "${GONOTELM_STUDIO_VIDEOOVERVIEW_AUDIO_MODEL_PROVIDER:-qwen}"
+audioModel = "${GONOTELM_STUDIO_VIDEOOVERVIEW_AUDIO_MODEL:-qwen3-tts-instruct-flash}"
+audioSynthConcurrency = ${GONOTELM_STUDIO_VIDEOOVERVIEW_AUDIO_SYNTH_CONCURRENCY:-1}
+
 [embedding]
 type = "${GONOTELM_EMBEDDING_TYPE:-qwen}"
 batchSize = ${GONOTELM_EMBEDDING_BATCH_SIZE:-10}

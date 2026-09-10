@@ -118,6 +118,12 @@ func decodePayload(kind artifactentity.Kind, b []byte) (artifactentity.Payload, 
 			return nil, err
 		}
 		return &p, nil
+	case artifactentity.KindVideoOverview:
+		var p artifactentity.VideoOverviewPayload
+		if err := sonic.Unmarshal(b, &p); err != nil {
+			return nil, err
+		}
+		return &p, nil
 	}
 
 	return nil, nil

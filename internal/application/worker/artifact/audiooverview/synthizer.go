@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"sync"
+	"time"
 
 	"github.com/bytedance/sonic"
 	audios "github.com/gonotelm-lab/multimodal/audio"
-	mimopkg "github.com/gonotelm-lab/multimodal/audio/mimo"
-	minimaxpkg "github.com/gonotelm-lab/multimodal/audio/minimax"
 	"github.com/gonotelm-lab/multimodal/audio/schema"
 	audioutil "github.com/gonotelm-lab/multimodal/audio/util"
 	"golang.org/x/sync/errgroup"
@@ -24,6 +24,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	pkgaudio "github.com/gonotelm-lab/gonotelm/pkg/audio/wav"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/httpclient"
 )
 
 type AudioStorageResult struct {
@@ -59,6 +60,35 @@ type audioCheckpointMeta struct {
 type audioTurnPart struct {
 	Index    int    `json:"index"`
 	StoreKey string `json:"store_key"`
+}
+
+// audioSynthizer 负责播客音频合成：逐轮 TTS、上传 OSS、拼接成完整 WAV、断点续跑与陈旧音频清理。
+type audioSynthizer struct {
+	text2audio     *text2audio.Text2AudioGateway
+	storage        storage.Storage
+	checkpoints    *checkpointStore
+	downloadClient *http.Client
+
+	provider    text2audio.Text2AudioProvider
+	model       string
+	concurrency int
+}
+
+func newAudioSynthizer(deps *types.WorkerDeps, checkpoints *checkpointStore) *audioSynthizer {
+	cfg := conf.WorkerGlobal().Studio.AudioOverview
+	concurrency := cfg.AudioSynthConcurrency
+	if concurrency <= 0 {
+		concurrency = 1
+	}
+	return &audioSynthizer{
+		text2audio:     deps.Text2Audio,
+		storage:        deps.ObjectStorage,
+		checkpoints:    checkpoints,
+		downloadClient: httpclient.NewBuilder(nil).WithTimeout(5 * time.Minute).Build(),
+		provider:       cfg.AudioModelProvider,
+		model:          cfg.AudioModel,
+		concurrency:    concurrency,
+	}
 }
 
 // collectTurns 将 transcript 展平为按播放顺序排列的发言序列。
@@ -124,34 +154,9 @@ func resolveVoice(langMap map[string]string, lang artifactentity.Language) strin
 	return langMap[string(lang)]
 }
 
-func wavOptionForProvider(provider text2audio.Text2AudioProvider) audios.Option {
-	switch provider {
-	case text2audio.Text2AudioQwen:
-		// qwen 已默认返回 WAV
-		return nil
-	case text2audio.Text2AudioMimo:
-		return mimopkg.WithFormat(mimopkg.FormatWAV)
-	case text2audio.Text2AudioMiniMax:
-		return minimaxpkg.WithAudioFormat(minimaxpkg.AudioFormatWAV)
-	}
-
-	return nil
-}
-
-// generateAudio 逐段调用 TTS 并上传中间 WAV 到 OSS，每段成功后立即写 checkpoint.Field3。
-// 重试时跳过已合成 index、稀疏补齐失败的 index，最后下载/拼接、上传最终 WAV 并清理中间键。
-func toAudioLang(l artifactentity.Language) schema.Language {
-	switch l {
-	case artifactentity.LanguageChinese:
-		return schema.LanguageChinese
-	case artifactentity.LanguageEnglish:
-		return schema.LanguageEnglish
-	default:
-		return schema.LanguageAuto
-	}
-}
-
-func (a *Generator) generateAudio(
+// Generate 逐段调用 TTS 并上传中间 WAV 到 OSS，最后下载/拼接、上传最终 WAV 并清理中间键。
+// 重试时跳过已合成 index、稀疏补齐失败的 index。
+func (s *audioSynthizer) generate(
 	ctx context.Context,
 	req *types.Request,
 	payload *artifactentity.AudioOverviewPayload,
@@ -164,19 +169,17 @@ func (a *Generator) generateAudio(
 		slog.String("style", string(payload.Style)),
 	)
 
-	cfg := conf.WorkerGlobal().Studio.AudioOverview
-
-	provider := cfg.AudioModelProvider
+	provider := s.provider
 	if provider == "" {
 		return nil, errors.ErrInner.Msgf("audio model provider is empty")
 	}
 
 	slog.DebugContext(ctx, "[audio] provider config",
 		slog.String("provider", provider.String()),
-		slog.String("model", cfg.AudioModel),
+		slog.String("model", s.model),
 	)
 
-	audioGenerator, err := a.deps.Text2Audio.GetProvider(provider)
+	audioGenerator, err := s.text2audio.GetProvider(provider)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "get text2audio provider failed")
 	}
@@ -206,17 +209,7 @@ func (a *Generator) generateAudio(
 		slog.Int("pending", len(turns)-len(meta.Parts)),
 	)
 
-	if err = a.synthesizePendingTurns(ctx,
-		payload,
-		turns,
-		meta,
-		req.ArtifactId,
-		ckpt,
-		audioGenerator,
-		voiceByID,
-		provider,
-		cfg.AudioModel,
-	); err != nil {
+	if err = s.synthesizePendingTurns(ctx, payload, turns, meta, req.ArtifactId, ckpt, audioGenerator, voiceByID); err != nil {
 		return nil, errors.WithMessagef(err, "synthesize pending turns failed")
 	}
 
@@ -224,7 +217,7 @@ func (a *Generator) generateAudio(
 		slog.Int("total_turns", len(turns)),
 	)
 
-	orderedPCMs, err := a.assembleOrderedPCMs(ctx, len(turns), meta)
+	orderedPCMs, err := s.assembleOrderedPCMs(ctx, len(turns), meta)
 	if err != nil {
 		slog.WarnContext(ctx, "assemble ordered pcms failed, resetting checkpoint and re-synthesizing",
 			slog.String("artifact_id", req.ArtifactId.String()),
@@ -234,26 +227,16 @@ func (a *Generator) generateAudio(
 		meta.NumChannels = 0
 		meta.SampleRate = 0
 		meta.BitsPerSample = 0
-		if err := a.persistAudioCheckpoint(ctx, req.ArtifactId, ckpt, meta); err != nil {
+		if err := s.persistAudioCheckpoint(ctx, req.ArtifactId, ckpt, meta); err != nil {
 			slog.ErrorContext(ctx, "reset audio checkpoint failed",
 				slog.String("artifact_id", req.ArtifactId.String()),
 				slog.Any("err", err),
 			)
 		}
-		if err = a.synthesizePendingTurns(ctx,
-			payload,
-			turns,
-			meta,
-			req.ArtifactId,
-			ckpt,
-			audioGenerator,
-			voiceByID,
-			provider,
-			cfg.AudioModel,
-		); err != nil {
+		if err = s.synthesizePendingTurns(ctx, payload, turns, meta, req.ArtifactId, ckpt, audioGenerator, voiceByID); err != nil {
 			return nil, errors.WithMessagef(err, "re-synthesize pending turns failed")
 		}
-		orderedPCMs, err = a.assembleOrderedPCMs(ctx, len(turns), meta)
+		orderedPCMs, err = s.assembleOrderedPCMs(ctx, len(turns), meta)
 		if err != nil {
 			return nil, errors.WithMessagef(err, "re-assemble ordered pcms failed")
 		}
@@ -275,7 +258,7 @@ func (a *Generator) generateAudio(
 	)
 
 	storeKey := formatAudioStoreKey(payload.NotebookId, req.ArtifactId)
-	if err = a.deps.ObjectStorage.UploadObject(ctx, &storage.UploadObjectRequest{
+	if err = s.storage.UploadObject(ctx, &storage.UploadObjectRequest{
 		Key:         storeKey,
 		Body:        wavBytes,
 		ContentType: "audio/wav",
@@ -291,18 +274,7 @@ func (a *Generator) generateAudio(
 	)
 
 	// 全部成功后清理逐段中间音频
-	a.cleanupIntermediateAudio(ctx, meta)
-
-	// 计算 PCM 时长：size / (sample_rate * channels * bits/8) * 1000 ms
-	durationMs := int64(0)
-	if merged.SampleRate > 0 && merged.NumChannels > 0 && merged.BitsPerSample > 0 {
-		bytesPerSecond := uint32(merged.SampleRate) *
-			uint32(merged.NumChannels) *
-			uint32(merged.BitsPerSample) / 8
-		if bytesPerSecond > 0 {
-			durationMs = int64(float64(len(merged.Data)) / float64(bytesPerSecond) * 1000)
-		}
-	}
+	s.cleanupIntermediateAudio(ctx, meta)
 
 	return &AudioStorageResult{
 		StoreKey:    storeKey,
@@ -313,14 +285,14 @@ func (a *Generator) generateAudio(
 			SampleRate:    int(merged.SampleRate),
 			BitsPerSample: int(merged.BitsPerSample),
 			Size:          len(wavBytes),
-			DurationMs:    durationMs,
+			DurationMs:    merged.DurationMs(),
 		},
 	}, nil
 }
 
 // synthesizePendingTurns 并发执行尚未出现在 meta.Parts 中的 turn 的 TTS。
 // 每段成功后立即把 WAV 上传至 OSS 并增量写 checkpoint.Field3；任一失败终止剩余任务。
-func (a *Generator) synthesizePendingTurns(
+func (s *audioSynthizer) synthesizePendingTurns(
 	ctx context.Context,
 	payload *artifactentity.AudioOverviewPayload,
 	turns []synthesizedTurn,
@@ -329,8 +301,6 @@ func (a *Generator) synthesizePendingTurns(
 	ckpt *workerentity.Checkpoint,
 	audioGenerator audios.Generator,
 	voiceByID map[string]string,
-	provider text2audio.Text2AudioProvider,
-	model string,
 ) error {
 	done := len(meta.Parts)
 	if done >= len(turns) {
@@ -345,20 +315,16 @@ func (a *Generator) synthesizePendingTurns(
 		slog.Int("total", len(turns)),
 		slog.Int("done", done),
 		slog.Int("pending", len(turns)-done),
-		slog.String("provider", provider.String()),
-		slog.String("model", model),
+		slog.String("provider", s.provider.String()),
+		slog.String("model", s.model),
 		slog.String("language", string(payload.Language)),
 	)
 
-	g, gctx := errgroup.WithContext(ctx)
-	concurrency := conf.WorkerGlobal().Studio.AudioOverview.AudioSynthConcurrency
-	if concurrency <= 0 {
-		concurrency = 1
-	}
-	g.SetLimit(concurrency)
+	gp, gctx := errgroup.WithContext(ctx)
+	gp.SetLimit(s.concurrency)
 
 	var callOpts []audios.Option
-	if opt := wavOptionForProvider(provider); opt != nil {
+	if opt := text2audio.WAVOption(s.provider); opt != nil {
 		callOpts = append(callOpts, opt)
 	}
 
@@ -371,11 +337,10 @@ func (a *Generator) synthesizePendingTurns(
 	}
 
 	for i := range turns {
-		i := i
 		if doneSet[i] {
 			continue
 		}
-		g.Go(func() error {
+		gp.Go(func() error {
 			turn := &turns[i]
 			voice, ok := voiceByID[turn.SpeakerName]
 			if !ok {
@@ -392,10 +357,10 @@ func (a *Generator) synthesizePendingTurns(
 			}
 
 			ttsReq := &schema.Request{
-				Model:       model,
+				Model:       s.model,
 				Text:        turn.Text,
 				Voice:       voice,
-				Language:    toAudioLang(payload.Language),
+				Language:    text2audio.AudioLang(string(payload.Language)),
 				Instruction: turn.Instruction,
 			}
 
@@ -407,24 +372,19 @@ func (a *Generator) synthesizePendingTurns(
 					slog.String("voice", voice),
 					slog.Any("err", err),
 				)
-				return errors.Wrapf(err,
-					"tts generate failed for turn %d (speaker=%s)",
-					i, turn.SpeakerName,
-				)
+				return errors.Wrapf(err, "tts generate failed for turn %d (speaker=%s)", i, turn.SpeakerName)
 			}
 
 			reader, err := audioutil.ResolveResponse(resp,
 				audioutil.WithResolveContext(gctx),
-				audioutil.WithResolveHttpClient(a.downloadClient),
+				audioutil.WithResolveHttpClient(s.downloadClient),
 			)
 			if err != nil {
 				slog.ErrorContext(gctx, "[audio] turn resolve response failed",
 					slog.Int("turn_index", i),
 					slog.Any("err", err),
 				)
-				return errors.WithMessagef(err,
-					"resolve tts audio for turn %d failed", i,
-				)
+				return errors.WithMessagef(err, "resolve tts audio for turn %d failed", i)
 			}
 			defer reader.Close()
 
@@ -434,9 +394,7 @@ func (a *Generator) synthesizePendingTurns(
 					slog.Int("turn_index", i),
 					slog.Any("err", err),
 				)
-				return errors.Wrapf(errors.ErrInner,
-					"read tts audio for turn %d failed, err=%v", i, err,
-				)
+				return errors.Wrapf(errors.ErrInner, "read tts audio for turn %d failed, err=%v", i, err)
 			}
 
 			pcm, err := pkgaudio.Parse(raw)
@@ -446,23 +404,23 @@ func (a *Generator) synthesizePendingTurns(
 					slog.Int("audio_bytes", len(raw)),
 					slog.Any("err", err),
 				)
-				return errors.Wrapf(errors.ErrInner,
-					"parse wav for turn %d failed, err=%v", i, err,
-				)
+				return errors.Wrapf(errors.ErrInner, "parse wav for turn %d failed, err=%v", i, err)
 			}
 
-			if err = assertOrInitFormat(meta, pcm); err != nil {
+			// meta 为并发共享对象，格式校验读取也需持锁
+			mu.Lock()
+			fmtErr := assertOrInitFormat(meta, pcm)
+			mu.Unlock()
+			if fmtErr != nil {
 				slog.ErrorContext(gctx, "[audio] turn format incompatible",
 					slog.Int("turn_index", i),
-					slog.Any("err", err),
+					slog.Any("err", fmtErr),
 				)
-				return errors.Wrapf(errors.ErrInner,
-					"format incompatible for turn %d, err=%v", i, err,
-				)
+				return errors.Wrapf(errors.ErrInner, "format incompatible for turn %d, err=%v", i, fmtErr)
 			}
 
 			partKey := formatIntermediateAudioStoreKey(payload.NotebookId, artifactId, i)
-			if err = a.deps.ObjectStorage.UploadObject(gctx, &storage.UploadObjectRequest{
+			if err = s.storage.UploadObject(gctx, &storage.UploadObjectRequest{
 				Key:         partKey,
 				Body:        raw,
 				ContentType: "audio/wav",
@@ -472,12 +430,10 @@ func (a *Generator) synthesizePendingTurns(
 					slog.String("part_key", partKey),
 					slog.Any("err", err),
 				)
-				return errors.Wrapf(errors.ErrInner,
-					"upload intermediate audio for turn %d failed, err=%v", i, err,
-				)
+				return errors.Wrapf(errors.ErrInner, "upload intermediate audio for turn %d failed, err=%v", i, err)
 			}
 
-			// 落 checkpoint 必须在 OSS 上传成功之后；保证 store_key 就一定有音频。
+			// 落 checkpoint 必须在 OSS 上传成功之后；锁内只做快照，DB 写入在锁外。
 			mu.Lock()
 			if meta.NumChannels == 0 {
 				meta.NumChannels = pcm.NumChannels
@@ -485,9 +441,14 @@ func (a *Generator) synthesizePendingTurns(
 				meta.BitsPerSample = pcm.BitsPerSample
 			}
 			meta.Parts = append(meta.Parts, audioTurnPart{Index: i, StoreKey: partKey})
+			snap, snapErr := snapshotAudioCheckpoint(ckpt, meta)
 			mu.Unlock()
 
-			if saveErr := a.persistAudioCheckpoint(gctx, artifactId, ckpt, meta); saveErr != nil {
+			if snapErr != nil {
+				slog.WarnContext(gctx, "snapshot audio checkpoint failed",
+					slog.String("artifact_id", artifactId.String()),
+					slog.Any("err", snapErr))
+			} else if saveErr := s.checkpoints.save(gctx, snap); saveErr != nil {
 				slog.WarnContext(gctx, "persist audio checkpoint failed",
 					slog.String("artifact_id", artifactId.String()),
 					slog.Any("err", saveErr))
@@ -503,15 +464,11 @@ func (a *Generator) synthesizePendingTurns(
 		})
 	}
 
-	if err := g.Wait(); err != nil {
-		return err
-	}
-
-	return nil
+	return gp.Wait()
 }
 
 // assembleOrderedPCMs 按 turn index 从 OSS 读回所有逐段 PCM，形成 [0..N-1] 保序切片。
-func (a *Generator) assembleOrderedPCMs(
+func (s *audioSynthizer) assembleOrderedPCMs(
 	ctx context.Context,
 	total int,
 	meta *audioCheckpointMeta,
@@ -529,16 +486,14 @@ func (a *Generator) assembleOrderedPCMs(
 	}
 
 	out := make([]*pkgaudio.PCM, total)
-	for i := 0; i < total; i++ {
+	for i := range total {
 		key, ok := partsByIndex[i]
 		if !ok {
 			return nil, errors.ErrInner.Msgf("missing intermediate audio for turn %d", i)
 		}
-		pcm, err := a.downloadTurnPCM(ctx, key)
+		pcm, err := s.downloadTurnPCM(ctx, key)
 		if err != nil {
-			return nil, errors.WithMessagef(err,
-				"download intermediate audio for turn %d failed", i,
-			)
+			return nil, errors.WithMessagef(err, "download intermediate audio for turn %d failed", i)
 		}
 		out[i] = pcm
 	}
@@ -546,8 +501,8 @@ func (a *Generator) assembleOrderedPCMs(
 }
 
 // downloadTurnPCM 从 OSS 下载逐段 WAV 并解析为 PCM。
-func (a *Generator) downloadTurnPCM(ctx context.Context, key string) (*pkgaudio.PCM, error) {
-	resp, err := a.deps.ObjectStorage.GetObject(ctx, &storage.GetObjectRequest{Key: key})
+func (s *audioSynthizer) downloadTurnPCM(ctx context.Context, key string) (*pkgaudio.PCM, error) {
+	resp, err := s.storage.GetObject(ctx, &storage.GetObjectRequest{Key: key})
 	if err != nil {
 		return nil, err
 	}
@@ -556,7 +511,7 @@ func (a *Generator) downloadTurnPCM(ctx context.Context, key string) (*pkgaudio.
 }
 
 // cleanupIntermediateAudio 在最终 WAV 合并上传成功后批量删除中间音频，失败仅记日志。
-func (a *Generator) cleanupIntermediateAudio(ctx context.Context, meta *audioCheckpointMeta) {
+func (s *audioSynthizer) cleanupIntermediateAudio(ctx context.Context, meta *audioCheckpointMeta) {
 	if meta == nil || len(meta.Parts) == 0 {
 		return
 	}
@@ -564,7 +519,7 @@ func (a *Generator) cleanupIntermediateAudio(ctx context.Context, meta *audioChe
 	for _, p := range meta.Parts {
 		keys = append(keys, p.StoreKey)
 	}
-	if err := a.deps.ObjectStorage.BatchDeleteObject(ctx, &storage.BatchDeleteObjectRequest{
+	if err := s.storage.BatchDeleteObject(ctx, &storage.BatchDeleteObjectRequest{
 		Keys: keys,
 	}); err != nil {
 		slog.ErrorContext(ctx, "cleanup intermediate audio failed",
@@ -577,10 +532,10 @@ func (a *Generator) cleanupIntermediateAudio(ctx context.Context, meta *audioChe
 	slog.InfoContext(ctx, "intermediate audio cleaned up", slog.Int("count", len(keys)))
 }
 
-// discardStaleAudio 清理废弃的中间音频并清空 field3。
+// DiscardStale 清理废弃的中间音频并清空 field3。
 // 当 transcript 被重新生成（field2 是新写入的）但 checkpoint.field3 仍有旧数据时，
 // 旧音频与新 transcript 不匹配，必须丢弃并从零重新合成。
-func (a *Generator) discardStaleAudio(ctx context.Context, artifactId valobj.Id, ckpt *workerentity.Checkpoint) {
+func (s *audioSynthizer) discardStale(ctx context.Context, artifactId valobj.Id, ckpt *workerentity.Checkpoint) {
 	meta := restoreAudioMeta(ckpt)
 	if meta == nil || len(meta.Parts) == 0 {
 		return
@@ -591,10 +546,10 @@ func (a *Generator) discardStaleAudio(ctx context.Context, artifactId valobj.Id,
 		slog.Int("part_count", len(meta.Parts)),
 	)
 
-	a.cleanupIntermediateAudio(ctx, meta)
+	s.cleanupIntermediateAudio(ctx, meta)
 
 	ckpt.UpdateField3(nil)
-	if err := a.deps.CheckpointRepository.Save(ctx, ckpt); err != nil {
+	if err := s.checkpoints.save(ctx, ckpt); err != nil {
 		slog.ErrorContext(ctx, "clear stale audio checkpoint failed",
 			slog.String("artifact_id", artifactId.String()),
 			slog.Any("err", err),
@@ -602,7 +557,22 @@ func (a *Generator) discardStaleAudio(ctx context.Context, artifactId valobj.Id,
 	}
 }
 
-func (a *Generator) persistAudioCheckpoint(
+// snapshotAudioCheckpoint 序列化 meta 并更新 Field3，返回浅拷贝供锁外保存。
+func snapshotAudioCheckpoint(ckpt *workerentity.Checkpoint, meta *audioCheckpointMeta) (*workerentity.Checkpoint, error) {
+	if ckpt == nil {
+		return nil, errors.New("audio checkpoint is nil")
+	}
+	data, err := sonic.Marshal(meta)
+	if err != nil {
+		return nil, err
+	}
+	ckpt.UpdateField3(data)
+	snap := *ckpt
+	return &snap, nil
+}
+
+// persistAudioCheckpoint 无并发场景下直接序列化并保存 checkpoint（如失败重置路径）。
+func (s *audioSynthizer) persistAudioCheckpoint(
 	ctx context.Context,
 	artifactId valobj.Id,
 	ckpt *workerentity.Checkpoint,
@@ -616,8 +586,7 @@ func (a *Generator) persistAudioCheckpoint(
 		return err
 	}
 	if ckpt == nil {
-		loaded, loadErr := a.deps.CheckpointRepository.FindByArtifactId(ctx, artifactId)
-		if loadErr == nil && loaded != nil {
+		if loaded := s.checkpoints.load(ctx, artifactId); loaded != nil {
 			ckpt = loaded
 		} else {
 			ckpt = workerentity.NewCheckpoint(artifactId)
@@ -625,7 +594,7 @@ func (a *Generator) persistAudioCheckpoint(
 	}
 	ckpt.UpdateField3(data)
 
-	return a.deps.CheckpointRepository.Save(ctx, ckpt)
+	return s.checkpoints.save(ctx, ckpt)
 }
 
 func restoreAudioMeta(ckpt *workerentity.Checkpoint) *audioCheckpointMeta {

@@ -23,6 +23,7 @@ const (
 	StudioQuizScene          = SceneType("studio.quiz")
 	StudioDataTableScene     = SceneType("studio.data_table")
 	StudioSlidesScene        = SceneType("studio.slides")
+	StudioVideoOverviewScene = SceneType("studio.video_overview")
 )
 
 func (s SceneType) String() string {

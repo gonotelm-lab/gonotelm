@@ -56,6 +56,14 @@ func WithModel(model string) einomodel.Option {
 	return einomodel.Option{}
 }
 
+// WithMaxTokens 限制单次补全最大输出 token；<=0 时不设置（由上游默认决定）。
+func WithMaxTokens(maxTokens int) einomodel.Option {
+	if maxTokens > 0 {
+		return einomodel.WithMaxTokens(maxTokens)
+	}
+	return einomodel.Option{}
+}
+
 func WithResponseJsonObject(providerType Provider) einomodel.Option {
 	return einomodel.WrapImplSpecificOptFn(func(o *callOptions) {
 		o.ResponseFormatJSONObject = true

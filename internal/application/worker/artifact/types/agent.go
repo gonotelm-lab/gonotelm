@@ -22,7 +22,6 @@ type Agent = pkgagent.Agent[*SessionState]
 func buildSourceExploreAgent(
 	deps *WorkerDeps,
 	modelProvider llmchat.Provider,
-	model string,
 	maxRound int,
 	options []einomodel.Option,
 	notebookId valobj.Id,
@@ -56,8 +55,9 @@ func buildSourceExploreAgent(
 		})
 	} else {
 		err = ag.BindTools(map[string]einotool.InvokableTool{
-			tools.StatSourceToolName: tools.NewStatSourceTool(deps.Agentize, spChecker),
-			tools.GrepSourceToolName: tools.NewGrepSourceTool(deps.Agentize, spChecker),
+			tools.StatSourceToolName:  tools.NewStatSourceTool(deps.Agentize, spChecker),
+			tools.GrepSourceToolName:  tools.NewGrepSourceTool(deps.Agentize, spChecker),
+			tools.QuerySourceToolName: tools.NewQuerySourceTool(deps.Agentize, notebookId, spChecker),
 		})
 	}
 	if err != nil {
@@ -121,7 +121,7 @@ func (b *ExploreAgentBuilder) WithMaxRound(round int) *ExploreAgentBuilder {
 	return b
 }
 
-// WithoutBindAllTools 关闭全量工具绑定，仅绑定 StatSource/GrepSource。
+// WithoutBindAllTools 关闭全量工具绑定，仅绑定 StatSource/GrepSource/QuerySource。
 func (b *ExploreAgentBuilder) WithoutBindAllTools() *ExploreAgentBuilder {
 	b.bindAllTools = false
 	return b
@@ -136,7 +136,6 @@ func (b *ExploreAgentBuilder) Build(req *Request) (*Agent, error) {
 	return buildSourceExploreAgent(
 		b.deps,
 		b.provider,
-		b.model,
 		b.maxRound,
 		b.options,
 		req.NotebookId,

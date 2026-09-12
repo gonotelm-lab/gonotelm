@@ -7,7 +7,7 @@ import (
 )
 
 // newInfoGraphicAgent 构造 infographic 步骤的 source explore agent。
-// bindAllTools 关闭时仅绑定 StatSource/GrepSource，用于简洁模式。
+// bindAllTools 关闭时仅绑定 StatSource/GrepSource/QuerySource，用于简洁模式。
 func newInfoGraphicAgent(deps *types.WorkerDeps, req *types.Request, bindAllTools bool) (*types.Agent, error) {
 	cfg := conf.WorkerGlobal().Studio.InfoGraphic
 	builder := types.NewExploreAgentBuilder(deps).

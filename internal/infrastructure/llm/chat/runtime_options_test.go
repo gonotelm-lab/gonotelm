@@ -112,6 +112,18 @@ func TestApplyProviderCallOptions_ResponseFormatOptions(t *testing.T) {
 	})
 }
 
+func TestWithMaxTokens(t *testing.T) {
+	t.Run("positive", func(t *testing.T) {
+		opts := einomodel.GetCommonOptions(&einomodel.Options{}, WithMaxTokens(32768))
+		require.NotNil(t, opts.MaxTokens)
+		assert.Equal(t, 32768, *opts.MaxTokens)
+	})
+	t.Run("non_positive_noop", func(t *testing.T) {
+		opts := einomodel.GetCommonOptions(&einomodel.Options{}, WithMaxTokens(0), WithMaxTokens(-1))
+		assert.Nil(t, opts.MaxTokens)
+	})
+}
+
 func deepSeekFieldsForTest(streaming bool, enableThinking bool, responseFormat bool) map[string]any {
 	fields := map[string]any{}
 	if streaming {

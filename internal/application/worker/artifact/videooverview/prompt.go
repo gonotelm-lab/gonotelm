@@ -12,28 +12,32 @@ import (
 	einoschema "github.com/cloudwego/eino/schema"
 )
 
-//go:embed video-outline.jinja
-var videoOutlinePromptContent string
-
-var videoOutlineTpl = prompt.FromMessages(einoschema.Jinja2, einoschema.SystemMessage(videoOutlinePromptContent))
+//go:embed video-script.jinja
+var videoScriptPromptContent string
 
 //go:embed video-storyboard.jinja
 var videoStoryboardPromptContent string
 
+var videoScriptTpl = prompt.FromMessages(einoschema.Jinja2, einoschema.SystemMessage(videoScriptPromptContent))
 var videoStoryboardTpl = prompt.FromMessages(einoschema.Jinja2, einoschema.SystemMessage(videoStoryboardPromptContent))
 
-func RenderVideoOutline(
+func RenderVideoScript(
 	ctx context.Context,
 	sourceIds []string,
 	lang artifactentity.Language,
 	tip string,
+	style artifactentity.VideoOverviewStyle,
 ) ([]*einoschema.Message, error) {
-	msgs, err := videoOutlineTpl.Format(ctx, map[string]any{
+	msgs, err := videoScriptTpl.Format(ctx, map[string]any{
 		"SourceIds": types.NormalizeStrings(sourceIds),
 		"Language":  lang.DisplayName(),
+		"StyleInfo": map[string]any{
+			"Style":       style.String(),
+			"Description": videoStyleDescription(style),
+		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("render video outline prompt: %w", err)
+		return nil, fmt.Errorf("render video script prompt: %w", err)
 	}
 	if tipMsg := types.BuildTipMessage(tip); tipMsg != nil {
 		msgs = append(msgs, tipMsg)
@@ -47,26 +51,17 @@ func RenderVideoStoryboard(
 	lang artifactentity.Language,
 	tip string,
 	style artifactentity.VideoOverviewStyle,
-	outline *videoOutline,
+	outlineMarkdown string,
+	narrationMarkdown string,
 ) ([]*einoschema.Message, error) {
-	segments := make([]map[string]string, 0, len(outline.Segments))
-	for _, seg := range outline.Segments {
-		segments = append(segments, map[string]string{
-			"name":    seg.Name,
-			"content": seg.Content,
-		})
-	}
-
 	msgs, err := videoStoryboardTpl.Format(ctx, map[string]any{
-		"SourceIds": types.NormalizeStrings(sourceIds),
-		"Language":  lang.DisplayName(),
+		"SourceIds":         types.NormalizeStrings(sourceIds),
+		"Language":          lang.DisplayName(),
+		"OutlineMarkdown":   outlineMarkdown,
+		"NarrationMarkdown": narrationMarkdown,
 		"StyleInfo": map[string]any{
 			"Style":       style.String(),
 			"Description": videoStyleDescription(style),
-		},
-		"Outline": map[string]any{
-			"title":    outline.Title,
-			"segments": segments,
 		},
 	})
 	if err != nil {

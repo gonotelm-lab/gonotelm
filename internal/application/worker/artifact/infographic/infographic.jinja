@@ -7,7 +7,7 @@
 2) **内容忠实**：不得编造；信息不足须写“信息不足”；冲突观点并列，不自行裁决。  
 3) **调用顺序**：优先 `StatSource`，再 `QuerySource` / `GrepSource` 定位，最后才做 `ReadSource` 精读。  
 {% if DetailLevel == "concise" %}
-4) **工具白名单**：仅可调用 `StatSource`、`GrepSource`，控制`GrepSource` 次数，避免过度展开。
+4) **工具白名单**：仅可调用 `StatSource`、`GrepSource`、`QuerySource`，控制检索次数，避免过度展开。
 6) **探索深度**：`concise`。每个来源优先提炼核心信息，尽量控制检索轮次，避免过度展开。  
 7) **信息密度**：只保留最关键结论，优先覆盖“定义 / 核心机制 / 结论”三类信息，细节从简。  
 {% elif DetailLevel == "detailed" %}

@@ -6,8 +6,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 )
 
-// newVideoAgent 构造 videooverview 步骤的 source explore agent。
-func newVideoAgent(deps *types.WorkerDeps, req *types.Request) (*types.Agent, error) {
+func newVideoScriptAgent(deps *types.WorkerDeps, req *types.Request) (*types.Agent, error) {
 	cfg := conf.WorkerGlobal().Studio.VideoOverview
 	return types.NewExploreAgentBuilder(deps).
 		WithModel(cfg.ModelProvider, cfg.Model).
@@ -16,6 +15,20 @@ func newVideoAgent(deps *types.WorkerDeps, req *types.Request) (*types.Agent, er
 			chat.WithModel(cfg.Model),
 			chat.WithResponseJsonObject(cfg.ModelProvider),
 			chat.WithThinking(cfg.ModelProvider, false),
+		).
+		Build(req)
+}
+
+func newStoryboardAgent(deps *types.WorkerDeps, req *types.Request) (*types.Agent, error) {
+	cfg := conf.WorkerGlobal().Studio.VideoOverview
+	return types.NewExploreAgentBuilder(deps).
+		WithModel(cfg.ModelProvider, cfg.Model).
+		WithMaxRound(cfg.MaxRound).
+		WithoutBindAllTools().
+		WithOptions(
+			chat.WithModel(cfg.Model),
+			chat.WithThinking(cfg.ModelProvider, false),
+			chat.WithMaxTokens(16384),
 		).
 		Build(req)
 }

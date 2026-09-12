@@ -25,6 +25,7 @@ import (
 	pkgaudio "github.com/gonotelm-lab/gonotelm/pkg/audio/wav"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/httpclient"
+	"github.com/gonotelm-lab/gonotelm/pkg/safe"
 )
 
 type AudioStorageResult struct {
@@ -209,7 +210,16 @@ func (s *audioSynthizer) generate(
 		slog.Int("pending", len(turns)-len(meta.Parts)),
 	)
 
-	if err = s.synthesizePendingTurns(ctx, payload, turns, meta, req.ArtifactId, ckpt, audioGenerator, voiceByID); err != nil {
+	job := &turnSynthJob{
+		payload:    payload,
+		turns:      turns,
+		meta:       meta,
+		artifactId: req.ArtifactId,
+		ckpt:       ckpt,
+		generator:  audioGenerator,
+		voiceByID:  voiceByID,
+	}
+	if err = s.synthesizePendingTurns(ctx, job); err != nil {
 		return nil, errors.WithMessagef(err, "synthesize pending turns failed")
 	}
 
@@ -233,7 +243,7 @@ func (s *audioSynthizer) generate(
 				slog.Any("err", err),
 			)
 		}
-		if err = s.synthesizePendingTurns(ctx, payload, turns, meta, req.ArtifactId, ckpt, audioGenerator, voiceByID); err != nil {
+		if err = s.synthesizePendingTurns(ctx, job); err != nil {
 			return nil, errors.WithMessagef(err, "re-synthesize pending turns failed")
 		}
 		orderedPCMs, err = s.assembleOrderedPCMs(ctx, len(turns), meta)
@@ -290,181 +300,246 @@ func (s *audioSynthizer) generate(
 	}, nil
 }
 
-// synthesizePendingTurns 并发执行尚未出现在 meta.Parts 中的 turn 的 TTS。
-// 每段成功后立即把 WAV 上传至 OSS 并增量写 checkpoint.Field3；任一失败终止剩余任务。
-func (s *audioSynthizer) synthesizePendingTurns(
-	ctx context.Context,
-	payload *artifactentity.AudioOverviewPayload,
-	turns []synthesizedTurn,
-	meta *audioCheckpointMeta,
-	artifactId valobj.Id,
-	ckpt *workerentity.Checkpoint,
-	audioGenerator audios.Generator,
-	voiceByID map[string]string,
-) error {
-	done := len(meta.Parts)
-	if done >= len(turns) {
+// turnSynthResult 并发生成侧产出的单段结果，经 channel 交给顺序落库侧。
+type turnSynthResult struct {
+	index   int
+	partKey string
+	pcm     *pkgaudio.PCM
+}
+
+// turnSynthJob 一次 pending 合成任务的共享上下文，避免各步骤参数爆炸。
+type turnSynthJob struct {
+	payload    *artifactentity.AudioOverviewPayload
+	turns      []synthesizedTurn
+	meta       *audioCheckpointMeta
+	artifactId valobj.Id
+	ckpt       *workerentity.Checkpoint
+	generator  audios.Generator
+	voiceByID  map[string]string
+	callOpts   []audios.Option
+}
+
+// synthesizePendingTurns 并发 TTS/上传尚未完成的 turn，经 channel 顺序落 checkpoint。
+func (s *audioSynthizer) synthesizePendingTurns(ctx context.Context, job *turnSynthJob) error {
+	done := len(job.meta.Parts)
+	if done >= len(job.turns) {
 		slog.DebugContext(ctx, "[audio] all turns already synthesized, skip",
-			slog.Int("total", len(turns)),
+			slog.Int("total", len(job.turns)),
 			slog.Int("done", done),
 		)
 		return nil
 	}
 
-	slog.DebugContext(ctx, "[audio] synthesizePendingTurns start",
-		slog.Int("total", len(turns)),
-		slog.Int("done", done),
-		slog.Int("pending", len(turns)-done),
-		slog.String("provider", s.provider.String()),
-		slog.String("model", s.model),
-		slog.String("language", string(payload.Language)),
-	)
-
-	gp, gctx := errgroup.WithContext(ctx)
-	gp.SetLimit(s.concurrency)
-
-	var callOpts []audios.Option
-	if opt := text2audio.WAVOption(s.provider); opt != nil {
-		callOpts = append(callOpts, opt)
-	}
-
-	// protected 内 meta + ckpt 的增量读写：每段成功立刻持久化 checkpoint。
-	var mu sync.Mutex
-
-	doneSet := make(map[int]bool, len(meta.Parts))
-	for _, p := range meta.Parts {
+	doneSet := make(map[int]bool, len(job.meta.Parts))
+	for _, p := range job.meta.Parts {
 		doneSet[p.Index] = true
 	}
 
-	for i := range turns {
-		if doneSet[i] {
-			continue
+	pendingIdx := make([]int, 0, len(job.turns)-done)
+	for i := range job.turns {
+		if !doneSet[i] {
+			pendingIdx = append(pendingIdx, i)
 		}
+	}
+	if len(pendingIdx) == 0 {
+		return nil
+	}
+
+	slog.DebugContext(ctx, "[audio] synthesizePendingTurns start",
+		slog.Int("total", len(job.turns)),
+		slog.Int("done", done),
+		slog.Int("pending", len(pendingIdx)),
+		slog.String("provider", s.provider.String()),
+		slog.String("model", s.model),
+		slog.String("language", string(job.payload.Language)),
+	)
+
+	if opt := text2audio.WAVOption(s.provider); opt != nil {
+		job.callOpts = append(job.callOpts, opt)
+	}
+
+	results := make(chan turnSynthResult, s.concurrency)
+	saveCtx, saveCancel := context.WithCancel(ctx)
+	defer saveCancel()
+
+	var saveErr error
+	var saveWG sync.WaitGroup
+	safe.Go2(ctx, "audio.synthesize.save_checkpoint", &saveWG, func(ctx context.Context) {
+		saveErr = s.persistTurnSynthResults(ctx, job, results, saveCancel)
+	})
+
+	synthErr := s.synthesizeTurnsConcurrent(saveCtx, job, pendingIdx, results)
+	close(results)
+	saveWG.Wait()
+
+	if saveErr != nil {
+		return saveErr
+	}
+	return synthErr
+}
+
+// synthesizeTurnsConcurrent 并发生成并上传各 turn，成功结果写入 results。
+func (s *audioSynthizer) synthesizeTurnsConcurrent(
+	ctx context.Context,
+	job *turnSynthJob,
+	pendingIdx []int,
+	results chan<- turnSynthResult,
+) error {
+	gp, gctx := errgroup.WithContext(ctx)
+	gp.SetLimit(s.concurrency)
+
+	for _, idx := range pendingIdx {
+		i := idx
 		gp.Go(func() error {
-			turn := &turns[i]
-			voice, ok := voiceByID[turn.SpeakerName]
-			if !ok {
-				err := errors.ErrInner.Msgf(
-					"no voice mapping for speaker %q (turn %d)",
-					turn.SpeakerName, i,
-				)
-				slog.ErrorContext(gctx, "[audio] turn failed: no voice mapping",
-					slog.Int("turn_index", i),
-					slog.String("speaker", turn.SpeakerName),
-					slog.Any("err", err),
-				)
-				return err
-			}
-
-			ttsReq := &schema.Request{
-				Model:       s.model,
-				Text:        turn.Text,
-				Voice:       voice,
-				Language:    text2audio.AudioLang(string(payload.Language)),
-				Instruction: turn.Instruction,
-			}
-
-			resp, err := audioGenerator.Generate(gctx, ttsReq, callOpts...)
-			if err != nil {
-				slog.ErrorContext(gctx, "[audio] turn TTS generate failed",
-					slog.Int("turn_index", i),
-					slog.String("speaker", turn.SpeakerName),
-					slog.String("voice", voice),
-					slog.Any("err", err),
-				)
-				return errors.Wrapf(err, "tts generate failed for turn %d (speaker=%s)", i, turn.SpeakerName)
-			}
-
-			reader, err := audioutil.ResolveResponse(resp,
-				audioutil.WithResolveContext(gctx),
-				audioutil.WithResolveHttpClient(s.downloadClient),
-			)
-			if err != nil {
-				slog.ErrorContext(gctx, "[audio] turn resolve response failed",
-					slog.Int("turn_index", i),
-					slog.Any("err", err),
-				)
-				return errors.WithMessagef(err, "resolve tts audio for turn %d failed", i)
-			}
-			defer reader.Close()
-
-			raw, err := io.ReadAll(reader)
-			if err != nil {
-				slog.ErrorContext(gctx, "[audio] turn read audio failed",
-					slog.Int("turn_index", i),
-					slog.Any("err", err),
-				)
-				return errors.Wrapf(errors.ErrInner, "read tts audio for turn %d failed, err=%v", i, err)
-			}
-
-			pcm, err := pkgaudio.Parse(raw)
-			if err != nil {
-				slog.ErrorContext(gctx, "[audio] turn parse wav failed",
-					slog.Int("turn_index", i),
-					slog.Int("audio_bytes", len(raw)),
-					slog.Any("err", err),
-				)
-				return errors.Wrapf(errors.ErrInner, "parse wav for turn %d failed, err=%v", i, err)
-			}
-
-			// meta 为并发共享对象，格式校验读取也需持锁
-			mu.Lock()
-			fmtErr := assertOrInitFormat(meta, pcm)
-			mu.Unlock()
-			if fmtErr != nil {
-				slog.ErrorContext(gctx, "[audio] turn format incompatible",
-					slog.Int("turn_index", i),
-					slog.Any("err", fmtErr),
-				)
-				return errors.Wrapf(errors.ErrInner, "format incompatible for turn %d, err=%v", i, fmtErr)
-			}
-
-			partKey := formatIntermediateAudioStoreKey(payload.NotebookId, artifactId, i)
-			if err = s.storage.UploadObject(gctx, &storage.UploadObjectRequest{
-				Key:         partKey,
-				Body:        raw,
-				ContentType: "audio/wav",
-			}); err != nil {
-				slog.ErrorContext(gctx, "[audio] turn upload intermediate audio failed",
-					slog.Int("turn_index", i),
-					slog.String("part_key", partKey),
-					slog.Any("err", err),
-				)
-				return errors.Wrapf(errors.ErrInner, "upload intermediate audio for turn %d failed, err=%v", i, err)
-			}
-
-			// 落 checkpoint 必须在 OSS 上传成功之后；锁内只做快照，DB 写入在锁外。
-			mu.Lock()
-			if meta.NumChannels == 0 {
-				meta.NumChannels = pcm.NumChannels
-				meta.SampleRate = pcm.SampleRate
-				meta.BitsPerSample = pcm.BitsPerSample
-			}
-			meta.Parts = append(meta.Parts, audioTurnPart{Index: i, StoreKey: partKey})
-			snap, snapErr := snapshotAudioCheckpoint(ckpt, meta)
-			mu.Unlock()
-
-			if snapErr != nil {
-				slog.WarnContext(gctx, "snapshot audio checkpoint failed",
-					slog.String("artifact_id", artifactId.String()),
-					slog.Any("err", snapErr))
-			} else if err := s.checkpoints.save(gctx, snap); err != nil {
-				slog.WarnContext(gctx, "persist audio checkpoint failed",
-					slog.String("artifact_id", artifactId.String()),
-					slog.Any("err", err))
-				// checkpoint 失败不阻断本轮，但下次重试将重复上传这段；可接受。
-			}
-
-			slog.DebugContext(gctx, "podcast audio turn synthesized",
-				slog.String("artifact_id", artifactId.String()),
-				slog.Int("turn", i),
-				slog.Int("pcm_bytes", len(pcm.Data)),
-			)
-			return nil
+			return s.synthesizeOneTurn(gctx, job, i, results)
 		})
 	}
 
 	return gp.Wait()
+}
+
+// synthesizeOneTurn 单段 TTS → 解析 → 上传中间 WAV，再投递到 results。
+func (s *audioSynthizer) synthesizeOneTurn(
+	ctx context.Context,
+	job *turnSynthJob,
+	index int,
+	results chan<- turnSynthResult,
+) error {
+	turn := &job.turns[index]
+	voice, ok := job.voiceByID[turn.SpeakerName]
+	if !ok {
+		err := errors.ErrInner.Msgf(
+			"no voice mapping for speaker %q (turn %d)",
+			turn.SpeakerName, index,
+		)
+		slog.ErrorContext(ctx, "[audio] turn failed: no voice mapping",
+			slog.Int("turn_index", index),
+			slog.String("speaker", turn.SpeakerName),
+			slog.Any("err", err),
+		)
+		return err
+	}
+
+	ttsReq := &schema.Request{
+		Model:       s.model,
+		Text:        turn.Text,
+		Voice:       voice,
+		Language:    text2audio.AudioLang(string(job.payload.Language)),
+		Instruction: turn.Instruction,
+	}
+
+	resp, err := job.generator.Generate(ctx, ttsReq, job.callOpts...)
+	if err != nil {
+		slog.ErrorContext(ctx, "[audio] turn TTS generate failed",
+			slog.Int("turn_index", index),
+			slog.String("speaker", turn.SpeakerName),
+			slog.String("voice", voice),
+			slog.Any("err", err),
+		)
+		return errors.Wrapf(err, "tts generate failed for turn %d (speaker=%s)", index, turn.SpeakerName)
+	}
+
+	reader, err := audioutil.ResolveResponse(resp,
+		audioutil.WithResolveContext(ctx),
+		audioutil.WithResolveHttpClient(s.downloadClient),
+	)
+	if err != nil {
+		slog.ErrorContext(ctx, "[audio] turn resolve response failed",
+			slog.Int("turn_index", index),
+			slog.Any("err", err),
+		)
+		return errors.WithMessagef(err, "resolve tts audio for turn %d failed", index)
+	}
+	defer reader.Close()
+
+	raw, err := io.ReadAll(reader)
+	if err != nil {
+		slog.ErrorContext(ctx, "[audio] turn read audio failed",
+			slog.Int("turn_index", index),
+			slog.Any("err", err),
+		)
+		return errors.Wrapf(errors.ErrInner, "read tts audio for turn %d failed, err=%v", index, err)
+	}
+
+	pcm, err := pkgaudio.Parse(raw)
+	if err != nil {
+		slog.ErrorContext(ctx, "[audio] turn parse wav failed",
+			slog.Int("turn_index", index),
+			slog.Int("audio_bytes", len(raw)),
+			slog.Any("err", err),
+		)
+		return errors.Wrapf(errors.ErrInner, "parse wav for turn %d failed, err=%v", index, err)
+	}
+
+	partKey := formatIntermediateAudioStoreKey(job.payload.NotebookId, job.artifactId, index)
+	if err = s.storage.UploadObject(ctx, &storage.UploadObjectRequest{
+		Key:         partKey,
+		Body:        raw,
+		ContentType: "audio/wav",
+	}); err != nil {
+		slog.ErrorContext(ctx, "[audio] turn upload intermediate audio failed",
+			slog.Int("turn_index", index),
+			slog.String("part_key", partKey),
+			slog.Any("err", err),
+		)
+		return errors.Wrapf(errors.ErrInner, "upload intermediate audio for turn %d failed, err=%v", index, err)
+	}
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case results <- turnSynthResult{index: index, partKey: partKey, pcm: pcm}:
+		return nil
+	}
+}
+
+// persistTurnSynthResults 单消费者顺序落 checkpoint；格式失败时 cancel 并排空 channel。
+func (s *audioSynthizer) persistTurnSynthResults(
+	ctx context.Context,
+	job *turnSynthJob,
+	results <-chan turnSynthResult,
+	onFatal func(),
+) error {
+	var saveErr error
+	for r := range results {
+		if saveErr != nil {
+			continue
+		}
+		if err := assertOrInitFormat(job.meta, r.pcm); err != nil {
+			slog.ErrorContext(ctx, "[audio] turn format incompatible",
+				slog.Int("turn_index", r.index),
+				slog.Any("err", err),
+			)
+			saveErr = errors.Wrapf(errors.ErrInner, "format incompatible for turn %d, err=%v", r.index, err)
+			if onFatal != nil {
+				onFatal()
+			}
+			continue
+		}
+		if job.meta.NumChannels == 0 {
+			job.meta.NumChannels = r.pcm.NumChannels
+			job.meta.SampleRate = r.pcm.SampleRate
+			job.meta.BitsPerSample = r.pcm.BitsPerSample
+		}
+		job.meta.Parts = append(job.meta.Parts, audioTurnPart{Index: r.index, StoreKey: r.partKey})
+		snap, snapErr := snapshotAudioCheckpoint(job.ckpt, job.meta)
+		if snapErr != nil {
+			slog.WarnContext(ctx, "snapshot audio checkpoint failed",
+				slog.String("artifact_id", job.artifactId.String()),
+				slog.Any("err", snapErr))
+		} else if err := s.checkpoints.save(ctx, snap); err != nil {
+			slog.WarnContext(ctx, "persist audio checkpoint failed",
+				slog.String("artifact_id", job.artifactId.String()),
+				slog.Any("err", err))
+		}
+
+		slog.DebugContext(ctx, "podcast audio turn synthesized",
+			slog.String("artifact_id", job.artifactId.String()),
+			slog.Int("turn", r.index),
+			slog.Int("pcm_bytes", len(r.pcm.Data)),
+		)
+	}
+	return saveErr
 }
 
 // assembleOrderedPCMs 按 turn index 从 OSS 读回所有逐段 PCM，形成 [0..N-1] 保序切片。
@@ -557,7 +632,7 @@ func (s *audioSynthizer) discardStale(ctx context.Context, artifactId valobj.Id,
 	}
 }
 
-// snapshotAudioCheckpoint 序列化 meta 并更新 Field3，返回浅拷贝供锁外保存。
+// snapshotAudioCheckpoint 序列化 meta 并更新 Field3，返回浅拷贝供顺序 Save。
 func snapshotAudioCheckpoint(ckpt *workerentity.Checkpoint, meta *audioCheckpointMeta) (*workerentity.Checkpoint, error) {
 	if ckpt == nil {
 		return nil, errors.New("audio checkpoint is nil")
@@ -633,8 +708,7 @@ func formatAudioStoreKey(notebookId, artifactId valobj.Id) string {
 	return fmt.Sprintf("artifact/%s/%s.wav", notebookId.String(), artifactId.String())
 }
 
-// formatIntermediateAudioStoreKey 格式 artifact/{nb}/{art}/audio/turn_{index:06d}.wav
 func formatIntermediateAudioStoreKey(notebookId, artifactId valobj.Id, index int) string {
-	return fmt.Sprintf("artifact/%s/%s/audio/turn_%06d.wav",
+	return fmt.Sprintf("tmp/artifact/%s/%s/audio/turn_%06d.wav",
 		notebookId.String(), artifactId.String(), index)
 }

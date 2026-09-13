@@ -9,12 +9,12 @@ import (
 	"github.com/bytedance/sonic"
 	einoschema "github.com/cloudwego/eino/schema"
 
-	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/audiooverview/assets/voices"
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	workerentity "github.com/gonotelm-lab/gonotelm/internal/domain/worker/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio/voices"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"

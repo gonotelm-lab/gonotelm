@@ -77,7 +77,7 @@ func (g *hyperframesVideoGenerator) generate(
 	}
 
 	if err := agent.AppendTools(map[string]einotool.InvokableTool{
-		tools.BashToolName:      tools.NewBashTool(sandbox),
+		tools.BashToolName:      tools.NewBashTool(sandbox, workspaceDir),
 		tools.ReadFileToolName:  tools.NewReadFileTool(sandbox),
 		tools.WriteFileToolName: tools.NewWriteFileTool(sandbox),
 		tools.EditFileToolName:  tools.NewEditFileTool(sandbox),
@@ -170,12 +170,14 @@ func (g *hyperframesVideoGenerator) getSandboxService() (*sandboxservice.Service
 
 // sandbox 工作目录结构如下：
 //
-//	/tmp/{userId}/{notebookId}/                 ← 沙箱 WorkspaceDir（Bash 默认 cwd、真实 vendor）
+//	/tmp/{userId}/{notebookId}/                 ← 沙箱 WorkspaceDir（真实 vendor）
 //	├── vendor/                                 ← 沙箱上传的 vendor（含 gsap.browser.js）
 //	└── studiovideooverview/
-//	    └── {artifactId}/                       ← 视频逻辑工作区（prompt WorkspaceDir）
+//	    └── {artifactId}/                       ← 视频逻辑工作区（prompt WorkspaceDir、Bash cwd）
 //	        ├── vendor -> ../../vendor          ← 软链，兼容相对路径 vendor/gsap.browser.js
 //	        ├── audio/audio_{seg}-{line}.wav
+//	        ├── .check/                         ← 逐镜临时校验目录
+//	        ├── render.log / ffmpeg.log         ← 渲染/压制日志
 //	        ├── index.html
 //	        └── output/video.mp4
 
@@ -183,10 +185,12 @@ func ensureVideoOverviewWorkspace(ctx context.Context, sandbox sandboxent.Sandbo
 	vendorLink := path.Join(workspaceDir, "vendor")
 	audioDir := path.Join(workspaceDir, "audio")
 	outputDir := path.Join(workspaceDir, "output")
+	checkDir := path.Join(workspaceDir, ".check")
 	cmd := fmt.Sprintf(
-		"mkdir -p %s %s && ln -sfn ../../vendor %s && test -s %s/gsap.browser.js",
+		"mkdir -p %s %s %s && ln -sfn ../../vendor %s && test -s %s/gsap.browser.js",
 		shellQuote(audioDir),
 		shellQuote(outputDir),
+		shellQuote(checkDir),
 		shellQuote(vendorLink),
 		shellQuote(vendorLink),
 	)

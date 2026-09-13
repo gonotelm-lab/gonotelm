@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"strings"
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
@@ -37,6 +38,7 @@ func RenderVideoScript(
 		"Language":    lang.DisplayName(),
 		"VisualStyle": style.String(),
 		"StyleInfo":   videoStyleInfo(style),
+		"Tip":         strings.TrimSpace(tip),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("render video script prompt: %w", err)
@@ -63,6 +65,7 @@ func RenderVideoStoryboard(
 		"NarrationMarkdown": narrationMarkdown,
 		"VisualStyle":       style.String(),
 		"StyleInfo":         videoStyleInfo(style),
+		"Tip":               strings.TrimSpace(tip),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("render video storyboard prompt: %w", err)
@@ -93,6 +96,7 @@ func RenderVideoGenerate(
 		"OutputLocation":        outputLocation,
 		"StoryboardMarkdown":    storyboardMarkdown,
 		"AudioManifestMarkdown": audioManifestMarkdown,
+		"Tip":                   strings.TrimSpace(tip),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("render video generate prompt: %w", err)

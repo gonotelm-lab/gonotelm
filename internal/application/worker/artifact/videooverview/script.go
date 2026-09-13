@@ -7,11 +7,15 @@ import (
 	"strings"
 
 	"github.com/bytedance/sonic"
+	einoschema "github.com/cloudwego/eino/schema"
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
+	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	workerentity "github.com/gonotelm-lab/gonotelm/internal/domain/worker/entity"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio/voices"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
@@ -19,11 +23,17 @@ import (
 
 const scriptCompensate = 3
 
+// videoScriptLine 逐句口播：text 送 TTS 朗读，voice_instruction 控制该句语气/节奏。
+type videoScriptLine struct {
+	Text             string `json:"text"`
+	VoiceInstruction string `json:"voice_instruction"`
+}
+
 // videoScript 口播稿：板块构思（content）+ 逐句旁白（lines），写入 checkpoint.field1。
 type videoScriptSegment struct {
-	Name    string   `json:"name"`
-	Content string   `json:"content"`
-	Lines   []string `json:"lines"`
+	Name    string            `json:"name"`
+	Content string            `json:"content"`
+	Lines   []videoScriptLine `json:"lines"`
 }
 
 type videoScript struct {
@@ -91,12 +101,17 @@ func (s *videoScript) renderNarrationMarkdown(meta *audioCheckpointMeta) string 
 
 // scriptGenerator 一次探索生成口播稿（先构思板块再写 lines），写入 checkpoint.field1。
 type scriptGenerator struct {
-	deps        *types.WorkerDeps
-	checkpoints *checkpointStore
+	deps          *types.WorkerDeps
+	checkpoints   *checkpointStore
+	audioProvider text2audio.Text2AudioProvider
 }
 
 func newScriptGenerator(deps *types.WorkerDeps, checkpoints *checkpointStore) *scriptGenerator {
-	return &scriptGenerator{deps: deps, checkpoints: checkpoints}
+	return &scriptGenerator{
+		deps:          deps,
+		checkpoints:   checkpoints,
+		audioProvider: conf.WorkerGlobal().Studio.VideoOverview.AudioModelProvider,
+	}
 }
 
 func (g *scriptGenerator) ensure(
@@ -135,6 +150,10 @@ func (g *scriptGenerator) generate(
 		return nil, errors.WithMessagef(err, "render video script prompt failed")
 	}
 
+	if skill := voices.GetProviderSkill(g.audioProvider); skill != "" {
+		msgs = append(msgs, einoschema.UserMessage(skill))
+	}
+
 	ag, err := newVideoScriptAgent(g.deps, req)
 	if err != nil {
 		return nil, err
@@ -153,10 +172,13 @@ func (g *scriptGenerator) compensateRules(validateErr error) []string {
 		"JSON must contain only `title` and `segments`",
 		"`segments` is a non-empty array; each element has `name`, `content`, and `lines`",
 		"`content` is the segment plan (what to cover), not the spoken narration",
-		"`lines` is an array of short spoken sentences for TTS — one sentence per element, no long paragraphs",
-		"each line must be spoken-style plain text, no markdown, emoji, urls, parentheses asides, or newlines",
-		"resolve ambiguous readings in lines by context (Roman numerals, single letters, English acronyms, mixed symbols) into unambiguous spoken Chinese/phonetic form for TTS; keep the same reading consistent across the script",
-		"never include system internals in title/name/content/lines: source ids, tool names, checkpoint/artifact fields, or meta narration about tools",
+		"`lines` is an array of objects; each element has `text` and `voice_instruction`",
+		"`text` is one short spoken sentence for TTS, no long paragraphs",
+		"`text` must be spoken-style plain text, no markdown, emoji, urls, parentheses asides, or newlines",
+		"`voice_instruction` is a natural-language voice direction for that line (pace, emotion, tone, style), not a restatement of `text`",
+		"resolve ambiguous readings in `text` by context (Roman numerals, single letters, English acronyms, mixed symbols) into unambiguous spoken Chinese/phonetic form for TTS; ",
+		"keep the same reading consistent across the script",
+		"never include system internals in title/name/content/text/voice_instruction: source ids, tool names, checkpoint/artifact fields, or meta narration about tools",
 		"plan each segment (name+content) first, then write lines",
 	}
 	if validateErr != nil {
@@ -232,10 +254,11 @@ func (g *scriptGenerator) parse(ctx context.Context, content string) (*videoScri
 		}
 
 		for j := range seg.Lines {
-			line := strings.Join(strings.Fields(seg.Lines[j]), " ")
-			seg.Lines[j] = line
-			if line == "" {
-				return nil, fmt.Errorf("segment[%d] lines[%d] is empty", i, j)
+			line := &seg.Lines[j]
+			line.Text = strings.Join(strings.Fields(line.Text), " ")
+			line.VoiceInstruction = strings.TrimSpace(line.VoiceInstruction)
+			if line.Text == "" {
+				return nil, fmt.Errorf("segment[%d] lines[%d] text is empty", i, j)
 			}
 		}
 	}

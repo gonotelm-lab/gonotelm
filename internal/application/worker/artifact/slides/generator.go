@@ -319,9 +319,12 @@ func (g *Generator) generatePPTX(
 		return nil, errors.WithMessage(err, "infer check pptx tool failed")
 	}
 
+	sandboxDesc := sandbox.Description()
+	workspaceDir := path.Join(sandboxDesc.Key.WorkspaceDir(), types.StudioSlidesDir, req.ArtifactId.String())
+
 	// 额外绑定沙箱工具
 	err = agent.AppendTools(map[string]einotool.InvokableTool{
-		tools.BashToolName:      tools.NewBashTool(sandbox),
+		tools.BashToolName:      tools.NewBashTool(sandbox, workspaceDir),
 		tools.ReadFileToolName:  tools.NewReadFileTool(sandbox),
 		tools.WriteFileToolName: tools.NewWriteFileTool(sandbox),
 		tools.EditFileToolName:  tools.NewEditFileTool(sandbox),
@@ -332,9 +335,6 @@ func (g *Generator) generatePPTX(
 		return nil, errors.Wrap(err, "gen pptx agent append tools failed")
 	}
 
-	sandboxDesc := sandbox.Description()
-	// slides 工作区：Workspace/{StudioSlidesDir}/{artifactId}，隔离同 notebook 多 artifact
-	workspaceDir := path.Join(sandboxDesc.Key.WorkspaceDir(), types.StudioSlidesDir, req.ArtifactId.String())
 	if err := ensureSlidesWorkspace(ctx, sandbox, workspaceDir); err != nil {
 		return nil, err
 	}

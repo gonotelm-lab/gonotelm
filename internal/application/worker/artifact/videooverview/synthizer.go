@@ -61,9 +61,10 @@ type audioLinePart struct {
 }
 
 type synthesizedLine struct {
-	SegmentIndex int
-	LineIndex    int
-	Text         string
+	SegmentIndex     int
+	LineIndex        int
+	Text             string
+	VoiceInstruction string
 }
 
 // audioSynthizer 按口播稿逐句 TTS 并上传 OSS，写入 field2；不做整轨拼接。
@@ -103,10 +104,12 @@ func (s *audioSynthizer) collectLines(script *videoScript) []synthesizedLine {
 	for si := range script.Segments {
 		seg := &script.Segments[si]
 		for li := range seg.Lines {
+			line := &seg.Lines[li]
 			lines = append(lines, synthesizedLine{
-				SegmentIndex: si,
-				LineIndex:    li,
-				Text:         seg.Lines[li],
+				SegmentIndex:     si,
+				LineIndex:        li,
+				Text:             line.Text,
+				VoiceInstruction: line.VoiceInstruction,
 			})
 		}
 	}
@@ -266,10 +269,11 @@ func (s *audioSynthizer) synthesizeOneLine(
 	line := &job.lines[index]
 
 	ttsReq := &schema.Request{
-		Model:    s.model,
-		Text:     line.Text,
-		Voice:    job.voice,
-		Language: text2audio.AudioLang(string(job.payload.GetLanguage())),
+		Model:       s.model,
+		Text:        line.Text,
+		Voice:       job.voice,
+		Language:    text2audio.AudioLang(string(job.payload.GetLanguage())),
+		Instruction: line.VoiceInstruction,
 	}
 
 	resp, err := job.generator.Generate(ctx, ttsReq, job.callOpts...)

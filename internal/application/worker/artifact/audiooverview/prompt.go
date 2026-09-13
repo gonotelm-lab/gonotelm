@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"strings"
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 
@@ -42,6 +43,7 @@ func RenderPodcastOutline(
 		StyleDesc:     ep.Description,
 		Speakers:      ep.Speakers,
 		NumOfSegments: ep.NumSegments,
+		Tip:           tips,
 	}
 
 	msgs, err := podcastOutlineTpl.Format(ctx, vars.PromptVars())
@@ -83,6 +85,7 @@ func RenderPodcastTranscript(
 		Speakers:     ep.Speakers,
 		SpeakerRoles: ep.SpeakerRoles,
 		SegmentFlow:  ep.SegmentFlow,
+		Tip:          tips,
 		Outline: map[string]any{
 			"title":    outline.Title,
 			"segments": segments,
@@ -107,6 +110,7 @@ type StudioPodcastOutlineTemplateVars struct {
 	Language      artifactentity.Language
 	Style         artifactentity.AudioOverviewStyle
 	StyleDesc     string
+	Tip           string
 }
 
 func (v StudioPodcastOutlineTemplateVars) PromptVars() map[string]any {
@@ -115,6 +119,7 @@ func (v StudioPodcastOutlineTemplateVars) PromptVars() map[string]any {
 		"Speakers":      v.Speakers,
 		"NumOfSegments": v.NumOfSegments,
 		"Language":      v.Language.DisplayName(),
+		"Tip":           strings.TrimSpace(v.Tip),
 		"StyleInfo": map[string]any{
 			"Style":       v.Style,
 			"Description": v.StyleDesc,
@@ -130,6 +135,7 @@ type StudioPodcastTranscriptTemplateVars struct {
 	Language     artifactentity.Language
 	Style        artifactentity.AudioOverviewStyle
 	StyleDesc    string
+	Tip          string
 	Outline      map[string]any
 }
 
@@ -140,6 +146,7 @@ func (v StudioPodcastTranscriptTemplateVars) PromptVars() map[string]any {
 		"SpeakerRoles": v.SpeakerRoles,
 		"SegmentFlow":  v.SegmentFlow,
 		"Language":     v.Language.DisplayName(),
+		"Tip":          strings.TrimSpace(v.Tip),
 		"StyleInfo": map[string]any{
 			"Style":       v.Style,
 			"Description": v.StyleDesc,

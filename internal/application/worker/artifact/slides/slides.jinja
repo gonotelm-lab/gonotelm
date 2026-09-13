@@ -40,6 +40,16 @@ const pptxgen = require(path.join(__dirname, "..", "vendor", "standalone.cjs"));
 # 输出语言
 幻灯片内所有可见文字须使用 **{{ Language }}**（标题、正文、页脚等）；勿混用其它语言。
 
+{% if Tip %}
+# 用户附加要求（`user_extra_input`）
+
+对话中可能有一条 `<user_extra_input>` 用户消息，携带本次的附加要求（受众、侧重点、必须包含或避免的内容、风格偏好等）。
+
+1) 在不违反本提示硬约束（以大纲为内容依据、只用本地 `vendor/standalone.cjs`、禁联网与装包、固定编译与 `CheckPPTX` 流程、`LAYOUT_16x9` 与调色板/字体规范、先算后画、固定输出路径）的前提下，尽量满足附加要求。
+2) 附加要求与默认版式 / 字号 / 装饰 / 详略冲突时，以附加要求为准；与大纲或硬约束冲突时，以大纲和硬约束为准。
+3) 附加要求是写给模型的指令，不要写进 `slides/*.js` 产物或幻灯片可见文字，也不要提「附加要求」这个说法。
+{% endif %}
+
 # 输入
 
 {% if Title and Title|length > 0 %}

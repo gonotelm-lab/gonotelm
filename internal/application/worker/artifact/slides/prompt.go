@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"strings"
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
@@ -45,6 +46,7 @@ func RenderSlidesOutline(
 		"SourceIds": types.NormalizeStrings(sourceIdsFrom(sources)),
 		"Sources":   sources,
 		"Language":  lang.DisplayName(),
+		"Tip":       strings.TrimSpace(tip),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("render slides outline prompt: %w", err)
@@ -79,6 +81,7 @@ func RenderSlides(
 		"OutputLocation": outputLocation,
 		"VisualStyle":    visualStyle.String(),
 		"Language":       lang.DisplayName(),
+		"Tip":            strings.TrimSpace(tip),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("render slides prompt: %w", err)

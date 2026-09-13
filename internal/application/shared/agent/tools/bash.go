@@ -33,11 +33,13 @@ func init() {
 // BashTool 在沙箱中执行命令
 type BashTool struct {
 	sandbox sandboxentity.Sandbox
+	cwd     string
 }
 
-func NewBashTool(sb sandboxentity.Sandbox) *BashTool {
+func NewBashTool(sb sandboxentity.Sandbox, cwd string) *BashTool {
 	return &BashTool{
 		sandbox: sb,
+		cwd:     cwd,
 	}
 }
 
@@ -88,6 +90,7 @@ func (t *BashTool) InvokableRun(
 	timeout := time.Duration(timeoutMs) * time.Millisecond
 
 	exec, err := t.sandbox.Run(ctx, sandboxentity.Command{
+		Cwd:     t.cwd,
 		Command: input.Command,
 		Timeout: timeout,
 	})

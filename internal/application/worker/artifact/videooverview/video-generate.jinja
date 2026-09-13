@@ -34,6 +34,8 @@ HyperFrames 用 HTML 描述画面与时间。本项目**默认走模块化架构
 ├── vendor/gsap.browser.js              ← 浏览器版 GSAP（含 TextPlugin），禁止安装或另找库
 ├── audio/audio_{seg}-{line}.wav        ← 逐句旁白，已就绪，禁止改动
 ├── compositions/shot-01.html …         ← 每镜一个子 composition（你写）
+├── .check/                             ← 逐镜临时校验目录（已就绪；不要用 /tmp 固定共享路径）
+├── render.log / ffmpeg.log             ← 渲染/压制日志（运行时生成）
 ├── index.html                          ← 薄编排层：槽位 + 音频 + 根时间线（你写）
 └── output/                             ← 最终产物目录
 ```
@@ -64,6 +66,16 @@ HyperFrames 用 HTML 描述画面与时间。本项目**默认走模块化架构
 # 输出语言
 
 画面内所有可见文字使用 **{{ Language }}**（标题、字幕、标签、数据）；勿混用其它语言。
+
+{% if Tip %}
+# 用户附加要求（`user_extra_input`）
+
+对话中可能有一条 `<user_extra_input>` 用户消息，携带本次的附加要求（画面打磨、字幕可读性、转场偏好、必须避免的效果等）。
+
+1) 在不违反本提示硬约束（HyperFrames 契约、模块化架构、本地 GSAP、禁联网、确定性渲染、渲染/校验流程）的前提下，尽量满足附加要求。
+2) 分镜稿是画面与节奏的权威依据：附加要求不得新增分镜外内容、不得改动口播与时间轴；与分镜冲突时以分镜为准，与硬约束冲突时以硬约束为准。
+3) 附加要求是写给模型的指令，不要写进 HTML 注释或画面文字，也不要提「附加要求」这个说法。
+{% endif %}
 
 # 输入
 
@@ -99,10 +111,10 @@ HyperFrames 用 HTML 描述画面与时间。本项目**默认走模块化架构
 # 工作流程
 
 1. **恢复现场（重试必做，先于一切）**：用一次合并命令盘点 Workspace 现有产物：
-   `ls -la; ls compositions/ 2>/dev/null | wc -l; test -f index.html && echo INDEX_OK; test -s output/video.mp4 && echo MP4_OK; pgrep -f '[h]yperframes render' >/dev/null && echo RENDER_RUNNING`
+   `ls -la; ls compositions/ 2>/dev/null | wc -l; test -f index.html && echo INDEX_OK; test -s output/video.mp4 && echo MP4_OK; pgrep -f "[h]yperframes render.*{{ OutputLocation }}" >/dev/null && echo RENDER_RUNNING`
    按现场决定起点，**禁止推倒重来**：
    - `output/video.mp4` 已存在且非空 → 跳到步骤 8「压制」（码率已 < 1 Mbps 说明压过，直接跳到步骤 9），不要重写任何文件。
-   - `RENDER_RUNNING` → 不要重启渲染，按「渲染阶段（长任务）」等待结束后做步骤 8-10。
+   - `RENDER_RUNNING` → 本任务的渲染进程已在跑（重试），不要重启；按「渲染阶段（长任务）」等待结束后做步骤 8-10。
    - `index.html` 与 `compositions/shot-NN.html` 齐全 → 跳到步骤 6 `hyperframes check`；只修报错的文件，已通过的部分跳过。
    - 只写了一部分镜头 → 跳到步骤 4，只补缺失或报错的镜头，已存在的文件不要重写，再走步骤 5-10。
    - 目录为空 → 从步骤 2 正常执行。
@@ -114,16 +126,17 @@ HyperFrames 用 HTML 描述画面与时间。本项目**默认走模块化架构
 4. **逐镜写子 composition**：对每个 Shot `N` 写 `compositions/shot-NN.html`（两位编号：`shot-01`…）。
    - 文件必须是**可独立校验**的子 composition（见下方骨架）。
    - v0.8.35 的 `check` / `lint` 只认项目目录且要求有 `index.html`
-   - 逐镜校验用临时校验目录：在 `/tmp` 建一个目录，软链 `vendor/` 与 `compositions/`，
-     放一个只挂当前镜的最小 `index.html`，然后 `hyperframes lint <临时目录>`；修到 0 error 再写下一镜。
+   - 逐镜校验用本任务专用临时目录 `{{ WorkspaceDir }}/.check`（已建好；勿用 `/tmp` 固定共享路径）：
+     软链 `{{ WorkspaceDir }}/vendor` 与 `{{ WorkspaceDir }}/compositions`，放一个只挂当前镜的最小 `index.html`，
+     然后 `hyperframes lint {{ WorkspaceDir }}/.check`；修到 0 error 再写下一镜。
 5. **拼薄 `index.html`**：只放 host 槽位（`data-composition-src`）、全部 `<audio>`、近空根时间线
    （转场写在根上操作槽位）。音频用**全局时间**；子文件内动画用**局部时间（从 0）**。
 6. **整项目质检**：`hyperframes check`（默认入口 `index.html`，会连带校验已挂载的子 composition）。
    修到 0 error（warning 尽量清零）。最多 3 轮；仍有 error 就把出问题的那一镜简化为纯文字 + 淡入。
 7. **渲染**：按下方「渲染阶段（长任务）」启动并等待，渲染期间不要频繁查进度。
 8. **压制**：渲染完成后后台跑 ffmpeg（H.264/AAC + faststart，目标 ≤ 4 Mbps），再用长等待命令等结束：
-   `setsid nohup ffmpeg -y -i {{ OutputLocation }} -c:v libx264 -preset medium -crf 23 -maxrate 4M -bufsize 8M -pix_fmt yuv420p -profile:v high -movflags +faststart -c:a aac -b:a 128k -ar 48000 -map_metadata -1 {{ OutputLocation }}.web.mp4 > /tmp/ffmpeg.log 2>&1 < /dev/null & echo started`
-   `while pgrep -f '[f]fmpeg' >/dev/null; do sleep 5; done; test -s {{ OutputLocation }}.web.mp4 && mv {{ OutputLocation }}.web.mp4 {{ OutputLocation }} && echo COMPRESS_OK || echo COMPRESS_FAIL`
+   `setsid nohup ffmpeg -y -i {{ OutputLocation }} -c:v libx264 -preset medium -crf 23 -maxrate 4M -bufsize 8M -pix_fmt yuv420p -profile:v high -movflags +faststart -c:a aac -b:a 128k -ar 48000 -map_metadata -1 {{ OutputLocation }}.web.mp4 > {{ WorkspaceDir }}/ffmpeg.log 2>&1 < /dev/null & echo started`
+   `while pgrep -f "[f]fmpeg.*{{ OutputLocation }}" >/dev/null; do sleep 5; done; test -s {{ OutputLocation }}.web.mp4 && mv {{ OutputLocation }}.web.mp4 {{ OutputLocation }} && echo COMPRESS_OK || echo COMPRESS_FAIL`
    被 15 分钟超时打断就原样重发等待命令；失败 → 保留原片，继续下一步。
 9. **验证**：`test -s`、`ffprobe` 检查时长 / 音轨 / 分辨率；不合格则修复重渲（最多 3 轮）。
 10. **格式确认（必做）**：对 `{{ OutputLocation }}` 调用 `CheckMP4`；返回 `OK` 才算通过。失败 → 修对应 HTML → 重渲 → 再 `CheckMP4`。
@@ -134,12 +147,12 @@ HyperFrames 用 HTML 描述画面与时间。本项目**默认走模块化架构
 渲染通常 **10–40 分钟**，期间画面推进缓慢。只启动一次，然后长等待；整个阶段主动检查 ≤ 3 次。
 
 1) 后台启动一次：
-   `setsid nohup hyperframes render --quality high -w 2 --output {{ OutputLocation }} > /tmp/render.log 2>&1 < /dev/null & echo started`
+   `setsid nohup hyperframes render --quality high -w 2 --output {{ OutputLocation }} > {{ WorkspaceDir }}/render.log 2>&1 < /dev/null & echo started`
 2) 用长等待命令等它结束：
-   `while pgrep -f '[h]yperframes render' >/dev/null; do sleep 5; done; echo RENDER_EXITED; tail -5 /tmp/render.log; ls -la {{ OutputLocation }}`
+   `while pgrep -f "[h]yperframes render.*{{ OutputLocation }}" >/dev/null; do sleep 5; done; echo RENDER_EXITED; tail -5 {{ WorkspaceDir }}/render.log; ls -la {{ OutputLocation }}`
    单条 Bash 命令最长 15 分钟；被超时打断就**原样重发**，直到渲染进程退出。两次检查间隔 ≥ 5 分钟。
 3) 渲染期间禁止：重复 `check` / `lint`、读或改 HTML、查进度（`ls` / `du` / `wc` / `tail`）。
-4) 发现 `hyperframes render` 已在跑（任务重试）→ 不要重启，直接执行第 2 步。
+4) 发现本任务（同一 `--output`）的 `hyperframes render` 已在跑（任务重试）→ 不要重启，直接执行第 2 步。
 5) 渲染进程退出后 → 先执行步骤 8「压制」，再进入「验证」与 `CheckMP4`；失败才修 HTML 重渲。
 
 # 时间轴重建（音频驱动，必须先做）
@@ -859,16 +872,16 @@ TOTAL = 7.20。
 ## 渲染与验证
 
 ```bash
-# 逐镜（临时校验目录，示例）
-hyperframes lint /tmp/hfchk
+# 逐镜（本任务专用临时校验目录，示例）
+hyperframes lint {{ WorkspaceDir }}/.check
 # 全部子文件 + 薄 index 就绪后
 hyperframes check
 # 渲染：后台启动一次，然后用长等待命令等结束（见「渲染阶段（长任务）」）
-setsid nohup hyperframes render --quality high -w 2 --output {{ OutputLocation }} > /tmp/render.log 2>&1 < /dev/null & echo started
-while pgrep -f '[h]yperframes render' >/dev/null; do sleep 5; done; echo RENDER_EXITED; tail -5 /tmp/render.log
+setsid nohup hyperframes render --quality high -w 2 --output {{ OutputLocation }} > {{ WorkspaceDir }}/render.log 2>&1 < /dev/null & echo started
+while pgrep -f "[h]yperframes render.*{{ OutputLocation }}" >/dev/null; do sleep 5; done; echo RENDER_EXITED; tail -5 {{ WorkspaceDir }}/render.log
 # 压制（H.264/AAC + faststart，目标 ≤ 4 Mbps）：后台跑 + 长等待
-setsid nohup ffmpeg -y -i {{ OutputLocation }} -c:v libx264 -preset medium -crf 23 -maxrate 4M -bufsize 8M -pix_fmt yuv420p -profile:v high -movflags +faststart -c:a aac -b:a 128k -ar 48000 -map_metadata -1 {{ OutputLocation }}.web.mp4 > /tmp/ffmpeg.log 2>&1 < /dev/null & echo started
-while pgrep -f '[f]fmpeg' >/dev/null; do sleep 5; done; test -s {{ OutputLocation }}.web.mp4 && mv {{ OutputLocation }}.web.mp4 {{ OutputLocation }} && echo COMPRESS_OK || echo COMPRESS_FAIL
+setsid nohup ffmpeg -y -i {{ OutputLocation }} -c:v libx264 -preset medium -crf 23 -maxrate 4M -bufsize 8M -pix_fmt yuv420p -profile:v high -movflags +faststart -c:a aac -b:a 128k -ar 48000 -map_metadata -1 {{ OutputLocation }}.web.mp4 > {{ WorkspaceDir }}/ffmpeg.log 2>&1 < /dev/null & echo started
+while pgrep -f "[f]fmpeg.*{{ OutputLocation }}" >/dev/null; do sleep 5; done; test -s {{ OutputLocation }}.web.mp4 && mv {{ OutputLocation }}.web.mp4 {{ OutputLocation }} && echo COMPRESS_OK || echo COMPRESS_FAIL
 test -s {{ OutputLocation }}
 ffprobe -v error -show_entries format=duration -of csv=p=0 {{ OutputLocation }}
 ffprobe -v error -select_streams a -show_entries stream=codec_name -of csv=p=0 {{ OutputLocation }}

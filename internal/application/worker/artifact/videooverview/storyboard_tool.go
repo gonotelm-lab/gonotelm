@@ -59,10 +59,10 @@ func (d *storyboardDoc) getBindedTools() (map[string]einotool.InvokableTool, err
 			"- Do not paste the full storyboard into the chat message.",
 		func(ctx context.Context, input *appendStoryBoardInput) (string, error) {
 			indexes := make([]int, 0, len(input.Shots))
-			shots := make([]storyboardShotInput, 0, len(input.Shots))
+			shots := make([]storyboardShot, 0, len(input.Shots))
 			for _, s := range input.Shots {
 				indexes = append(indexes, s.Index)
-				shots = append(shots, storyboardShotInput{Index: s.Index, Content: s.Content})
+				shots = append(shots, storyboardShot(s))
 			}
 			slog.DebugContext(ctx, "storyboard tool AppendStoryBoardShot",
 				slog.Any("indexes", indexes),
@@ -94,10 +94,10 @@ func (d *storyboardDoc) getBindedTools() (map[string]einotool.InvokableTool, err
 			"- Duplicate index in the same call is rejected.",
 		func(ctx context.Context, input *editStoryBoardInput) (string, error) {
 			indexes := make([]int, 0, len(input.Edits))
-			ops := make([]storyboardEditOp, 0, len(input.Edits))
+			ops := make([]storyboardShot, 0, len(input.Edits))
 			for _, e := range input.Edits {
 				indexes = append(indexes, e.Index)
-				ops = append(ops, storyboardEditOp{Index: e.Index, Content: e.Content})
+				ops = append(ops, storyboardShot(e))
 			}
 			slog.DebugContext(ctx, "storyboard tool EditStoryBoardShot",
 				slog.Any("indexes", indexes),

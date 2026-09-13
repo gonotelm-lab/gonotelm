@@ -20,12 +20,7 @@ type storyboardDoc struct {
 	expected []string       // 口播轨全部 audio_id，按播放顺序
 }
 
-type storyboardShotInput struct {
-	Index   int
-	Content string
-}
-
-type storyboardEditOp struct {
+type storyboardShot struct {
 	Index   int
 	Content string
 }
@@ -309,12 +304,12 @@ func (d *storyboardDoc) audioOrderIssuesLocked(indexes []int) []string {
 }
 
 // append 按 index 写入一个或多个 shot；同 index 已存在则失败（改用 Edit）。可并发调用。
-func (d *storyboardDoc) append(shots []storyboardShotInput) (string, error) {
+func (d *storyboardDoc) append(shots []storyboardShot) (string, error) {
 	if len(shots) == 0 {
 		return "", fmt.Errorf("shots is required (one or more)")
 	}
 
-	prepared := make([]storyboardShotInput, 0, len(shots))
+	prepared := make([]storyboardShot, 0, len(shots))
 	seen := make(map[int]struct{}, len(shots))
 	for i, raw := range shots {
 		if raw.Index < 1 {
@@ -329,7 +324,7 @@ func (d *storyboardDoc) append(shots []storyboardShotInput) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("shots[%d] (index=%d): %w", i, raw.Index, err)
 		}
-		prepared = append(prepared, storyboardShotInput{Index: raw.Index, Content: content})
+		prepared = append(prepared, storyboardShot{Index: raw.Index, Content: content})
 	}
 
 	d.mu.Lock()
@@ -366,7 +361,7 @@ func (d *storyboardDoc) append(shots []storyboardShotInput) (string, error) {
 }
 
 // edit 按镜头序号批量替换/删除；空 content 表示删除。
-func (d *storyboardDoc) edit(ops []storyboardEditOp) (string, error) {
+func (d *storyboardDoc) edit(ops []storyboardShot) (string, error) {
 	if len(ops) == 0 {
 		return "", fmt.Errorf("edits is required (one or more)")
 	}

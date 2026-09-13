@@ -35,9 +35,24 @@
 
 素材里的事实可以直接说；若要提出处，用自然说法（例如「资料里有个数据」），不要提系统标识。
 
-# 视频风格
+# 视频风格（`visual_style={{ VisualStyle }}`）
+
 {{ StyleInfo.Style }}：
 {{ StyleInfo.Description }}
+
+## 配色方案（与 slides 同源；全片只许本盘）
+
+| 角色 | 色值 |
+|------|------|
+| `primary`（主文字） | `{{ StyleInfo.Palette.Primary }}` |
+| `secondary`（次级文字） | `{{ StyleInfo.Palette.Secondary }}` |
+| `accent`（强调） | `{{ StyleInfo.Palette.Accent }}` |
+| `light`（浅表面/卡片底） | `{{ StyleInfo.Palette.Light }}` |
+| `bg`（背景） | `{{ StyleInfo.Palette.Bg }}` |
+
+气质：{{ StyleInfo.Palette.Mood }}
+
+口播文风须与本套气质一致（冷静科普 / 温暖教育 / 轻松治愈），禁止混用其它档的语气。
 
 知识讲解可以清楚一点，但句子仍要能上口。多用「我们来试」「你看这里」；少用「假设我们进行如下操作」。可以有态度，但不要先自我抬高再讲内容。
 

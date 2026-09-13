@@ -2,6 +2,8 @@ package videooverview
 
 import (
 	"context"
+	"log/slog"
+	"strings"
 
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 
@@ -55,12 +57,26 @@ func (d *storyboardDoc) getBindedTools() (map[string]einotool.InvokableTool, err
 			"- Parallel AppendStoryBoardShot calls are OK: placement follows index.\n"+
 			"- Same index already present is rejected; use EditStoryBoardShot to replace.\n"+
 			"- Do not paste the full storyboard into the chat message.",
-		func(_ context.Context, input *appendStoryBoardInput) (string, error) {
+		func(ctx context.Context, input *appendStoryBoardInput) (string, error) {
+			indexes := make([]int, 0, len(input.Shots))
 			shots := make([]storyboardShotInput, 0, len(input.Shots))
 			for _, s := range input.Shots {
+				indexes = append(indexes, s.Index)
 				shots = append(shots, storyboardShotInput{Index: s.Index, Content: s.Content})
 			}
-			return d.append(shots)
+			slog.DebugContext(ctx, "storyboard tool AppendStoryBoardShot",
+				slog.Any("indexes", indexes),
+				slog.Int("count", len(indexes)),
+			)
+			out, err := d.append(shots)
+			if err != nil {
+				slog.DebugContext(ctx, "storyboard tool AppendStoryBoardShot failed",
+					slog.Any("indexes", indexes),
+					slog.Any("err", err),
+				)
+				return "", err
+			}
+			return out, nil
 		},
 	)
 	if err != nil {
@@ -76,12 +92,26 @@ func (d *storyboardDoc) getBindedTools() (map[string]einotool.InvokableTool, err
 			"- edits[].content empty string \"\" → DELETE that shot (this is the delete API; there is no separate Delete tool).\n"+
 			"  Example delete: {\"edits\":[{\"index\":3,\"content\":\"\"}]}\n"+
 			"- Duplicate index in the same call is rejected.",
-		func(_ context.Context, input *editStoryBoardInput) (string, error) {
+		func(ctx context.Context, input *editStoryBoardInput) (string, error) {
+			indexes := make([]int, 0, len(input.Edits))
 			ops := make([]storyboardEditOp, 0, len(input.Edits))
 			for _, e := range input.Edits {
+				indexes = append(indexes, e.Index)
 				ops = append(ops, storyboardEditOp{Index: e.Index, Content: e.Content})
 			}
-			return d.edit(ops)
+			slog.DebugContext(ctx, "storyboard tool EditStoryBoardShot",
+				slog.Any("indexes", indexes),
+				slog.Int("count", len(indexes)),
+			)
+			out, err := d.edit(ops)
+			if err != nil {
+				slog.DebugContext(ctx, "storyboard tool EditStoryBoardShot failed",
+					slog.Any("indexes", indexes),
+					slog.Any("err", err),
+				)
+				return "", err
+			}
+			return out, nil
 		},
 	)
 	if err != nil {
@@ -94,8 +124,21 @@ func (d *storyboardDoc) getBindedTools() (map[string]einotool.InvokableTool, err
 			"Usage:\n"+
 			"- Default: offset/limit over shot indexes sorted ascending.\n"+
 			"- Or pass indexes for an explicit multi-shot read.",
-		func(_ context.Context, input *readStoryBoardInput) (string, error) {
-			return d.read(input.Offset, input.Limit, input.Indexes)
+		func(ctx context.Context, input *readStoryBoardInput) (string, error) {
+			slog.DebugContext(ctx, "storyboard tool ReadStoryBoardShot",
+				slog.Int("offset", input.Offset),
+				slog.Int("limit", input.Limit),
+				slog.Any("indexes", input.Indexes),
+			)
+			out, err := d.read(input.Offset, input.Limit, input.Indexes)
+			if err != nil {
+				slog.DebugContext(ctx, "storyboard tool ReadStoryBoardShot failed",
+					slog.Any("indexes", input.Indexes),
+					slog.Any("err", err),
+				)
+				return "", err
+			}
+			return out, nil
 		},
 	)
 	if err != nil {
@@ -111,8 +154,17 @@ func (d *storyboardDoc) getBindedTools() (map[string]einotool.InvokableTool, err
 			"- audio_id order (within a shot and across shots must follow the narration track)\n\n"+
 			"Call this after bulk Append/Edit. If FAIL, fix with Append/Edit then Check again.\n"+
 			"No required arguments.",
-		func(_ context.Context, _ *checkStoryBoardInput) (string, error) {
-			return d.checkContinuity(), nil
+		func(ctx context.Context, input *checkStoryBoardInput) (string, error) {
+			slog.DebugContext(ctx, "storyboard tool CheckStoryboardShot",
+				slog.Int("shots", d.ShotCount()),
+				slog.String("reason", input.Reason),
+			)
+			out := d.checkContinuity()
+			slog.DebugContext(ctx, "storyboard tool CheckStoryboardShot result",
+				slog.Int("shots", d.ShotCount()),
+				slog.Bool("pass", strings.HasPrefix(out, "PASS")),
+			)
+			return out, nil
 		},
 	)
 	if err != nil {

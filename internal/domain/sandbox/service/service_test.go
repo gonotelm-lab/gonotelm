@@ -90,10 +90,23 @@ type fakeMgr struct {
 	createCount int
 	sandboxes   map[string]entity.Sandbox
 	getCalls    []string
+	renewCalls  []renewCall
+}
+
+type renewCall struct {
+	id  string
+	ttl time.Duration
 }
 
 func newFakeMgr() *fakeMgr {
 	return &fakeMgr{sandboxes: make(map[string]entity.Sandbox)}
+}
+
+func (m *fakeMgr) RenewSandbox(_ context.Context, sandboxId string, ttl time.Duration) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.renewCalls = append(m.renewCalls, renewCall{id: sandboxId, ttl: ttl})
+	return nil
 }
 
 func (m *fakeMgr) CreateSandbox(_ context.Context, key entity.SandboxKey, spec entity.Spec) (entity.Sandbox, error) {
@@ -215,6 +228,27 @@ func TestGetOrCreateSandbox_DoubleCheckReusesExisting(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "sb-existing", sb.Id())
 	require.Equal(t, 0, mgr.createCount)
+}
+
+func TestGetOrCreateSandbox_ReuseRefreshesTTL(t *testing.T) {
+	key := testKey(t)
+	repo := newFakeRepo()
+	mgr := newFakeMgr()
+
+	existing := &stubSandbox{id: "sb-existing", key: key}
+	mgr.sandboxes[existing.id] = existing
+	require.NoError(t, repo.SetSandbox(context.Background(), key, existing.Description(), time.Minute))
+
+	svc := New(repo, mgr, &recordingLock{})
+	ttl := 2 * time.Hour
+	sb, err := svc.GetOrCreateSandbox(context.Background(), key, entity.Spec{TTL: ttl})
+	require.NoError(t, err)
+	require.Equal(t, "sb-existing", sb.Id())
+	require.Equal(t, 0, mgr.createCount)
+
+	// 复用沙箱时：沙箱过期时间与 Redis 绑定 TTL 都要刷新为本次 TTL
+	require.Equal(t, []renewCall{{id: "sb-existing", ttl: ttl}}, mgr.renewCalls)
+	require.Equal(t, ttl, repo.ttls[repo.cacheKey(key)])
 }
 
 func TestGetOrCreateSandbox_StaleCacheClearedOnce(t *testing.T) {

@@ -52,6 +52,7 @@ func (s *Service) GetOrCreateSandbox(
 	if sb, ok, err := s.tryGetAlive(ctx, key); err != nil {
 		return nil, err
 	} else if ok {
+		s.touchSandbox(ctx, key, sb, ttl)
 		return sb, nil
 	}
 
@@ -72,6 +73,7 @@ func (s *Service) GetOrCreateSandbox(
 	if sb, ok, err := s.tryGetAlive(ctx, key); err != nil {
 		return nil, err
 	} else if ok {
+		s.touchSandbox(ctx, key, sb, ttl)
 		return sb, nil
 	}
 
@@ -96,6 +98,25 @@ func (s *Service) GetOrCreateSandbox(
 	}
 
 	return sb, nil
+}
+
+// touchSandbox 复用沙箱时刷新沙箱过期时间与 Redis 绑定 TTL（best-effort，失败只告警）。
+func (s *Service) touchSandbox(ctx context.Context, key entity.SandboxKey, sb entity.Sandbox, ttl time.Duration) {
+	if err := s.mgr.RenewSandbox(ctx, sb.Id(), ttl); err != nil {
+		slog.WarnContext(ctx, "renew sandbox expiration failed",
+			slog.Any("err", err),
+			slog.String("sandbox_key", key.String()),
+			slog.String("sandbox_id", sb.Id()),
+		)
+	}
+
+	if err := s.repo.SetSandbox(ctx, key, sb.Description(), ttl); err != nil {
+		slog.WarnContext(ctx, "refresh sandbox binding failed",
+			slog.Any("err", err),
+			slog.String("sandbox_key", key.String()),
+			slog.String("sandbox_id", sb.Id()),
+		)
+	}
 }
 
 func (s *Service) tryGetAlive(ctx context.Context, key entity.SandboxKey) (entity.Sandbox, bool, error) {

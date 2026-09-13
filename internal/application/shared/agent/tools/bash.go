@@ -19,8 +19,8 @@ var bashToolParams *schema.ParamsOneOf
 
 const BashToolName = "Bash"
 
-// 命令最大超时时间 3 分钟
-var maxBashTimeout = (3 * time.Minute).Milliseconds()
+// 命令最大超时时间 15 分钟
+var maxBashTimeout = (15 * time.Minute).Milliseconds()
 
 func init() {
 	var err error
@@ -45,7 +45,7 @@ var _ tool.InvokableTool = &BashTool{}
 
 type BashToolInput struct {
 	Command string `json:"command"            jsonschema:"title=command to execute,description=The command to execute"`
-	Timeout int    `json:"timeout,omitempty"  jsonschema_description:"Optional timeout in milliseconds (max 180000)"`
+	Timeout int    `json:"timeout,omitempty"  jsonschema_description:"Optional timeout in milliseconds (max 900000)."`
 }
 
 // 命令输出最大返回字符数
@@ -58,7 +58,7 @@ func (t *BashTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 			"Guidelines:\n" +
 			"- Quote file paths containing spaces with double quotes.\n" +
 			"- Combine multiple commands with ';' or '&&' instead of newlines. Prefer workspace-relative or absolute paths over cd.\n" +
-			"- timeout is optional, in milliseconds (max 180000ms / 3 minutes). If not specified, defaults to 3 minutes.\n" +
+			"- timeout is optional, in milliseconds (max 900000ms / 15 minutes). If not specified, defaults to 15 minutes.\n" +
 			"- If the output exceeds 30000 characters, it will be truncated.",
 		ParamsOneOf: bashToolParams,
 	}, nil

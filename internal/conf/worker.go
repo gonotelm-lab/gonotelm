@@ -35,6 +35,7 @@ type WorkerConfig struct {
 type WorkerPoolConfig struct {
 	MaxConcurrency int           `toml:"maxConcurrency"`
 	Heartbeat      time.Duration `toml:"heartbeat"`
+	AgentVerbose   bool          `toml:"agentVerbose"`
 }
 
 type StudioConfig struct {
@@ -104,6 +105,8 @@ type StudioConfig struct {
 		MaxRound              int                           `toml:"maxRound"`
 		ModelProvider         llmchat.Provider              `toml:"modelProvider"`
 		Model                 string                        `toml:"model"`
+		GenerateMaxRound      int                           `toml:"generateMaxRound"`
+		SandboxProvider       sandbox.Provider              `toml:"sandboxProvider"`
 		AudioModelProvider    text2audio.Text2AudioProvider `toml:"audioModelProvider"`
 		AudioModel            string                        `toml:"audioModel"`
 		AudioSynthConcurrency int                           `toml:"audioSynthConcurrency"`

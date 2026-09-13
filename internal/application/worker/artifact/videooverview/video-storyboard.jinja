@@ -13,10 +13,26 @@
 
 旁白文本和时长以口播轨为准。大纲只用于理解结构，**分镜稿里不要再划分「板块」标题**。
 
-# 风格
+# 风格（`visual_style={{ VisualStyle }}`）
 
 - 风格：{{ StyleInfo.Style }}
 - 描述：{{ StyleInfo.Description }}
+
+## 配色方案（与 slides 同源；全片只许本盘）
+
+| 角色 | 色值 |
+|------|------|
+| `primary`（主文字） | `{{ StyleInfo.Palette.Primary }}` |
+| `secondary`（次级文字） | `{{ StyleInfo.Palette.Secondary }}` |
+| `accent`（强调） | `{{ StyleInfo.Palette.Accent }}` |
+| `light`（浅表面/卡片底） | `{{ StyleInfo.Palette.Light }}` |
+| `bg`（背景） | `{{ StyleInfo.Palette.Bg }}` |
+
+气质：{{ StyleInfo.Palette.Mood }}
+
+硬约束：
+- frontmatter `visual_style` **必须**写 `{{ VisualStyle }}`；`layout` / `on_screen_text` / 背景层描述只用上表五色，禁止自造第四套或换盘。
+- 文字与 `bg` 须高对比；`cute` 标题用 `primary`，勿用过浅粉当正文。
 
 气质跟着风格走，但讲解片有一条底线：**远一点仍可读**。字偏大、边距偏松、主元素清楚。
 
@@ -220,7 +236,7 @@
 title: 所有权一分钟搞懂
 format: 1920x1080
 total_duration: 18.4s
-visual_style: educational
+visual_style: {{ VisualStyle }}
 arc: 提问 → 规则 → 对照 → 收束
 ---
 

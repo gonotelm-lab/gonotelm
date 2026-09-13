@@ -88,6 +88,7 @@ func (k *SandboxKey) String() string {
 }
 
 type Spec struct {
-	TTL time.Duration
-	Env map[string]string
+	TTL            time.Duration
+	Env            map[string]string
+	ResourceLimits map[string]string // memory and cpu limits
 }

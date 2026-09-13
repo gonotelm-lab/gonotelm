@@ -12,6 +12,8 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/domain/sandbox/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	aliosb "github.com/alibaba/OpenSandbox/sdks/sandbox/go"
 )
 
 const (
@@ -31,6 +33,30 @@ func TestNewInvalidEndpoint(t *testing.T) {
 	cfg.Endpoint = "://bad-endpoint"
 	_, err := NewManager(t.Context(), cfg)
 	require.Error(t, err)
+}
+
+func TestMergeResourceLimits(t *testing.T) {
+	defaults := aliosb.ResourceLimits{"cpu": "500m", "memory": "128Mi"}
+
+	t.Run("nil overrides keeps defaults", func(t *testing.T) {
+		got := mergeResourceLimits(defaults, nil)
+		assert.Equal(t, aliosb.ResourceLimits{"cpu": "500m", "memory": "128Mi"}, got)
+	})
+
+	t.Run("overrides win and defaults preserved", func(t *testing.T) {
+		got := mergeResourceLimits(defaults, aliosb.ResourceLimits{"memory": "2Gi"})
+		assert.Equal(t, aliosb.ResourceLimits{"cpu": "500m", "memory": "2Gi"}, got)
+	})
+
+	t.Run("empty defaults uses overrides", func(t *testing.T) {
+		got := mergeResourceLimits(nil, aliosb.ResourceLimits{"cpu": "2", "memory": "2Gi"})
+		assert.Equal(t, aliosb.ResourceLimits{"cpu": "2", "memory": "2Gi"}, got)
+	})
+
+	t.Run("does not mutate defaults", func(t *testing.T) {
+		_ = mergeResourceLimits(defaults, aliosb.ResourceLimits{"memory": "4Gi"})
+		assert.Equal(t, "128Mi", defaults["memory"])
+	})
 }
 
 func TestManagerLifecycle(t *testing.T) {

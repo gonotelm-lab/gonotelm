@@ -38,6 +38,13 @@ func (a *CustomSandbox) Description() entity.SandboxDescription {
 	}
 }
 
+func commandTimeoutMs(cmd entity.Command) int64 {
+	if cmd.Timeout <= 0 {
+		return 0
+	}
+	return cmd.Timeout.Milliseconds()
+}
+
 func (a *CustomSandbox) Run(ctx context.Context, cmd entity.Command) (entity.Execution, error) {
 	req := osb.RunCommandRequest{
 		Command: cmd.Command,
@@ -47,8 +54,8 @@ func (a *CustomSandbox) Run(ctx context.Context, cmd entity.Command) (entity.Exe
 	if req.Cwd == "" {
 		req.Cwd = a.key.WorkspaceDir()
 	}
-	if cmd.Timeout > 0 {
-		req.Timeout = int64(cmd.Timeout.Seconds())
+	if timeoutMs := commandTimeoutMs(cmd); timeoutMs > 0 {
+		req.Timeout = timeoutMs
 	}
 
 	start := time.Now()

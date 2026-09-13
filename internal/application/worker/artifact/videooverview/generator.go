@@ -2,18 +2,22 @@ package videooverview
 
 import (
 	"context"
+	"log/slog"
+
+	"github.com/bytedance/sonic"
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
-// Generator 编排视频产物：口播稿 → 逐句 TTS → 分镜脚本。
+// Generator 编排视频产物：口播稿 → 逐句 TTS → 分镜脚本 → HyperFrames 渲染。
 type Generator struct {
 	checkpoints *checkpointStore
 	script      *scriptGenerator
 	audio       *audioSynthizer
 	storyboard  *storyboardGenerator
+	hyperframes *hyperframesVideoGenerator
 }
 
 var _ types.Generator = &Generator{}
@@ -25,11 +29,11 @@ func New(deps *types.WorkerDeps) *Generator {
 		script:      newScriptGenerator(deps, checkpoints),
 		audio:       newAudioSynthizer(deps, checkpoints),
 		storyboard:  newStoryboardGenerator(deps, checkpoints),
+		hyperframes: newHyperframesVideoGenerator(deps),
 	}
 }
 
-// Generate 流程：口播稿（field1）→ 逐句旁白音频（field2）→ 分镜 Markdown（field3）。
-// 视频渲染尚未实现。
+// Generate 流程：口播稿（field1）→ 逐句旁白音频（field2）→ 分镜 Markdown（field3）→ 沙箱渲染 MP4。
 func (g *Generator) Generate(ctx context.Context, req *types.Request) (*types.Response, error) {
 	payload := artifactentity.PayloadAs[*artifactentity.VideoOverviewPayload](req.Payload)
 
@@ -54,10 +58,32 @@ func (g *Generator) Generate(ctx context.Context, req *types.Request) (*types.Re
 		g.storyboard.discardStale(ctx, req.ArtifactId, ckpt)
 	}
 
-	if _, _, _, err := g.storyboard.ensure(ctx, req, payload, script, audioMeta, ckpt); err != nil {
+	slog.DebugContext(ctx, "video overview audio ready, start storyboard generation",
+		slog.String("artifact_id", req.ArtifactId.String()),
+	)
+
+	storyboardMD, _, _, err := g.storyboard.ensure(ctx, req, payload, script, audioMeta, ckpt)
+	if err != nil {
 		return nil, errors.WithMessagef(err, "generate video storyboard failed")
 	}
 
-	// TODO: 渲染视频尚未实现。
-	return nil, errors.ErrParams.Msgf("video_overview rendering is not implemented yet")
+	slog.DebugContext(ctx, "video overview storyboard ready, start hyperframes render",
+		slog.String("artifact_id", req.ArtifactId.String()),
+	)
+
+	result, err := g.hyperframes.generate(ctx, req, payload, storyboardMD, audioMeta)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "generate hyperframes video failed")
+	}
+
+	resultBytes, err := sonic.Marshal(result)
+	if err != nil {
+		return nil, errors.Wrap(err, "marshal video overview result failed")
+	}
+
+	return &types.Response{
+		Title:      script.Title,
+		Result:     resultBytes,
+		ResultKind: artifactentity.ResultKindStorage,
+	}, nil
 }

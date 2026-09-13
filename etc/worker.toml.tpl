@@ -98,6 +98,8 @@ sandboxProvider = "${GONOTELM_STUDIO_SLIDES_SANDBOX_PROVIDER:-opensandbox}"
 maxRound = ${GONOTELM_STUDIO_VIDEOOVERVIEW_MAX_ROUND:-50}
 modelProvider = "${GONOTELM_STUDIO_VIDEOOVERVIEW_PROVIDER:-deepseek}"
 model = "${GONOTELM_STUDIO_VIDEOOVERVIEW_MODEL:-deepseek-flash}"
+generateMaxRound = ${GONOTELM_STUDIO_VIDEOOVERVIEW_GENERATE_MAX_ROUND:-100}
+sandboxProvider = "${GONOTELM_STUDIO_VIDEOOVERVIEW_SANDBOX_PROVIDER:-opensandbox}"
 audioModelProvider = "${GONOTELM_STUDIO_VIDEOOVERVIEW_AUDIO_MODEL_PROVIDER:-qwen}"
 audioModel = "${GONOTELM_STUDIO_VIDEOOVERVIEW_AUDIO_MODEL:-qwen3-tts-instruct-flash}"
 audioSynthConcurrency = ${GONOTELM_STUDIO_VIDEOOVERVIEW_AUDIO_SYNTH_CONCURRENCY:-1}
@@ -246,11 +248,12 @@ dialTimeout = "${GONOTELM_FLOW_DIAL_TIMEOUT:-5s}"
 endpoint = "${GONOTELM_SANDBOX_ENDPOINT:-http://localhost:23080}"
 apiKey = "${GONOTELM_SANDBOX_API_KEY:-123456}"
 timeout = "${GONOTELM_SANDBOX_TIMEOUT:-30s}"
-image = "${GONOTELM_SANDBOX_IMAGE:opensandbox/code-interpreter-base}"
+image = "${GONOTELM_SANDBOX_IMAGE:-ghcr.io/gonotelm-lab/opensandbox-amd64:v0.0.1}"
 
 [worker]
 maxConcurrency  = ${GONOTELM_WORKER_MAX_CONCURRENCY:-4}
 heartbeat       = "${GONOTELM_WORKER_HEARTBEAT:-5s}"
+agentVerbose    = ${GONOTELM_WORKER_AGENT_VERBOSE:-false}
 
 [otelTrace]
 name = "worker"

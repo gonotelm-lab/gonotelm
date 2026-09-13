@@ -255,24 +255,25 @@ func (g *Generator) ensureSandbox(ctx context.Context, req *types.Request) (sand
 	return sandbox, nil
 }
 
-// ensureSlidesWorkspace 在沙箱 notebook 目录下创建 artifact 子目录，并挂上 vendor 软链。
+// ensureSlidesWorkspace 在沙箱 notebook/studioslides 下创建 artifact 子目录，并挂上 vendor 软链。
 //
 // sandbox 工作目录结构如下：
 //
-//	/tmp/{userId}/{notebookId}/           ← 沙箱 WorkspaceDir（Bash 默认 cwd、真实 vendor）
-//	├── vendor/                           ← opensandbox 上传的 pptxgenjs
-//	└── {artifactId}/                     ← slides 逻辑工作区（prompt WorkspaceDir）
-//	    ├── vendor -> ../vendor           ← 软链，兼容 slides/../vendor 的 require
-//	    └── slides/
-//	        ├── slide-01.js
-//	        ├── compile.js
-//	        └── output/presentation.pptx
+//	/tmp/{userId}/{notebookId}/                 ← 沙箱 WorkspaceDir（Bash 默认 cwd、真实 vendor）
+//	├── vendor/                                 ← 沙箱上传的 pptxgenjs
+//	└── studioslides/
+//	    └── {artifactId}/                       ← slides 逻辑工作区（prompt WorkspaceDir）
+//	        ├── vendor -> ../../vendor          ← 软链，兼容 slides/../vendor 的 require
+//	        └── slides/
+//	            ├── slide-01.js
+//	            ├── compile.js
+//	            └── output/presentation.pptx
 func ensureSlidesWorkspace(ctx context.Context, sandbox sandboxent.Sandbox, workspaceDir string) error {
 	vendorLink := path.Join(workspaceDir, "vendor")
 	slidesOut := path.Join(workspaceDir, "slides", "output")
 	// 建工作区 + vendor 软链；并校验 notebook 级 vendor/standalone.cjs 非空（0 字节会导致 agent 全盘找库）
 	cmd := fmt.Sprintf(
-		"mkdir -p %s && ln -sfn ../vendor %s && test -s %s/standalone.cjs",
+		"mkdir -p %s && ln -sfn ../../vendor %s && test -s %s/standalone.cjs",
 		shellQuote(slidesOut),
 		shellQuote(vendorLink),
 		shellQuote(vendorLink),
@@ -332,8 +333,8 @@ func (g *Generator) generatePPTX(
 	}
 
 	sandboxDesc := sandbox.Description()
-	// slides 工作区在沙箱 Workspace 下多一层 artifactId，隔离同 notebook 多 artifact
-	workspaceDir := path.Join(sandboxDesc.Key.WorkspaceDir(), req.ArtifactId.String())
+	// slides 工作区：Workspace/{StudioSlidesDir}/{artifactId}，隔离同 notebook 多 artifact
+	workspaceDir := path.Join(sandboxDesc.Key.WorkspaceDir(), types.StudioSlidesDir, req.ArtifactId.String())
 	if err := ensureSlidesWorkspace(ctx, sandbox, workspaceDir); err != nil {
 		return nil, err
 	}

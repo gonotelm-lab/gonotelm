@@ -8,6 +8,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
+	pkgagent "github.com/gonotelm-lab/gonotelm/pkg/agent"
 
 	"github.com/cloudwego/eino/components/prompt"
 	einoschema "github.com/cloudwego/eino/schema"
@@ -96,6 +97,7 @@ func RenderVideoGenerate(
 		"OutputLocation":        outputLocation,
 		"StoryboardMarkdown":    storyboardMarkdown,
 		"AudioManifestMarkdown": audioManifestMarkdown,
+		"Skills":                pkgagent.SkillsPrompt(ctx, videoSkillsFS, "skills"),
 		"Tip":                   strings.TrimSpace(tip),
 	})
 	if err != nil {

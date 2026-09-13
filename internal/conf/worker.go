@@ -110,6 +110,8 @@ type StudioConfig struct {
 		AudioModelProvider    text2audio.Text2AudioProvider `toml:"audioModelProvider"`
 		AudioModel            string                        `toml:"audioModel"`
 		AudioSynthConcurrency int                           `toml:"audioSynthConcurrency"`
+		SandboxCPU            string                        `toml:"sandboxCpu"`
+		SandboxMemory         string                        `toml:"sandboxMemory"`
 	} `toml:"videoOverview"`
 }
 

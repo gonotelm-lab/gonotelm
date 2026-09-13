@@ -1,6 +1,6 @@
 package agent
 
-const maxVerboseRune = 150
+const maxVerboseRune = 200
 
 func truncateVerbose(s string) string {
 	runes := []rune(s)

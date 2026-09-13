@@ -22,7 +22,7 @@
 
 路径约定：
 - `WriteFile` / `ReadFile` / `EditFile` / `ListDir` / `CheckPPTX`：**只用** Workspace 下绝对路径。
-- `Bash`：优先 `node {{ WorkspaceDir }}/slides/compile.js`（或 `cd {{ WorkspaceDir }} && node slides/compile.js`）。
+- `Bash`：用 `dir` 指定命令运行的目录（工作区命令传 `dir` = `{{ WorkspaceDir }}`）；本流程命令用绝对路径即可（如 `node {{ WorkspaceDir }}/slides/compile.js`）。
 - 引入库**只能**用（compile.js 模板已写好，勿改路径）：
 
 ```javascript

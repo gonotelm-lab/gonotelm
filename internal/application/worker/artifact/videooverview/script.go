@@ -175,7 +175,7 @@ func (g *scriptGenerator) compensateRules(validateErr error) []string {
 		"`lines` is an array of objects; each element has `text` and `voice_instruction`",
 		"`text` is one short spoken sentence for TTS, no long paragraphs",
 		"`text` must be spoken-style plain text, no markdown, emoji, urls, parentheses asides, or newlines",
-		"`voice_instruction` is a natural-language voice direction for that line (pace, emotion, tone, style), not a restatement of `text`",
+		"`voice_instruction` is a natural-language voice direction for that line, not a restatement of `text`; keep ONE baseline across the whole script — spoken-narration style, medium pace, consistent tone/intonation — that fits the video's overall style and the source content's register, with only slight local adjustments (never fast here / slow there)",
 		"resolve ambiguous readings in `text` by context (Roman numerals, single letters, English acronyms, mixed symbols) into unambiguous spoken Chinese/phonetic form for TTS; ",
 		"keep the same reading consistent across the script",
 		"never include system internals in title/name/content/text/voice_instruction: source ids, tool names, checkpoint/artifact fields, or meta narration about tools",

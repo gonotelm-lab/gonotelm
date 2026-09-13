@@ -6,7 +6,7 @@ import (
 )
 
 // videoNarratorSpeakerKey 视频旁白固定使用单一解说音色。
-const videoNarratorSpeakerKey = "apollo"
+const videoNarratorSpeakerKey = "athena"
 
 func (s *audioSynthizer) resolveNarratorVoice(lang entity.Language) (string, error) {
 	sp, ok := entity.BuiltinSpeakers[videoNarratorSpeakerKey]

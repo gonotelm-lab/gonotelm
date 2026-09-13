@@ -47,6 +47,7 @@ var _ tool.InvokableTool = &BashTool{}
 
 type BashToolInput struct {
 	Command string `json:"command"            jsonschema:"title=command to execute,description=The command to execute"`
+	Dir     string `json:"dir,omitempty"      jsonschema_description:"Optional working directory to run the command in. Omit to run in the task workspace (the default)."`
 	Timeout int    `json:"timeout,omitempty"  jsonschema_description:"Optional timeout in milliseconds (max 900000)."`
 }
 
@@ -58,8 +59,9 @@ func (t *BashTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 		Name: BashToolName,
 		Desc: "Execute a shell command inside the sandbox and return its exit code, stdout and stderr.\n\n" +
 			"Guidelines:\n" +
+			"- Set `dir` to the directory the command should run in; omit it to use the tool's default directory.\n" +
 			"- Quote file paths containing spaces with double quotes.\n" +
-			"- Combine multiple commands with ';' or '&&' instead of newlines. Prefer workspace-relative or absolute paths over cd.\n" +
+			"- Combine multiple commands with ';' or '&&' instead of newlines.\n" +
 			"- timeout is optional, in milliseconds (max 900000ms / 15 minutes). If not specified, defaults to 15 minutes.\n" +
 			"- If the output exceeds 30000 characters, it will be truncated.",
 		ParamsOneOf: bashToolParams,
@@ -89,8 +91,13 @@ func (t *BashTool) InvokableRun(
 	}
 	timeout := time.Duration(timeoutMs) * time.Millisecond
 
+	cwd := t.cwd
+	if input.Dir != "" {
+		cwd = input.Dir
+	}
+
 	exec, err := t.sandbox.Run(ctx, sandboxentity.Command{
-		Cwd:     t.cwd,
+		Cwd:     cwd,
 		Command: input.Command,
 		Timeout: timeout,
 	})

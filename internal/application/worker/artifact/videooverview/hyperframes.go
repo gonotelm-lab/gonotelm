@@ -32,13 +32,27 @@ type hyperframesVideoGenerator struct {
 	deps *types.WorkerDeps
 }
 
-// video 沙箱要跑 chrome-headless + ffmpeg 渲染，提高资源配额
-var videoSandboxResourceLimits = map[string]string{
-	"cpu":    "2",
-	"memory": "4Gi",
-}
+const (
+	videoSandboxDefaultCPU    = "2"
+	videoSandboxDefaultMemory = "4Gi"
+)
 
 const videoSandboxTTL = 3 * time.Hour
+
+func videoSandboxResourceLimits() map[string]string {
+	cfg := conf.WorkerGlobal().Studio.VideoOverview
+	limits := map[string]string{
+		"cpu":    videoSandboxDefaultCPU,
+		"memory": videoSandboxDefaultMemory,
+	}
+	if cfg.SandboxCPU != "" {
+		limits["cpu"] = cfg.SandboxCPU
+	}
+	if cfg.SandboxMemory != "" {
+		limits["memory"] = cfg.SandboxMemory
+	}
+	return limits
+}
 
 func newHyperframesVideoGenerator(deps *types.WorkerDeps) *hyperframesVideoGenerator {
 	return &hyperframesVideoGenerator{deps: deps}
@@ -60,6 +74,14 @@ func (g *hyperframesVideoGenerator) generate(
 	workspaceDir := path.Join(sandboxDesc.Key.WorkspaceDir(), types.StudioVideoOverviewsDir, req.ArtifactId.String())
 	if err := ensureVideoOverviewWorkspace(ctx, sandbox, workspaceDir); err != nil {
 		return nil, err
+	}
+
+	if err := syncSkillsToSandbox(ctx, sandbox, workspaceDir); err != nil {
+		return nil, errors.WithMessage(err, "sync skills to sandbox failed")
+	}
+
+	if err := syncComponentsToSandbox(ctx, sandbox, workspaceDir); err != nil {
+		return nil, errors.WithMessage(err, "sync components to sandbox failed")
 	}
 
 	if err := g.syncAudioToSandbox(ctx, sandbox, workspaceDir, audioMeta); err != nil {
@@ -151,7 +173,7 @@ func (g *hyperframesVideoGenerator) ensureSandbox(ctx context.Context, req *type
 				"HYPERFRAMES_NO_UPDATE_CHECK": "1",
 				"HYPERFRAMES_NO_TELEMETRY":    "1",
 			},
-			ResourceLimits: videoSandboxResourceLimits,
+			ResourceLimits: videoSandboxResourceLimits(),
 		},
 	)
 	if err != nil {
@@ -175,22 +197,25 @@ func (g *hyperframesVideoGenerator) getSandboxService() (*sandboxservice.Service
 //	└── studiovideooverview/
 //	    └── {artifactId}/                       ← 视频逻辑工作区（prompt WorkspaceDir、Bash cwd）
 //	        ├── vendor -> ../../vendor          ← 软链，兼容相对路径 vendor/gsap.browser.js
+//	        ├── skills/<name>/SKILL.md          ← 标准 Agent Skills（契约/视觉/动画/镜头/数据/转场），只读
+//	        ├── components/<name>/<name>.html   ← 可复用动画片段，INDEX.md 为索引，只读
 //	        ├── audio/audio_{seg}-{line}.wav
 //	        ├── .check/                         ← 逐镜临时校验目录
 //	        ├── render.log / ffmpeg.log         ← 渲染/压制日志
 //	        ├── index.html
 //	        └── output/video.mp4
-
 func ensureVideoOverviewWorkspace(ctx context.Context, sandbox sandboxent.Sandbox, workspaceDir string) error {
 	vendorLink := path.Join(workspaceDir, "vendor")
 	audioDir := path.Join(workspaceDir, "audio")
 	outputDir := path.Join(workspaceDir, "output")
 	checkDir := path.Join(workspaceDir, ".check")
+	skillsDir := path.Join(workspaceDir, "skills")
 	cmd := fmt.Sprintf(
-		"mkdir -p %s %s %s && ln -sfn ../../vendor %s && test -s %s/gsap.browser.js",
+		"mkdir -p %s %s %s %s && ln -sfn ../../vendor %s && test -s %s/gsap.browser.js",
 		shellQuote(audioDir),
 		shellQuote(outputDir),
 		shellQuote(checkDir),
+		shellQuote(skillsDir),
 		shellQuote(vendorLink),
 		shellQuote(vendorLink),
 	)

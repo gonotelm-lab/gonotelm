@@ -130,8 +130,9 @@ func (r *UpdateArtifactRequest) Validate() error {
 }
 
 type GetArtifactStatusResponse struct {
-	TaskId string                `json:"task_id"`
-	Status artifactentity.Status `json:"status"`
+	TaskId    string                `json:"task_id"`
+	Status    artifactentity.Status `json:"status"`
+	Timestamp int64                 `json:"timestamp"` // unix ms
 }
 
 type ConvertNoteToSourceResponse struct {

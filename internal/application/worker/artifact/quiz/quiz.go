@@ -103,13 +103,13 @@ func (g *quizGenerator) parse(ctx context.Context, content string) (*quizExpecta
 		DisallowUnknownFields: true,
 		LogOnDirectFailure: func(err error, _ []byte) {
 			slog.DebugContext(ctx, "quiz direct unmarshal did not match, fallback to json extraction",
-				slog.Any("err", err),
+				slog.String("err", types.TruncateForLog(err.Error())),
 				slog.String("raw_content", types.TruncateForLog(content)))
 		},
 	}
 	if err := decoder.Unmarshal(pkgstring.AsBytes(content), &expect); err != nil {
 		slog.WarnContext(ctx, "quiz output unmarshal failed after compatibility fallback",
-			slog.Any("err", err),
+			slog.String("err", types.TruncateForLog(err.Error())),
 			slog.String("raw_content", types.TruncateForLog(content)))
 		return nil, err
 	}

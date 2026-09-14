@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
@@ -79,5 +80,29 @@ func TestBuildClientInjectsTraceparent(t *testing.T) {
 	}
 	if spans[0].Parent.TraceID() != span.SpanContext().TraceID() {
 		t.Fatalf("client span not child of server span")
+	}
+}
+
+func TestBuilderResponseHeaderTimeout(t *testing.T) {
+	// 未配置：沿用共享 DefaultTransport
+	if got := NewBuilder(nil).defaultTransport(); got != DefaultTransport {
+		t.Fatalf("expected shared DefaultTransport when unset, got %T", got)
+	}
+
+	// 配置为默认值：不克隆
+	if got := NewBuilder(nil).WithResponseHeaderTimeout(DefaultResponseHeaderTimeout).defaultTransport(); got != DefaultTransport {
+		t.Fatalf("expected shared DefaultTransport when set to default, got %T", got)
+	}
+
+	// 显式覆盖：克隆并设置 ResponseHeaderTimeout，且不改动全局
+	tr, ok := NewBuilder(nil).WithResponseHeaderTimeout(30 * time.Second).defaultTransport().(*http.Transport)
+	if !ok {
+		t.Fatalf("expected *http.Transport")
+	}
+	if tr.ResponseHeaderTimeout != 30*time.Second {
+		t.Fatalf("got %s want 30s", tr.ResponseHeaderTimeout)
+	}
+	if DefaultTransport.ResponseHeaderTimeout != DefaultResponseHeaderTimeout {
+		t.Fatalf("global DefaultTransport mutated: %s", DefaultTransport.ResponseHeaderTimeout)
 	}
 }

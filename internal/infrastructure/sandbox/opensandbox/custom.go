@@ -30,6 +30,14 @@ func (a *CustomSandbox) Id() string {
 	return a.s.ID()
 }
 
+func (a *CustomSandbox) Ping(ctx context.Context) error {
+	if err := a.s.Ping(ctx); err != nil {
+		return pkgerr.Wrapf(err, "custom sandbox ping failed")
+	}
+
+	return nil
+}
+
 func (a *CustomSandbox) Description() entity.SandboxDescription {
 	return entity.SandboxDescription{
 		Id:      a.s.ID(),

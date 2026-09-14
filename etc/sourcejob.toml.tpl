@@ -138,6 +138,7 @@ region = "${GONOTELM_TENCENTCLOUD_REGION:-ap-guangzhou}"
 [provider.deepseek]
 apiKey = "${GONOTELM_DEEPSEEK_API_KEY}"
 timeout = "${GONOTELM_DEEPSEEK_TIMEOUT:-5m}"
+responseHeaderTimeout = "${GONOTELM_DEEPSEEK_RESPONSE_HEADER_TIMEOUT:-10s}"
 baseUrl = "${GONOTELM_DEEPSEEK_BASE_URL:-https://api.deepseek.com}"
 defaultModel = "${GONOTELM_DEEPSEEK_MODEL:-deepseek-flash}"
 thinkingEnabled = false
@@ -159,6 +160,7 @@ apiKey = "${GONOTELM_OPENAI_API_KEY:-}"
 baseUrl = "${GONOTELM_OPENAI_BASE_URL:-https://api.openai.com/v1}"
 defaultModel = "${GONOTELM_OPENAI_MODEL:-gpt-4o-mini}"
 timeout = "${GONOTELM_OPENAI_TIMEOUT:-5m}"
+responseHeaderTimeout = "${GONOTELM_OPENAI_RESPONSE_HEADER_TIMEOUT:-10s}"
 temperature = ${GONOTELM_OPENAI_TEMPERATURE:-1.0}
 reasoningEffort = "${GONOTELM_OPENAI_REASONING_EFFORT:-}"
 
@@ -167,6 +169,7 @@ apiKey = "${GONOTELM_QWEN_API_KEY:-}"
 baseUrl = "${GONOTELM_QWEN_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}"
 defaultModel = "${GONOTELM_QWEN_MODEL:-glm-5.1}"
 timeout = "${GONOTELM_QWEN_TIMEOUT:-5m}"
+responseHeaderTimeout = "${GONOTELM_QWEN_RESPONSE_HEADER_TIMEOUT:-10s}"
 temperature = ${GONOTELM_QWEN_TEMPERATURE:-1.0}
 topP = ${GONOTELM_QWEN_TOP_P:-1.0}
 enableThinking = ${GONOTELM_QWEN_ENABLE_THINKING:-false}
@@ -208,6 +211,7 @@ apiKey = "${GONOTELM_AGNES_API_KEY:-}"
 baseUrl = "${GONOTELM_AGNES_BASE_URL:-https://apihub.agnes-ai.com/v1}"
 defaultModel = "${GONOTELM_AGNES_MODEL:-agnes-2.5-flash}"
 timeout = "${GONOTELM_AGNES_TIMEOUT:-5m}"
+responseHeaderTimeout = "${GONOTELM_AGNES_RESPONSE_HEADER_TIMEOUT:-10s}"
 temperature = ${GONOTELM_AGNES_TEMPERATURE:-1.0}
 topP = ${GONOTELM_AGNES_TOP_P:-1.0}
 

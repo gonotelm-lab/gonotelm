@@ -222,14 +222,14 @@ func (g *scriptGenerator) parse(ctx context.Context, content string) (*videoScri
 		LogOnDirectFailure: func(err error, _ []byte) {
 			slog.DebugContext(ctx,
 				"video script direct unmarshal did not match, fallback to json extraction",
-				slog.Any("err", err),
+				slog.String("err", types.TruncateForLog(err.Error())),
 				slog.String("raw_content", types.TruncateForLog(content)),
 			)
 		},
 	}
 	if err := decoder.Unmarshal(pkgstring.AsBytes(content), &script); err != nil {
 		slog.WarnContext(ctx, "video script output unmarshal failed after compatibility fallback",
-			slog.Any("err", err),
+			slog.String("err", types.TruncateForLog(err.Error())),
 			slog.String("raw_content", types.TruncateForLog(content)))
 		return nil, err
 	}

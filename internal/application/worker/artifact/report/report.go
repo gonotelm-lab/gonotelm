@@ -81,13 +81,13 @@ func (g *reportGenerator) parse(ctx context.Context, content string) (*reportExp
 		DisallowUnknownFields: true,
 		LogOnDirectFailure: func(err error, _ []byte) {
 			slog.DebugContext(ctx, "report direct unmarshal did not match, fallback to json extraction",
-				slog.Any("err", err),
+				slog.String("err", types.TruncateForLog(err.Error())),
 				slog.String("raw_content", types.TruncateForLog(content)))
 		},
 	}
 	if err := decoder.Unmarshal(pkgstring.AsBytes(content), &expect); err != nil {
 		slog.WarnContext(ctx, "report output unmarshal failed after compatibility fallback",
-			slog.Any("err", err),
+			slog.String("err", types.TruncateForLog(err.Error())),
 			slog.String("raw_content", types.TruncateForLog(content)))
 		return nil, err
 	}

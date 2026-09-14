@@ -64,27 +64,28 @@ type Model struct {
 }
 
 type DeepSeekChatConfig struct {
-	ApiKey           string           `toml:"apiKey"`
-	Timeout          time.Duration    `toml:"timeout"`
-	BaseURL          string           `toml:"baseUrl"`
-	Path             string           `toml:"path"`
-	Temperature      *float32         `toml:"temperature"`
-	TopP             *float32         `toml:"topP"`
-	PresencePenalty  *float32         `toml:"presencePenalty"`
-	FrequencyPenalty *float32         `toml:"frequencyPenalty"`
-	LogProbs         bool             `toml:"logProbs"`
-	TopLogProbs      int              `toml:"topLogProbs"`
-	MaxConcurrency   int              `toml:"maxConcurrency"`
-	ThinkingEnabled  bool             `toml:"thinkingEnabled"`
-	DefaultModel     string           `toml:"defaultModel"`
-	Models           map[string]Model `toml:"models"`
+	ApiKey                string           `toml:"apiKey"`
+	Timeout               time.Duration    `toml:"timeout"`
+	ResponseHeaderTimeout time.Duration    `toml:"responseHeaderTimeout"`
+	BaseURL               string           `toml:"baseUrl"`
+	Path                  string           `toml:"path"`
+	Temperature           *float32         `toml:"temperature"`
+	TopP                  *float32         `toml:"topP"`
+	PresencePenalty       *float32         `toml:"presencePenalty"`
+	FrequencyPenalty      *float32         `toml:"frequencyPenalty"`
+	LogProbs              bool             `toml:"logProbs"`
+	TopLogProbs           int              `toml:"topLogProbs"`
+	MaxConcurrency        int              `toml:"maxConcurrency"`
+	ThinkingEnabled       bool             `toml:"thinkingEnabled"`
+	DefaultModel          string           `toml:"defaultModel"`
+	Models                map[string]Model `toml:"models"`
 }
 
 func (c *DeepSeekChatConfig) ToEino() *deepseek.ChatModelConfig {
 	dc := &deepseek.ChatModelConfig{
 		APIKey:      c.ApiKey,
 		Timeout:     c.Timeout,
-		HTTPClient:  newHttpClient(c.Timeout),
+		HTTPClient:  newHttpClient(c.Timeout, c.ResponseHeaderTimeout),
 		BaseURL:     c.BaseURL,
 		Path:        c.Path,
 		LogProbs:    c.LogProbs,
@@ -116,7 +117,7 @@ func (c *DeepSeekChatConfig) ToOpenaiEino() *openai.ChatModelConfig {
 	cc := &openai.ChatModelConfig{
 		APIKey:           c.ApiKey,
 		Timeout:          c.Timeout,
-		HTTPClient:       newHttpClient(c.Timeout),
+		HTTPClient:       newHttpClient(c.Timeout, c.ResponseHeaderTimeout),
 		BaseURL:          c.BaseURL,
 		Model:            c.DefaultModel,
 		Temperature:      c.Temperature,
@@ -141,25 +142,26 @@ func (c *DeepSeekChatConfig) ToOpenaiEino() *openai.ChatModelConfig {
 }
 
 type OpenAIChatConfig struct {
-	ApiKey           string           `toml:"apiKey"`
-	Timeout          time.Duration    `toml:"timeout"`
-	BaseUrl          string           `toml:"baseUrl"`
-	DefaultModel     string           `toml:"defaultModel"`
-	Temperature      *float32         `toml:"temperature"`
-	TopP             *float32         `toml:"topP"`
-	PresencePenalty  *float32         `toml:"presencePenalty"`
-	Seed             *int             `toml:"seed"`
-	FrequencyPenalty *float32         `toml:"frequencyPenalty"`
-	ReasoningEffort  string           `toml:"reasoningEffort"` // low, medium, high
-	MaxConcurrency   int              `toml:"maxConcurrency"`
-	Models           map[string]Model `toml:"models"`
+	ApiKey                string           `toml:"apiKey"`
+	Timeout               time.Duration    `toml:"timeout"`
+	ResponseHeaderTimeout time.Duration    `toml:"responseHeaderTimeout"`
+	BaseUrl               string           `toml:"baseUrl"`
+	DefaultModel          string           `toml:"defaultModel"`
+	Temperature           *float32         `toml:"temperature"`
+	TopP                  *float32         `toml:"topP"`
+	PresencePenalty       *float32         `toml:"presencePenalty"`
+	Seed                  *int             `toml:"seed"`
+	FrequencyPenalty      *float32         `toml:"frequencyPenalty"`
+	ReasoningEffort       string           `toml:"reasoningEffort"` // low, medium, high
+	MaxConcurrency        int              `toml:"maxConcurrency"`
+	Models                map[string]Model `toml:"models"`
 }
 
 func (c *OpenAIChatConfig) ToEino() *openai.ChatModelConfig {
 	return &openai.ChatModelConfig{
 		APIKey:           c.ApiKey,
 		Timeout:          c.Timeout,
-		HTTPClient:       httpclient.NewBuilder(nil).WithTimeout(c.Timeout).Build(),
+		HTTPClient:       newHttpClient(c.Timeout, c.ResponseHeaderTimeout),
 		BaseURL:          c.BaseUrl,
 		Model:            c.DefaultModel,
 		Temperature:      c.Temperature,
@@ -171,25 +173,26 @@ func (c *OpenAIChatConfig) ToEino() *openai.ChatModelConfig {
 }
 
 type QwenChatConfig struct {
-	ApiKey           string           `toml:"apiKey"`
-	Timeout          time.Duration    `toml:"timeout"`
-	BaseUrl          string           `toml:"baseUrl"`
-	Model            string           `toml:"model"`
-	Temperature      *float32         `toml:"temperature"`
-	TopP             *float32         `toml:"topP"`
-	PresencePenalty  *float32         `toml:"presencePenalty"`
-	Seed             *int             `toml:"seed"`
-	FrequencyPenalty *float32         `toml:"frequencyPenalty"`
-	EnableThinking   *bool            `toml:"enableThinking"`
-	MaxConcurrency   int              `toml:"maxConcurrency"`
-	Models           map[string]Model `toml:"models"`
+	ApiKey                string           `toml:"apiKey"`
+	Timeout               time.Duration    `toml:"timeout"`
+	ResponseHeaderTimeout time.Duration    `toml:"responseHeaderTimeout"`
+	BaseUrl               string           `toml:"baseUrl"`
+	Model                 string           `toml:"model"`
+	Temperature           *float32         `toml:"temperature"`
+	TopP                  *float32         `toml:"topP"`
+	PresencePenalty       *float32         `toml:"presencePenalty"`
+	Seed                  *int             `toml:"seed"`
+	FrequencyPenalty      *float32         `toml:"frequencyPenalty"`
+	EnableThinking        *bool            `toml:"enableThinking"`
+	MaxConcurrency        int              `toml:"maxConcurrency"`
+	Models                map[string]Model `toml:"models"`
 }
 
 func (c *QwenChatConfig) ToEino() *qwen.ChatModelConfig {
 	return &qwen.ChatModelConfig{
 		APIKey:           c.ApiKey,
 		Timeout:          c.Timeout,
-		HTTPClient:       newHttpClient(c.Timeout),
+		HTTPClient:       newHttpClient(c.Timeout, c.ResponseHeaderTimeout),
 		BaseURL:          c.BaseUrl,
 		Model:            c.Model,
 		Temperature:      c.Temperature,
@@ -202,24 +205,25 @@ func (c *QwenChatConfig) ToEino() *qwen.ChatModelConfig {
 }
 
 type AgnesChatConfig struct {
-	ApiKey           string           `toml:"apiKey"`
-	Timeout          time.Duration    `toml:"timeout"`
-	BaseUrl          string           `toml:"baseUrl"`
-	DefaultModel     string           `toml:"defaultModel"`
-	Temperature      *float32         `toml:"temperature"`
-	TopP             *float32         `toml:"topP"`
-	PresencePenalty  *float32         `toml:"presencePenalty"`
-	Seed             *int             `toml:"seed"`
-	FrequencyPenalty *float32         `toml:"frequencyPenalty"`
-	MaxConcurrency   int              `toml:"maxConcurrency"`
-	Models           map[string]Model `toml:"models"`
+	ApiKey                string           `toml:"apiKey"`
+	Timeout               time.Duration    `toml:"timeout"`
+	ResponseHeaderTimeout time.Duration    `toml:"responseHeaderTimeout"`
+	BaseUrl               string           `toml:"baseUrl"`
+	DefaultModel          string           `toml:"defaultModel"`
+	Temperature           *float32         `toml:"temperature"`
+	TopP                  *float32         `toml:"topP"`
+	PresencePenalty       *float32         `toml:"presencePenalty"`
+	Seed                  *int             `toml:"seed"`
+	FrequencyPenalty      *float32         `toml:"frequencyPenalty"`
+	MaxConcurrency        int              `toml:"maxConcurrency"`
+	Models                map[string]Model `toml:"models"`
 }
 
 func (c *AgnesChatConfig) ToEino() *agnes.ChatModelConfig {
 	return &agnes.ChatModelConfig{
 		APIKey:           c.ApiKey,
 		Timeout:          c.Timeout,
-		HTTPClient:       newHttpClient(c.Timeout),
+		HTTPClient:       newHttpClient(c.Timeout, c.ResponseHeaderTimeout),
 		BaseURL:          c.BaseUrl,
 		Model:            c.DefaultModel,
 		Temperature:      c.Temperature,
@@ -230,10 +234,13 @@ func (c *AgnesChatConfig) ToEino() *agnes.ChatModelConfig {
 	}
 }
 
-func newHttpClient(timeout time.Duration) *http.Client {
+func newHttpClient(timeout, responseHeaderTimeout time.Duration) *http.Client {
 	builder := httpclient.NewBuilder(nil)
 	if timeout > 0 {
 		builder = builder.WithTimeout(timeout)
+	}
+	if responseHeaderTimeout > 0 {
+		builder = builder.WithResponseHeaderTimeout(responseHeaderTimeout)
 	}
 
 	return builder.Build()

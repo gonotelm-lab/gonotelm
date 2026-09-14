@@ -34,6 +34,9 @@ func GetSandboxOption(opts ...SandboxOption) sandBoxOption {
 type Sandbox interface {
 	Id() string
 
+	// Ping 检查沙箱是否仍存活可用
+	Ping(ctx context.Context) error
+
 	// Run 同步执行一条命令，返回完整结果。
 	Run(ctx context.Context, cmd Command) (Execution, error)
 

@@ -57,13 +57,13 @@ func NewManager(ctx context.Context, c Config) (*Manager, error) {
 	if err != nil {
 		return nil, fmt.Errorf("opensandbox invalid endpoint %s, %w", c.Endpoint, err)
 	}
-	retryConfig := aliosb.DefaultRetryConfig()
+	// retryConfig := aliosb.DefaultRetryConfig()
 	osbCfg := aliosb.ConnectionConfig{
 		Domain:     u.Host,
 		Protocol:   u.Scheme,
 		APIKey:     c.ApiKey,
 		HTTPClient: c.HttpClient,
-		Retry:      &retryConfig,
+		// Retry:      &retryConfig, // we do not need retry because we use c.HttpClient with retry
 	}
 
 	lc := aliosb.NewLifecycleClientWithCache(
@@ -225,6 +225,11 @@ func (m *Manager) RenewSandbox(ctx context.Context, sandboxId string, ttl time.D
 		return pkgerr.Wrapf(err, "opensandbox renew remote %s failed", sandboxId)
 	}
 
+	return nil
+}
+
+func (m *Manager) EvictSandbox(_ context.Context, sandboxId string) error {
+	m.deleteOpenSandbox(sandboxId)
 	return nil
 }
 

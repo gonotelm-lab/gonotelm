@@ -140,14 +140,14 @@ func (g *outlineGenerator) parse(ctx context.Context, content string) (*podcastO
 		LogOnDirectFailure: func(err error, _ []byte) {
 			slog.DebugContext(ctx,
 				"podcast outline direct unmarshal did not match, fallback to json extraction",
-				slog.Any("err", err),
+				slog.String("err", types.TruncateForLog(err.Error())),
 				slog.String("raw_content", types.TruncateForLog(content)),
 			)
 		},
 	}
 	if err := decoder.Unmarshal(pkgstring.AsBytes(content), &expect); err != nil {
 		slog.WarnContext(ctx, "podcast outline output unmarshal failed after compatibility fallback",
-			slog.Any("err", err),
+			slog.String("err", types.TruncateForLog(err.Error())),
 			slog.String("raw_content", types.TruncateForLog(content)))
 		return nil, err
 	}

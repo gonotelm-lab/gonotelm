@@ -23,6 +23,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	pkgaudio "github.com/gonotelm-lab/gonotelm/pkg/audio/wav"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/httpclient"
 	"github.com/gonotelm-lab/gonotelm/pkg/safe"
@@ -67,7 +68,7 @@ type audioTurnPart struct {
 type audioSynthizer struct {
 	text2audio     *text2audio.Text2AudioGateway
 	storage        storage.Storage
-	checkpoints    *checkpointStore
+	checkpoints    *types.CheckpointStore
 	downloadClient *http.Client
 
 	provider    text2audio.Text2AudioProvider
@@ -75,7 +76,7 @@ type audioSynthizer struct {
 	concurrency int
 }
 
-func newAudioSynthizer(deps *types.WorkerDeps, checkpoints *checkpointStore) *audioSynthizer {
+func newAudioSynthizer(deps *types.WorkerDeps, checkpoints *types.CheckpointStore) *audioSynthizer {
 	cfg := conf.WorkerGlobal().Studio.AudioOverview
 	concurrency := cfg.AudioSynthConcurrency
 	if concurrency <= 0 {
@@ -164,6 +165,8 @@ func (s *audioSynthizer) generate(
 	transcript *podcastTranscriptExpectation,
 	ckpt *workerentity.Checkpoint,
 ) (*AudioStorageResult, error) {
+	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioAudioOverviewAudioScene)
+
 	slog.DebugContext(ctx, "[audio] generateAudio start",
 		slog.String("artifact_id", req.ArtifactId.String()),
 		slog.String("notebook_id", payload.NotebookId.String()),
@@ -527,7 +530,7 @@ func (s *audioSynthizer) persistTurnSynthResults(
 			slog.WarnContext(ctx, "snapshot audio checkpoint failed",
 				slog.String("artifact_id", job.artifactId.String()),
 				slog.Any("err", snapErr))
-		} else if err := s.checkpoints.save(ctx, snap); err != nil {
+		} else if err := s.checkpoints.Save(ctx, snap); err != nil {
 			slog.WarnContext(ctx, "persist audio checkpoint failed",
 				slog.String("artifact_id", job.artifactId.String()),
 				slog.Any("err", err))
@@ -624,7 +627,7 @@ func (s *audioSynthizer) discardStale(ctx context.Context, artifactId valobj.Id,
 	s.cleanupIntermediateAudio(ctx, meta)
 
 	ckpt.UpdateField3(nil)
-	if err := s.checkpoints.save(ctx, ckpt); err != nil {
+	if err := s.checkpoints.Save(ctx, ckpt); err != nil {
 		slog.ErrorContext(ctx, "clear stale audio checkpoint failed",
 			slog.String("artifact_id", artifactId.String()),
 			slog.Any("err", err),
@@ -661,7 +664,7 @@ func (s *audioSynthizer) persistAudioCheckpoint(
 		return err
 	}
 	if ckpt == nil {
-		if loaded := s.checkpoints.load(ctx, artifactId); loaded != nil {
+		if loaded := s.checkpoints.Load(ctx, artifactId); loaded != nil {
 			ckpt = loaded
 		} else {
 			ckpt = workerentity.NewCheckpoint(artifactId)
@@ -669,7 +672,7 @@ func (s *audioSynthizer) persistAudioCheckpoint(
 	}
 	ckpt.UpdateField3(data)
 
-	return s.checkpoints.save(ctx, ckpt)
+	return s.checkpoints.Save(ctx, ckpt)
 }
 
 func restoreAudioMeta(ckpt *workerentity.Checkpoint) *audioCheckpointMeta {

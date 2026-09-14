@@ -14,7 +14,7 @@ import (
 
 // Generator 编排播客产物的各生成步骤：大纲 → 文字稿 → 音频合成。
 type Generator struct {
-	checkpoints *checkpointStore
+	checkpoints *types.CheckpointStore
 	outline     *outlineGenerator
 	transcript  *transcriptGenerator
 	audio       *audioSynthizer
@@ -23,7 +23,7 @@ type Generator struct {
 var _ types.Generator = &Generator{}
 
 func New(deps *types.WorkerDeps) *Generator {
-	checkpoints := newCheckpointStore(deps.CheckpointRepository)
+	checkpoints := types.NewCheckpointStore(deps.CheckpointRepository)
 	return &Generator{
 		checkpoints: checkpoints,
 		outline:     newOutlineGenerator(deps, checkpoints),
@@ -36,7 +36,7 @@ func New(deps *types.WorkerDeps) *Generator {
 func (a *Generator) Generate(ctx context.Context, req *types.Request) (*types.Response, error) {
 	payload := entity.PayloadAs[*entity.AudioOverviewPayload](req.Payload)
 
-	ckpt := a.checkpoints.load(ctx, req.ArtifactId)
+	ckpt := a.checkpoints.Load(ctx, req.ArtifactId)
 
 	outline, ckpt, err := a.outline.ensure(ctx, req, payload, ckpt)
 	if err != nil {

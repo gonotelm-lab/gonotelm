@@ -15,6 +15,7 @@ import (
 	workerentity "github.com/gonotelm-lab/gonotelm/internal/domain/worker/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio/voices"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
@@ -39,13 +40,13 @@ type podcastTranscriptExpectation struct {
 // transcriptGenerator 基于大纲生成/恢复播客文字稿，写入 checkpoint.field2。
 type transcriptGenerator struct {
 	deps          *types.WorkerDeps
-	checkpoints   *checkpointStore
+	checkpoints   *types.CheckpointStore
 	audioProvider text2audio.Text2AudioProvider
 }
 
 func newTranscriptGenerator(
 	deps *types.WorkerDeps,
-	checkpoints *checkpointStore,
+	checkpoints *types.CheckpointStore,
 	audioProvider text2audio.Text2AudioProvider,
 ) *transcriptGenerator {
 	return &transcriptGenerator{deps: deps, checkpoints: checkpoints, audioProvider: audioProvider}
@@ -81,6 +82,8 @@ func (g *transcriptGenerator) generate(
 	payload *artifactentity.AudioOverviewPayload,
 	outline *podcastOutlineExpectation,
 ) (*podcastTranscriptExpectation, error) {
+	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioAudioOverviewTranscriptScene)
+
 	sourceIds := types.SourceIDsToStrings(req.SourceIds)
 	msgs, err := RenderPodcastTranscript(ctx, sourceIds, payload.Language, payload.Tip, payload.Style, outline)
 	if err != nil {
@@ -129,7 +132,7 @@ func (g *transcriptGenerator) save(
 		ckpt = workerentity.NewCheckpoint(artifactId)
 	}
 	ckpt.UpdateField2(data)
-	if err := g.checkpoints.save(ctx, ckpt); err != nil {
+	if err := g.checkpoints.Save(ctx, ckpt); err != nil {
 		return nil, err
 	}
 	return ckpt, nil

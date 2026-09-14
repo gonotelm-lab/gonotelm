@@ -20,6 +20,7 @@ import (
 	sandboxent "github.com/gonotelm-lab/gonotelm/internal/domain/sandbox/entity"
 	sandboxservice "github.com/gonotelm-lab/gonotelm/internal/domain/sandbox/service"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
@@ -65,6 +66,8 @@ func (g *hyperframesVideoGenerator) generate(
 	storyboardMarkdown string,
 	audioMeta *audioCheckpointMeta,
 ) (*videoStorageResult, error) {
+	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioVideoOverviewHyperframesScene)
+
 	sandbox, err := g.ensureSandbox(ctx, req)
 	if err != nil {
 		return nil, errors.WithMessage(err, "ensure video sandbox failed")

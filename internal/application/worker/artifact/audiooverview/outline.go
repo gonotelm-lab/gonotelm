@@ -12,6 +12,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	workerentity "github.com/gonotelm-lab/gonotelm/internal/domain/worker/entity"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
@@ -30,10 +31,10 @@ type podcastOutlineExpectation struct {
 // outlineGenerator 生成/恢复播客大纲，写入 checkpoint.field1。
 type outlineGenerator struct {
 	deps        *types.WorkerDeps
-	checkpoints *checkpointStore
+	checkpoints *types.CheckpointStore
 }
 
-func newOutlineGenerator(deps *types.WorkerDeps, checkpoints *checkpointStore) *outlineGenerator {
+func newOutlineGenerator(deps *types.WorkerDeps, checkpoints *types.CheckpointStore) *outlineGenerator {
 	return &outlineGenerator{deps: deps, checkpoints: checkpoints}
 }
 
@@ -65,6 +66,8 @@ func (g *outlineGenerator) generate(
 	req *types.Request,
 	payload *artifactentity.AudioOverviewPayload,
 ) (*podcastOutlineExpectation, error) {
+	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioAudioOverviewOutlineScene)
+
 	sourceIds := types.SourceIDsToStrings(req.SourceIds)
 	msgs, err := RenderPodcastOutline(ctx, sourceIds, payload.Language, payload.GetTip(), payload.Style)
 	if err != nil {
@@ -105,7 +108,7 @@ func (g *outlineGenerator) save(
 		ckpt = workerentity.NewCheckpoint(artifactId)
 	}
 	ckpt.UpdateField1(data)
-	if err := g.checkpoints.save(ctx, ckpt); err != nil {
+	if err := g.checkpoints.Save(ctx, ckpt); err != nil {
 		return nil, err
 	}
 	return ckpt, nil

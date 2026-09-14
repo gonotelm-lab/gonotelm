@@ -12,6 +12,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	workerentity "github.com/gonotelm-lab/gonotelm/internal/domain/worker/entity"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 )
@@ -22,10 +23,10 @@ const storyboardCompensate = 3
 // 模型通过内存工具 AppendStoryBoardShot / EditStoryBoardShot / ReadStoryBoardShot 增量写入，避免一次吐完整稿。
 type storyboardGenerator struct {
 	deps        *types.WorkerDeps
-	checkpoints *checkpointStore
+	checkpoints *types.CheckpointStore
 }
 
-func newStoryboardGenerator(deps *types.WorkerDeps, checkpoints *checkpointStore) *storyboardGenerator {
+func newStoryboardGenerator(deps *types.WorkerDeps, checkpoints *types.CheckpointStore) *storyboardGenerator {
 	return &storyboardGenerator{deps: deps, checkpoints: checkpoints}
 }
 
@@ -63,6 +64,8 @@ func (g *storyboardGenerator) generate(
 	script *videoScript,
 	audioMeta *audioCheckpointMeta,
 ) (string, error) {
+	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioVideoOverviewStoryboardScene)
+
 	sourceIds := types.SourceIDsToStrings(req.SourceIds)
 	outlineMD := script.renderOutlineMarkdown()
 	narrationMD := script.renderNarrationMarkdown(audioMeta)
@@ -224,7 +227,7 @@ func (g *storyboardGenerator) save(
 		ckpt = workerentity.NewCheckpoint(artifactId)
 	}
 	ckpt.UpdateField3(pkgstring.AsBytes(markdown))
-	if err := g.checkpoints.save(ctx, ckpt); err != nil {
+	if err := g.checkpoints.Save(ctx, ckpt); err != nil {
 		return nil, err
 	}
 	return ckpt, nil
@@ -264,7 +267,7 @@ func (g *storyboardGenerator) discardStale(ctx context.Context, artifactId valob
 		slog.Int("bytes", len(ckpt.Field3)),
 	)
 	ckpt.UpdateField3(nil)
-	if err := g.checkpoints.save(ctx, ckpt); err != nil {
+	if err := g.checkpoints.Save(ctx, ckpt); err != nil {
 		slog.ErrorContext(ctx, "clear stale video storyboard checkpoint failed",
 			slog.String("artifact_id", artifactId.String()), slog.Any("err", err))
 	}

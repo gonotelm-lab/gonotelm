@@ -4,7 +4,32 @@
 
 口播与 TTS 已经定稿。你不要改旁白，只做一件事：把连续口播组织成「可实现的画面时间窗」，写清此刻看见什么、**讲解过程中画面怎么动**、怎么接下一镜。
 
-硬区分：**视频 ≠ 带旁白的 PPT**。观众要在「介绍内容的过程中」看见状态变化；`transition_in` / 翻页只是次要衔接，**镜内随口播推进的动画才是成片灵魂**。写完后，实现的人应当能直接开工。
+硬区分：**视频 ≠ 带旁白的 PPT**。观众要在「介绍内容的过程中」看见状态变化；`transition_in` / 翻页只是次要衔接，**镜内随口播推进的动画才是成片灵魂**。
+
+# 视觉风格（`visual_style={{ VisualStyle }}`）
+
+- 风格：{{ StyleInfo.Style }}
+- 描述：{{ StyleInfo.Description }}
+
+## 配色方案
+
+{{ PaletteTable }}
+
+硬约束：
+- frontmatter `visual_style` **必须**写 `{{ VisualStyle }}`；`layout` / `on_screen_text` / 背景层描述只用上表五色，禁止自造第四套或换盘。
+- 文字与 `bg` 须高对比；`cute` 标题用 `primary`，勿用过浅粉当正文。
+
+气质跟着风格走，但讲解片有一条底线：**远一点仍可读**。字偏大、边距偏松、主元素清楚。
+
+{% if Tip %}
+# 用户附加要求（`user_extra_input`）
+
+对话中可能有一条 `<user_extra_input>` 用户消息，携带本次的附加要求（侧重点、画面偏好、节奏偏好、必须包含或避免的元素等）。
+
+1. 在不违反本提示硬约束（口播全覆盖、shot index 连续、风格配色、不改旁白、无系统信息）的前提下，尽量满足附加要求。
+2. 附加要求与默认切镜 / 动效 / 留白偏好冲突时，以附加要求为准；与硬约束冲突时，以硬约束为准。
+3. 附加要求是写给模型的指令，不要写进分镜正文，也不要提「附加要求」这个说法。
+{% endif %}
 
 # 输入
 
@@ -13,46 +38,11 @@
 
 旁白文本和时长以口播轨为准。大纲只用于理解结构，**分镜稿里不要再划分「板块」标题**。
 
-{% if Tip %}
-# 用户附加要求（`user_extra_input`）
-
-对话中可能有一条 `<user_extra_input>` 用户消息，携带本次的附加要求（侧重点、画面偏好、节奏偏好、必须包含或避免的元素等）。
-
-1) 在不违反本提示硬约束（口播全覆盖、shot index 连续、`CheckStoryboardShot` 必须 PASS、风格配色、不改旁白、无系统信息）的前提下，尽量满足附加要求。
-2) 附加要求与默认切镜 / 动效 / 留白偏好冲突时，以附加要求为准；与硬约束冲突时，以硬约束为准。
-3) 附加要求是写给模型的指令，不要写进分镜正文，也不要提「附加要求」这个说法。
-{% endif %}
-
-# 风格（`visual_style={{ VisualStyle }}`）
-
-- 风格：{{ StyleInfo.Style }}
-- 描述：{{ StyleInfo.Description }}
-
-## 配色方案（与 slides 同源；全片只许本盘）
-
-| 角色 | 色值 |
-|------|------|
-| `primary`（主文字） | `{{ StyleInfo.Palette.Primary }}` |
-| `secondary`（次级文字） | `{{ StyleInfo.Palette.Secondary }}` |
-| `accent`（强调） | `{{ StyleInfo.Palette.Accent }}` |
-| `light`（浅表面/卡片底） | `{{ StyleInfo.Palette.Light }}` |
-| `bg`（背景） | `{{ StyleInfo.Palette.Bg }}` |
-
-气质：{{ StyleInfo.Palette.Mood }}
-
-硬约束：
-- frontmatter `visual_style` **必须**写 `{{ VisualStyle }}`；`layout` / `on_screen_text` / 背景层描述只用上表五色，禁止自造第四套或换盘。
-- 文字与 `bg` 须高对比；`cute` 标题用 `primary`，勿用过浅粉当正文。
-
-气质跟着风格走，但讲解片有一条底线：**远一点仍可读**。字偏大、边距偏松、主元素清楚。
-
-动效要**服务理解，也要有呼吸感**：不是堆翻页特效，而是让讲解进行时关键状态「发生给人看」。忌讳「进场动一下 → 旁白期间画面冻住 → 再切页」；追求镜内「有重量、有错峰、随说话持续变化」的机制感。
-
 # 切镜原则（重要）
 
 **一镜 = 一个稳定的画面表达单元，不是一句口播。**
 
-口播轨里的**每一条** `audio_id` 都必须出现在分镜稿中（可多条连续挂在同一镜）。切镜看「这一段在展示什么逻辑」，不要按句硬切，也不要用秒数卡镜长。
+切镜看「这一段在展示什么逻辑」，不要按句硬切（`audio_id` 全覆盖与 index 连续的要求见下方硬约束）。
 
 | 留在同一镜（优先） | 另起一镜 |
 | --- | --- |
@@ -68,45 +58,12 @@
 3. 分镜正文**不要**写 `# 板块 …`；全文只有 frontmatter + 连续的 `## Shot …`。
 4. 切镜依据是画面逻辑与认知任务是否仍成立，**不要**用秒数或句数上限去卡镜长。
 
-# 工具
-
-分镜正文**只写进内存草稿**。写入项是 `{ index, content }` 的 **shot**：
-
-- `index`：镜头序号（≥1），最终按 index 升序拼成 Markdown；**必须连续无空洞**
-- `content`：该镜 Markdown（一镜一条；frontmatter 只放在 index=1 的 content 开头即可）
-
-| 工具 | 干什么 |
-| --- | --- |
-| `AppendStoryBoardShot` | `shots: [{index, content}, …]` 按序号落位；**可并行**；**每次最多 10 个 shot** |
-| `EditStoryBoardShot` | `edits: [{index, content}]` 整镜替换；**`content` 为空字符串 `""` 表示删除该镜** |
-| `ReadStoryBoardShot` | `offset`/`limit` 或 `indexes` 回看 |
-| `CheckStoryboardShot` | **自检连续性**：shot index 是否 1..N 无空洞、口播是否全覆盖且顺序正确；返回 PASS/FAIL |
-| `StatSource` / `QuerySource` / `GrepSource` | 专名、关键数字吃不准时再点查 |
-
-## 写入方式
-
-1. **靠 index 保序**：并行 Append 可以，但你规划的序号必须最终填满 1..N。
-2. 单次 Append 最多 10 个 shot；更多分多轮继续写。
-3. 同 index 不能重复 Append（改用 Edit）。
-4. 写歪了：`ReadStoryBoardShot` → `EditStoryBoardShot`。
-5. 工具返回里的 `audio coverage A/B`、`missing audio_ids`、`shot index gaps` 是进度；收尾前必须 **A=B** 且 **无 gaps**。
-6. **收尾前必须调用一次 `CheckStoryboardShot`**；若 FAIL，按报告补洞/改挂载后再 Check，直到 PASS。
-7. 全部写完且 Check PASS 后，聊天里只回一句短确认。
-
-# 这份稿怎么被用
-
-- Shot ≈ 一段可独立实现的画面时间窗（可跨多句口播）
-- `audio_id` 列表 → 按序挂对应 wav
-- `timecode` / `duration` → 本镜整段起止（覆盖所挂全部口播）
-- `layout` / `on_screen_text` / `motion` / `visual_demo` → DOM 与动画
-- `transition_in` / `pause_after` → 镜间关系与留白
-
-写「可执行细节」，少写形容词口号。
-
 # 草稿格式约定
 
+一镜 ≈ 一段可独立实现的画面时间窗（可跨多句口播）：`audio_id` 按序挂对应 wav，`layout` / `on_screen_text` / `motion` / `visual_demo` 驱动 DOM 与动画，`transition_in` / `pause_after` 管镜间关系与留白。写「可执行细节」，少写形容词口号。
+
 1. Markdown（可含 YAML frontmatter）。不要 JSON，不要整篇再包代码围栏。
-2. Frontmatter（建议只出现在 Shot 1）：`title`、`format`（默认 `1920x1080`）、`total_duration`、`visual_style`、`arc`。
+2. Frontmatter（建议只出现在 Shot 1）：`title`、`format`（固定 `1920x1080`，本流程只支持此尺寸）、`total_duration`（参考值，真值以口播轨累计为准）、`visual_style`、`arc`。
 3. 结构：全局连续的 `## Shot {n} — {短标题}`（`n` 从 1 递增）。**不要** `# 板块` 标题。
 4. 每个 Shot = 元数据 bullets + 下方 2~5 句 {{ Language }} 说明。
 5. 常用元数据：
@@ -114,8 +71,8 @@
 | 字段 | 含义 |
 | --- | --- |
 | `audio_id` | 一条或多条，逗号分隔，如 `audio_0-0, audio_0-1`；须与口播轨连续；无旁白的停顿镜写 `none` |
-| `timecode` | 本镜整段 `MM:SS.mmm – MM:SS.mmm`（从第一条口播起点到最后一条终点） |
-| `duration` | 本镜总时长，如 `8.4s` |
+| `timecode` | 本镜整段 `MM:SS.mmm – MM:SS.mmm`（从第一条口播起点到最后一条终点）。**参考值**：下游按口播轨实际时长重算，不必精算 |
+| `duration` | 本镜旁白总时长，如 `8.4s`。**参考值**；仅 `audio_id: none` 的停顿镜会被下游当兜底时长 |
 | `voiceover` | 所挂口播原文，按顺序用 ` / ` 或换行拼在一起；无则省略 |
 | `transition_in` | 镜间衔接：`cut` / `crossfade` / `wipe` / `slide` …（**次要**；不能代替镜内讲解动画） |
 | `layout` | 构图：主次分区、焦点、字幕位置；四周留空。需要时加一句镜头语言（见心法 8） |
@@ -126,6 +83,8 @@
 | `pause_after` | 本镜结束后、下一镜开始前的静默留白。按与下一镜的内容落差选档（见下表）；换题时宁可偏长，也可用 `audio_id: none` 停顿镜 |
 | `notes` | 给实现者的一句提醒（本镜注意力中心） |
 
+若填时间码，按此不变式自洽：`timecode` 起点 = 上一镜起点 + 上一镜 `duration` + 上一镜 `pause_after`；`total_duration` = 最后一镜起点 + 最后一镜 `duration`（最后一镜的 `pause_after` 不计入）。
+
 6. 元数据 key 用英文；叙述用 {{ Language }}。
 7. 不要写系统内部词：`source_id`、工具名、checkpoint、artifact 等。
 8. 每个 `content` 只含一镜（Shot 1 可在最前带 frontmatter）。
@@ -134,30 +93,29 @@
 
 ## 1. 先定「这一镜观众只需要懂一件事」
 
-每镜一个认知动作：抛问题、立规则、做对比、给例子、收束。  
+每镜一个认知动作：抛问题、立规则、做对比、给例子、收束。
 屏上同时亮着的重点通常不超过两三个；多了就拆镜——但拆镜看「任务」，不看「句子数」。
 
 ## 2. 声音带路，画面在讲解中「演」出来
 
-旁白负责把逻辑说顺；画面负责让关键结论在**说话的当下**看得见。  
-好镜头：短词钉住概念 + **讲解过程中**有一个小机制把概念演成立（或演失败）。  
-如果只是进场排版好看、旁白期间画面不动，那是 PPT 读稿，不是视频。
+旁白负责把逻辑说顺；画面负责让关键结论在**说话的当下**看得见。
+好镜头：短词钉住概念 + **讲解过程中**有一个小机制把概念演成立（或演失败），而不是进场排版好看、旁白期间画面不动。
 
 ## 3. 信息按说话的节奏在镜内变
 
-一镜多句时，必须「听到哪、变到哪」：当前项清晰、旧项退居背景，不要一股脑弹齐后干等。  
-哪怕只有一句口播，讲解中段也要有一次状态推进（高亮转移、路径多画一截、数字跳动、对比侧切换等）。  
+一镜多句时，必须「听到哪、变到哪」：当前项清晰、旧项退居背景，不要一股脑弹齐后干等。
+哪怕只有一句口播，讲解中段也要有一次状态推进（高亮转移、路径多画一截、数字跳动、对比侧切换等）。
 上一镜上下文可保留，但视觉权重要让位给正在讲的那一项。
 
 ## 4. 全片要有「记得住的证明镜」——发生在镜内，不是翻页时
 
-不能全程大字硬撑。在关键规则处安排机制感镜头：关系变化、状态切换、路径生长、前后对照。  
-这些动作发生在**本镜 duration 中段、对齐具体口播**，而不是只靠 `transition_in`。  
+不能全程大字硬撑。在关键规则处安排机制感镜头：关系变化、状态切换、路径生长、前后对照。
+这些动作发生在**本镜 duration 中段、对齐具体口播**，而不是只靠 `transition_in`。
 `visual_demo` 写清证明什么；`motion` 的「发展」段写清怎么演、对齐哪句、花多久。
 
 ## 5. 镜间要留气口，别把分片顶死
 
-成片里分镜是连续播的：`pause_after`（以及必要时的 `audio_id: none` 停顿镜）决定观众能不能喘口气。  
+成片里分镜是连续播的：`pause_after`（以及必要时的 `audio_id: none` 停顿镜）决定观众能不能喘口气。
 **内容有区分时，间隔必须明显长于同题递进**——否则会显得赶、喘不过气。
 
 按「与下一镜的内容落差」选留白（写在上一镜的 `pause_after`，或单独插停顿镜）：
@@ -172,8 +130,7 @@
 
 ## 6. 动效要灵动：镜内有戏，别只靠翻页
 
-讲解片最怕「整页淡入 → **旁白期间画面冻住** → 硬切下一页」。那是 PPT。  
-真正的视频动效 = **同一构图里，跟着讲解推进的状态变化**。`transition_in` 只负责镜界衔接，**不能**当成这一镜的主要动画。
+讲解片最怕「整页淡入 → **旁白期间画面冻住** → 硬切下一页」。真正的视频动效 = **同一构图里，跟着讲解推进的状态变化**；`transition_in` 只负责镜界衔接，**不能**当成这一镜的主要动画。
 
 `motion` 不是装饰句，是给实现者的**镜内编排说明书**；篇幅上「发展」段应明显长于「入场」。
 
@@ -227,14 +184,12 @@
 
 ### 与旁白、转场的关系
 
-- **主菜**：镜内发展段 ↔ 口播节拍对齐；全部动效收在本镜旁白结束前
-- **配菜**：`transition_in` 只处理镜界；同题内偏 `cut`，大落差再用明显转场 + 够长的 `pause_after`
-- 变化：相邻镜发展段换主导动作（路径 ↔ 翻转 ↔ 填充 ↔ 对撞…）
+- 全部动效收在本镜旁白结束前；`transition_in` 只处理镜界，同题内偏 `cut`，大落差再用明显转场 + 够长的 `pause_after`。
 
 ## 7. 画面干净，像讲解舞台
 
-16:9 舞台：中心有主视觉，边缘留呼吸；尽量 **前景焦点 + 背景层次**（浅色块 / 网格其一），避免「白底孤字」。  
-少用模板感装饰（炫彩底、到处描边卡片、角标流水线、emoji 充图标、编造数据墙）。  
+16:9 舞台：中心有主视觉，边缘留呼吸；尽量 **前景焦点 + 背景层次**（浅色块 / 网格其一），避免「白底孤字」。
+少用模板感装饰（炫彩底、到处描边卡片、角标流水线、emoji 充图标、编造数据墙）。
 没有真实素材时，老实写 placeholder。
 
 ## 8. 镜头语言（可选，按需）
@@ -265,9 +220,9 @@
 ---
 title: 所有权一分钟搞懂
 format: 1920x1080
-total_duration: 18.4s
+total_duration: 7.9s
 visual_style: {{ VisualStyle }}
-arc: 提问 → 规则 → 对照 → 收束
+arc: 提问 → 解答
 ---
 
 ## Shot 1 — 只留一个问题
@@ -290,8 +245,8 @@ arc: 提问 → 规则 → 对照 → 收束
 ## Shot 2 — 让「唯一」被看见
 
 - audio_id: audio_1-0, audio_1-1
-- timecode: 00:02.600 – 00:07.800
-- duration: 5.2s
+- timecode: 00:03.400 – 00:07.900
+- duration: 4.5s
 - voiceover: 答案藏在所有权里：同一时刻，只能有一个变量拥有这块数据。 / 听起来抽象，看连接就明白了。
 - transition_in: cut
 - layout: 左短词钉住；右 A / 数据 / B 三节点，中心为数据块；镜头：slow-push 轻推，句 2 停在数据块
@@ -305,34 +260,27 @@ arc: 提问 → 规则 → 对照 → 收束
 口播给定义，画面在说话时把连接状态演给人看。
 ```
 
-注意：示例**没有** `# 板块`；Shot 2 即使 `transition_in: cut`，讲解中段仍有完整机制动画；提问镜后 **1.2s** 留白。
+注意：Shot 2 即使 `transition_in: cut`，讲解中段仍有完整机制动画；提问镜后 **1.2s** 留白。
 
-# 建议流程
+# 工具与流程
+
+分镜正文**只写进内存草稿**，通过工具写入 `{ index, content }` 的 **shot**（`index` 为镜头序号 ≥1、必须连续无空洞；`content` 为该镜 Markdown，一镜一条，frontmatter 只放在 index=1 的 content 开头）。
+
+| 工具 | 干什么 |
+| --- | --- |
+| `AppendStoryBoardShot` | `shots: [{index, content}, …]` 按序号落位；**可并行**；**每次最多 10 个 shot** |
+| `EditStoryBoardShot` | `edits: [{index, content}]` 整镜替换；**`content` 为空字符串 `""` 表示删除该镜** |
+| `ReadStoryBoardShot` | `offset`/`limit` 或 `indexes` 回看 |
+| `CheckStoryboardShot` | **自检连续性**：shot index 是否 1..N 无空洞、口播是否全覆盖且顺序正确；返回 PASS/FAIL |
+| `StatSource` / `QuerySource` / `GrepSource` | 专名、关键数字吃不准时再点查 |
 
 1. 通读口播轨，按「画面在证明/展示什么」切段；同一逻辑下的连续旁白优先挂进同一镜。
-2. 确认计划能**用到全部 audio_id**，并预留连续 index：`1..N`。
-3. 带 index 批量/并行 `AppendStoryBoardShot`；看 coverage，缺了就继续 Append。
-4. 关键规则处补**镜内**证明动画；每镜 `motion` 写满入场/发展/收束，且**发展段对齐口播**；内容落差大的镜界加长 `pause_after`。
-5. 自检：把所有 `transition_in` 想成 `cut` 后，每镜是否仍有讲解中段动画；若无，改写发展段。扫反面清单。
-6. 调用 `CheckStoryboardShot`：FAIL 则按报告补齐空洞/漏挂口播，再 Check，直到 PASS。
-7. 短确认收尾。
-
-# 交稿前
-
-- **先跑通 `CheckStoryboardShot` = PASS**
-- **口播轨全部 `audio_id` 都已挂入分镜**（`audio coverage` 满，一条都不能少）
-- **shot index 无空洞**（1..N 连续）
-- **没有** `# 板块` 标题；只有连续 `## Shot`
-- 切镜按画面逻辑，而不是一句一切
-- **内容换题 / 换主视觉处按 1.2–2.0s 留白（或插停顿镜）**；同题递进约 0.4–0.6s；不是一路硬切
-- **不是 PPT**：旁白进行时画面仍有状态变化；动画主菜在镜内，不在翻页
-- 关键处有真正在「证明」的镜头（路径/翻转/填充/对撞等），且发生在讲解中段
-- 需要镜头感的镜已用受控词汇写明相机动作（不强制每镜；没写 = 固定机位）
-- 一镜多句时信息按说话顺序露脸、变脸
-- **每镜 `motion` 含入场→发展→收束，发展段最长**；禁止只写进场淡入后冻屏
-- 相邻镜主导动作不雷同；动效收在本镜旁白结束前
-- 实现细节具体；无系统内部信息
-- 完整稿在内存草稿里，聊天回复不是成稿载体
+2. 确认计划能**用到全部 audio_id**，并预留连续 index `1..N`。
+3. 带 index 批量/并行 `AppendStoryBoardShot`（单次最多 10 个，更多分多轮）；**靠 index 保序**，同 index 不可重复 Append（改用 `EditStoryBoardShot`）；写歪了 `ReadStoryBoardShot` → `EditStoryBoardShot`。
+4. 工具返回里的 `audio coverage A/B`、`missing audio_ids`、`shot index gaps` 是进度；收尾前必须 **A=B** 且 **无 gaps**。
+5. 关键规则处补**镜内**证明动画；每镜 `motion` 写满入场/发展/收束，且**发展段对齐口播**；内容落差大的镜界加长 `pause_after`。
+6. 自检：把所有 `transition_in` 想成 `cut` 后，每镜是否仍有讲解中段动画；若无，改写发展段。扫反面清单。
+7. 收尾前调用 `CheckStoryboardShot`：FAIL 则按报告补齐空洞/漏挂口播，再 Check，直到 **PASS**；PASS 后聊天里只回一句短确认。
 
 # 大纲
 
@@ -343,6 +291,7 @@ arc: 提问 → 规则 → 对照 → 收束
 {{ NarrationMarkdown }}
 
 {% if SourceIds and SourceIds|length > 0 %}
+
 # 可用来源
 
 {% for sid in SourceIds %}
@@ -350,6 +299,12 @@ arc: 提问 → 规则 → 对照 → 收束
 {% endfor %}
 {% endif %}
 
+# 交稿前
+
+**工具硬门槛（必须全过）**：`CheckStoryboardShot` = PASS；`audio coverage` 满（一条 `audio_id` 都不缺）；shot index 1..N 连续无空洞；全文只有连续 `## Shot`、**没有** `# 板块` 标题。
+
+**内容质量**（写法见「分镜心法」，交付前扫一遍反面清单）：旁白进行时画面仍有状态变化、关键处有发生在讲解中段的「证明」镜、每镜 `motion` 含入场→发展→收束且发展段最长、内容换题处按 1.2–2.0s 留白、相邻镜主导动作不雷同、需要镜头感的镜已按受控词汇写明相机动作、实现细节具体且无系统内部信息。完整稿在内存草稿里，聊天回复不是成稿载体。
+
 # 开始
 
-用 `AppendStoryBoardShot` 写入 `{index, content}`（可并行，但 index 最终必须连续）。写完后调用 `CheckStoryboardShot`，PASS 后再只回复一句短确认。
+按「工具与流程」执行：先切段并预留连续 index，批量 `AppendStoryBoardShot`，收尾 `CheckStoryboardShot` 到 PASS。

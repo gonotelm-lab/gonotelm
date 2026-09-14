@@ -13,7 +13,7 @@ import (
 
 // Generator 编排视频产物：口播稿 → 逐句 TTS → 分镜脚本 → HyperFrames 渲染。
 type Generator struct {
-	checkpoints *checkpointStore
+	checkpoints *types.CheckpointStore
 	script      *scriptGenerator
 	audio       *audioSynthizer
 	storyboard  *storyboardGenerator
@@ -23,7 +23,7 @@ type Generator struct {
 var _ types.Generator = &Generator{}
 
 func New(deps *types.WorkerDeps) *Generator {
-	checkpoints := newCheckpointStore(deps.CheckpointRepository)
+	checkpoints := types.NewCheckpointStore(deps.CheckpointRepository)
 	return &Generator{
 		checkpoints: checkpoints,
 		script:      newScriptGenerator(deps, checkpoints),
@@ -37,7 +37,7 @@ func New(deps *types.WorkerDeps) *Generator {
 func (g *Generator) Generate(ctx context.Context, req *types.Request) (*types.Response, error) {
 	payload := artifactentity.PayloadAs[*artifactentity.VideoOverviewPayload](req.Payload)
 
-	ckpt := g.checkpoints.load(ctx, req.ArtifactId)
+	ckpt := g.checkpoints.Load(ctx, req.ArtifactId)
 
 	script, ckpt, scriptRestored, err := g.script.ensure(ctx, req, payload, ckpt)
 	if err != nil {

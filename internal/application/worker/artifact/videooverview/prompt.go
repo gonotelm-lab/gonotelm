@@ -35,11 +35,12 @@ func RenderVideoScript(
 	style artifactentity.VideoOverviewStyle,
 ) ([]*einoschema.Message, error) {
 	msgs, err := videoScriptTpl.Format(ctx, map[string]any{
-		"SourceIds":   types.NormalizeStrings(sourceIds),
-		"Language":    lang.DisplayName(),
-		"VisualStyle": style.String(),
-		"StyleInfo":   videoStyleInfo(style),
-		"Tip":         strings.TrimSpace(tip),
+		"SourceIds":    types.NormalizeStrings(sourceIds),
+		"Language":     lang.DisplayName(),
+		"VisualStyle":  style.String(),
+		"StyleInfo":    videoStyleInfo(style),
+		"PaletteTable": videoPaletteTable(style),
+		"Tip":          strings.TrimSpace(tip),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("render video script prompt: %w", err)
@@ -66,6 +67,7 @@ func RenderVideoStoryboard(
 		"NarrationMarkdown": narrationMarkdown,
 		"VisualStyle":       style.String(),
 		"StyleInfo":         videoStyleInfo(style),
+		"PaletteTable":      videoPaletteTable(style),
 		"Tip":               strings.TrimSpace(tip),
 	})
 	if err != nil {
@@ -90,8 +92,10 @@ func RenderVideoGenerate(
 ) ([]*einoschema.Message, error) {
 	msgs, err := videoGenerateTpl.Format(ctx, map[string]any{
 		"Language":              lang.DisplayName(),
+		"CJKFont":               lang == artifactentity.LanguageChinese,
 		"VisualStyle":           style.String(),
 		"StyleInfo":             videoStyleInfo(style),
+		"PaletteTable":          videoPaletteTable(style),
 		"Runtime":               runtime,
 		"WorkspaceDir":          workspaceDir,
 		"OutputLocation":        outputLocation,
@@ -128,7 +132,6 @@ func videoStyleDescription(style artifactentity.VideoOverviewStyle) string {
 	}
 }
 
-// videoStylePalette 与 slides 同源（primary/secondary/accent/light/bg），全片只许本盘。
 func videoStylePalette(style artifactentity.VideoOverviewStyle) map[string]string {
 	switch style {
 	case artifactentity.VideoOverviewStyleEducational:
@@ -159,4 +162,19 @@ func videoStylePalette(style artifactentity.VideoOverviewStyle) map[string]strin
 			"Mood":      "扁平手绘感、米色/奶油纸张底、温暖教育向",
 		}
 	}
+}
+
+func videoPaletteTable(style artifactentity.VideoOverviewStyle) string {
+	p := videoStylePalette(style)
+	return fmt.Sprintf(
+		"| 角色 | 色值 |\n"+
+			"|------|------|\n"+
+			"| `primary`（主文字） | `%s` |\n"+
+			"| `secondary`（次级文字） | `%s` |\n"+
+			"| `accent`（强调） | `%s` |\n"+
+			"| `light`（浅表面/卡片底） | `%s` |\n"+
+			"| `bg`（背景） | `%s` |\n\n"+
+			"气质：%s",
+		p["Primary"], p["Secondary"], p["Accent"], p["Light"], p["Bg"], p["Mood"],
+	)
 }

@@ -10,6 +10,12 @@ HyperFrames 用 HTML 描述画面与时间。本项目**默认走模块化架构
 
 你写 HTML + CSS + GSAP，`hyperframes render` 负责出片。
 
+# 产出与目标
+
+- **产物**：音画同步、风格统一、可播放的 MP4，路径固定 `{{ OutputLocation }}`。
+- **忠实分镜**：画面必须如实实现分镜稿。每镜的 `layout` / `on_screen_text` / `motion` / `visual_demo` / `transition_in` / `pause_after` 都要落实；不新增分镜里没有的内容，也不漏掉 `visual_demo` 要求的机制动画。
+- **输出语言**：画面内所有可见文字使用 **{{ Language }}**（标题、字幕、标签、数据），勿混用其它语言。
+
 # 运行环境
 
 ## Runtime
@@ -18,7 +24,7 @@ HyperFrames 用 HTML 描述画面与时间。本项目**默认走模块化架构
 
 ## 沙箱已知事实（不要再排查环境）
 
-- CLI 为 `hyperframes` v0.8.35：`check` / `lint` **只接受项目目录**（无 `-c <file>`），且要求目录里存在 `index.html`。不要升级、不要联网、不要装包。
+- 当前 `hyperframes` CLI：`check` / `lint` **只接受项目目录**（无 `-c <file>`），且要求目录里存在 `index.html`。不要升级、不要联网、不要装包。
 - 已注入 `HYPERFRAMES_NO_UPDATE_CHECK=1`、`HYPERFRAMES_NO_TELEMETRY=1`；渲染 worker 数用 `-w auto`（自动决定，不要写死数量）。
 - Chrome 启动参数已含 `--no-sandbox --disable-dev-shm-usage`；`/dev/shm` 64 MB 属正常。
 - doctor 的 `Version`、`/dev/shm`、`whisper-cpp`、`TTS`、`BGM`、`Docker` 报 `✗` 一律忽略。不要调 shm、杀 chrome、改 cgroup、查内存。
@@ -68,7 +74,9 @@ HyperFrames 用 HTML 描述画面与时间。本项目**默认走模块化架构
 - 校验：`hyperframes check [DIR]` / `hyperframes lint [DIR]`（均需项目目录且先有 `index.html`）+ `ffprobe` + 收尾 `CheckMP4`。
 - `EditFile`：**仅**在 `check` 或渲染失败后修对应 HTML（子文件或 `index.html`）。
 
-# Skills（知识库路由）
+# 知识库
+
+## Skills（知识库路由）
 
 技能位于 `{{ WorkspaceDir }}/skills/`（**只读**，禁止写入 / 修改 / 删除）；每个技能是 `<name>/SKILL.md`。
 
@@ -77,10 +85,11 @@ HyperFrames 用 HTML 描述画面与时间。本项目**默认走模块化架构
 激活方式：任务匹配某个 skill 的 `description` 时，用 `ReadFile` 读取它的 `<location>` 获得完整指引——location 相对工作目录，拼上 `{{ WorkspaceDir }}/` 得到绝对路径；不要凭记忆写契约细节。
 
 硬要求：
+
 - `hyperframes-contract` 必读，时机是写第一个 HTML 前（不是开工前）；
 - `visual-style` / `animation` 在写对应内容前各读一次。
 
-# 组件库（Components）
+## 组件库（Components）
 
 工作目录 `{{ WorkspaceDir }}/components/` 有现成动画片段（**只读**）。用法：
 
@@ -90,25 +99,46 @@ HyperFrames 用 HTML 描述画面与时间。本项目**默认走模块化架构
 - 组件里的文案 / 颜色 / 尺寸必须按本片语言与色盘替换，不要照搬示例。
 - 组件是加速手段，不是必须；完整用法（四步并入、时间线接线、约束）见 `skills/components/SKILL.md`。
 
-# 目标
+# 视觉风格（与 `visual_style={{ VisualStyle }}` 绑定；全片只用本套）
 
-产出音画同步、风格统一、可播放的 MP4，路径固定：`{{ OutputLocation }}`。
+风格描述：{{ StyleInfo.Description }}
 
-画面必须忠实实现分镜稿：每个 Shot 的 `layout` / `on_screen_text` / `motion` / `visual_demo` /
-`transition_in` / `pause_after` 都要落实；不要新增分镜里没有的内容，也不要漏掉 `visual_demo` 要求的机制动画。
+## 配色方案
 
-# 输出语言
+{{ PaletteTable }}
 
-画面内所有可见文字使用 **{{ Language }}**（标题、字幕、标签、数据）；勿混用其它语言。
+CSS/SVG/`style` **必须**使用上表色值（可带透明度），禁止自造第四套或改盘。
+
+{% if VisualStyle == "educational" %}
+**本套：Sharp & Educational（教科书科普：高对比、几何分区清晰、冷静易读）**
+
+- 字体：标题 `Montserrat` 800–900；正文 `Inter` 400；数据 `IBM Plex Mono` 700
+- 构图：直角（0–4px）、几何分区、清晰网格线；主标题 64–110px，正文 28–36px
+- 动效：克制精确，入场 `power3.out` 0.3–0.5s；环境动效用网格线脉冲 / 路径生长
+{% elif VisualStyle == "cute" %}
+**本套：Rounded & Cute（粉嫩柔和、治愈轻松）**
+
+- 字体：标题 `Nunito` 900 / `Montserrat` 900；正文 `Nunito` 400；圆角 16–32px
+- 构图：圆润卡片、留白充足、轻装饰；主标题 64–110px
+- 动效：活泼弹跳 `back.out(1.6)`（overshoot ≤ 2）、错峰 0.05–0.08s；环境动效用漂浮 / 气泡 / 柔和呼吸
+{% else %}
+**本套：Soft & Balanced（默认，温暖教育向）**
+
+- 字体：标题 `Montserrat` 800 / `Playfair Display` 700；正文 `Inter` 400；数据 `IBM Plex Mono` 700
+- 构图：扁平手绘感、温和留白、圆角适中（8–16px）；主标题 64–110px
+- 动效：舒缓有呼吸感，入场 `power3.out` 0.4–0.6s；环境动效用径向光晕 / 细线漂移
+{% endif %}
+
+图形语义、SVG 绘制纪律、数据图、视频构图与字号尺度见 `skills/visual-style/SKILL.md`（设计画面前必读）。
 
 {% if Tip %}
 # 用户附加要求（`user_extra_input`）
 
 对话中可能有一条 `<user_extra_input>` 用户消息，携带本次的附加要求（画面打磨、字幕可读性、转场偏好、必须避免的效果等）。
 
-1) 在不违反本提示硬约束（HyperFrames 契约、模块化架构、本地 GSAP、禁联网、确定性渲染、渲染/校验流程）的前提下，尽量满足附加要求。
-2) 分镜稿是画面与节奏的权威依据：附加要求不得新增分镜外内容、不得改动口播与时间轴；与分镜冲突时以分镜为准，与硬约束冲突时以硬约束为准。
-3) 附加要求是写给模型的指令，不要写进 HTML 注释或画面文字，也不要提「附加要求」这个说法。
+1. 在不违反本提示硬约束（HyperFrames 契约、模块化架构、本地 GSAP、禁联网、确定性渲染、渲染/校验流程）的前提下，尽量满足附加要求。
+2. 分镜稿是画面与节奏的权威依据：附加要求不得新增分镜外内容、不得改动口播与时间轴；与分镜冲突时以分镜为准，与硬约束冲突时以硬约束为准。
+3. 附加要求是写给模型的指令，不要写进 HTML 注释或画面文字，也不要提「附加要求」这个说法。
 {% endif %}
 
 # 输入
@@ -127,8 +157,7 @@ HyperFrames 用 HTML 描述画面与时间。本项目**默认走模块化架构
 
 # 执行纪律（最高优先级，违反即失败）
 
-**唯一流程**：重建时间轴 → 逐镜写 `compositions/shot-NN.html` 并**各自** `check` 通过 →
-写薄 `index.html` 拼接 → 整项目 `check` → `render` → `ffprobe` → `CheckMP4` → 短确认结束。
+**唯一流程**：重建时间轴 → 逐镜写 `compositions/shot-NN.html` 并**各自** `check` 通过 → 写薄 `index.html` 拼接 → 整项目 `check` → `render` → `ffprobe` → `CheckMP4` → 短确认结束。
 
 | 做 | 不做（严禁） |
 |----|------|
@@ -142,54 +171,6 @@ HyperFrames 用 HTML 描述画面与时间。本项目**默认走模块化架构
 | 按 `skills/` 路由读取契约与配方 | 修改 / 删除 / 重命名 `skills/` 里的文件 |
 
 渲染命令报错时：**不要排查环境**。先读报错定位到具体文件/属性/选择器，修源码后重跑；不得扩大搜索范围。
-
-# 工作流程
-
-1. **恢复现场（重试必做，先于一切）**：用一次合并命令盘点 Workspace 现有产物：
-   `ls -la; ls compositions/ 2>/dev/null | wc -l; test -f index.html && echo INDEX_OK; test -s output/video.mp4 && echo MP4_OK; pgrep -f "[h]yperframes render.*{{ OutputLocation }}" >/dev/null && echo RENDER_RUNNING`
-   按现场决定起点，**禁止推倒重来**：
-   - `output/video.mp4` 已存在且非空 → 跳到步骤 8「压制」（码率已 < 1 Mbps 说明压过，直接跳到步骤 9），不要重写任何文件。
-   - `RENDER_RUNNING` → 本任务的渲染进程已在跑（重试），不要重启；按「渲染阶段（长任务）」等待结束后做步骤 8-10。
-   - `index.html` 与 `compositions/shot-NN.html` 齐全 → 跳到步骤 6 `hyperframes check`；只修报错的文件，已通过的部分跳过。
-   - 只写了一部分镜头 → 跳到步骤 4，只补缺失或报错的镜头，已存在的文件不要重写，再走步骤 5-10。
-   - 目录为空 → 从步骤 2 正常执行。
-2. **侦察**：`ListDir` 一次 `{{ WorkspaceDir }}`；跑一次 `hyperframes doctor --json`，
-   只确认 `Chrome` / `FFmpeg` / `FFprobe` 三项 `ok`；其余 `✗` 忽略。不要排查、不要安装、不要升级。
-   - 读分镜与音频清单。
-   - 对音频清单里每个文件用一次合并的 `ffprobe` 循环确认时长（与清单不一致时以 ffprobe 为准）。
-3. **重建时间轴**：按下方算法生成「镜头时间轴表」（内部使用，不必输出）。记下每镜 `shotStart` / `shotWindow` / 挂载的 `audio_id`。
-4. **逐镜写子 composition**：对每个 Shot `N` 写 `compositions/shot-NN.html`（两位编号：`shot-01`…）。
-   - 文件必须是**可独立校验**的子 composition（骨架见 `skills/hyperframes-contract/SKILL.md`）。
-   - v0.8.35 的 `check` / `lint` 只认项目目录且要求有 `index.html`
-   - 逐镜校验用本任务专用临时目录 `{{ WorkspaceDir }}/.check`（已建好；勿用 `/tmp` 固定共享路径）：
-     软链 `{{ WorkspaceDir }}/vendor` 与 `{{ WorkspaceDir }}/compositions`，放一个只挂当前镜的最小 `index.html`，
-     然后 `hyperframes lint {{ WorkspaceDir }}/.check`；修到 0 error 再写下一镜。
-5. **拼薄 `index.html`**：只放 host 槽位（`data-composition-src`）、全部 `<audio>`、近空根时间线
-   （转场写在根上操作槽位）。音频用**全局时间**；子文件内动画用**局部时间（从 0）**。
-6. **整项目质检**：`hyperframes check`（默认入口 `index.html`，会连带校验已挂载的子 composition）。
-   可用 `--json` 便于定位；单镜动画诊断用 `keyframes --json <composition.html>`。
-   修到 0 error（warning 尽量清零）。最多 3 轮；仍有 error 就把出问题的那一镜简化为纯文字 + 淡入。
-7. **渲染**：按下方「渲染阶段（长任务）」启动并等待，渲染期间不要频繁查进度。
-8. **压制**：渲染完成后后台跑 ffmpeg（H.264/AAC + faststart，目标 ≤ 4 Mbps），再用长等待命令等结束：
-   `setsid nohup ffmpeg -y -i {{ OutputLocation }} -c:v libx264 -preset medium -crf 23 -maxrate 4M -bufsize 8M -pix_fmt yuv420p -profile:v high -movflags +faststart -c:a aac -b:a 128k -ar 48000 -map_metadata -1 {{ OutputLocation }}.web.mp4 > {{ WorkspaceDir }}/ffmpeg.log 2>&1 < /dev/null & echo started`
-   `while pgrep -f "[f]fmpeg.*{{ OutputLocation }}" >/dev/null; do sleep 5; done; test -s {{ OutputLocation }}.web.mp4 && mv {{ OutputLocation }}.web.mp4 {{ OutputLocation }} && echo COMPRESS_OK || echo COMPRESS_FAIL`
-   被 15 分钟超时打断就原样重发等待命令；失败 → 保留原片，继续下一步。
-9. **验证**：`test -s`、`ffprobe` 检查时长 / 音轨 / 分辨率；不合格则修复重渲（最多 3 轮）。
-10. **格式确认（必做）**：对 `{{ OutputLocation }}` 调用 `CheckMP4`；返回 `OK` 才算通过。失败 → 修对应 HTML → 重渲 → 再 `CheckMP4`。
-11. **收尾**：`CheckMP4` 通过后，聊天里只回一句短确认（镜头数 / 总时长 / 分辨率 / 输出路径）；**禁止**未调用 `CheckMP4` 就结束。
-
-# 渲染阶段（长任务，禁止频繁轮询）
-
-渲染通常 **10–40 分钟**，期间画面推进缓慢。只启动一次，然后长等待；整个阶段主动检查 ≤ 3 次。
-
-1) 后台启动一次：
-   `setsid nohup hyperframes render --quality standard -w auto --output {{ OutputLocation }} > {{ WorkspaceDir }}/render.log 2>&1 < /dev/null & echo started`
-2) 用长等待命令等它结束：
-   `while pgrep -f "[h]yperframes render.*{{ OutputLocation }}" >/dev/null; do sleep 5; done; echo RENDER_EXITED; tail -5 {{ WorkspaceDir }}/render.log; ls -la {{ OutputLocation }}`
-   单条 Bash 命令最长 15 分钟；被超时打断就**原样重发**，直到渲染进程退出。两次检查间隔 ≥ 5 分钟。
-3) 渲染期间禁止：重复 `check` / `lint`、读或改 HTML、查进度（`ls` / `du` / `wc` / `tail`）。
-4) 发现本任务（同一 `--output`）的 `hyperframes render` 已在跑（任务重试）→ 不要重启，直接执行第 2 步。
-5) 渲染进程退出后 → 先执行步骤 8「压制」，再进入「验证」与 `CheckMP4`；失败才修 HTML 重渲。
 
 # 时间轴重建（音频驱动，必须先做）
 
@@ -218,54 +199,88 @@ HyperFrames 用 HTML 描述画面与时间。本项目**默认走模块化架构
 - `wipe` / `slide`：同上提前 `0.5s`，根时间线用槽位内层 `xPercent` 推挤。
 - 转场只操作 host 槽位**内层包装**或槽位自身透明度，**不要**进子 composition 改兄弟镜。
 
-# 视觉风格（与 `visual_style={{ VisualStyle }}` 绑定；全片只用本套）
+## 音画同步
 
-风格描述：{{ StyleInfo.Description }}
+- 子 composition 内动画用局部时间，收在本镜 `data-duration` 结束前（留 0.1–0.3s）。
+- 镜间转场可重叠槽位窗口，但音频不重叠。
 
-## 配色方案（与 slides 同源；仅此五键）
+# 工作流程
 
-| 角色 | 色值 |
-|------|------|
-| `primary`（主文字） | `{{ StyleInfo.Palette.Primary }}` |
-| `secondary`（次级文字） | `{{ StyleInfo.Palette.Secondary }}` |
-| `accent`（强调） | `{{ StyleInfo.Palette.Accent }}` |
-| `light`（浅表面/卡片底） | `{{ StyleInfo.Palette.Light }}` |
-| `bg`（背景） | `{{ StyleInfo.Palette.Bg }}` |
+1. **恢复现场（重试必做，先于一切）**：用一次合并命令盘点 Workspace 现有产物：
+  `ls -la; ls compositions/ 2>/dev/null | wc -l; test -f index.html && echo INDEX_OK; test -s output/video.mp4 && echo MP4_OK; pgrep -f "[h]yperframes render.*{{ OutputLocation }}" >/dev/null && echo RENDER_RUNNING`
+  按现场决定起点，**禁止推倒重来**：
+  - `output/video.mp4` 已存在且非空 → 进入步骤 8「压制」；若码率已达压制目标（≤ 4 Mbps）说明压过，直接跳到步骤 9，不要重写任何文件。
+  - `RENDER_RUNNING` → 本任务的渲染进程已在跑（重试），不要重启；按「渲染阶段（长任务）」等待结束后做步骤 8-10。
+  - `index.html` 与 `compositions/shot-NN.html` 齐全 → 跳到步骤 6 `hyperframes check`；只修报错的文件，已通过的部分跳过。
+  - 只写了一部分镜头 → 跳到步骤 4，只补缺失或报错的镜头，已存在的文件不要重写，再走步骤 5-10。
+  - 目录为空 → 从步骤 2 正常执行。
+2. **侦察**：`ListDir` 一次 `{{ WorkspaceDir }}`；跑一次 `hyperframes doctor --json`，
+  只确认 `Chrome` / `FFmpeg` / `FFprobe` 三项 `ok`；其余 `✗` 忽略。不要排查、不要安装、不要升级。
+  - 读分镜与音频清单。
+  - 对音频清单里每个文件用一次合并的 `ffprobe` 循环确认时长（与清单不一致时以 ffprobe 为准）。
+3. **重建时间轴**：按下方算法生成「镜头时间轴表」（内部使用，不必输出）。记下每镜 `shotStart` / `shotWindow` / 挂载的 `audio_id`。
+4. **逐镜写子 composition**：对每个 Shot `N` 写 `compositions/shot-NN.html`（两位编号：`shot-01`…）。
+  - 文件必须是**可独立校验**的子 composition（骨架见 `skills/hyperframes-contract/SKILL.md`）。
+  - `check` / `lint` 只认项目目录且要求有 `index.html`
+  - 逐镜校验用本任务专用临时目录 `{{ WorkspaceDir }}/.check`（已建好；勿用 `/tmp` 固定共享路径）：
+  软链 `{{ WorkspaceDir }}/vendor` 与 `{{ WorkspaceDir }}/compositions`，放一个只挂当前镜的最小 `index.html`，
+  然后 `hyperframes lint {{ WorkspaceDir }}/.check`；修到 0 error 再写下一镜。
+5. **拼薄 `index.html`**：只放 host 槽位（`data-composition-src`）、全部 `<audio>`、近空根时间线
+  （转场写在根上操作槽位）。音频用**全局时间**；子文件内动画用**局部时间（从 0）**。
+6. **整项目质检**：`hyperframes check`（默认入口 `index.html`，会连带校验已挂载的子 composition）。
+  可用 `--json` 便于定位；单镜动画诊断用 `keyframes --json <composition.html>`。
+  修到 0 error（warning 尽量清零）。最多 3 轮；仍有 error 就把出问题的那一镜简化为纯文字 + 淡入。
+7. **渲染**：按下方「渲染阶段（长任务）」启动并等待，渲染期间不要频繁查进度。
+8. **压制**：渲染完成后后台跑 ffmpeg（H.264/AAC + faststart，目标 ≤ 4 Mbps），再用长等待命令等结束：
+  `setsid nohup ffmpeg -y -i {{ OutputLocation }} -c:v libx264 -preset medium -crf 23 -maxrate 4M -bufsize 8M -pix_fmt yuv420p -profile:v high -movflags +faststart -c:a aac -b:a 128k -ar 48000 -map_metadata -1 {{ OutputLocation }}.web.mp4 > {{ WorkspaceDir }}/ffmpeg.log 2>&1 < /dev/null & echo started`
+  `while pgrep -f "[f]fmpeg.*{{ OutputLocation }}" >/dev/null; do sleep 5; done; test -s {{ OutputLocation }}.web.mp4 && mv {{ OutputLocation }}.web.mp4 {{ OutputLocation }} && echo COMPRESS_OK || echo COMPRESS_FAIL`
+  被 15 分钟超时打断就原样重发等待命令；失败 → 保留原片，继续下一步。
+9. **验证**：`test -s`、`ffprobe` 检查时长 / 音轨 / 分辨率；不合格则修复重渲（最多 3 轮）。
+10. **格式确认（必做）**：对 `{{ OutputLocation }}` 调用 `CheckMP4`；返回 `OK` 才算通过。失败 → 修对应 HTML → 重渲 → 再 `CheckMP4`。
+11. **收尾**：`CheckMP4` 通过后，聊天里只回一句短确认（镜头数 / 总时长 / 分辨率 / 输出路径）；**禁止**未调用 `CheckMP4` 就结束。
 
-气质：{{ StyleInfo.Palette.Mood }}
+# 渲染阶段（长任务，禁止频繁轮询）
 
-CSS/SVG/`style` **必须**使用上表色值（可带透明度），禁止自造第四套或改盘。
+渲染通常 **10–40 分钟**，期间画面推进缓慢。只启动一次，然后长等待；整个阶段主动检查 ≤ 3 次。
 
-{% if VisualStyle == "educational" %}
-**本套：Sharp & Educational（教科书科普：高对比、几何分区清晰、冷静易读）**
-- 字体：标题 `Montserrat` 800–900；正文 `Inter` 400；数据 `IBM Plex Mono` 700
-- 构图：直角（0–4px）、几何分区、清晰网格线；主标题 64–110px，正文 28–36px
-- 动效：克制精确，入场 `power3.out` 0.3–0.5s；环境动效用网格线脉冲 / 路径生长
-{% elif VisualStyle == "cute" %}
-**本套：Rounded & Cute（粉嫩柔和、治愈轻松）**
-- 字体：标题 `Nunito` 900 / `Montserrat` 900；正文 `Nunito` 400；圆角 16–32px
-- 构图：圆润卡片、留白充足、轻装饰；主标题 64–110px
-- 动效：活泼弹跳 `back.out(1.6)`（overshoot ≤ 2）、错峰 0.05–0.08s；环境动效用漂浮 / 气泡 / 柔和呼吸
-{% else %}
-**本套：Soft & Balanced（默认，温暖教育向）**
-- 字体：标题 `Montserrat` 800 / `Playfair Display` 700；正文 `Inter` 400；数据 `IBM Plex Mono` 700
-- 构图：扁平手绘感、温和留白、圆角适中（8–16px）；主标题 64–110px
-- 动效：舒缓有呼吸感，入场 `power3.out` 0.4–0.6s；环境动效用径向光晕 / 细线漂移
-{% endif %}
+1. 后台启动一次：
+  `setsid nohup hyperframes render --quality standard -w auto --output {{ OutputLocation }} > {{ WorkspaceDir }}/render.log 2>&1 < /dev/null & echo started`
+2. 用长等待命令等它结束：
+  `while pgrep -f "[h]yperframes render.*{{ OutputLocation }}" >/dev/null; do sleep 5; done; echo RENDER_EXITED; tail -5 {{ WorkspaceDir }}/render.log; ls -la {{ OutputLocation }}`
+  单条 Bash 命令最长 15 分钟；被超时打断就**原样重发**，直到渲染进程退出。两次检查间隔 ≥ 5 分钟。
+3. 渲染期间禁止：重复 `check` / `lint`、读或改 HTML、查进度（`ls` / `du` / `wc` / `tail`）。
+4. 发现本任务（同一 `--output`）的 `hyperframes render` 已在跑（任务重试）→ 不要重启，直接执行第 2 步。
+5. 渲染进程退出后 → 先执行步骤 8「压制」，再进入「验证」与 `CheckMP4`；失败才修 HTML 重渲。
 
-图形语义、数据图、视频构图与字号尺度见 `skills/visual-style/SKILL.md`（设计画面前必读）。
+# 质检、修复与渲染
 
-## SVG 绘制纪律（画图标 / 示意图时）
+`check` / `render` 报错 → 读 `skills/hyperframes-contract/SKILL.md` 的报错对照表与失败降级；先修源码再重跑。整项目 `check` 可用 `--json` 定位；单镜动画诊断用 `keyframes --json <composition.html>`。
 
-- **原语优先**：能用 `<circle>` / `<ellipse>` / `<rect rx>` / `<line>` / `<polygon>` 就别用 `<path>`；原语不会走形，只有自由形状才用 path。
-- **对称靠镜像**：先定中心与坐标网格（如 `viewBox="0 0 120 120"`、中心 60,60），左右 / 上下坐标成对镜像（左 30 右 90），不要各自估。
-- **闭合**：闭合图形用 `<polygon>` 或 path 末尾写 `Z`，不要指望描边端点自己接上。
-- **曲线**：圆弧用原语或 `A` 命令，禁止随手写 `C` / `S` 贝塞尔控制点。
-- **描边留边**：`stroke-width` 向路径两侧各扩一半，viewBox 四周留 ≥ `stroke-width/2` 边距；出血装饰显式处理（`overflow: visible` 或容器裁切）。
+```bash
+hyperframes lint {{ WorkspaceDir }}/.check   # 逐镜：本任务专用临时校验目录
+hyperframes check                            # 全部子文件 + 薄 index 就绪后
+```
+
+渲染与压制的完整命令见「渲染阶段（长任务）」与工作流程步骤 8/9，此处不重复。
+
+然后**必须**调用工具（不是 Bash）：`CheckMP4 {{ OutputLocation }}`。
+
+- 帧率固定 **24fps**：根 `#root` 写 `data-fps="24"`，渲染无需 `--fps`；仅当分镜明确要求其他帧率时才加 `--fps <值>`。
+- **不要运行 `hyperframes preview`**：本流程无人审核，check 通过后直接渲染。
+- `ffprobe` 验内容（时长/音轨/分辨率，命令见工作流程步骤 9）；`CheckMP4` 验文件确为合法 MP4。**两者都过才能结束**；未调用 `CheckMP4` 视为未完成。
+
+验收标准：
+
+- 文件存在且非空；
+- 时长与 TOTAL 相差 ≤ 0.2s；
+- **存在音频流**（否则回到音频章节检查 id / src / 时间窗）；
+- `CheckMP4` 返回 `OK`。
 
 # 完整示例（模块化结构参考，内容以分镜为准）
 
 下面的两镜示例演示模块化结构与接线方式；实际内容以分镜稿为准。契约细节见 `skills/hyperframes-contract/SKILL.md`，视觉细节见 `skills/visual-style/SKILL.md`，动画配方见 `skills/animation/SKILL.md`。
+
+**示例中的字体、文案、数字均为占位**：色值已按本片 `visual_style` 色盘参数化；标题 / 正文字体须按上方「视觉风格」本套替换（三套各不相同），可见文字一律用 {{ Language }}。
 
 时间轴（2 镜 / 3 段音频 / 1920×1080）：
 
@@ -287,21 +302,22 @@ TOTAL = 7.20。
       <style>
         #root {
           position: absolute; inset: 0; width: 1920px; height: 1080px; overflow: hidden;
-          background: #faf6ec; font-family: "Montserrat", "CJK", sans-serif;
+          background: {{ StyleInfo.Palette.Bg }}; font-family: "Montserrat"{% if CJKFont %}, "CJK"{% endif %}, sans-serif;
         }
-        @font-face {
+        {% if CJKFont %}@font-face {
           font-family: "CJK";
           src: local("Noto Sans CJK SC"), local("Noto Sans SC"), local("Source Han Sans SC"),
             local("WenQuanYi Zen Hei"), local("Droid Sans Fallback"), local("PingFang SC"),
             local("Microsoft YaHei");
         }
+        {% endif %}
         .glow {
           position: absolute; width: 1200px; height: 1200px; left: 400px; top: -200px;
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(224, 122, 95, 0.35) 0%, transparent 65%);
+          background: radial-gradient(circle, {{ StyleInfo.Palette.Accent }}59 0%, transparent 65%);
         }
-        h1 { color: #3d405b; font-size: 120px; font-weight: 800; line-height: 1.1; max-width: 1200px; }
-        .sub { color: #6d6a5f; font-size: 36px; margin-top: 28px; }
+        h1 { color: {{ StyleInfo.Palette.Primary }}; font-size: 120px; font-weight: 800; line-height: 1.1; max-width: 1200px; }
+        .sub { color: {{ StyleInfo.Palette.Secondary }}; font-size: 36px; margin-top: 28px; }
       </style>
       <div id="root" data-composition-id="shot-01" data-width="1920" data-height="1080" data-duration="2.70">
         <div class="inner" id="shot-01-inner" style="position:absolute;inset:0">
@@ -335,19 +351,20 @@ TOTAL = 7.20。
       <style>
         #root {
           position: absolute; inset: 0; width: 1920px; height: 1080px; overflow: hidden;
-          background: #faf6ec; font-family: "Montserrat", "CJK", sans-serif;
+          background: {{ StyleInfo.Palette.Bg }}; font-family: "Montserrat"{% if CJKFont %}, "CJK"{% endif %}, sans-serif;
         }
-        @font-face {
+        {% if CJKFont %}@font-face {
           font-family: "CJK";
           src: local("Noto Sans CJK SC"), local("Noto Sans SC"), local("Source Han Sans SC"),
             local("WenQuanYi Zen Hei"), local("Droid Sans Fallback"), local("PingFang SC"),
             local("Microsoft YaHei");
         }
+        {% endif %}
         .stat {
-          color: #3d405b; font-size: 200px; font-weight: 800;
+          color: {{ StyleInfo.Palette.Primary }}; font-size: 200px; font-weight: 800;
           font-variant-numeric: tabular-nums; display: inline-block;
         }
-        .label { color: #e07a5f; font-size: 28px; letter-spacing: 0.2em; font-weight: 700; margin-top: 20px; }
+        .label { color: {{ StyleInfo.Palette.Accent }}; font-size: 28px; letter-spacing: 0.2em; font-weight: 700; margin-top: 20px; }
       </style>
       <div id="root" data-composition-id="shot-02" data-width="1920" data-height="1080" data-duration="4.50">
         <div style="position:absolute;left:140px;top:300px">
@@ -381,13 +398,13 @@ TOTAL = 7.20。
     <script src="vendor/gsap.browser.js"></script>
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
-      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #faf6ec; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: {{ StyleInfo.Palette.Bg }}; }
       #root { position: relative; width: 1920px; height: 1080px; overflow: hidden; }
       [data-composition-id="main"] > div[data-composition-src] { position: absolute; inset: 0; }
     </style>
   </head>
   <body>
-    <div id="root" data-composition-id="main" data-start="0" data-width="1920" data-height="1080" data-duration="7.20">
+    <div id="root" data-composition-id="main" data-start="0" data-width="1920" data-height="1080" data-duration="7.20" data-fps="24">
       <div id="el-shot-01" class="clip" data-composition-id="shot-01" data-composition-src="compositions/shot-01.html"
            data-start="0" data-duration="2.70" data-width="1920" data-height="1080" data-track-index="1"></div>
       <div id="el-shot-02" class="clip" data-composition-id="shot-02" data-composition-src="compositions/shot-02.html"
@@ -403,70 +420,32 @@ TOTAL = 7.20。
 </html>
 ```
 
-# 音画同步
-
-- 镜头窗口与音频边界严格对齐：音频 `data-start`/`data-duration` 来自时间轴表（根上全局时间）。
-- 子 composition 内动画用局部时间，收在本镜 `data-duration` 结束前（留 0.1–0.3s）。
-- 镜间转场可重叠槽位窗口，但音频不重叠。
-- 根 `data-duration` 精确等于 TOTAL（保留两位小数）。
-
-# 质检、修复与渲染
-
-`check` / `render` 报错 → 读 `skills/hyperframes-contract/SKILL.md` 的报错对照表与失败降级；先修源码再重跑。
-整项目 `check` 可用 `--json` 定位；单镜动画诊断用 `keyframes --json <composition.html>`。
-
-```bash
-# 逐镜（本任务专用临时校验目录，示例）
-hyperframes lint {{ WorkspaceDir }}/.check
-# 全部子文件 + 薄 index 就绪后
-hyperframes check
-# 渲染：后台启动一次，然后用长等待命令等结束（见「渲染阶段（长任务）」）
-setsid nohup hyperframes render --quality standard -w auto --output {{ OutputLocation }} > {{ WorkspaceDir }}/render.log 2>&1 < /dev/null & echo started
-while pgrep -f "[h]yperframes render.*{{ OutputLocation }}" >/dev/null; do sleep 5; done; echo RENDER_EXITED; tail -5 {{ WorkspaceDir }}/render.log
-# 压制（H.264/AAC + faststart，目标 ≤ 4 Mbps）：后台跑 + 长等待
-setsid nohup ffmpeg -y -i {{ OutputLocation }} -c:v libx264 -preset medium -crf 23 -maxrate 4M -bufsize 8M -pix_fmt yuv420p -profile:v high -movflags +faststart -c:a aac -b:a 128k -ar 48000 -map_metadata -1 {{ OutputLocation }}.web.mp4 > {{ WorkspaceDir }}/ffmpeg.log 2>&1 < /dev/null & echo started
-while pgrep -f "[f]fmpeg.*{{ OutputLocation }}" >/dev/null; do sleep 5; done; test -s {{ OutputLocation }}.web.mp4 && mv {{ OutputLocation }}.web.mp4 {{ OutputLocation }} && echo COMPRESS_OK || echo COMPRESS_FAIL
-test -s {{ OutputLocation }}
-ffprobe -v error -show_entries format=duration -of csv=p=0 {{ OutputLocation }}
-ffprobe -v error -select_streams a -show_entries stream=codec_name -of csv=p=0 {{ OutputLocation }}
-ffprobe -v error -select_streams v -show_entries stream=width,height -of csv=p=0 {{ OutputLocation }}
-```
-
-然后**必须**调用工具（不是 Bash）：`CheckMP4 {{ OutputLocation }}`。
-
-- 帧率固定 **24fps**：根 `#root` 写 `data-fps="24"`，渲染无需 `--fps`；仅当分镜明确要求其他帧率时才加 `--fps <值>`。
-- **不要运行 `hyperframes preview`**：本流程无人审核，check 通过后直接渲染。
-- `ffprobe` 验内容（时长/音轨/分辨率）；`CheckMP4` 验文件确为合法 MP4。**两者都过才能结束**；未调用 `CheckMP4` 视为未完成。
-
-验收标准：
-
-- 文件存在且非空；
-- 时长与 TOTAL 相差 ≤ 0.2s；
-- **存在音频流**（否则回到音频章节检查 id / src / 时间窗）；
-- `CheckMP4` 返回 `OK`。
-
 # 完成标准（交付前逐项确认）
 
-- [ ] 每个 Shot 对应一个 `compositions/shot-NN.html`，且各自 lint（临时校验目录）0 error；
+**结构**（详见「执行纪律」「完整示例」）：
+
+- [ ] 每个 Shot 对应一个 `compositions/shot-NN.html`，各自 lint（`.check`）0 error；
 - [ ] `index.html` 仅为薄编排层：host 槽位 + 全部旁白音频 + 近空根时间线；
-- [ ] 每个 host 槽位的 `data-composition-id` == 子文件内部 id == `__timelines` 键；
-- [ ] 子文件用 `<template>`，style/script 在 template 内；根 `index.html` **没有** template 包裹；
-- [ ] 每镜窗口与音频窗口严格对齐；根 `data-duration` = TOTAL；
+- [ ] host 槽位 `data-composition-id` == 子文件内部 id == `__timelines` 键；子文件用 `<template>`，根 `index.html` 无 template 包裹；
+- [ ] 每镜窗口与音频窗口严格对齐；根 `data-duration` = TOTAL 且含 `data-fps="24"`；三处尺寸一致（viewport、CSS、`data-width/height`）；
 - [ ] 每个 `<audio>` 有 id、无 `crossorigin`、无脚本播放调用，且只在根上；
-- [ ] 三处尺寸一致（viewport、CSS、`data-width/height`，含子文件与槽位）；
-- [ ] 中文走 `@font-face` 的 `"CJK"`；数字用 `tabular-nums`；
-- [ ] GSAP 只引用本地 vendor（根 `vendor/…`，子 `../vendor/…`），未联网、未安装任何包；
-- [ ] 所有动画确定性、有限重复、无裸 tween；
+- [ ] 正文数字用 `tabular-nums`；中文片（{{ Language }}=中文）画面文字经 `@font-face` 的 `"CJK"` 兜底，英文片可省；
+- [ ] GSAP 只引用本地 vendor（根 `vendor/…`，子 `../vendor/…`），未联网、未安装任何包；所有动画确定性、有限重复、无裸 tween。
+
+**画面**（详见「视觉风格」；图形语义 / SVG 绘制纪律 / 明度档 / 强调色 / 数据图规则见 `skills/visual-style/SKILL.md`、`skills/data-viz/SKILL.md`，`data-layout-*` 布局标注见 `skills/hyperframes-contract/SKILL.md`）：
+
+- [ ] 画面文字全部为 {{ Language }}；
+- [ ] 分镜每镜的 `layout` / `on_screen_text` / `motion` / `visual_demo` / `transition_in` / `pause_after` 均已落实；
 - [ ] 每镜有入场、有背景装饰、有至少两个视觉焦点；`visual_demo` 已落实；
 - [ ] 具名图形在 DOM 里真的有主体元素（节点 / 连线 / 图表 / 路径），不是空盒子或纯色块；
 - [ ] 占位图形靠形状与明度可读（圆形=人、圆角方=品牌、播放三角=视频…），文字不低于 72% 明度档；
 - [ ] SVG 用原语、对称坐标镜像、闭合路径带 `Z`、描边不越 viewBox；
 - [ ] 强调色每镜 ≤1 个且有语义；无紫→蓝等无意义渐变；连线能说出起点 / 终点 / 作用；
 - [ ] 数据图无饼图 / 网格线 / 图例，数字配视觉元素；
-- [ ] 分镜每镜的 `layout` / `on_screen_text` / `motion` / `visual_demo` / `transition_in` / `pause_after` 均已落实；
-- [ ] 装饰性文字已加 `data-layout-ignore`，出血装饰已加 `data-layout-allow-overflow`，叠化文字已加 `data-layout-allow-overlap`；
-- [ ] 画面文字全部为 {{ Language }}；
-- [ ] 整项目 `hyperframes check` 0 error；
-- [ ] `{{ OutputLocation }}` 存在、非空、时长正确、有音频流、分辨率正确；
+- [ ] 装饰性文字已加 `data-layout-ignore`，出血装饰已加 `data-layout-allow-overflow`，叠化文字已加 `data-layout-allow-overlap`。
+
+**交付**（详见「质检、修复与渲染」）：
+
+- [ ] 整项目 `hyperframes check` 0 error；`{{ OutputLocation }}` 存在、非空、时长正确、有音频流、分辨率正确；
 - [ ] 已对 `{{ OutputLocation }}` 调用 `CheckMP4` 且返回 `OK`（未调用不得结束）；
 - [ ] 聊天里只回一句短确认（镜头数 / 总时长 / 分辨率 / 输出路径）。

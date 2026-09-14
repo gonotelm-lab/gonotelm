@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestParseAgentOutput_Valid(t *testing.T) {
+func TestFlashcardGeneratorParse_Valid(t *testing.T) {
 	raw := `{
   "title": "Rust所有权核心闪卡合集",
   "flashcard": {
@@ -20,7 +20,7 @@ func TestParseAgentOutput_Valid(t *testing.T) {
     ]
   }
 }`
-	got, err := parseAgentOutput(t.Context(), raw)
+	got, err := newFlashcardGenerator(nil).parse(t.Context(), raw)
 	require.NoError(t, err)
 	assert.Equal(t, "Rust所有权核心闪卡合集", got.Title)
 	require.Len(t, got.Flashcard.Cards, 1)
@@ -29,13 +29,13 @@ func TestParseAgentOutput_Valid(t *testing.T) {
 	assert.Equal(t, "想想谁负责释放内存", got.Flashcard.Cards[0].Hint)
 }
 
-func TestParseAgentOutput_RejectsEmptyCards(t *testing.T) {
+func TestFlashcardGeneratorParse_RejectsEmptyCards(t *testing.T) {
 	raw := `{"title":"空闪卡标题示例文本","flashcard":{"cards":[]}}`
-	_, err := parseAgentOutput(t.Context(), raw)
+	_, err := newFlashcardGenerator(nil).parse(t.Context(), raw)
 	require.Error(t, err)
 }
 
-func TestParseAgentOutput_RejectsMissingFront(t *testing.T) {
+func TestFlashcardGeneratorParse_RejectsMissingFront(t *testing.T) {
 	raw := `{
   "title": "字段缺失闪卡标题示例",
   "flashcard": {
@@ -44,7 +44,7 @@ func TestParseAgentOutput_RejectsMissingFront(t *testing.T) {
     ]
   }
 }`
-	_, err := parseAgentOutput(t.Context(), raw)
+	_, err := newFlashcardGenerator(nil).parse(t.Context(), raw)
 	require.Error(t, err)
 }
 

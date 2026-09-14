@@ -16,6 +16,7 @@ import (
 	workerentity "github.com/gonotelm-lab/gonotelm/internal/domain/worker/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio/voices"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
@@ -102,11 +103,11 @@ func (s *videoScript) renderNarrationMarkdown(meta *audioCheckpointMeta) string 
 // scriptGenerator 一次探索生成口播稿（先构思板块再写 lines），写入 checkpoint.field1。
 type scriptGenerator struct {
 	deps          *types.WorkerDeps
-	checkpoints   *checkpointStore
+	checkpoints   *types.CheckpointStore
 	audioProvider text2audio.Text2AudioProvider
 }
 
-func newScriptGenerator(deps *types.WorkerDeps, checkpoints *checkpointStore) *scriptGenerator {
+func newScriptGenerator(deps *types.WorkerDeps, checkpoints *types.CheckpointStore) *scriptGenerator {
 	return &scriptGenerator{
 		deps:          deps,
 		checkpoints:   checkpoints,
@@ -144,6 +145,8 @@ func (g *scriptGenerator) generate(
 	req *types.Request,
 	payload *artifactentity.VideoOverviewPayload,
 ) (*videoScript, error) {
+	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioVideoOverviewScriptScene)
+
 	sourceIds := types.SourceIDsToStrings(req.SourceIds)
 	msgs, err := RenderVideoScript(ctx, sourceIds, payload.GetLanguage(), payload.GetTip(), payload.GetVisualStyle())
 	if err != nil {
@@ -201,7 +204,7 @@ func (g *scriptGenerator) save(
 		ckpt = workerentity.NewCheckpoint(artifactId)
 	}
 	ckpt.UpdateField1(data)
-	if err := g.checkpoints.save(ctx, ckpt); err != nil {
+	if err := g.checkpoints.Save(ctx, ckpt); err != nil {
 		return nil, err
 	}
 	return ckpt, nil

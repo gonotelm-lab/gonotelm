@@ -24,6 +24,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	pkgaudio "github.com/gonotelm-lab/gonotelm/pkg/audio/wav"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/httpclient"
 	"github.com/gonotelm-lab/gonotelm/pkg/safe"
@@ -71,7 +72,7 @@ type synthesizedLine struct {
 type audioSynthizer struct {
 	text2audio     *text2audio.Text2AudioGateway
 	storage        storage.Storage
-	checkpoints    *checkpointStore
+	checkpoints    *types.CheckpointStore
 	downloadClient *http.Client
 
 	provider    text2audio.Text2AudioProvider
@@ -79,7 +80,7 @@ type audioSynthizer struct {
 	concurrency int
 }
 
-func newAudioSynthizer(deps *types.WorkerDeps, checkpoints *checkpointStore) *audioSynthizer {
+func newAudioSynthizer(deps *types.WorkerDeps, checkpoints *types.CheckpointStore) *audioSynthizer {
 	cfg := conf.WorkerGlobal().Studio.VideoOverview
 	concurrency := cfg.AudioSynthConcurrency
 	if concurrency <= 0 {
@@ -124,6 +125,8 @@ func (s *audioSynthizer) generate(
 	script *videoScript,
 	ckpt *workerentity.Checkpoint,
 ) (*audioCheckpointMeta, bool, error) {
+	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioVideoOverviewAudioScene)
+
 	if s.provider == "" {
 		return nil, false, errors.ErrInner.Msgf("audio model provider is empty")
 	}
@@ -344,7 +347,7 @@ func (s *audioSynthizer) persistLineSynthResults(
 			slog.WarnContext(ctx, "snapshot video audio checkpoint failed",
 				slog.String("artifact_id", job.artifactId.String()),
 				slog.Any("err", snapErr))
-		} else if err := s.checkpoints.save(ctx, snap); err != nil {
+		} else if err := s.checkpoints.Save(ctx, snap); err != nil {
 			slog.WarnContext(ctx, "persist video audio checkpoint failed",
 				slog.String("artifact_id", job.artifactId.String()),
 				slog.Any("err", err))
@@ -366,7 +369,7 @@ func (s *audioSynthizer) discardStale(ctx context.Context, artifactId valobj.Id,
 	if meta == nil || len(meta.Parts) == 0 {
 		if ckpt != nil && len(ckpt.Field2) > 0 {
 			ckpt.UpdateField2(nil)
-			_ = s.checkpoints.save(ctx, ckpt)
+			_ = s.checkpoints.Save(ctx, ckpt)
 		}
 		return
 	}
@@ -385,7 +388,7 @@ func (s *audioSynthizer) discardStale(ctx context.Context, artifactId valobj.Id,
 	}
 
 	ckpt.UpdateField2(nil)
-	if err := s.checkpoints.save(ctx, ckpt); err != nil {
+	if err := s.checkpoints.Save(ctx, ckpt); err != nil {
 		slog.ErrorContext(ctx, "clear stale video audio checkpoint failed",
 			slog.String("artifact_id", artifactId.String()), slog.Any("err", err))
 	}

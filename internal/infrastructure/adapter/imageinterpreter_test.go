@@ -20,10 +20,10 @@ func TestMain(m *testing.M) {
 		DeepSeek: chat.DeepSeekChatConfig{
 			ApiKey:       os.Getenv("GONOTELM_OPENAI_API_KEY"),
 			BaseURL:      "https://api.deepseek.com",
-			DefaultModel: "deepseek-v4-flash",
+			DefaultModel: "deepseek-flash",
 			Models: map[string]chat.Model{
-				"deepseek-v4-flash-vision-exp": {
-					Name: "deepseek-v4-flash-vision-exp",
+				"deepseek-flash-vision-exp": {
+					Name: "deepseek-flash-vision-exp",
 					Modalities: chat.Modality{
 						Input:  []chat.ModalityType{chat.ModalityImage, chat.ModalityText},
 						Output: []chat.ModalityType{chat.ModalityText},
@@ -40,7 +40,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestImageInterpreter_Interpret(t *testing.T) {
-	itpr, err := NewImageInterpreter(testGateway, chat.ProviderDeepSeek, "deepseek-v4-flash-vision-exp")
+	itpr, err := NewImageInterpreter(testGateway, chat.ProviderDeepSeek, "deepseek-flash-vision-exp")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +54,7 @@ func TestImageInterpreter_Interpret(t *testing.T) {
 
 func TestImageInterpreter_InterpretBase64(t *testing.T) {
 	ctx := t.Context()
-	itpr, err := NewImageInterpreter(testGateway, chat.ProviderDeepSeek, "deepseek-v4-flash-vision-exp")
+	itpr, err := NewImageInterpreter(testGateway, chat.ProviderDeepSeek, "deepseek-flash-vision-exp")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +74,7 @@ func TestImageInterpreter_InterpretBase64(t *testing.T) {
 
 func TestImageInterpreter_InterpretBytes(t *testing.T) {
 	ctx := t.Context()
-	itpr, err := NewImageInterpreter(testGateway, chat.ProviderDeepSeek, "deepseek-v4-flash-vision-exp")
+	itpr, err := NewImageInterpreter(testGateway, chat.ProviderDeepSeek, "deepseek-flash-vision-exp")
 	if err != nil {
 		t.Fatal(err)
 	}

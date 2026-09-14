@@ -12,6 +12,7 @@ func NewTime() Time {
 	}
 }
 
+// unix ms
 func (t Time) Value() int64 {
 	return t.unixMs
 }

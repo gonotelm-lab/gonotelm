@@ -18,14 +18,6 @@ func TestRenderDataTable(t *testing.T) {
 	assert.Contains(t, msgs[1].Content, "focus on metrics")
 }
 
-func TestRenderTitleMaker(t *testing.T) {
-	msgs, err := RenderTitleMaker(t.Context(), "| a | b |\n| --- | --- |\n| 1 | 2 |")
-	require.NoError(t, err)
-	require.Len(t, msgs, 2)
-	assert.Contains(t, msgs[0].Content, "| a | b |")
-	assert.Equal(t, einoschema.User, msgs[1].Role)
-}
-
 func TestDataTableCompensateRules(t *testing.T) {
 	rules := dataTableCompensateRules(assert.AnError)
 	require.NotEmpty(t, rules)

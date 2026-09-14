@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net/url"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/sandbox/entity"
@@ -55,13 +57,13 @@ func NewManager(ctx context.Context, c Config) (*Manager, error) {
 	if err != nil {
 		return nil, fmt.Errorf("opensandbox invalid endpoint %s, %w", c.Endpoint, err)
 	}
-	retryConfig := aliosb.DefaultRetryConfig()
+	// retryConfig := aliosb.DefaultRetryConfig()
 	osbCfg := aliosb.ConnectionConfig{
 		Domain:     u.Host,
 		Protocol:   u.Scheme,
 		APIKey:     c.ApiKey,
 		HTTPClient: c.HttpClient,
-		Retry:      &retryConfig,
+		// Retry:      &retryConfig, // we do not need retry because we use c.HttpClient with retry
 	}
 
 	lc := aliosb.NewLifecycleClientWithCache(
@@ -112,7 +114,7 @@ func (m *Manager) CreateSandbox(ctx context.Context, key entity.SandboxKey, spec
 	openSandbox, err := aliosb.CreateSandbox(ctx, m.osbConfig,
 		aliosb.SandboxCreateOptions{
 			Image:          m.c.Image,
-			ResourceLimits: sandboxDefaultResourceLimit,
+			ResourceLimits: mergeResourceLimits(sandboxDefaultResourceLimit, spec.ResourceLimits),
 			TimeoutSeconds: ttl,
 			Env:            spec.Env,
 			Metadata: map[string]string{
@@ -206,19 +208,29 @@ func (m *Manager) GetSandbox(ctx context.Context, sandboxId string) (entity.Sand
 	return NewCustomSandbox(targetSb, key, runtime), nil
 }
 
-// keyFromMetadata 从沙箱元信息中还原绑定的 key
-func keyFromMetadata(meta map[string]string) entity.SandboxKey {
-	key := entity.SandboxKey{}
-	if uid, err := valobj.NewUidFromString(meta[MetadataUserIdKey]); err == nil {
-		key.UserId = uid
-	}
-	if nbId, ok := meta[MetadataNotebookIdKey]; ok {
-		if id, err := valobj.NewIdFromString(nbId); err == nil {
-			key.NotebookId = id
-		}
+// RenewSandbox 把沙箱过期时间延长为「当前时间 + ttl」。
+func (m *Manager) RenewSandbox(ctx context.Context, sandboxId string, ttl time.Duration) error {
+	if ttl <= 0 {
+		return nil
 	}
 
-	return key
+	if target := m.getOpenSandbox(sandboxId); target != nil {
+		if _, err := target.osb.Renew(ctx, ttl); err != nil {
+			return pkgerr.Wrapf(err, "opensandbox renew %s failed", sandboxId)
+		}
+		return nil
+	}
+
+	if _, err := m.lifecycle.RenewExpiration(ctx, sandboxId, time.Now().Add(ttl)); err != nil {
+		return pkgerr.Wrapf(err, "opensandbox renew remote %s failed", sandboxId)
+	}
+
+	return nil
+}
+
+func (m *Manager) EvictSandbox(_ context.Context, sandboxId string) error {
+	m.deleteOpenSandbox(sandboxId)
+	return nil
 }
 
 func (m *Manager) DeleteSandbox(ctx context.Context, sandboxId string) error {
@@ -262,4 +274,27 @@ func getOpenSandboxRuntime(ctx context.Context, key entity.SandboxKey, openSandb
 	}
 
 	return output.Text()
+}
+
+// keyFromMetadata 从沙箱元信息中还原绑定的 key
+func keyFromMetadata(meta map[string]string) entity.SandboxKey {
+	key := entity.SandboxKey{}
+	if uid, err := valobj.NewUidFromString(meta[MetadataUserIdKey]); err == nil {
+		key.UserId = uid
+	}
+	if nbId, ok := meta[MetadataNotebookIdKey]; ok {
+		if id, err := valobj.NewIdFromString(nbId); err == nil {
+			key.NotebookId = id
+		}
+	}
+
+	return key
+}
+
+func mergeResourceLimits(defaults, overrides aliosb.ResourceLimits) aliosb.ResourceLimits {
+	limits := make(aliosb.ResourceLimits, len(defaults)+len(overrides))
+	maps.Copy(limits, defaults)
+	maps.Copy(limits, overrides)
+
+	return limits
 }

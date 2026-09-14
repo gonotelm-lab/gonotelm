@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestParseAgentOutput_Valid(t *testing.T) {
+func TestQuizGeneratorParse_Valid(t *testing.T) {
 	raw := `{
   "title": "Rust所有权测验题组示例",
   "quiz": {
@@ -29,7 +29,7 @@ func TestParseAgentOutput_Valid(t *testing.T) {
     "follow_up_hint": ["生命周期", "智能指针"]
   }
 }`
-	got, err := parseAgentOutput(t.Context(), raw)
+	got, err := newQuizGenerator(nil).parse(t.Context(), raw)
 	require.NoError(t, err)
 	assert.Equal(t, "Rust所有权测验题组示例", got.Title)
 	require.Len(t, got.Quiz.Questions, 2)
@@ -37,7 +37,7 @@ func TestParseAgentOutput_Valid(t *testing.T) {
 	assert.Equal(t, []int{0, 1}, got.Quiz.Questions[1].AnswerIndex)
 }
 
-func TestParseAgentOutput_RejectsWrongOptionCount(t *testing.T) {
+func TestQuizGeneratorParse_RejectsWrongOptionCount(t *testing.T) {
 	raw := `{
   "title": "选项数量错误测验示例",
   "quiz": {
@@ -53,11 +53,11 @@ func TestParseAgentOutput_RejectsWrongOptionCount(t *testing.T) {
     "follow_up_hint": ["h"]
   }
 }`
-	_, err := parseAgentOutput(t.Context(), raw)
+	_, err := newQuizGenerator(nil).parse(t.Context(), raw)
 	require.Error(t, err)
 }
 
-func TestParseAgentOutput_RejectsMultiBeforeSingle(t *testing.T) {
+func TestQuizGeneratorParse_RejectsMultiBeforeSingle(t *testing.T) {
 	raw := `{
   "title": "题型顺序错误测验示例",
   "quiz": {
@@ -79,7 +79,7 @@ func TestParseAgentOutput_RejectsMultiBeforeSingle(t *testing.T) {
     "follow_up_hint": ["h"]
   }
 }`
-	_, err := parseAgentOutput(t.Context(), raw)
+	_, err := newQuizGenerator(nil).parse(t.Context(), raw)
 	require.Error(t, err)
 }
 

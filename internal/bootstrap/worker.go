@@ -32,6 +32,7 @@ var buildinTaskTypes = []string{
 	"artifact.quiz",
 	"artifact.data_table",
 	"artifact.slides",
+	"artifact.video_overview",
 }
 
 type Worker struct {

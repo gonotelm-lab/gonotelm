@@ -52,6 +52,7 @@ func (s *Service) GetOrCreateSandbox(
 	if sb, ok, err := s.tryGetAlive(ctx, key); err != nil {
 		return nil, err
 	} else if ok {
+		s.touchSandbox(ctx, key, sb, ttl)
 		return sb, nil
 	}
 
@@ -72,6 +73,7 @@ func (s *Service) GetOrCreateSandbox(
 	if sb, ok, err := s.tryGetAlive(ctx, key); err != nil {
 		return nil, err
 	} else if ok {
+		s.touchSandbox(ctx, key, sb, ttl)
 		return sb, nil
 	}
 
@@ -98,6 +100,27 @@ func (s *Service) GetOrCreateSandbox(
 	return sb, nil
 }
 
+// touchSandbox 复用沙箱时刷新沙箱过期时间，成功后再刷新 Redis 绑定 TTL（best-effort，失败只告警）。
+// 沙箱续期失败时不刷新 Redis TTL，避免沙箱已失效但绑定被无限续期。
+func (s *Service) touchSandbox(ctx context.Context, key entity.SandboxKey, sb entity.Sandbox, ttl time.Duration) {
+	if err := s.mgr.RenewSandbox(ctx, sb.Id(), ttl); err != nil {
+		slog.WarnContext(ctx, "renew sandbox expiration failed, skip refreshing binding ttl",
+			slog.Any("err", err),
+			slog.String("sandbox_key", key.String()),
+			slog.String("sandbox_id", sb.Id()),
+		)
+		return
+	}
+
+	if err := s.repo.SetSandbox(ctx, key, sb.Description(), ttl); err != nil {
+		slog.WarnContext(ctx, "refresh sandbox binding failed",
+			slog.Any("err", err),
+			slog.String("sandbox_key", key.String()),
+			slog.String("sandbox_id", sb.Id()),
+		)
+	}
+}
+
 func (s *Service) tryGetAlive(ctx context.Context, key entity.SandboxKey) (entity.Sandbox, bool, error) {
 	desc, err := s.repo.GetSandbox(ctx, key)
 	if err != nil {
@@ -112,10 +135,23 @@ func (s *Service) tryGetAlive(ctx context.Context, key entity.SandboxKey) (entit
 
 	sb, err := s.mgr.GetSandbox(ctx, desc.Id)
 	if err == nil {
-		return sb, true, nil
+		// 命中句柄不代表沙箱还活着：复用前做存活检查，失败则视为失效
+		if pingErr := sb.Ping(ctx); pingErr == nil {
+			return sb, true, nil
+		} else {
+			err = pingErr
+			// 句柄已失效：主动从 manager 内存缓存驱逐，避免后续继续复用
+			if evictErr := s.mgr.EvictSandbox(ctx, desc.Id); evictErr != nil {
+				slog.WarnContext(ctx, "evict dead sandbox handle failed",
+					slog.Any("err", evictErr),
+					slog.String("sandbox_key", key.String()),
+					slog.String("sandbox_id", desc.Id),
+				)
+			}
+		}
 	}
 
-	slog.WarnContext(ctx, "cached sandbox no longer exists, will recreate",
+	slog.WarnContext(ctx, "cached sandbox no longer alive, will recreate",
 		slog.Any("err", err),
 		slog.String("sandbox_key", key.String()),
 		slog.String("sandbox_id", desc.Id),

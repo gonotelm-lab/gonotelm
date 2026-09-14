@@ -13,21 +13,22 @@ var (
 	maxIdleConns          = 200
 	idleConnTimeout       = 120 * time.Second
 	expectContinueTimeout = 1 * time.Second
-	responseHeaderTimeout = 10 * time.Second
 	tlsHandshakeTimeout   = 10 * time.Second
+
+	DefaultResponseHeaderTimeout = 10 * time.Second
 
 	DefaultDialer = &net.Dialer{
 		Timeout:   10 * time.Second,
 		KeepAlive: 15 * time.Second,
 	}
-	DefaultTransport http.RoundTripper = &http.Transport{
+	DefaultTransport = &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
 		DialContext:           DefaultDialer.DialContext,
 		ForceAttemptHTTP2:     true,
 		MaxIdleConns:          maxIdleConns,
 		IdleConnTimeout:       idleConnTimeout,
 		ExpectContinueTimeout: expectContinueTimeout,
-		ResponseHeaderTimeout: responseHeaderTimeout,
+		ResponseHeaderTimeout: DefaultResponseHeaderTimeout,
 		TLSHandshakeTimeout:   tlsHandshakeTimeout,
 	}
 )
@@ -35,10 +36,11 @@ var (
 type Builder struct {
 	baseTransport http.RoundTripper
 
-	maxRedirects int
-	timeout      time.Duration
-	maxRetries   int
-	retryOptions []RetryOption
+	maxRedirects          int
+	timeout               time.Duration
+	responseHeaderTimeout time.Duration
+	maxRetries            int
+	retryOptions          []RetryOption
 }
 
 func NewBuilder(baseRoundTripper http.RoundTripper) *Builder {
@@ -48,6 +50,21 @@ func NewBuilder(baseRoundTripper http.RoundTripper) *Builder {
 		maxRetries:    3,
 		baseTransport: baseRoundTripper,
 	}
+}
+
+func (b *Builder) WithResponseHeaderTimeout(timeout time.Duration) *Builder {
+	b.responseHeaderTimeout = timeout
+	return b
+}
+
+func (b *Builder) defaultTransport() http.RoundTripper {
+	if b.responseHeaderTimeout > 0 && b.responseHeaderTimeout != DefaultResponseHeaderTimeout {
+		tr := DefaultTransport.Clone()
+		tr.ResponseHeaderTimeout = b.responseHeaderTimeout
+		return tr
+	}
+
+	return DefaultTransport
 }
 
 // 整个请求的超时时间
@@ -75,7 +92,7 @@ func (b *Builder) WithRetryOptions(opts ...RetryOption) *Builder {
 func (b *Builder) Build() *http.Client {
 	baseTransport := b.baseTransport
 	if baseTransport == nil {
-		baseTransport = DefaultTransport
+		baseTransport = b.defaultTransport()
 	}
 
 	// 重试计数 需要放在链路追踪包住

@@ -50,24 +50,24 @@ level = "${GONOTELM_LOG_LEVEL:-debug}"
 [studio.mindmap]
 maxRound = ${GONOTELM_STUDIO_MINDMAP_MAX_ROUND:-50}
 modelProvider = "${GONOTELM_STUDIO_MINDMAP_PROVIDER:-deepseek}"
-model = "${GONOTELM_STUDIO_MINDMAP_MODEL:-deepseek-v4-flash}"
+model = "${GONOTELM_STUDIO_MINDMAP_MODEL:-deepseek-flash}"
 
 [studio.report]
 maxRound = ${GONOTELM_STUDIO_REPORT_MAX_ROUND:-50}
 modelProvider = "${GONOTELM_STUDIO_REPORT_PROVIDER:-deepseek}"
-model = "${GONOTELM_STUDIO_REPORT_MODEL:-deepseek-v4-flash}"
+model = "${GONOTELM_STUDIO_REPORT_MODEL:-deepseek-flash}"
 
 [studio.infoGraphic]
 maxRound = ${GONOTELM_STUDIO_INFOGRAPHIC_MAX_ROUND:-50}
 modelProvider = "${GONOTELM_STUDIO_INFOGRAPHIC_PROVIDER:-deepseek}"
-model = "${GONOTELM_STUDIO_INFOGRAPHIC_MODEL:-deepseek-v4-flash}"
+model = "${GONOTELM_STUDIO_INFOGRAPHIC_MODEL:-deepseek-flash}"
 imageModelProvider = "${GONOTELM_STUDIO_INFOGRAPHIC_IMAGE_MODEL_PROVIDER:-qwen}"
 imageModel = "${GONOTELM_STUDIO_INFOGRAPHIC_IMAGE_MODEL:-qwen-image-2.0-pro}"
 
 [studio.audioOverview]
 maxRound = ${GONOTELM_STUDIO_AUDIOOVERVIEW_MAX_ROUND:-50}
 modelProvider = "${GONOTELM_STUDIO_AUDIOOVERVIEW_PROVIDER:-deepseek}"
-model = "${GONOTELM_STUDIO_AUDIOOVERVIEW_MODEL:-deepseek-v4-flash}"
+model = "${GONOTELM_STUDIO_AUDIOOVERVIEW_MODEL:-deepseek-flash}"
 audioModelProvider = "${GONOTELM_STUDIO_AUDIOOVERVIEW_AUDIO_MODEL_PROVIDER:-qwen}"
 audioModel = "${GONOTELM_STUDIO_AUDIOOVERVIEW_AUDIO_MODEL:-qwen3-tts-instruct-flash}"
 audioSynthConcurrency = ${GONOTELM_STUDIO_AUDIOOVERVIEW_AUDIO_SYNTH_CONCURRENCY:-1}
@@ -75,24 +75,36 @@ audioSynthConcurrency = ${GONOTELM_STUDIO_AUDIOOVERVIEW_AUDIO_SYNTH_CONCURRENCY:
 [studio.flashcard]
 maxRound = ${GONOTELM_STUDIO_FLASHCARD_MAX_ROUND:-50}
 modelProvider = "${GONOTELM_STUDIO_FLASHCARD_PROVIDER:-deepseek}"
-model = "${GONOTELM_STUDIO_FLASHCARD_MODEL:-deepseek-v4-flash}"
+model = "${GONOTELM_STUDIO_FLASHCARD_MODEL:-deepseek-flash}"
 
 [studio.quiz]
 maxRound = ${GONOTELM_STUDIO_QUIZ_MAX_ROUND:-50}
 modelProvider = "${GONOTELM_STUDIO_QUIZ_PROVIDER:-deepseek}"
-model = "${GONOTELM_STUDIO_QUIZ_MODEL:-deepseek-v4-flash}"
+model = "${GONOTELM_STUDIO_QUIZ_MODEL:-deepseek-flash}"
 
 [studio.dataTable]
 maxRound = ${GONOTELM_STUDIO_DATATABLE_MAX_ROUND:-50}
 modelProvider = "${GONOTELM_STUDIO_DATATABLE_PROVIDER:-deepseek}"
-model = "${GONOTELM_STUDIO_DATATABLE_MODEL:-deepseek-v4-flash}"
+model = "${GONOTELM_STUDIO_DATATABLE_MODEL:-deepseek-flash}"
 
 [studio.slides]
 maxRound = ${GONOTELM_STUDIO_SLIDES_MAX_ROUND:-50}
 modelProvider = "${GONOTELM_STUDIO_SLIDES_PROVIDER:-deepseek}"
 generateMaxRound = ${GONOTELM_STUDIO_SLIDES_GENERATE_MAX_ROUND:-100}
-model = "${GONOTELM_STUDIO_SLIDES_MODEL:-deepseek-v4-flash}"
+model = "${GONOTELM_STUDIO_SLIDES_MODEL:-deepseek-flash}"
 sandboxProvider = "${GONOTELM_STUDIO_SLIDES_SANDBOX_PROVIDER:-opensandbox}"
+
+[studio.videoOverview]
+maxRound = ${GONOTELM_STUDIO_VIDEOOVERVIEW_MAX_ROUND:-100}
+modelProvider = "${GONOTELM_STUDIO_VIDEOOVERVIEW_PROVIDER:-deepseek}"
+model = "${GONOTELM_STUDIO_VIDEOOVERVIEW_MODEL:-deepseek-flash}"
+generateMaxRound = ${GONOTELM_STUDIO_VIDEOOVERVIEW_GENERATE_MAX_ROUND:-150}
+sandboxProvider = "${GONOTELM_STUDIO_VIDEOOVERVIEW_SANDBOX_PROVIDER:-opensandbox}"
+audioModelProvider = "${GONOTELM_STUDIO_VIDEOOVERVIEW_AUDIO_MODEL_PROVIDER:-qwen}"
+audioModel = "${GONOTELM_STUDIO_VIDEOOVERVIEW_AUDIO_MODEL:-qwen3-tts-instruct-flash}"
+audioSynthConcurrency = ${GONOTELM_STUDIO_VIDEOOVERVIEW_AUDIO_SYNTH_CONCURRENCY:-1}
+sandboxCpu = "${GONOTELM_STUDIO_VIDEOOVERVIEW_SANDBOX_CPU:-2}"
+sandboxMemory = "${GONOTELM_STUDIO_VIDEOOVERVIEW_SANDBOX_MEMORY:-4Gi}"
 
 [embedding]
 type = "${GONOTELM_EMBEDDING_TYPE:-qwen}"
@@ -121,12 +133,13 @@ apiVersion = "${GONOTELM_OPENAI_API_VERSION:-}"
 [provider.deepseek]
 apiKey = "${GONOTELM_DEEPSEEK_API_KEY}"
 timeout = "${GONOTELM_DEEPSEEK_TIMEOUT:-5m}"
+responseHeaderTimeout = "${GONOTELM_DEEPSEEK_RESPONSE_HEADER_TIMEOUT:-10s}"
 baseUrl = "${GONOTELM_DEEPSEEK_BASE_URL:-https://api.deepseek.com}"
-defaultModel = "${GONOTELM_DEEPSEEK_MODEL:-deepseek-v4-flash}"
+defaultModel = "${GONOTELM_DEEPSEEK_MODEL:-deepseek-flash}"
 thinkingEnabled = false
 
-[provider.deepseek.models.deepseek-v4-flash]
-name = "deepseek-v4-flash"
+[provider.deepseek.models.deepseek-flash]
+name = "deepseek-flash"
 modalities = {input = ["text"], output = ["text"]}
 
 [provider.deepseek.models.deepseek-v4-pro]
@@ -142,6 +155,7 @@ apiKey = "${GONOTELM_OPENAI_API_KEY:-}"
 baseUrl = "${GONOTELM_OPENAI_BASE_URL:-https://api.openai.com/v1}"
 defaultModel = "${GONOTELM_OPENAI_MODEL:-gpt-4o-mini}"
 timeout = "${GONOTELM_OPENAI_TIMEOUT:-5m}"
+responseHeaderTimeout = "${GONOTELM_OPENAI_RESPONSE_HEADER_TIMEOUT:-10s}"
 temperature = ${GONOTELM_OPENAI_TEMPERATURE:-1.0}
 reasoningEffort = "${GONOTELM_OPENAI_REASONING_EFFORT:-}"
 
@@ -150,6 +164,7 @@ apiKey = "${GONOTELM_QWEN_API_KEY:-}"
 baseUrl = "${GONOTELM_QWEN_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}"
 defaultModel = "${GONOTELM_QWEN_MODEL:-glm-5.1}"
 timeout = "${GONOTELM_QWEN_TIMEOUT:-5m}"
+responseHeaderTimeout = "${GONOTELM_QWEN_RESPONSE_HEADER_TIMEOUT:-10s}"
 temperature = ${GONOTELM_QWEN_TEMPERATURE:-1.0}
 topP = ${GONOTELM_QWEN_TOP_P:-1.0}
 enableThinking = ${GONOTELM_QWEN_ENABLE_THINKING:-false}
@@ -191,6 +206,7 @@ apiKey = "${GONOTELM_AGNES_API_KEY:-}"
 baseUrl = "${GONOTELM_AGNES_BASE_URL:-https://apihub.agnes-ai.com/v1}"
 defaultModel = "${GONOTELM_AGNES_MODEL:-agnes-2.5-flash}"
 timeout = "${GONOTELM_AGNES_TIMEOUT:-5m}"
+responseHeaderTimeout = "${GONOTELM_AGNES_RESPONSE_HEADER_TIMEOUT:-10s}"
 temperature = ${GONOTELM_AGNES_TEMPERATURE:-1.0}
 topP = ${GONOTELM_AGNES_TOP_P:-1.0}
 
@@ -238,11 +254,12 @@ dialTimeout = "${GONOTELM_FLOW_DIAL_TIMEOUT:-5s}"
 endpoint = "${GONOTELM_SANDBOX_ENDPOINT:-http://localhost:23080}"
 apiKey = "${GONOTELM_SANDBOX_API_KEY:-123456}"
 timeout = "${GONOTELM_SANDBOX_TIMEOUT:-30s}"
-image = "${GONOTELM_SANDBOX_IMAGE:opensandbox/code-interpreter-base}"
+image = "${GONOTELM_SANDBOX_IMAGE:-ghcr.io/gonotelm-lab/opensandbox-amd64:v0.0.1}"
 
 [worker]
 maxConcurrency  = ${GONOTELM_WORKER_MAX_CONCURRENCY:-4}
 heartbeat       = "${GONOTELM_WORKER_HEARTBEAT:-5s}"
+agentVerbose    = ${GONOTELM_WORKER_AGENT_VERBOSE:-false}
 
 [otelTrace]
 name = "worker"

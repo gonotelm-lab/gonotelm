@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"strings"
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 
@@ -22,6 +23,7 @@ type RenderVars struct {
 	SourceIds []string
 	Style     artifactentity.ReportStyle
 	Language  artifactentity.Language
+	Tip       string
 }
 
 func (v RenderVars) promptVars() map[string]any {
@@ -29,6 +31,7 @@ func (v RenderVars) promptVars() map[string]any {
 		"SourceIds": types.NormalizeStrings(v.SourceIds),
 		"Style":     string(v.Style),
 		"Language":  string(v.Language),
+		"Tip":       strings.TrimSpace(v.Tip),
 	}
 }
 
@@ -43,6 +46,7 @@ func RenderReport(
 		SourceIds: sourceIds,
 		Style:     style,
 		Language:  lang,
+		Tip:       tip,
 	}.promptVars())
 	if err != nil {
 		return nil, fmt.Errorf("render report prompt: %w", err)

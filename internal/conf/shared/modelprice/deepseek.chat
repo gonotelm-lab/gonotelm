@@ -5,9 +5,9 @@ let peak = workday && ((hour >= 9 && hour < 12) || (hour >= 14 && hour < 18));
 if peak && model == 'deepseek-v4-pro' {
 	{cache_hit_1m: "0.30", cache_miss_1m: "9.0", output_1m: "27.0"}
 } else if peak {
-	{cache_hit_1m: "0.10", cache_miss_1m: "3.0", output_1m: "9.0"}
+	{cache_hit_1m: "0.04", cache_miss_1m: "2.0", output_1m: "8.0"}
 } else if model == 'deepseek-v4-pro' {
 	{cache_hit_1m: "0.15", cache_miss_1m: "4.5", output_1m: "13.5"}
 } else {
-	{cache_hit_1m: "0.05", cache_miss_1m: "1.5", output_1m: "4.5"}
+	{cache_hit_1m: "0.02", cache_miss_1m: "1.0", output_1m: "4"}
 }

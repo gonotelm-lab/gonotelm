@@ -12,6 +12,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/report"
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/slides"
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
+	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/videooverview"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -46,6 +47,8 @@ func newGenerator(kind entity.Kind, deps *types.WorkerDeps) (types.Generator, pk
 		return datatable.New(deps), pkgcontext.StudioDataTableScene, nil
 	case entity.KindSlides:
 		return slides.New(deps), pkgcontext.StudioSlidesScene, nil
+	case entity.KindVideoOverview:
+		return videooverview.New(deps), pkgcontext.StudioVideoOverviewScene, nil
 	}
 	return nil, pkgcontext.UnknownScene, errors.ErrParams.Msgf("unsupported kind: %s", kind)
 }

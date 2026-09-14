@@ -255,6 +255,10 @@ func (a *Agent[State]) BaseLLM() eino.ToolCallingChatModel {
 	return a.cfg.BaseLLM
 }
 
+func (a *Agent[State]) Options() []eino.Option {
+	return a.cfg.Options
+}
+
 func (a *Agent[State]) appendAccumulatedMessages(msgs ...*EinoMessage) {
 	if len(msgs) == 0 {
 		return

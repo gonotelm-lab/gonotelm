@@ -3,8 +3,10 @@ package types
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/shared/agent/tools"
+	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	pkgagent "github.com/gonotelm-lab/gonotelm/pkg/agent"
@@ -12,14 +14,14 @@ import (
 
 	einomodel "github.com/cloudwego/eino/components/model"
 	einotool "github.com/cloudwego/eino/components/tool"
+	einoschema "github.com/cloudwego/eino/schema"
 )
 
 type Agent = pkgagent.Agent[*SessionState]
 
-func BuildSourceExploreAgent(
+func buildSourceExploreAgent(
 	deps *WorkerDeps,
 	modelProvider llmchat.Provider,
-	model string,
 	maxRound int,
 	options []einomodel.Option,
 	notebookId valobj.Id,
@@ -35,7 +37,7 @@ func BuildSourceExploreAgent(
 		MaxRound: maxRound,
 		BaseLLM:  tcm,
 		Options:  options,
-		Verbose:  false,
+		Verbose:  conf.WorkerGlobal().Worker.AgentVerbose,
 	}
 
 	ag := pkgagent.New(agConfig, &SessionState{
@@ -53,8 +55,9 @@ func BuildSourceExploreAgent(
 		})
 	} else {
 		err = ag.BindTools(map[string]einotool.InvokableTool{
-			tools.StatSourceToolName: tools.NewStatSourceTool(deps.Agentize, spChecker),
-			tools.GrepSourceToolName: tools.NewGrepSourceTool(deps.Agentize, spChecker),
+			tools.StatSourceToolName:  tools.NewStatSourceTool(deps.Agentize, spChecker),
+			tools.GrepSourceToolName:  tools.NewGrepSourceTool(deps.Agentize, spChecker),
+			tools.QuerySourceToolName: tools.NewQuerySourceTool(deps.Agentize, notebookId, spChecker),
 		})
 	}
 	if err != nil {
@@ -88,4 +91,188 @@ func SourceIDsToStrings(ids []valobj.Id) []string {
 		strs = append(strs, id.String())
 	}
 	return strs
+}
+
+// ExploreAgentBuilder 逐步收集 source explore agent 的构造参数，未设置项使用默认值：
+// MaxRound=conf.DefaultMaxRound、BindAllTools=true。
+type ExploreAgentBuilder struct {
+	deps         *WorkerDeps
+	provider     llmchat.Provider
+	model        string
+	maxRound     int
+	bindAllTools bool
+	options      []einomodel.Option
+}
+
+func NewExploreAgentBuilder(deps *WorkerDeps) *ExploreAgentBuilder {
+	return &ExploreAgentBuilder{deps: deps, maxRound: conf.DefaultMaxRound, bindAllTools: true}
+}
+
+func (b *ExploreAgentBuilder) WithModel(provider llmchat.Provider, model string) *ExploreAgentBuilder {
+	b.provider = provider
+	b.model = model
+	return b
+}
+
+func (b *ExploreAgentBuilder) WithMaxRound(round int) *ExploreAgentBuilder {
+	if round > 0 {
+		b.maxRound = round
+	}
+	return b
+}
+
+// WithoutBindAllTools 关闭全量工具绑定，仅绑定 StatSource/GrepSource/QuerySource。
+func (b *ExploreAgentBuilder) WithoutBindAllTools() *ExploreAgentBuilder {
+	b.bindAllTools = false
+	return b
+}
+
+func (b *ExploreAgentBuilder) WithOptions(options ...einomodel.Option) *ExploreAgentBuilder {
+	b.options = append(b.options, options...)
+	return b
+}
+
+func (b *ExploreAgentBuilder) Build(req *Request) (*Agent, error) {
+	return buildSourceExploreAgent(
+		b.deps,
+		b.provider,
+		b.maxRound,
+		b.options,
+		req.NotebookId,
+		req.SourceIds,
+		b.bindAllTools,
+	)
+}
+
+// AgentStep 描述一个 agent 步骤的输出契约，并负责执行 React → 解析 → 补偿重试。
+// 仅可通过 AgentStepBuilder 构造。
+type AgentStep[T any] struct {
+	agent       *Agent
+	name        string
+	maxRetry    int
+	plainOutput bool
+	rules       func(error) []string
+	parse       func(context.Context, string) (T, error)
+}
+
+// AgentStepBuilder 链式收集步骤配置，未设置项使用默认值：
+// Retry=1、PlainOutput=false、Rules=无额外约束。
+type AgentStepBuilder[T any] struct {
+	agent       *Agent
+	name        string
+	parse       func(context.Context, string) (T, error)
+	maxRetry    int
+	plainOutput bool
+	rules       func(error) []string
+}
+
+func NewAgentStepBuilder[T any](agent *Agent, name string) *AgentStepBuilder[T] {
+	return &AgentStepBuilder[T]{
+		agent:    agent,
+		name:     name,
+		maxRetry: 1,
+		rules:    func(error) []string { return nil },
+	}
+}
+
+func (b *AgentStepBuilder[T]) WithParse(parse func(context.Context, string) (T, error)) *AgentStepBuilder[T] {
+	b.parse = parse
+	return b
+}
+
+func (b *AgentStepBuilder[T]) WithRetry(retry int) *AgentStepBuilder[T] {
+	if retry >= 0 {
+		b.maxRetry = retry
+	}
+	return b
+}
+
+func (b *AgentStepBuilder[T]) WithPlainOutput(plain bool) *AgentStepBuilder[T] {
+	b.plainOutput = plain
+	return b
+}
+
+func (b *AgentStepBuilder[T]) WithRules(rules func(error) []string) *AgentStepBuilder[T] {
+	if rules != nil {
+		b.rules = rules
+	}
+	return b
+}
+
+func (b *AgentStepBuilder[T]) Build() AgentStep[T] {
+	return AgentStep[T]{
+		agent:       b.agent,
+		name:        b.name,
+		maxRetry:    b.maxRetry,
+		plainOutput: b.plainOutput,
+		rules:       b.rules,
+		parse:       b.parse,
+	}
+}
+
+func (s AgentStep[T]) Run(ctx context.Context, msgs []*einoschema.Message) (T, error) {
+	var zero T
+	if s.agent == nil {
+		return zero, errors.Errorf("agent step %s agent is not configured", s.name)
+	}
+	if s.parse == nil {
+		return zero, errors.Errorf("agent step %s parse is not configured", s.name)
+	}
+
+	output, err := s.agent.React(ctx, msgs)
+	if err != nil {
+		return zero, errors.WithMessagef(err, "generate %s output failed", s.name)
+	}
+
+	slog.InfoContext(ctx, fmt.Sprintf("generate %s agent usage: %+v", s.name, s.agent.TokenUsage()))
+
+	parsed, err := s.parse(ctx, output.Content)
+	if err == nil {
+		return parsed, nil
+	}
+
+	return s.compensate(ctx, output.Content, err)
+}
+
+// compensate 解析失败后带着重新约束继续对话，直至解析成功或耗尽重试次数。
+func (s AgentStep[T]) compensate(ctx context.Context, firstContent string, firstErr error) (T, error) {
+	var zero T
+	lastContent, lastErr := firstContent, firstErr
+	msgs := append([]*einoschema.Message{}, s.agent.AccumulatedMessages()...)
+
+	for attempt := 1; attempt <= s.maxRetry; attempt++ {
+		slog.WarnContext(ctx, "agent output invalid, compensating",
+			slog.String("step", s.name),
+			slog.Int("attempt", attempt),
+			slog.Int("max_retry", s.maxRetry),
+			slog.Any("err", lastErr),
+			slog.Any("usage", s.agent.TokenUsage()),
+		)
+
+		compensateMsgs := append([]*einoschema.Message{}, msgs...)
+		if s.plainOutput {
+			compensateMsgs = append(compensateMsgs, BuildCompensatePlainMessage(lastContent, s.rules(lastErr)))
+		} else {
+			compensateMsgs = append(compensateMsgs, BuildCompensateMessage(lastContent, s.rules(lastErr)))
+		}
+
+		llmResp, genErr := s.agent.BaseLLM().Generate(ctx, compensateMsgs, s.agent.Options()...)
+		if genErr != nil {
+			return zero, errors.WithMessagef(errors.ErrLLM, "%s compensate generate failed on attempt %d, err=%v", s.name, attempt, genErr)
+		}
+
+		parsed, err := s.parse(ctx, llmResp.Content)
+		if err == nil {
+			return parsed, nil
+		}
+
+		lastContent = llmResp.Content
+		lastErr = err
+		msgs = append(compensateMsgs, &einoschema.Message{
+			Role:    einoschema.Assistant,
+			Content: lastContent,
+		})
+	}
+
+	return zero, errors.WithMessagef(errors.ErrLLM, "%s agent output invalid after %d retries, err=%v", s.name, s.maxRetry, lastErr)
 }

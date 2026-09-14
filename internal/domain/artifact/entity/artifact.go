@@ -25,6 +25,7 @@ const (
 	KindDataTable     Kind = "data_table"
 	KindNote          Kind = "note"
 	KindSlides        Kind = "slides"
+	KindVideoOverview Kind = "video_overview"
 )
 
 func (k Kind) Supported() bool {
@@ -37,7 +38,8 @@ func (k Kind) Supported() bool {
 		KindQuiz,
 		KindDataTable,
 		KindNote,
-		KindSlides:
+		KindSlides,
+		KindVideoOverview:
 		return true
 	}
 	return false

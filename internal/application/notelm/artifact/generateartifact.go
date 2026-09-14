@@ -34,6 +34,7 @@ type GenerateRequest struct {
 	Quiz          *artifactentity.QuizPayload
 	DataTable     *artifactentity.DataTablePayload
 	Slides        *artifactentity.SlidesPayload
+	VideoOverview *artifactentity.VideoOverviewPayload
 	Note          *artifactentity.NotePayload
 }
 
@@ -96,47 +97,52 @@ func (h *GenerateArtifactHandler) Handle(ctx context.Context, cmd *GenerateReque
 		return h.saveAsNote(ctx, cmd, userId)
 	}
 
-	filteredIds, err := h.filterReadySources(ctx, cmd.NotebookId, cmd.SourceIds)
-	if err != nil {
-		return nil, errors.WithMessagef(err,
-			"failed to filter ready sources, notebook_id=%s, source_ids=%v",
-			cmd.NotebookId, cmd.SourceIds,
-		)
+	if err := h.validateReadySources(ctx, cmd.NotebookId, cmd.SourceIds); err != nil {
+		return nil, err
 	}
-	cmd.SourceIds = filteredIds
 
 	return h.beginArtifactTask(ctx, cmd, userId)
 }
 
-func (h *GenerateArtifactHandler) filterReadySources(
+// validateReadySources 校验请求里的每个 source 都存在且 ready，任一不满足都拒绝创建任务。
+func (h *GenerateArtifactHandler) validateReadySources(
 	ctx context.Context,
 	notebookId valobj.Id,
 	sourceIds []valobj.Id,
-) ([]valobj.Id, error) {
+) error {
 	if len(sourceIds) == 0 {
-		return nil, errors.ErrParams.Msgf("no sources provided, notebook_id=%s, source_ids=%v", notebookId, sourceIds)
+		return errors.ErrParams.Msgf("no sources provided, notebook_id=%s, source_ids=%v", notebookId, sourceIds)
 	}
 
 	sources, err := h.sourceRepo.GetByNotebookIdAndIds(ctx, notebookId, sourceIds)
 	if err != nil {
-		return nil, errors.WithMessagef(err, "failed to get sources, notebook_id=%s, source_ids=%v", notebookId, sourceIds)
+		return errors.WithMessagef(err, "failed to get sources, notebook_id=%s, source_ids=%v", notebookId, sourceIds)
 	}
 
-	ids := make([]valobj.Id, 0, len(sources))
+	found := make(map[valobj.Id]struct{}, len(sources))
+	notReady := make([]valobj.Id, 0, len(sources))
 	for _, s := range sources {
-		// filter status
+		found[s.Id] = struct{}{}
 		if !s.Status.IsReady() {
-			continue
+			notReady = append(notReady, s.Id)
 		}
-
-		ids = append(ids, s.Id)
 	}
 
-	if len(ids) == 0 {
-		return nil, errors.ErrParams.Msgf("no ready sources found, notebook_id=%s, source_ids=%v", notebookId, sourceIds)
+	missing := make([]valobj.Id, 0)
+	for _, id := range sourceIds {
+		if _, ok := found[id]; !ok {
+			missing = append(missing, id)
+		}
 	}
 
-	return ids, nil
+	if len(missing) > 0 || len(notReady) > 0 {
+		return errors.ErrParams.Msgf(
+			"sources must all exist and be ready, notebook_id=%s, missing=%v, not_ready=%v",
+			notebookId, missing, notReady,
+		)
+	}
+
+	return nil
 }
 
 func (r *GenerateRequest) buildPayload() (artifactentity.Payload, error) {
@@ -231,6 +237,13 @@ func (r *GenerateRequest) buildPayload() (artifactentity.Payload, error) {
 		r.Slides.NotebookId = r.NotebookId
 		r.Slides.SourceIds = r.SourceIds
 		return r.Slides, nil
+	case artifactentity.KindVideoOverview:
+		if r.VideoOverview == nil {
+			return nil, errors.ErrParams.Msgf("video_overview payload required")
+		}
+		r.VideoOverview.NotebookId = r.NotebookId
+		r.VideoOverview.SourceIds = r.SourceIds
+		return r.VideoOverview, nil
 	}
 
 	return nil, errors.ErrParams.Msgf("unsupported artifact kind: %s", r.Kind)

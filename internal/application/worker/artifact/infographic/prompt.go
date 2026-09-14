@@ -35,6 +35,7 @@ func (v TemplateVars) promptVars() map[string]any {
 		"Orientation":  v.Orientation.String(),
 		"DetailLevel":  v.DetailLevel.String(),
 		"VisualStyle":  v.VisualStyle.String(),
+		"Tip":          strings.TrimSpace(v.ExtraPrompt),
 	}
 }
 

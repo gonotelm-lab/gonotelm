@@ -2,41 +2,26 @@ package mindmap
 
 import (
 	"context"
-	"fmt"
-	"log/slog"
-	"strings"
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
-	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
-	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
-	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
-
-	einomodel "github.com/cloudwego/eino/components/model"
-	einoschema "github.com/cloudwego/eino/schema"
 )
 
 const MindmapMaxOnceToken = 32_000
 
 type Generator struct {
-	deps *types.WorkerDeps
+	step *mindmapGenerator
 }
 
 var _ types.Generator = &Generator{}
 
 func New(deps *types.WorkerDeps) *Generator {
-	return &Generator{deps: deps}
+	return &Generator{step: newMindmapGenerator(deps)}
 }
 
-type mindmapExpectation struct {
-	Title   string `json:"title"`
-	Mindmap string `json:"mindmap"`
-}
-
-func (m *Generator) Generate(ctx context.Context, req *types.Request) (*types.Response, error) {
-	expect, err := m.generate(ctx, req)
+func (g *Generator) Generate(ctx context.Context, req *types.Request) (*types.Response, error) {
+	expect, err := g.step.generate(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -46,122 +31,4 @@ func (m *Generator) Generate(ctx context.Context, req *types.Request) (*types.Re
 		Result:     pkgstring.AsBytes(expect.Mindmap),
 		ResultKind: artifactentity.ResultKindInline,
 	}, nil
-}
-
-func (m *Generator) llmOptions() []einomodel.Option {
-	var (
-		provider = conf.WorkerGlobal().Studio.Mindmap.ModelProvider
-		model    = conf.WorkerGlobal().Studio.Mindmap.Model
-	)
-	llmOptions := []einomodel.Option{
-		chat.WithModel(model),
-		chat.WithResponseJsonObject(provider),
-		chat.WithThinking(provider, false),
-	}
-	return llmOptions
-}
-
-func (m *Generator) generate(
-	ctx context.Context,
-	req *types.Request,
-) (*mindmapExpectation, error) {
-	llmOptions := m.llmOptions()
-
-	tip := artifactentity.PayloadAs[*artifactentity.MindmapPayload](req.Payload).GetTip()
-
-	ag, err := types.BuildSourceExploreAgent(
-		m.deps,
-		conf.WorkerGlobal().Studio.Mindmap.ModelProvider,
-		conf.WorkerGlobal().Studio.Mindmap.Model,
-		conf.WorkerGlobal().Studio.Mindmap.MaxRound,
-		llmOptions,
-		req.NotebookId,
-		req.SourceIds,
-		true,
-	)
-	if err != nil {
-		return nil, errors.Wrapf(errors.ErrInner, "failed to build source explore agent for mindmap, err=%v", err)
-	}
-
-	sourceIds := types.SourceIDsToStrings(req.SourceIds)
-	msgs, err := RenderMindmap(ctx, sourceIds, tip)
-	if err != nil {
-		return nil, errors.Wrapf(errors.ErrInner, "generate mindmap message failed, err=%v", err)
-	}
-	output, err := ag.React(ctx, msgs)
-	if err != nil {
-		return nil, errors.Wrapf(errors.ErrInner, "generate mindmap output failed, err=%v", err)
-	}
-
-	slog.InfoContext(ctx, fmt.Sprintf("generate mindmap agent usage: %+v", ag.TokenUsage()))
-
-	expect, err := m.parseAgentOutput(ctx, output.Content)
-	if err == nil {
-		return expect, nil
-	}
-
-	slog.WarnContext(ctx, "mindmap agent output invalid, compensating",
-		slog.String("notebook_id", req.NotebookId.String()),
-		slog.Any("usage", ag.TokenUsage()),
-	)
-
-	msgs = append([]*einoschema.Message{}, ag.AccumulatedMessages()...)
-	msgs = append(msgs, types.BuildCompensateMessage(output.Content, []string{
-		"JSON must contain only `title` and `mindmap`",
-		"`title` length must be 10-30 characters",
-		"`mindmap` must be a complete mermaid mindmap code-block string",
-	}))
-
-	llmResp, genErr := ag.BaseLLM().Generate(ctx, msgs, llmOptions...)
-	if genErr != nil {
-		return nil, errors.Wrapf(errors.ErrLLM,
-			"mindmap compensate generate failed, err=%v",
-			genErr,
-		)
-	}
-
-	expect, err = m.parseAgentOutput(ctx, llmResp.Content)
-	if err == nil {
-		return expect, nil
-	}
-
-	return nil, errors.Wrapf(errors.ErrLLM,
-		"mindmap agent output invalid after compensation, first_output=%q, compensate_output=%q, err=%v",
-		output.Content,
-		llmResp.Content,
-		err,
-	)
-}
-
-func (m *Generator) parseAgentOutput(ctx context.Context, content string) (*mindmapExpectation, error) {
-	content = pkgstring.StripJSONPrefix(content)
-	if content == "" {
-		return nil, fmt.Errorf("empty output")
-	}
-
-	var expect mindmapExpectation
-	decoder := pkgjson.Decoder{
-		DisallowUnknownFields: true,
-		LogOnDirectFailure: func(err error, _ []byte) {
-			slog.DebugContext(ctx, "mindmap direct unmarshal did not match, fallback to json extraction",
-				slog.Any("err", err),
-				slog.String("raw_content", types.TruncateForLog(content)),
-			)
-		},
-	}
-	if err := decoder.Unmarshal(pkgstring.AsBytes(content), &expect); err != nil {
-		slog.WarnContext(ctx, "mindmap output unmarshal failed after compatibility fallback",
-			slog.Any("err", err),
-			slog.String("raw_content", types.TruncateForLog(content)))
-		return nil, err
-	}
-
-	expect.Title = types.NormalizeTitle(expect.Title)
-	expect.Mindmap = strings.TrimSpace(expect.Mindmap)
-
-	if !CheckStudioMindmapResult(expect.Mindmap) {
-		return nil, fmt.Errorf("mindmap format invalid")
-	}
-
-	return &expect, nil
 }

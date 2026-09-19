@@ -25,8 +25,8 @@ type writeStoryboardInput struct {
 }
 
 type editStoryboardInput struct {
-	OldString  string `json:"old_string"  jsonschema:"title=old_string content,description=The exact existing content to be replaced, must match the file content exactly"`
-	NewString  string `json:"new_string"  jsonschema:"title=new_string content,description=The new content to replace the old content with"`
+	OldString  string `json:"old_string"            jsonschema:"title=old_string content,description=The exact existing content to be replaced, must match the file content exactly"`
+	NewString  string `json:"new_string"            jsonschema:"title=new_string content,description=The new content to replace the old content with"`
 	ReplaceAll bool   `json:"replace_all,omitempty" jsonschema:"title=replace all,description=Replace every occurrence. Default false: the edit fails when old_string matches more than one place."`
 }
 

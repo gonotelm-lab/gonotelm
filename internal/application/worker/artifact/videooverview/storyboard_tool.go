@@ -2,9 +2,11 @@ package videooverview
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 
 	einotool "github.com/cloudwego/eino/components/tool"
@@ -12,169 +14,145 @@ import (
 )
 
 const (
-	appendStoryBoardShotToolName = "AppendStoryBoardShot"
-	editStoryBoardShotToolName   = "EditStoryBoardShot"
-	readStoryBoardShotToolName   = "ReadStoryBoardShot"
-	checkStoryboardShotToolName  = "CheckStoryboardShot"
+	writeStoryboardToolName = "WriteStoryboard"
+	editStoryboardToolName  = "EditStoryboard"
+	readStoryboardToolName  = "ReadStoryboard"
+	statStoryboardToolName  = "StatStoryboard"
 )
 
-type appendStoryBoardShot struct {
-	Index   int    `json:"index"   jsonschema:"title=shot index,description=1-based shot order key. Final markdown is sorted by this index."`
-	Content string `json:"content" jsonschema:"title=shot content,description=Markdown for this shot (typically one ## Shot …)."`
+type writeStoryboardInput struct {
+	Content string `json:"content" jsonschema:"title=full storyboard markdown,description=The COMPLETE storyboard document: YAML frontmatter (title only) plus contiguous '## Shot 1..N' sections. Replaces any previous draft entirely."`
 }
 
-type appendStoryBoardInput struct {
-	Shots []appendStoryBoardShot `json:"shots" jsonschema:"title=indexed shots,description=One or more {index, content} shots. Parallel Append is OK because index decides placement."`
+type editStoryboardInput struct {
+	OldString  string `json:"old_string"  jsonschema:"title=old_string content,description=The exact existing content to be replaced, must match the file content exactly"`
+	NewString  string `json:"new_string"  jsonschema:"title=new_string content,description=The new content to replace the old content with"`
+	ReplaceAll bool   `json:"replace_all,omitempty" jsonschema:"title=replace all,description=Replace every occurrence. Default false: the edit fails when old_string matches more than one place."`
 }
 
-type editStoryBoardItem struct {
-	Index   int    `json:"index"   jsonschema:"title=shot index,description=Which shot to replace or delete"`
-	Content string `json:"content" jsonschema:"title=replacement or delete,description=Non-empty: full replacement markdown for that shot. Empty string \"\": DELETE that shot."`
+type readStoryboardInput struct {
+	Offset int `json:"offset,omitempty" jsonschema_description:"1-based line number to start reading from. Only provide if the draft is too large to read at once. If omitted or 0, reads from line 1."`
+	Limit  int `json:"limit,omitempty"  jsonschema_description:"The number of lines to read. Only provide if the draft is too large to read at once. If omitted or 0, reads to the end."`
 }
 
-type editStoryBoardInput struct {
-	Edits []editStoryBoardItem `json:"edits" jsonschema:"title=edits,description=One or more shot edits/deletes. Duplicate index in the same call is rejected."`
-}
+type statStoryboardInput struct{}
 
-type readStoryBoardInput struct {
-	Offset  int   `json:"offset,omitempty"  jsonschema_description:"1-based position in the sorted shot-index list when indexes is empty. Omit or 0 to start from the first shot."`
-	Limit   int   `json:"limit,omitempty"   jsonschema_description:"Number of shots to read when indexes is empty. Omit or 0 to read through the end."`
-	Indexes []int `json:"indexes,omitempty" jsonschema_description:"Optional explicit shot indexes to read. When set, offset/limit are ignored."`
-}
-
-// checkStoryBoardInput 无必填参数；占位让工具可被无参调用。
-type checkStoryBoardInput struct {
-	Reason string `json:"reason,omitempty" jsonschema_description:"Optional note for why you are checking (ignored by the tool)."`
-}
-
-func (d *storyboardDoc) getBindedTools() (map[string]einotool.InvokableTool, error) {
-	appendTool, err := einotoolutils.InferTool(
-		appendStoryBoardShotToolName,
-		"Append indexed storyboard shots (safe to call in parallel).\n\n"+
+// getStoryboardFileTools 构造 storyboard 步骤的文件工具；三个工具都没有路径参数，
+// 只能读写 storyboardFilePath 推导出的那一个文件。
+func getStoryboardFileTools(notebookId, artifactId valobj.Id) (map[string]einotool.InvokableTool, error) {
+	writeTool, err := einotoolutils.InferTool(
+		writeStoryboardToolName,
+		"Overwrite the storyboard draft file with the complete document.\n\n"+
 			"Usage:\n"+
-			"- Each item is {index, content}; index >= 1.\n"+
-			"- Prefer one shot per item; index is the ordering key for the final document.\n"+
-			"- Parallel AppendStoryBoardShot calls are OK: placement follows index.\n"+
-			"- Same index already present is rejected; use EditStoryBoardShot to replace.\n"+
-			"- Do not paste the full storyboard into the chat message.",
-		func(ctx context.Context, input *appendStoryBoardInput) (string, error) {
-			indexes := make([]int, 0, len(input.Shots))
-			shots := make([]storyboardShot, 0, len(input.Shots))
-			for _, s := range input.Shots {
-				indexes = append(indexes, s.Index)
-				shots = append(shots, storyboardShot(s))
+			"- Put the whole storyboard markdown in `content`: frontmatter (title only) + contiguous `## Shot 1..N`.\n"+
+			"- The target file is fixed by the system; you cannot and need not specify a path.\n"+
+			"- Calling it again replaces the previous draft entirely; prefer EditStoryboard for a small fix.\n"+
+			"- Do not paste the storyboard into the chat reply.",
+		func(ctx context.Context, input *writeStoryboardInput) (string, error) {
+			content := strings.TrimSpace(input.Content)
+			if content == "" {
+				return "", fmt.Errorf("content is required")
 			}
-			slog.DebugContext(ctx, "storyboard tool AppendStoryBoardShot",
-				slog.Any("indexes", indexes),
-				slog.Int("count", len(indexes)),
-			)
-			out, err := d.append(shots)
+
+			written, err := writeStoryboardFile(notebookId, artifactId, content)
 			if err != nil {
-				slog.DebugContext(ctx, "storyboard tool AppendStoryBoardShot failed",
-					slog.Any("indexes", indexes),
-					slog.Any("err", err),
-				)
 				return "", err
 			}
-			return out, nil
+
+			slog.DebugContext(ctx, "storyboard tool WriteStoryboard", slog.Int("chars", written))
+			return fmt.Sprintf("OK wrote storyboard (%d chars)", written), nil
 		},
 	)
 	if err != nil {
-		return nil, errors.Wrapf(errors.ErrInner, "infer %s tool failed: %v", appendStoryBoardShotToolName, err)
+		return nil, errors.Wrapf(errors.ErrInner, "infer %s tool failed: %v", writeStoryboardToolName, err)
 	}
 
 	editTool, err := einotoolutils.InferTool(
-		editStoryBoardShotToolName,
-		"Replace or DELETE storyboard shots by index.\n\n"+
+		editStoryboardToolName,
+		"Fix the storyboard draft with an exact string replacement (same principle as EditFile).\n\n"+
 			"Usage:\n"+
-			"- edits[].index identifies the shot.\n"+
-			"- edits[].content non-empty → replace the whole shot body.\n"+
-			"- edits[].content empty string \"\" → DELETE that shot (this is the delete API; there is no separate Delete tool).\n"+
-			"  Example delete: {\"edits\":[{\"index\":3,\"content\":\"\"}]}\n"+
-			"- Duplicate index in the same call is rejected.",
-		func(ctx context.Context, input *editStoryBoardInput) (string, error) {
-			indexes := make([]int, 0, len(input.Edits))
-			ops := make([]storyboardShot, 0, len(input.Edits))
-			for _, e := range input.Edits {
-				indexes = append(indexes, e.Index)
-				ops = append(ops, storyboardShot(e))
-			}
-			slog.DebugContext(ctx, "storyboard tool EditStoryBoardShot",
-				slog.Any("indexes", indexes),
-				slog.Int("count", len(indexes)),
+			"- `old_string` must be copied verbatim from the draft, including indentation and whitespace.\n"+
+			"- The edit fails when `old_string` is missing, or matches more than one place and `replace_all` is false — "+
+			"then include more surrounding lines to make it unique.\n"+
+			"- Use WriteStoryboard instead when the fix touches many shots at once.",
+		func(ctx context.Context, input *editStoryboardInput) (string, error) {
+			replaced, err := editStoryboardFile(
+				notebookId, artifactId, input.OldString, input.NewString, input.ReplaceAll,
 			)
-			out, err := d.edit(ops)
 			if err != nil {
-				slog.DebugContext(ctx, "storyboard tool EditStoryBoardShot failed",
-					slog.Any("indexes", indexes),
-					slog.Any("err", err),
-				)
 				return "", err
 			}
-			return out, nil
+
+			slog.DebugContext(ctx, "storyboard tool EditStoryboard", slog.Int("replaced", replaced))
+			return fmt.Sprintf("OK edited storyboard (%d replacement(s))", replaced), nil
 		},
 	)
 	if err != nil {
-		return nil, errors.Wrapf(errors.ErrInner, "infer %s tool failed: %v", editStoryBoardShotToolName, err)
+		return nil, errors.Wrapf(errors.ErrInner, "infer %s tool failed: %v", editStoryboardToolName, err)
 	}
 
 	readTool, err := einotoolutils.InferTool(
-		readStoryBoardShotToolName,
-		"Read storyboard shots by index.\n\n"+
+		readStoryboardToolName,
+		"Read back the current storyboard draft file by lines.\n\n"+
 			"Usage:\n"+
-			"- Default: offset/limit over shot indexes sorted ascending.\n"+
-			"- Or pass indexes for an explicit multi-shot read.",
-		func(ctx context.Context, input *readStoryBoardInput) (string, error) {
-			slog.DebugContext(ctx, "storyboard tool ReadStoryBoardShot",
-				slog.Int("offset", input.Offset),
-				slog.Int("limit", input.Limit),
-				slog.Any("indexes", input.Indexes),
-			)
-			out, err := d.read(input.Offset, input.Limit, input.Indexes)
+			"- No path argument: the file is fixed by the system.\n"+
+			"- By default reads the whole draft from the beginning; use offset (1-based line number) "+
+			"and limit to read a long draft in chunks.\n"+
+			"- Lines longer than 2000 characters will be truncated.\n"+
+			"- Results are returned as 'LINE_NUMBER|LINE_CONTENT', line numbers start at 1.\n"+
+			"- Returns `(empty storyboard)` when nothing has been written yet.",
+		func(ctx context.Context, input *readStoryboardInput) (string, error) {
+			content, err := readStoryboardFile(notebookId, artifactId)
 			if err != nil {
-				slog.DebugContext(ctx, "storyboard tool ReadStoryBoardShot failed",
-					slog.Any("indexes", input.Indexes),
-					slog.Any("err", err),
-				)
 				return "", err
 			}
+			if strings.TrimSpace(content) == "" {
+				return "(empty storyboard)", nil
+			}
+
+			out := formatStoryboardLines(content, input.Offset, input.Limit)
+			if out == "" {
+				return "(no lines in that range)", nil
+			}
+
+			slog.DebugContext(ctx, "storyboard tool ReadStoryboard",
+				slog.Int("offset", input.Offset),
+				slog.Int("limit", input.Limit),
+				slog.Int("chars", len(out)),
+			)
 			return out, nil
 		},
 	)
 	if err != nil {
-		return nil, errors.Wrapf(errors.ErrInner, "infer %s tool failed: %v", readStoryBoardShotToolName, err)
+		return nil, errors.Wrapf(errors.ErrInner, "infer %s tool failed: %v", readStoryboardToolName, err)
 	}
 
-	checkTool, err := einotoolutils.InferTool(
-		checkStoryboardShotToolName,
-		"Self-check storyboard continuity before finishing.\n\n"+
-			"Reports PASS/FAIL for:\n"+
-			"- shot index continuity (must fill 1..max with no gaps)\n"+
-			"- audio_id coverage (every narration clip appears exactly once)\n"+
-			"- audio_id order (within a shot and across shots must follow the narration track)\n\n"+
-			"Call this after bulk Append/Edit. If FAIL, fix with Append/Edit then Check again.\n"+
-			"No required arguments.",
-		func(ctx context.Context, input *checkStoryBoardInput) (string, error) {
-			slog.DebugContext(ctx, "storyboard tool CheckStoryboardShot",
-				slog.Int("shots", d.ShotCount()),
-				slog.String("reason", input.Reason),
-			)
-			out := d.checkContinuity()
-			slog.DebugContext(ctx, "storyboard tool CheckStoryboardShot result",
-				slog.Int("shots", d.ShotCount()),
-				slog.Bool("pass", strings.HasPrefix(out, "PASS")),
-			)
-			return out, nil
+	statTool, err := einotoolutils.InferTool(
+		statStoryboardToolName,
+		"Check whether the storyboard draft file exists and how large it is.\n\n"+
+			"No arguments and no path: the file is fixed by the system. "+
+			"Use it to decide whether to read the whole draft or read it in chunks.",
+		func(ctx context.Context, _ *statStoryboardInput) (string, error) {
+			size, exists, err := statStoryboardFile(notebookId, artifactId)
+			if err != nil {
+				return "", err
+			}
+			if !exists {
+				return "(no storyboard file)", nil
+			}
+
+			slog.DebugContext(ctx, "storyboard tool StatStoryboard", slog.Int64("bytes", size))
+			return fmt.Sprintf("storyboard file exists, %d bytes", size), nil
 		},
 	)
 	if err != nil {
-		return nil, errors.Wrapf(errors.ErrInner, "infer %s tool failed: %v", checkStoryboardShotToolName, err)
+		return nil, errors.Wrapf(errors.ErrInner, "infer %s tool failed: %v", statStoryboardToolName, err)
 	}
 
 	return map[string]einotool.InvokableTool{
-		appendStoryBoardShotToolName: appendTool,
-		editStoryBoardShotToolName:   editTool,
-		readStoryBoardShotToolName:   readTool,
-		checkStoryboardShotToolName:  checkTool,
+		writeStoryboardToolName: writeTool,
+		editStoryboardToolName:  editTool,
+		readStoryboardToolName:  readTool,
+		statStoryboardToolName:  statTool,
 	}, nil
 }

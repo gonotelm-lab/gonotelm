@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -110,11 +111,19 @@ func (s *audioSynthizer) collectLines(script *videoScript) []synthesizedLine {
 				SegmentIndex:     si,
 				LineIndex:        li,
 				Text:             line.Text,
-				VoiceInstruction: line.VoiceInstruction,
+				VoiceInstruction: resolveVoiceInstruction(script.VoiceBaseline, line.VoiceInstruction),
 			})
 		}
 	}
 	return lines
+}
+
+// resolveVoiceInstruction 取该行的 TTS 语气指令：有行级覆盖就用覆盖，否则继承全片基线。
+func resolveVoiceInstruction(baseline, line string) string {
+	if instruction := strings.TrimSpace(line); instruction != "" {
+		return instruction
+	}
+	return strings.TrimSpace(baseline)
 }
 
 // generate 逐句 TTS；第二个返回值表示 field2 在进入本步前已完整，无需新合成。

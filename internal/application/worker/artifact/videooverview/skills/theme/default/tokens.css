@@ -1,0 +1,74 @@
+/* ─────────────────────────────────────────────────────────────────────
+ * Theme · default (Soft & Balanced)
+ *   扁平手绘感、米色 / 奶油纸张底、温暖教育向。
+ *
+ *   调色映射（沿用旧五色原值）：
+ *     bg       #faf6ec  → --surface
+ *     light    #f2cc8f  → --surface-2
+ *     primary  #3d405b  → --text
+ *     secondary#6d6a5f  → --text-2
+ *     accent   #e07a5f  → --accent
+ *
+ *   character knobs:
+ *     • hero numbers — 衬线数字 + mono 单位
+ *     • rule         — 1px 发丝
+ *     • card radius  — 12px，适中圆角
+ *     • signature    — 暖米底 + sun bloom + 对角 counter-bloom
+ *     • motion       — 舒缓有呼吸感（560 / 900 / 1300ms）
+ * ───────────────────────────────────────────────────────────────────── */
+:root {
+  /* ─── palette ─── */
+  --shell:        #f3ecdc;
+  --surface:      #faf6ec;
+  --surface-2:    #f2cc8f;
+  --surface-3:    #ecd9b0;
+  --text:         #3d405b;
+  --text-2:       #6d6a5f;
+  --text-mute:    #9a9483;
+  --text-faint:   #c9c2b0;
+  --rule:         #e3d9c4;
+  --accent:       #e07a5f;
+  --accent-soft:  rgba(224, 122, 95, 0.13);
+  --accent-glow:  rgba(224, 122, 95, 0.42);
+
+  /* ─── fonts ─── */
+  --font-display-cn: "PingFang SC", "Noto Sans SC", "Source Han Sans SC",
+                     "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-display-en: "Playfair Display", "Montserrat", "Georgia", serif;
+  --font-body:       "Inter", "PingFang SC", "Noto Sans SC",
+                     -apple-system, sans-serif;
+  --font-mono:       "IBM Plex Mono", "SF Mono", ui-monospace, monospace;
+  --font-features:   "tnum", "ss01";
+
+  /* ─── motion: soft, breathing ─── */
+  --dur-base:       560ms;
+  --dur-slow:       900ms;
+  --dur-cinematic:  1300ms;
+
+  /* ─── design identity ─── */
+  --r-card:        12px;
+  --r-stage:       0;
+  --rule-w:        1px;
+  --rule-style:    solid;
+  --hero-num-font:    var(--font-display-en);
+  --hero-num-style:   normal;
+  --hero-num-weight:  700;
+  --hero-num-track:   -0.02em;
+  --stage-pad-x:   120px;
+  --stage-pad-y:   88px;
+
+  /* ─── surfaces ─── */
+  --card-shadow:   0 1px 0 rgba(61, 64, 91, 0.05) inset;
+  --card-glass-bg:     rgba(61, 64, 91, 0.04);
+  --card-glass-border: rgba(61, 64, 91, 0.10);
+  --shadow-stage:  0 40px 120px rgba(61, 64, 91, 0.20);
+
+  /* ─── decoration: sun bloom + 对角 ember counter-bloom ─── */
+  --surface-vignette:
+    radial-gradient(70% 60% at 38% 32%,
+      rgba(224, 122, 95, 0.10) 0%,
+      transparent 60%),
+    radial-gradient(55% 50% at 78% 82%,
+      rgba(242, 204, 143, 0.18) 0%,
+      transparent 62%);
+}

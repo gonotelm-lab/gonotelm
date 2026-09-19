@@ -167,15 +167,11 @@ thinkingEnabled = false
 
 [provider.deepseek.models.deepseek-flash]
 name = "deepseek-flash"
-modalities = {input = ["text"], output = ["text"]}
+modalities = {input = ["text", "image"], output = ["text"]}
 
 [provider.deepseek.models.deepseek-v4-pro]
 name = "deepseek-v4-pro"
 modalities = {input = ["text"], output = ["text"]}
-
-[provider.deepseek.models.deepseek-v4-flash-vision-exp]
-name = "deepseek-v4-flash-vision-exp"
-modalities = {input = ["text", "image"], output = ["text"]}
 
 [provider.openai]
 apiKey = "${GONOTELM_OPENAI_API_KEY:-}"

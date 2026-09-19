@@ -38,65 +38,63 @@ type videoScriptSegment struct {
 }
 
 type videoScript struct {
-	Title    string               `json:"title"`
-	Segments []videoScriptSegment `json:"segments"`
+	Title string `json:"title"`
+	// VoiceBaseline 是全片唯一的 TTS 语气基线；每行 voice_instruction 只在偏离基线时才写。
+	VoiceBaseline string               `json:"voice_baseline"`
+	Segments      []videoScriptSegment `json:"segments"`
 }
 
-func (s *videoScript) renderOutlineMarkdown() string {
+// renderSegmentsMarkdown 以 segment 为骨架，合并板块构思与逐句口播；每条口播只保留 audio_id、时长与文本。
+func (s *videoScript) renderSegmentsMarkdown(meta *audioCheckpointMeta) string {
 	if s == nil {
-		return "(no outline)"
+		return "(no script)"
 	}
-	var b strings.Builder
-	fmt.Fprintf(&b, "# %s\n\n", strings.TrimSpace(s.Title))
-	for i, seg := range s.Segments {
-		fmt.Fprintf(&b, "## Segment %d · %s\n\n", i, strings.TrimSpace(seg.Name))
-		fmt.Fprintf(&b, "%s\n\n", strings.TrimSpace(seg.Content))
-	}
-	return strings.TrimSpace(b.String())
-}
 
-func (s *videoScript) renderNarrationMarkdown(meta *audioCheckpointMeta) string {
 	parts := meta.sortedAudioParts()
 	if len(parts) == 0 {
 		return "(no narration audio track)"
 	}
 
-	segName := func(si int) string {
-		if s != nil && si >= 0 && si < len(s.Segments) {
-			return s.Segments[si].Name
+	partsBySegment := make(map[int][]audioLinePart, len(s.Segments))
+	segmentOrder := make([]int, 0, len(s.Segments))
+	for _, p := range parts {
+		if _, ok := partsBySegment[p.SegmentIndex]; !ok {
+			segmentOrder = append(segmentOrder, p.SegmentIndex)
 		}
-		return ""
+		partsBySegment[p.SegmentIndex] = append(partsBySegment[p.SegmentIndex], p)
 	}
 
 	var b strings.Builder
-	b.WriteString("Sorted by `segment_index` → `line_index`; timecodes are cumulative start–end.\n\n")
+	var totalMs int64
+	fmt.Fprintf(&b,
+		"共 %d 条口播音频，按 `segment_index` → `line_index` 排序；每条时长由 TTS 固定，全部必须被 Shot 引用。\n",
+		len(parts),
+	)
 
-	var cursor int64
-	curSeg := -1
-	for _, p := range parts {
-		if p.SegmentIndex != curSeg {
-			curSeg = p.SegmentIndex
-			name := segName(curSeg)
-			if name != "" {
-				fmt.Fprintf(&b, "### Segment %d · %s\n\n", curSeg, name)
-			} else {
-				fmt.Fprintf(&b, "### Segment %d\n\n", curSeg)
-			}
+	for _, si := range segmentOrder {
+		var name, content string
+		if si >= 0 && si < len(s.Segments) {
+			name = strings.TrimSpace(s.Segments[si].Name)
+			content = strings.TrimSpace(s.Segments[si].Content)
 		}
-		start := cursor
-		end := cursor + p.DurationMs
-		cursor = end
-		fmt.Fprintf(&b, "- **audio_id**: `audio_%d-%d`\n", p.SegmentIndex, p.LineIndex)
-		fmt.Fprintf(&b, "  - timecode: `%s – %s`\n", formatTimecode(start), formatTimecode(end))
-		fmt.Fprintf(&b, "  - duration_ms: %d\n", p.DurationMs)
-		fmt.Fprintf(&b, "  - text: %s\n\n", strings.TrimSpace(p.Text))
+
+		b.WriteString("\n")
+		if name != "" {
+			fmt.Fprintf(&b, "## Segment %d · %s\n", si, name)
+		} else {
+			fmt.Fprintf(&b, "## Segment %d\n", si)
+		}
+		if content != "" {
+			fmt.Fprintf(&b, "%s\n\n", content)
+		}
+		for _, p := range partsBySegment[si] {
+			totalMs += p.DurationMs
+			fmt.Fprintf(&b, "- `audio_%d-%d` · %.1fs · %s\n",
+				p.SegmentIndex, p.LineIndex, float64(p.DurationMs)/1000, strings.TrimSpace(p.Text))
+		}
 	}
-	fmt.Fprintf(&b, "Total about `%s` (%d ms).\n", formatTimecode(cursor), cursor)
-	fmt.Fprintf(&b, "\n## Coverage requirement\n\n")
-	fmt.Fprintf(&b, "There are **%d** spoken clips above. Every `audio_id` MUST appear in some shot — none may be omitted.\n", len(parts))
-	fmt.Fprintf(&b, "One shot may cover multiple **consecutive** clips when they serve the same on-screen logic.\n")
-	fmt.Fprintf(&b, "Shot indexes must be contiguous from 1; do not emit section/板块 headings in the storyboard.\n")
-	fmt.Fprintf(&b, "Do not cut shots by stopwatch limits; cut when the visual argument changes.\n")
+
+	fmt.Fprintf(&b, "\nTotal %d clips · %.1fs.\n", len(parts), float64(totalMs)/1000)
 	return strings.TrimSpace(b.String())
 }
 
@@ -148,7 +146,7 @@ func (g *scriptGenerator) generate(
 	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioVideoOverviewScriptScene)
 
 	sourceIds := types.SourceIDsToStrings(req.SourceIds)
-	msgs, err := RenderVideoScript(ctx, sourceIds, payload.GetLanguage(), payload.GetTip(), payload.GetVisualStyle())
+	msgs, err := RenderVideoScript(ctx, sourceIds, payload.GetLanguage(), payload.GetTip())
 	if err != nil {
 		return nil, errors.WithMessagef(err, "render video script prompt failed")
 	}
@@ -172,16 +170,17 @@ func (g *scriptGenerator) generate(
 
 func (g *scriptGenerator) compensateRules(validateErr error) []string {
 	rules := []string{
-		"JSON must contain only `title` and `segments`",
+		"JSON must contain only `title`, `voice_baseline` and `segments`",
+		"`voice_baseline` is required and holds the ONE baseline voice direction for the whole script — spoken-narration style, medium pace, consistent tone/intonation — matching the video's overall style and the source content's register",
 		"`segments` is a non-empty array; each element has `name`, `content`, and `lines`",
 		"`content` is the segment plan (what to cover), not the spoken narration",
-		"`lines` is an array of objects; each element has `text` and `voice_instruction`",
+		"`lines` is an array of objects; each element has `text`, plus `voice_instruction` ONLY when that line deviates from the baseline",
 		"`text` is one short spoken sentence for TTS, no long paragraphs",
 		"`text` must be spoken-style plain text, no markdown, emoji, urls, parentheses asides, or newlines",
-		"`voice_instruction` is a natural-language voice direction for that line, not a restatement of `text`; keep ONE baseline across the whole script — spoken-narration style, medium pace, consistent tone/intonation — that fits the video's overall style and the source content's register, with only slight local adjustments (never fast here / slow there)",
-		"resolve ambiguous readings in `text` by context (Roman numerals, single letters, English acronyms, mixed symbols) into unambiguous spoken Chinese/phonetic form for TTS; ",
+		"`voice_instruction` is a short natural-language note on the LOCAL adjustment (never fast here / slow there), not a restatement of `text`; omit it when the line follows the baseline",
+		"keep common English acronyms / product names as-is (TTS reads them); only resolve genuinely ambiguous marks (Roman numerals, single letters, mixed symbols) by context",
 		"keep the same reading consistent across the script",
-		"never include system internals in title/name/content/text/voice_instruction: source ids, tool names, checkpoint/artifact fields, or meta narration about tools",
+		"never include system internals in title/name/content/text/voice_baseline/voice_instruction: source ids, tool names, checkpoint/artifact fields, or meta narration about tools",
 		"plan each segment (name+content) first, then write lines",
 	}
 	if validateErr != nil {
@@ -237,6 +236,10 @@ func (g *scriptGenerator) parse(ctx context.Context, content string) (*videoScri
 	script.Title = strings.TrimSpace(script.Title)
 	if script.Title == "" {
 		return nil, fmt.Errorf("video script title is empty")
+	}
+	script.VoiceBaseline = strings.TrimSpace(script.VoiceBaseline)
+	if script.VoiceBaseline == "" {
+		return nil, fmt.Errorf("video script voice_baseline is empty")
 	}
 	if len(script.Segments) == 0 {
 		return nil, fmt.Errorf("video script segments is empty")

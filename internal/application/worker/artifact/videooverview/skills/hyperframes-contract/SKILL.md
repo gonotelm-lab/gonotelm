@@ -46,9 +46,9 @@ description: HyperFrames 合成契约与排错：文件架构、骨架、data �
           width: 1920px;
           height: 1080px;
           overflow: hidden;
-          background: #0d1b2a;
-          font-family: "Montserrat", "CJK", sans-serif;
-          color: #fff;
+          background: var(--surface);
+          font-family: var(--font-display-en), "CJK", sans-serif;
+          color: var(--text);
         }
         @font-face {
           font-family: "CJK";
@@ -114,7 +114,7 @@ description: HyperFrames 合成契约与排错：文件架构、骨架、data �
         height: 1080px;
         overflow: hidden;
         background: #0d1b2a;
-        font-family: "Montserrat", "CJK", sans-serif;
+        font-family: var(--font-display-en), "CJK", sans-serif;
       }
       #root { position: relative; width: 1920px; height: 1080px; overflow: hidden; }
       /* 子 composition 槽位铺满根 */
@@ -234,7 +234,9 @@ tl.to("#a2", { volume: 0, duration: 0.4, ease: "power1.in" }, audioEnd - 0.4);
 - **每个** composition（含每个子文件）只注册**一个** `gsap.timeline({ paused: true })`，在脚本末尾注册。
 - 子文件：`window.__timelines["shot-NN"] = tl;`（局部时间）。
 - 根：`window.__timelines["main"] = tl;`（通常近空，只做转场）。
-- 动画统一用 `tl.fromTo(...)`；不要用 `gsap.from`。
+- 动画用 `tl.to(...)` / `tl.fromTo(...)`，不要用 `gsap.from`：
+  - **`fromTo` 只用来定义「入场初始态」**（该元素在本镜里第一次出现）。元素已经被前序 tween 或 `tl.set` 定过态时一律用 `tl.to(...)`——`fromTo` 的 `from` 会在 immediateRender 时立刻写入，把前序结果盖掉。
+  - `from` 与 `to` **不能同值**；只改一个属性、或只想「瞬间置位」，不要为了统一而套 `fromTo`。
 - 同一元素、同一属性同一时间只能被一个 tween 控制。
 - 所有环境动效必须挂在该 composition 自己的 `tl` 上，禁止裸 `gsap.to()`。
 - 不要在 `setTimeout` / `Promise` 里注册时间线。
@@ -282,6 +284,21 @@ tl.to("#el", { scale: 1.05, duration: cycle, ease: "sine.inOut", yoyo: true, rep
 | `standalone_composition_wrapped_in_template` | `index.html` 根不要包 `<template>` |
 | `subcomposition_root_styled_by_class` | 子文件用 `#root` 设尺寸 |
 
+## lint 抓不到、但必须第一稿就避开的写法
+
+以下写法都过 `hyperframes lint`（0 error 0 warning），却会在成片里穿帮，或逼你回头重改。
+
+| 不要写 | 改写成 |
+| --- | --- |
+| `tl.to(el, { …, duration: 0.01 }, t)` 当「瞬间置位」 | `tl.set(el, { … }, t)`——瞬间改状态**只用 `tl.set`**，不要用趋近 0 的 duration |
+| `tl.fromTo(el, { x: 0 }, { x: 76, … }, t)`（from/to 同值，或元素已有前序动画） | `tl.to(el, { x: 76, … }, t)` |
+| 用 class 选择器驱动只该动一个 / 一动一组的元素（`tl.to(".sline", …)`） | 每个元素给唯一 `id`，动画一律写 `#id`；同类多元素要一起动就写数组 `["#a", "#b"]` |
+| SVG 线条生长用 `scaleX` / `scaleY` | 量 `getTotalLength()` 设 `strokeDasharray` / `strokeDashoffset`，动画 dashoffset |
+| 运行时用 JS 改 `textContent` 摆**静态**文案 | 文案直接写进 HTML；只有确实要「变字」时才用 `tl.set` |
+| 最后一个 tween 的 `start + duration` 贴住甚至超过本镜 `data-duration` | 先算好本镜槽位秒数，最后一个 tween 收在 `data-duration - 0.1 ~ 0.3s` |
+
+**每写一镜，落盘前对着这张表自检一遍**——比写完再回头 patch 便宜一个数量级。
+
 ## 字体
 
 - 可直接使用的内置字体（离线可渲染）：`Inter` `Roboto` `Open Sans` `Lato` `Nunito` `Montserrat`
@@ -290,7 +307,7 @@ tl.to("#el", { scale: 1.05, duration: cycle, ease: "sine.inOut", yoyo: true, rep
 - 别名：`Helvetica Neue`/`Arial` → Inter；`Futura`/`Arial Black` → Montserrat；
   `Bebas Neue` → League Gothic；`Courier New` → JetBrains Mono。
 - **League Gothic 与 Archivo Black 只有 400 字重**，不要写 700/900。
-- 中文必须落到 `@font-face` 声明的 `"CJK"` 家族；`font-family: "Montserrat", "CJK", sans-serif`。
+- 中文必须落到 `@font-face` 声明的 `"CJK"` 家族；`font-family: var(--font-display-en), "CJK", sans-serif`。
 - 数字/数据用 `font-variant-numeric: tabular-nums`。
 
 ## 装饰性文字与出血装饰的豁免

@@ -128,6 +128,10 @@ byAzure = ${GONOTELM_OPENAI_BY_AZURE:-false}
 baseUrl = "${GONOTELM_OPENAI_BASE_URL:-}"
 apiVersion = "${GONOTELM_OPENAI_API_VERSION:-}"
 
+[llmRecord]
+# whether over-long recorded LLM input content is truncated before being persisted
+truncate = ${GONOTELM_LLM_RECORD_TRUNCATE:-true}
+
 [provider]
 
 [provider.deepseek]
@@ -140,15 +144,11 @@ thinkingEnabled = false
 
 [provider.deepseek.models.deepseek-flash]
 name = "deepseek-flash"
-modalities = {input = ["text"], output = ["text"]}
+modalities = {input = ["text", "image"], output = ["text"]}
 
 [provider.deepseek.models.deepseek-v4-pro]
 name = "deepseek-v4-pro"
 modalities = {input = ["text"], output = ["text"]}
-
-[provider.deepseek.models.deepseek-v4-flash-vision-exp]
-name = "deepseek-v4-flash-vision-exp"
-modalities = {input = ["text", "image"], output = ["text"]}
 
 [provider.openai]
 apiKey = "${GONOTELM_OPENAI_API_KEY:-}"

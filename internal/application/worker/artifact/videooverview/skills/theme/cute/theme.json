@@ -1,0 +1,26 @@
+{
+  "id": "cute",
+  "name": "Rounded & Cute",
+  "nameZh": "圆润可爱",
+  "description": "Soft pastel stage: pink / mint / cream, rounded pills and cards, playful and healing. Friendly for beginner introductions.",
+  "descriptionZh": "粉嫩柔和（粉/薄荷绿/奶油底），治愈轻松，适合入门介绍。",
+  "mood": ["light", "pastel", "soft", "rounded", "playful", "healing"],
+  "bestFor": [
+    "入门介绍 / 科普",
+    "轻松知识分享",
+    "面向大众的内容",
+    "友好向产品讲解"
+  ],
+  "preview": {
+    "shell": "#fdeee7",
+    "surface": "#fff8f5",
+    "text": "#5b4b6e",
+    "accent": "#f4a4b8"
+  },
+  "guidance": {
+    "fonts": "标题 `Nunito` 900 / `Montserrat` 900；正文 `Nunito` 400；圆角 16–32px",
+    "composition": "圆润卡片、留白充足、轻装饰；主标题 64–110px",
+    "motion": "活泼弹跳 `back.out(1.6)`（overshoot ≤ 2）、错峰 0.05–0.08s；环境动效用漂浮 / 气泡 / 柔和呼吸",
+    "expression": "所有容器药丸化（小元素 9999px，大卡片 20–32px 圆角）+ 2px 描边；描边色用 `text`。硬偏移阴影 `6/4px` 零模糊（只给内容元素，漂浮装饰不投影）；半径 20 / 28 / 50px。内联 SVG 小装饰 3–7 个（花 / 星 / 云 / 彩虹，可出血到画框外），禁 emoji；点状 bullet 用描边圆点。强调用药丸高亮（替代加粗 / 斜体）；accent 只做小标记，不做大面积底。"
+  }
+}

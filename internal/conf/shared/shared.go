@@ -112,6 +112,7 @@ type InfraConfig struct {
 	Storage         storageimpl.StorageTypeConfig `toml:"storage"`
 	Provider        llmchat.ProviderConfig        `toml:"provider"`
 	ProviderBilling ProviderBillingConfig         `toml:"providerBilling"`
+	LLMRecord       llmchat.RecordConfig          `toml:"llmRecord"`
 	Embedding       embedding.EmbeddingConfig     `toml:"embedding"`
 	Text2Image      text2image.Text2ImageConfig   `toml:"text2image"`
 	Text2Audio      text2audio.Text2AudioConfig   `toml:"text2audio"`
@@ -136,6 +137,7 @@ func (c *InfraConfig) InitInfra() {
 	}
 
 	c.ProviderBilling.Init()
+	c.LLMRecord.Init()
 }
 
 func (c *InfraConfig) SQLConfig() *sql.Config {

@@ -32,10 +32,11 @@ func init() {
 type Interceptor struct {
 	rootCtx  context.Context
 	recorder Recorder
+	truncate bool
 }
 
-func newInterceptor(rootCtx context.Context, recorder Recorder) *Interceptor {
-	return &Interceptor{rootCtx: rootCtx, recorder: recorder}
+func newInterceptor(rootCtx context.Context, recorder Recorder, truncate bool) *Interceptor {
+	return &Interceptor{rootCtx: rootCtx, recorder: recorder, truncate: truncate}
 }
 
 // Docs see: https://www.cloudwego.io/zh/docs/eino/quick_start/chapter_06_callback_and_trace/
@@ -151,7 +152,7 @@ func (i *Interceptor) OnEndWithStreamOutput(
 
 func (i *Interceptor) recordError(ctx context.Context, err error) {
 	if i.recorder != nil {
-		if rErr := i.recorder.Record(ctx, buildErrorRecord(ctx, err, getOnStartInput(ctx), time.Now())); rErr != nil {
+		if rErr := i.recorder.Record(ctx, buildErrorRecord(ctx, err, getOnStartInput(ctx), time.Now(), i.truncate)); rErr != nil {
 			slog.ErrorContext(ctx, "[chat.Interceptor] record error failed", slog.Any("err", rErr))
 		}
 	}
@@ -159,7 +160,7 @@ func (i *Interceptor) recordError(ctx context.Context, err error) {
 
 func (i *Interceptor) recordEnd(ctx context.Context, output *model.CallbackOutput) {
 	if i.recorder != nil {
-		r := buildEndRecord(ctx, getOnStartInput(ctx), output, time.Now())
+		r := buildEndRecord(ctx, getOnStartInput(ctx), output, time.Now(), i.truncate)
 		if err := i.recorder.Record(ctx, r); err != nil {
 			slog.ErrorContext(ctx, "[chat.Interceptor] record end failed", slog.Any("err", err))
 		}

@@ -1,0 +1,75 @@
+/* ─────────────────────────────────────────────────────────────────────
+ * Theme · cute (Rounded & Cute)
+ *   粉嫩柔和（粉 / 薄荷绿 / 奶油底），治愈轻松。
+ *
+ *   调色映射（沿用旧五色原值）：
+ *     bg       #fff8f5  → --surface
+ *     light    #b8e0d2  → --surface-2
+ *     primary  #5b4b6e  → --text
+ *     secondary#8b7aa0  → --text-2
+ *     accent   #f4a4b8  → --accent
+ *
+ *   character knobs:
+ *     • hero numbers — 圆体 900，俏皮
+ *     • rule         — 2px 实线
+ *     • card radius  — 24px，药丸化圆润
+ *     • signature    — 硬偏移阴影 + 漂浮气泡，禁 emoji
+ *     • motion       — 活泼弹跳，overshoot ≤ 2（520 / 850 / 1250ms）
+ * ───────────────────────────────────────────────────────────────────── */
+:root {
+  /* ─── palette ─── */
+  --shell:        #fdeee7;
+  --surface:      #fff8f5;
+  --surface-2:    #b8e0d2;
+  --surface-3:    #a8d4c4;
+  --text:         #5b4b6e;
+  --text-2:       #8b7aa0;
+  --text-mute:    #b3a6c2;
+  --text-faint:   #d8cfe0;
+  --rule:         #f0dbe4;
+  --accent:       #f4a4b8;
+  --accent-soft:  rgba(244, 164, 184, 0.18);
+  --accent-glow:  rgba(244, 164, 184, 0.50);
+
+  /* ─── fonts ─── */
+  --font-display-cn: "PingFang SC", "Noto Sans SC", "Source Han Sans SC",
+                     "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-display-en: "Nunito", "Montserrat", "Helvetica Neue",
+                     -apple-system, sans-serif;
+  --font-body:       "Nunito", "PingFang SC", "Noto Sans SC",
+                     -apple-system, sans-serif;
+  --font-mono:       "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  --font-features:   "tnum", "ss01";
+
+  /* ─── motion: playful, overshoot ≤ 2 ─── */
+  --dur-base:       520ms;
+  --dur-slow:       850ms;
+  --dur-cinematic:  1250ms;
+
+  /* ─── design identity ─── */
+  --r-card:        24px;
+  --r-stage:       0;
+  --rule-w:        2px;
+  --rule-style:    solid;
+  --hero-num-font:    var(--font-display-en);
+  --hero-num-style:   normal;
+  --hero-num-weight:  900;
+  --hero-num-track:   -0.02em;
+  --stage-pad-x:   120px;
+  --stage-pad-y:   88px;
+
+  /* ─── surfaces ─── */
+  --card-shadow:   6px 4px 0 rgba(91, 75, 110, 0.10);
+  --card-glass-bg:     rgba(255, 255, 255, 0.50);
+  --card-glass-border: rgba(91, 75, 110, 0.12);
+  --shadow-stage:  0 40px 120px rgba(91, 75, 110, 0.18);
+
+  /* ─── decoration: 柔和呼吸光晕 + 粉/薄荷气泡 ─── */
+  --surface-vignette:
+    radial-gradient(90% 70% at 22% 20%,
+      rgba(244, 164, 184, 0.16) 0%,
+      transparent 60%),
+    radial-gradient(80% 65% at 82% 82%,
+      rgba(184, 224, 210, 0.18) 0%,
+      transparent 62%);
+}

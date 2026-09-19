@@ -28,7 +28,7 @@ func newStoryboardAgent(deps *types.WorkerDeps, req *types.Request) (*types.Agen
 		WithOptions(
 			chat.WithModel(cfg.Model),
 			chat.WithThinking(cfg.ModelProvider, false),
-			chat.WithMaxTokens(16384),
+			chat.WithMaxTokens(32000),
 		).
 		Build(req)
 }

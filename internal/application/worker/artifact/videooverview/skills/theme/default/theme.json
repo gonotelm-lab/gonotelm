@@ -1,0 +1,26 @@
+{
+  "id": "default",
+  "name": "Soft & Balanced",
+  "nameZh": "柔和平衡",
+  "description": "Warm cream paper stage with a flat hand-drawn feel, moderate whitespace and a single terracotta accent. Warm and educational.",
+  "descriptionZh": "扁平手绘感、米色/奶油纸张底、温暖教育向。",
+  "mood": ["light", "warm", "paper", "editorial", "soft", "balanced"],
+  "bestFor": [
+    "通用知识讲解",
+    "产品 / 概念介绍",
+    "人文 / 生活方式内容",
+    "需要温暖质感的内容"
+  ],
+  "preview": {
+    "shell": "#f3ecdc",
+    "surface": "#faf6ec",
+    "text": "#3d405b",
+    "accent": "#e07a5f"
+  },
+  "guidance": {
+    "fonts": "标题 `Montserrat` 800 / `Playfair Display` 700；正文 `Inter` 400；数据 `IBM Plex Mono` 700",
+    "composition": "扁平手绘感、温和留白、圆角适中（8–16px）；主标题 64–110px",
+    "motion": "舒缓有呼吸感，入场 `power3.out` 0.4–0.6s；环境动效用径向光晕 / 细线漂移",
+    "expression": "暖米底 + tile 半阶面（`surface-2` 低透明或 `text` 淡染）；一帧只有一个 accent 电压（CTA / 链接 / 整条色带，不同时两个）。发丝级 elevation：1px 12% 墨描边 + 至多一个暖阴影；`✱` 做区域 kicker。数字 = serif 数字 + mono 单位；一个 sun bloom（42–70% 画幅、偏心）+ 对角 ember counter-bloom（15–22%）；1px 发丝线是唯一边框；右下角页码。"
+  }
+}

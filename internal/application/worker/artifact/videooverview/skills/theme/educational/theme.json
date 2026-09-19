@@ -1,0 +1,26 @@
+{
+  "id": "educational",
+  "name": "Sharp & Educational",
+  "nameZh": "锐利科普",
+  "description": "Textbook science on a clean stage: high contrast, geometric partitioning, crisp grid lines. Cool, precise, easy to read.",
+  "descriptionZh": "教科书科普：高对比、几何分区清晰、冷静易读。",
+  "mood": ["light", "sharp", "geometric", "data-first", "calm"],
+  "bestFor": [
+    "知识科普 / 概念讲解",
+    "教程 / 操作步骤",
+    "数据 / 指标解读",
+    "开发者向技术分享"
+  ],
+  "preview": {
+    "shell": "#eef2f6",
+    "surface": "#f8fafc",
+    "text": "#1e293b",
+    "accent": "#0d9488"
+  },
+  "guidance": {
+    "fonts": "标题 `Montserrat` 800–900；正文 `Inter` 400；数据 `IBM Plex Mono` 700",
+    "composition": "直角（0–4px）、几何分区、清晰网格线；主标题 64–110px，正文 28–36px",
+    "motion": "克制精确，入场 `power3.out` 0.3–0.5s；环境动效用网格线脉冲 / 路径生长",
+    "expression": "卡片：4% accent 淡染底 + 20% accent 的 1.5px 边框 + 无阴影（直角 0–4px 保持）。文字三档：近黑标题 / 中性正文 / 浅三级；accent 只用于 eyebrow、数字、进度、图表。底部 3px 进度条随镜序生长；步骤圆点透明度阶梯 1.0 → 0.85 → 0.7 → 0.55。网格纸：~2cqw 单元、accent 10%、2–4px 线（防 H.264 摩尔纹）；装饰环只在封面 / 结尾。"
+  }
+}

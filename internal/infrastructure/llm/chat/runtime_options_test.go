@@ -147,7 +147,7 @@ func TestDeepSeekUsingOpenAI(t *testing.T) {
 			BaseURL:      "https://api.deepseek.com",
 			DefaultModel: "deepseek-flash",
 		},
-	}, nil)
+	}, nil, defaultRecordTruncate)
 	if err != nil {
 		t.Fatal(err)
 	}

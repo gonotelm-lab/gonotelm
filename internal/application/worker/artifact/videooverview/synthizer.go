@@ -31,9 +31,13 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/safe"
 )
 
+// audioCheckpointVersion 音频产物缓存版本；朗读规则变化时递增，使旧音频失效并重新合成。
+const audioCheckpointVersion = 2
+
 // audioCheckpointMeta 持久化到 checkpoint.field2
 type audioCheckpointMeta struct {
-	Parts []audioLinePart `json:"parts"` // 逐句音频
+	Version int             `json:"version"`
+	Parts   []audioLinePart `json:"parts"` // 逐句音频
 }
 
 func (m *audioCheckpointMeta) sortedAudioParts() []audioLinePart {
@@ -284,7 +288,7 @@ func (s *audioSynthizer) synthesizeOneLine(
 		Model:       s.model,
 		Text:        line.Text,
 		Voice:       job.voice,
-		Language:    text2audio.AudioLang(string(job.payload.GetLanguage())),
+		Language:    text2audio.ResolveLineLanguage(line.Text, text2audio.AudioLang(string(job.payload.GetLanguage()))),
 		Instruction: line.VoiceInstruction,
 	}
 
@@ -418,11 +422,17 @@ func (s *audioSynthizer) snapshotAudioCheckpoint(ckpt *workerentity.Checkpoint, 
 
 func (s *audioSynthizer) restoreAudioMeta(ckpt *workerentity.Checkpoint) *audioCheckpointMeta {
 	if ckpt == nil || len(ckpt.Field2) == 0 {
-		return &audioCheckpointMeta{}
+		return &audioCheckpointMeta{Version: audioCheckpointVersion}
 	}
 	var meta audioCheckpointMeta
 	if err := sonic.Unmarshal(ckpt.Field2, &meta); err != nil {
-		return &audioCheckpointMeta{}
+		return &audioCheckpointMeta{Version: audioCheckpointVersion}
+	}
+	if meta.Version != audioCheckpointVersion {
+		slog.Warn("video audio checkpoint version mismatch, regenerate all lines",
+			slog.Int("cached_version", meta.Version),
+			slog.Int("current_version", audioCheckpointVersion))
+		return &audioCheckpointMeta{Version: audioCheckpointVersion}
 	}
 	return &meta
 }

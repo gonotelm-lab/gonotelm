@@ -19,9 +19,11 @@ description: 镜内动画配方与手艺：转场、入场、三段结构、机�
 
 - 子 composition 内：`tl.fromTo(el, { from }, { to, duration, ease }, 0.1~0.3)`（局部时间）。
 - 缓动：入场用 `.out`（`power3.out` / `expo.out` / `power4.out`），退场用 `.in`，位移之间 `.inOut`。
-- 方向要变化：不要所有元素都 `y:30, opacity:0`；交替从左、从右、缩放、纯透明度。
+- 方向要变化：不要所有元素都 `y:30, opacity:0`；交替从左、从右、缩放、纯透明度、字距展开。
 - 错峰：一组元素 `items × stagger ≤ 0.5s`；按重要性排序。
 - 速度有对比：快 0.15–0.3s / 中 0.3–0.5s / 慢 0.5–0.8s。
+- **T 型分工**：标题与内容卡入场方向错开（标题自上落下、卡自两翼入），入场方向即版式分工，天然不撞。
+- **入场即层级（Motion is typography）**：主焦点用快 / 重的入场（短距离、`expo.out`），从属用轻 / 慢——入场方式携带层级信息，防全屏同速乱入。
 
 ## 每镜三段（默认都要有）
 
@@ -42,6 +44,7 @@ description: 镜内动画配方与手艺：转场、入场、三段结构、机�
 - `IDLE_START ≥ 入场落定 + 0.1s`；用 `ease:"none"` 的相位 proxy，从 `sin(0)=0` 起，**叠加**到入场终态（不要另起 `fromTo` 覆盖入场结果）。
 - 长镜（>6s 或 >30% 镜长）：幅度减半、周期放到 3–4s，并加 **settle-and-fade 尾巴**（最后 ~20% 把包络降到 0），让转场前画面停稳。
 - **禁** CSS `@keyframes` 做 idle（浏览器时钟与 seek 时钟不同步）。
+- **所有装饰动效有限且在本镜窗口内收尾**（最后一段循环结束 ≤ 本镜时长 − 0.1s）——转场发生时背景必须停稳，不许抢戏。
 
 ## 动画配方库（可直接复制；时间为**子 composition 局部时间**，从 0 起）
 
@@ -175,9 +178,10 @@ tl.to("#el-shot-Last", { opacity: 0, duration: 0.6, ease: "power1.in" }, TOTAL -
 - **路径生长 / 描边**：setup 时 `getTotalLength()` 量长度，`strokeDasharray = len`、`strokeDashoffset = len`，再 tween 到 0；描边图形 CSS 必须 `fill: none`（否则填充立即出现，毁掉描画）；复杂路径长度不准时略放大 `len × 1.05`；圆环先 `rotate(-90deg)` 让描边从 12 点开始。分段描边每段 `0.3–0.8s`，后一段时长取前一段的 70–80%，`power2.out`（禁 `back`/`elastic`）；先描边后填充（`fillOpacity 0→1`）；虚线流动的偏移取 dash 周期的整数倍。**连接线两端必须落在真实元素上**且承担揭示 / 路由 / 验证 / 强调，只装饰空白的线删掉。
 - **图标 / 示意件「活起来」**（4 式）：旋转（`rotate(deg cx cy)`，分针 0.5–2 圈 / 秒针 4–10 圈，别落在整数圈）；摆动（对置两组 `rotate(±sin·amp)`，符号相反）；脉冲（`scale(1+sin·amp)` + opacity，外环相位滞后内点 π/2，振幅 0.05–0.20）；虚线流动（`strokeDashoffset` 线性，偏移取 dash 周期整数倍，负值 L→R）。**坑**：绕指定中心旋转必须用 `el.setAttribute("transform", "rotate(deg cx cy)")`，CSS `transform-origin` + `transform-box: fill-box` 对细线会绕错中心。多部件相位错开（如秒针快于分针、外环滞后内点 π/2）。禁 `requestAnimationFrame`，连续动作用时间线上的线性 proxy。
 - **SVG 中心变换（GSAP）**：绕内部点旋转 / 缩放优先用 `svgOrigin`（viewBox 全局坐标）；`svgOrigin` 与 `transformOrigin` 不能同元素并用；构建时间线前先让 SVG 挂载且有尺寸（detached / 0 尺寸时几何解析为 0）。
-- **连线网络（avatar cloud）**：一个 `<svg viewBox="0 0 1920 1080">` 覆盖画布，JS 用 `createElementNS` 注入 `<line>` 连接节点对；节点错峰 pop，线段 dash 描画，端点吸附节点边缘。
+- **连线网络（avatar cloud）**：一个 `<svg viewBox="0 0 1920 1080">` 覆盖画布，JS 用 `createElementNS` 注入 `<line>` 连接节点对；节点错峰 pop，线段 dash 描画，端点吸附节点边缘；头像环 8–12 个、单体 80–120px、径向 20–30%W × 18–25%H，环须容纳全部且不重叠；连线终止于 hub 边缘（hub z 在线上）；成网后 dwell ≥1s。
 - **流程图 / 连接线**：节点 + 连接线；连线端点吸附节点边缘，箭头用 `marker-end`（`refX` / `refY` / `orient="auto"` 设对），别让箭头脱离线。
 - **数字 / 数据**：数字与 scale 共用同一 timeline 位置；柱用 `scaleY`、进度条用 `scaleX` 从 0 生长；数字用 `tabular-nums` + `Math.round`。
+- **数据默认单焦点**：数字英雄居中 OR 左数右图，二选一；分屏只在分镜点名时用，别在一镜里混两种统计版式。
 - **对撞 / 替换**：入场元素驱动退场元素（同一 timeline 位置的三条并发 tween），退场元素时长取入场元素的 40–50%。
 - **整组推挤 / 位移**：慢-快-慢三段：入段 `power3.in`（10% 距离 / 20% 时间）→ 爆发 linear（65% / 18%）→ 尾段 `power4.out`（25% / 62%）；尾段**时间** ≥ 3× 入段（不够就延长尾段时间，不是距离）；在爆发段揭示新内容（爆发会遮住出现）。
 - **下划线 / 圈画 / 涂高**：用 `scaleX` 从 0 生长的规则线，或 SVG 描边；强调笔触跟随关键词，不整句乱画。
@@ -198,6 +202,20 @@ tl.to("#el-shot-Last", { opacity: 0, duration: 0.6, ease: "power1.in" }, TOTAL -
 - 权重表：锚点 / 重词 `Y 60–80px`、`0.16–0.20s`；普通词 `Y 40–50px`、`0.13–0.16s`；轻词 / 标点 `Y 30–48px`、`0.10–0.13s`。
 - ease 用 `power4.out`（更 snap 用 `expo.out`）；**禁**入场用 `.inOut`。
 - **透明度是二值的**：元素初始 `opacity: 0`，用 `tl.set` 在入场点切成 1 再 tween 位移，不要用 fade 到达（fade 会削弱砸入感）。
+
+## 层计划（多元素防遮挡）
+
+- 每个可见元素在 `<style>` 里给**静态** `z-index`（不进 GSAP；`gsap_non_transform_motion` 只查动画属性，静态 z 放行）。
+- 分层带：背景装饰 `0-9` / 底层卡片 `10-19` / 主体内容 `20-29` / 强调与标签 `30-49` / 覆盖层 `50+`。
+- 同 z 下渲染按 DOM 顺序绘制：**后出现的元素没给 z 就默认盖住先出现的**——这是浏览器默认行为，不是 bug；要改变就得显式分层（官方契约：画面层级用 CSS `z-index` 控制）。
+- **先出现即视觉主角**（choreography is hierarchy）：先出现的元素若要持续可见，其 z 高于后出现的元素；后到的元素想压住先来的，必须刻意拨高 z（`reactive-displacement` 里 intruder 显式 z 在上，不然像穿透），否则错开放置或给低层。
+- 元素空间重叠时自问三句：是不是故意的？谁在上？被盖的是不是关键文字（是→改布局或降 z；装饰→`data-layout-ignore`；刻意文字叠放→`data-layout-allow-overlap` 标在参与叠放的文字块上）。
+
+## 装配与拥挤防治（多元素共存）
+
+- **密阵直入槽位**：8+ 项的阵列（Logo 墙 / 特征墙 / 收益列表）禁止共享中心爆发入场——各自短程直入最终槽位，装配动画与最终布局解耦，密集阵列永远清楚。
+- **焦点槽 + 按位置渐暗**：长列表 / 轮换永远只有一个「亮槽」：新行弹入高亮焦点槽，离槽的邻行按位置降透明度 / 缩小，一步一拍——列表再长眼睛也有落点。
+- **骨架 → 真数据**：先把灰色骨架条逐行填充（左→右、带头尖），完成瞬间换成真实数值 / 头像 chip——「数据正在发生」比空等数字专业。
 
 ## 内容驱动序列（列表 / 多句口播）
 
@@ -225,6 +243,7 @@ tl.to("#el-shot-Last", { opacity: 0, duration: 0.6, ease: "power1.in" }, TOTAL -
 - 共享一个 `BEATS[]` 节拍数组，句子与节奏装饰都读它；每句入场动作不同（scale+blur 砸入 / 侧向 snap / 上升旋转），全片 ≥3 种 ease。
 - 入场 0.35–0.6s；退场 ≤0.25s；BEATS 间隔 1.2–1.8s（<0.8 太赶，>2.5 掉拍）；显示字号 150px+（中文用 120–200px + 字重 / 字距补气势）。
 - 重复用 `Math.max(0, Math.floor(holdDur / cycle) - 1)`；`Math.ceil` 会越过 `data-duration` 触发 lint。
+- **一屏一事、旧内容零残留**：每个全屏节拍独占画面，到达即清；换词用瞬时硬切（无滚动 / 模糊），前一句不得残留、不得堆叠。
 
 ## 动画自检
 
@@ -232,4 +251,6 @@ tl.to("#el-shot-Last", { opacity: 0, duration: 0.6, ease: "power1.in" }, TOTAL -
 - [ ] 子文件动画结束时间 ≤ 本镜 `data-duration`（末镜退场除外，写在根上）；
 - [ ] 无裸 `gsap.to()` / `gsap.from()`；无 `repeat: -1`；
 - [ ] 无并发控制同一元素同一属性；每个装饰元素都有克制动效；
+- [ ] 所有可见元素有显式 `z-index`；先出现的元素未被后出现的盖住关键文字；
+- [ ] 装饰动效都在本镜窗口内收尾，转场时背景停稳；
 - [ ] 每个 `compositions/shot-NN.html` 已单独 check 通过。

@@ -25,7 +25,7 @@ var subagentToolParams *schema.ParamsOneOf
 const SubagentToolName = "Subagent"
 
 const (
-	defaultSubagentMaxRound    = 50
+	defaultSubagentMaxRound    = 15
 	defaultSubagentConcurrency = 3
 	defaultSubagentResultChars = 20000
 
@@ -42,14 +42,11 @@ func init() {
 	}
 }
 
-// SubagentConfig 描述 spawn 出来的子代理所共有的执行环境，数值项 <=0 时取默认值
 type SubagentConfig struct {
-	BaseLLM model.ToolCallingChatModel
-	Options []model.Option
-	// 为空时使用 defaultSubagentSystemPrompt，name/title 会追加到末尾
+	BaseLLM      model.ToolCallingChatModel
+	Options      []model.Option
 	SystemPrompt string
-	// 子代理启动时绑定的工具集，声明式，构造期校验
-	Tools map[string]tool.InvokableTool
+	Tools        map[string]tool.InvokableTool // 绑定到subagent上的工具
 
 	MaxRound       int
 	Timeout        time.Duration
@@ -60,7 +57,6 @@ type SubagentConfig struct {
 	Verbose bool
 }
 
-// SubagentTool 把一个自包含任务 spawn 到独立上下文窗口中执行，只把最终结果返回给父模型
 type SubagentTool struct {
 	llm          model.ToolCallingChatModel
 	options      []model.Option
@@ -77,7 +73,6 @@ type SubagentTool struct {
 	calls atomic.Int64
 }
 
-// NewSubagentTool 解析并校验配置，构造一个可绑定到任意 Agent 的 spawn 工具
 func NewSubagentTool(cfg SubagentConfig) (*SubagentTool, error) {
 	if cfg.BaseLLM == nil {
 		return nil, fmt.Errorf("base llm is required")
@@ -124,7 +119,6 @@ func NewSubagentTool(cfg SubagentConfig) (*SubagentTool, error) {
 
 var _ tool.InvokableTool = &SubagentTool{}
 
-// SubagentToolInput 就是一次 spawn，任务由主模型在调用时生成
 type SubagentToolInput struct {
 	Name   string `json:"name"   jsonschema:"title=subagent name,description=A short name the model gives to this subagent, used to identify it."`
 	Title  string `json:"title"  jsonschema:"title=subagent title,description=One sentence describing what this subagent is doing."`
@@ -264,7 +258,6 @@ func resolveSubagentTools(declared map[string]tool.InvokableTool) (map[string]to
 	return resolved, nil
 }
 
-// buildSubagentSystemPrompt 把配置的 system prompt 与本次 spawn 的 name/title 组合
 func buildSubagentSystemPrompt(systemPrompt, name, title string) string {
 	var builder strings.Builder
 	builder.Grow(len(systemPrompt) + len(name) + len(title) + 32)

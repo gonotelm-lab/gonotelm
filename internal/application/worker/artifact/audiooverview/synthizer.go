@@ -50,9 +50,13 @@ type synthesizedTurn struct {
 	Instruction string
 }
 
+// audioCheckpointVersion 音频产物缓存版本；朗读规则变化时递增，使旧音频失效并重新合成。
+const audioCheckpointVersion = 2
+
 // audioCheckpointMeta 持久化到 checkpoint.Field3，记录已成功合成并上传的逐段音频元信息，
 // 用于跨进程断点重试。
 type audioCheckpointMeta struct {
+	Version       int             `json:"version"`
 	NumChannels   uint16          `json:"num_channels"`
 	SampleRate    uint32          `json:"sample_rate"`
 	BitsPerSample uint16          `json:"bits_per_sample"`
@@ -424,10 +428,12 @@ func (s *audioSynthizer) synthesizeOneTurn(
 	}
 
 	ttsReq := &schema.Request{
-		Model:       s.model,
-		Text:        turn.Text,
-		Voice:       voice,
-		Language:    text2audio.AudioLang(string(job.payload.Language)),
+		Model: s.model,
+		Text:  turn.Text,
+		Voice: voice,
+		// 语种按本句内容决定：含英文的句子交给模型自动中英混读，
+		// 避免整句强制中文导致句中英文被按中文发音朗读。
+		Language:    text2audio.ResolveLineLanguage(turn.Text, text2audio.AudioLang(string(job.payload.Language))),
 		Instruction: turn.Instruction,
 	}
 
@@ -677,11 +683,17 @@ func (s *audioSynthizer) persistAudioCheckpoint(
 
 func restoreAudioMeta(ckpt *workerentity.Checkpoint) *audioCheckpointMeta {
 	if ckpt == nil || len(ckpt.Field3) == 0 {
-		return &audioCheckpointMeta{}
+		return &audioCheckpointMeta{Version: audioCheckpointVersion}
 	}
 	var meta audioCheckpointMeta
 	if err := sonic.Unmarshal(ckpt.Field3, &meta); err != nil {
-		return &audioCheckpointMeta{}
+		return &audioCheckpointMeta{Version: audioCheckpointVersion}
+	}
+	if meta.Version != audioCheckpointVersion {
+		slog.Warn("audio checkpoint version mismatch, regenerate all turns",
+			slog.Int("cached_version", meta.Version),
+			slog.Int("current_version", audioCheckpointVersion))
+		return &audioCheckpointMeta{Version: audioCheckpointVersion}
 	}
 
 	return &meta

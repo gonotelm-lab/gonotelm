@@ -243,5 +243,8 @@ func newHttpClient(timeout, responseHeaderTimeout time.Duration) *http.Client {
 		builder = builder.WithResponseHeaderTimeout(responseHeaderTimeout)
 	}
 
-	return builder.Build()
+	client := builder.Build()
+	client.Transport = &opencodeSessionTransport{next: client.Transport}
+
+	return client
 }

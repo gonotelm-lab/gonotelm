@@ -37,7 +37,7 @@ description: HyperFrames 合成契约与排错：文件架构、骨架、data �
   </head>
   <body>
     <template>
-      <script src="../vendor/gsap.browser.js"></script>
+      <script src="vendor/gsap.browser.js"></script>
       <style>
         /* 根必须用 #root，禁止用 class 给带 data-composition-id 的根设尺寸（lint: subcomposition_root_styled_by_class） */
         #root {
@@ -279,7 +279,8 @@ tl.to("#el", { scale: 1.05, duration: cycle, ease: "sine.inOut", yoyo: true, rep
 | `root_composition_missing_duration_source` | 根与子根都写死 `data-duration` |
 | `font_family_without_font_face` | 只用 §字体 的内置字体；中文用 `@font-face` 的 `"CJK"` |
 | `gsap_repeat_ceil_overshoot` | repeat 用 `Math.max(0, Math.floor(...) - 1)` |
-| `missing_gsap_script` | 根 `vendor/gsap.browser.js`；子 `../vendor/gsap.browser.js` |
+| `missing_gsap_script` | 根与**子文件**都用根相对 `vendor/gsap.browser.js`（子文件**不要**写 `../`） |
+| `invalid_parent_traversal_in_asset_path` | 任何资源路径都根相对；`../` 会被 Studio / 直播预览按项目根解析而 404 |
 | `duplicate_audio_track` | 重叠音频不要放同一 `data-track-index` |
 | `standalone_composition_wrapped_in_template` | `index.html` 根不要包 `<template>` |
 | `subcomposition_root_styled_by_class` | 子文件用 `#root` 设尺寸 |
@@ -363,7 +364,8 @@ hyperframes check --frame-check
 | `timed_element_missing_clip_class` | host 槽位加 `class="clip"` |
 | `root_composition_missing_duration_source` | 根 / 子根上写 `data-duration` |
 | `gsap_repeat_ceil_overshoot` | `repeat` 用 `Math.max(0, Math.floor(...) - 1)` |
-| `missing_gsap_script` | 根用 `vendor/gsap.browser.js`；子文件用 `../vendor/gsap.browser.js` |
+| `missing_gsap_script` | 根与子文件都用根相对 `vendor/gsap.browser.js`（子文件**不要** `../`） |
+| `invalid_parent_traversal_in_asset_path` | 资源一律根相对；所有 composition 以项目根为 base URL |
 | `duplicate_audio_track` | 重叠音频换一个 `data-track-index` 或去掉重叠 |
 | `gsap_timeline_registered_before_async_build` | 异步构建完后再注册 `window.__timelines[...]` |
 | `standalone_composition_wrapped_in_template` | 顶层 `index.html` 的根不要包 `<template>` |

@@ -24,7 +24,7 @@ description: 使用工作目录 components/ 里的现成动画片段：怎么挑
 ## 关键约束
 
 - 组件**没有自己的时间线**，参与宿主 composition 的时间轴；尺寸 / 时长继承宿主。
-- 宿主已加载本地 GSAP（子文件用 `../vendor/gsap.browser.js`）；组件里**没有** CDN 引用，也**不要**补任何外链。
+- 宿主已加载本地 GSAP（子文件也用根相对 `vendor/gsap.browser.js`，**不要** `../`）；组件里**没有** CDN 引用，也**不要**补任何外链。
 - 文案 / 颜色 / 尺寸按本片语言与五色盘替换；不要照搬示例文案。
 - 同一镜同类效果不要叠加；一个组件通常只用一次。
 - 并入后跑 `hyperframes check`；报错按 `skills/hyperframes-contract/SKILL.md` 处理。

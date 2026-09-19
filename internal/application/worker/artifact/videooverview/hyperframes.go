@@ -5,9 +5,11 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"maps"
 	"path"
 	"time"
 
+	einomodel "github.com/cloudwego/eino/components/model"
 	einotool "github.com/cloudwego/eino/components/tool"
 	einotoolutils "github.com/cloudwego/eino/components/tool/utils"
 	"golang.org/x/sync/errgroup"
@@ -19,6 +21,7 @@ import (
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	sandboxent "github.com/gonotelm-lab/gonotelm/internal/domain/sandbox/entity"
 	sandboxservice "github.com/gonotelm-lab/gonotelm/internal/domain/sandbox/service"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -40,6 +43,13 @@ const (
 
 const videoSandboxTTL = 3 * time.Hour
 
+const (
+	defaultShotSubagentConcurrency = 10
+	defaultShotSubagentMaxRound    = 40
+	defaultShotSubagentResultChars = 4000
+	defaultShotSubagentMaxTokens   = 65536
+)
+
 func videoSandboxResourceLimits() map[string]string {
 	cfg := conf.WorkerGlobal().Studio.VideoOverview
 	limits := map[string]string{
@@ -53,6 +63,13 @@ func videoSandboxResourceLimits() map[string]string {
 		limits["memory"] = cfg.SandboxMemory
 	}
 	return limits
+}
+
+func shotSubagentConcurrency() int {
+	if n := conf.WorkerGlobal().Studio.VideoOverview.GenerateSubagentConcurrency; n > 0 {
+		return n
+	}
+	return defaultShotSubagentConcurrency
 }
 
 func newHyperframesVideoGenerator(deps *types.WorkerDeps) *hyperframesVideoGenerator {
@@ -101,14 +118,25 @@ func (g *hyperframesVideoGenerator) generate(
 		return nil, errors.WithMessage(err, "infer check mp4 tool failed")
 	}
 
-	if err := agent.AppendTools(map[string]einotool.InvokableTool{
+	// 主 agent 与 subagent 共用这批工具；subagent 不再绑定 Subagent。
+	sandboxTools := map[string]einotool.InvokableTool{
 		tools.BashToolName:      tools.NewBashTool(sandbox, workspaceDir),
 		tools.ReadFileToolName:  tools.NewReadFileTool(sandbox),
 		tools.WriteFileToolName: tools.NewWriteFileTool(sandbox),
 		tools.EditFileToolName:  tools.NewEditFileTool(sandbox),
 		tools.ListDirToolName:   tools.NewListDirTool(sandbox),
 		checkMP4ValidToolName:   checkMP4Tool,
-	}); err != nil {
+	}
+
+	subagentConcurrency := shotSubagentConcurrency()
+	shotSubagentTool, err := g.getShotSubagentTool(ctx, payload, agent, workspaceDir, sandboxTools, subagentConcurrency)
+	if err != nil {
+		return nil, err
+	}
+
+	mainTools := maps.Clone(sandboxTools)
+	mainTools[tools.SubagentToolName] = shotSubagentTool
+	if err := agent.AppendTools(mainTools); err != nil {
 		return nil, errors.Wrap(err, "hyperframes agent append tools failed")
 	}
 
@@ -123,6 +151,7 @@ func (g *hyperframesVideoGenerator) generate(
 		outputLocation,
 		storyboardMarkdown,
 		renderAudioManifestMarkdown(workspaceDir, audioMeta),
+		subagentConcurrency,
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "render video generate prompt failed")
@@ -156,6 +185,53 @@ func (g *hyperframesVideoGenerator) generate(
 		StoreKey:    storeKey,
 		ContentType: mimeTypeMP4,
 	}, nil
+}
+
+func (g *hyperframesVideoGenerator) getShotSubagentTool(
+	ctx context.Context,
+	payload *artifactentity.VideoOverviewPayload,
+	agent *types.Agent,
+	workspaceDir string,
+	sandboxTools map[string]einotool.InvokableTool,
+	concurrency int,
+) (einotool.InvokableTool, error) {
+	systemPrompt, err := RenderVideoShotSubagentSystemPrompt(
+		ctx, payload.GetLanguage(), payload.GetVisualStyle(), workspaceDir,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	cfg := conf.WorkerGlobal().Studio.VideoOverview
+	maxRound := cfg.GenerateSubagentMaxRound
+	if maxRound <= 0 {
+		maxRound = defaultShotSubagentMaxRound
+	}
+
+	shotSubagentTool, err := tools.NewSubagentTool(tools.SubagentConfig{
+		BaseLLM: agent.BaseLLM(),
+		Options: []einomodel.Option{
+			chat.WithModel(cfg.Model),
+			chat.WithThinking(cfg.ModelProvider, false),
+			chat.WithMaxTokens(defaultShotSubagentMaxTokens), // subagent 节约token不要开thinking
+		},
+		SystemPrompt:   systemPrompt,
+		Tools:          sandboxTools,
+		MaxConcurrency: concurrency,
+		MaxRound:       maxRound,
+		MaxResultChars: defaultShotSubagentResultChars,
+		Verbose:        conf.WorkerGlobal().Worker.AgentVerbose,
+	})
+	if err != nil {
+		return nil, errors.WithMessage(err, "new shot subagent tool failed")
+	}
+
+	slog.InfoContext(ctx, "video shot subagent tool ready",
+		slog.Int("max_concurrency", concurrency),
+		slog.Int("max_round", maxRound),
+		slog.Int("tools", len(sandboxTools)),
+	)
+	return shotSubagentTool, nil
 }
 
 func (g *hyperframesVideoGenerator) ensureSandbox(ctx context.Context, req *types.Request) (sandboxent.Sandbox, error) {

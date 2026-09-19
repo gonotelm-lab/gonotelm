@@ -12,6 +12,8 @@ import (
 
 	pkgllm "github.com/gonotelm-lab/gonotelm/pkg/llm"
 
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
+
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/schema"
@@ -26,12 +28,13 @@ type fakeChatModel struct {
 
 	toolNames     [][]string // tool names passed to WithTools, one entry per call
 	systemPrompts []string   // system message content seen on each Generate
+	subagentFlags []bool     // context subagent flag seen on each Generate
 
 	beforeGenerate func()
 }
 
 func (m *fakeChatModel) Generate(
-	_ context.Context,
+	ctx context.Context,
 	input []*schema.Message,
 	_ ...model.Option,
 ) (*schema.Message, error) {
@@ -41,6 +44,8 @@ func (m *fakeChatModel) Generate(
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	m.subagentFlags = append(m.subagentFlags, pkgcontext.IsSubagent(ctx))
 
 	for _, msg := range input {
 		if msg.Role == schema.System {
@@ -93,9 +98,19 @@ func (m *fakeChatModel) recordedSystemPrompts() []string {
 	return out
 }
 
+func (m *fakeChatModel) recordedSubagentFlags() []bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := make([]bool, len(m.subagentFlags))
+	copy(out, m.subagentFlags)
+	return out
+}
+
 type fakeTool struct {
 	name  string
 	calls atomic.Int64
+	// 记录调用时 ctx 是否带 subagent 标记
+	subagentCtx atomic.Bool
 }
 
 func (t *fakeTool) Info(context.Context) (*schema.ToolInfo, error) {
@@ -106,8 +121,11 @@ func (t *fakeTool) Info(context.Context) (*schema.ToolInfo, error) {
 	}, nil
 }
 
-func (t *fakeTool) InvokableRun(context.Context, string, ...tool.Option) (string, error) {
+func (t *fakeTool) InvokableRun(ctx context.Context, _ string, _ ...tool.Option) (string, error) {
 	t.calls.Add(1)
+	if pkgcontext.IsSubagent(ctx) {
+		t.subagentCtx.Store(true)
+	}
 	return "tool-ok", nil
 }
 
@@ -377,6 +395,40 @@ func TestSubagentToolSystemPromptCarriesNameAndTitle(t *testing.T) {
 			}
 		}
 	})
+}
+
+// TestSubagentToolMarksSubagentContext 验证子代理链路上的 llm 调用与工具调用都能
+// 从 ctx 读到 subagent 标记，且父 ctx 不被污染（日志与 llm record 依赖该标记）
+func TestSubagentToolMarksSubagentContext(t *testing.T) {
+	llm := newFakeModel(
+		toolCallMessage("T", `{}`),
+		stopMessage("ok"),
+	)
+	declaredTool := &fakeTool{name: "T"}
+	subagentTool := mustNewTool(t, testConfig(llm, map[string]tool.InvokableTool{"T": declaredTool}))
+
+	parentCtx := context.Background()
+	if _, err := subagentTool.InvokableRun(parentCtx, `{"name":"n","title":"t","prompt":"p"}`); err != nil {
+		t.Fatalf("InvokableRun: %v", err)
+	}
+
+	flags := llm.recordedSubagentFlags()
+	if len(flags) == 0 {
+		t.Fatal("expected subagent llm calls")
+	}
+	for i, flag := range flags {
+		if !flag {
+			t.Fatalf("llm call %d not marked as subagent", i)
+		}
+	}
+
+	if !declaredTool.subagentCtx.Load() {
+		t.Fatal("subagent tool call not marked as subagent")
+	}
+
+	if pkgcontext.IsSubagent(parentCtx) {
+		t.Fatal("parent context must not be marked as subagent")
+	}
 }
 
 // TestSubagentToolToolsSurviveAcrossRuns 回归 NewFinalRoundHook -> StripTools() -> clear(map)

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	pkgagent "github.com/gonotelm-lab/gonotelm/pkg/agent"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	pkstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 
 	"github.com/bytedance/sonic"
@@ -198,6 +199,8 @@ func (t *SubagentTool) run(ctx context.Context, name, title, prompt string) (str
 		ctx, cancel = context.WithTimeout(ctx, t.timeout)
 		defer cancel()
 	}
+
+	ctx = pkgcontext.WithSubagent(ctx)
 
 	ag := pkgagent.New(pkgagent.Config[struct{}]{
 		MaxRound: t.maxRound,

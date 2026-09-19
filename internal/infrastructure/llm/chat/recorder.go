@@ -18,6 +18,7 @@ const (
 	RecordMetaStreaming  = "streaming"
 	RecordMetaThinking   = "thinking"
 	RecordMetaJSONObject = "json_object"
+	RecordMetaSubagent   = "subagent"
 )
 
 const (
@@ -269,6 +270,9 @@ func buildRecord(ctx context.Context, endTime time.Time) *Record {
 		metadatas[RecordMetaThinking] = thinking
 	}
 	metadatas[RecordMetaJSONObject] = getJSONObject(ctx)
+	if pkgcontext.IsSubagent(ctx) {
+		metadatas[RecordMetaSubagent] = true
+	}
 
 	return &Record{
 		Provider:  getProvider(ctx),

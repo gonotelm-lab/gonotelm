@@ -149,6 +149,7 @@ func (b *ExploreAgentBuilder) Build(req *Request) (*Agent, error) {
 type AgentStep[T any] struct {
 	agent       *Agent
 	name        string
+	duty        string
 	maxRetry    int
 	plainOutput bool
 	rules       func(error) []string
@@ -156,10 +157,11 @@ type AgentStep[T any] struct {
 }
 
 // AgentStepBuilder 链式收集步骤配置，未设置项使用默认值：
-// Retry=1、PlainOutput=false、Rules=无额外约束。
+// Retry=1、PlainOutput=false、Rules=无额外约束、Duty=空。
 type AgentStepBuilder[T any] struct {
 	agent       *Agent
 	name        string
+	duty        string
 	parse       func(context.Context, string) (T, error)
 	maxRetry    int
 	plainOutput bool
@@ -192,6 +194,12 @@ func (b *AgentStepBuilder[T]) WithPlainOutput(plain bool) *AgentStepBuilder[T] {
 	return b
 }
 
+// WithDuty sets this step's duty, injected at the top of every compensate message.
+func (b *AgentStepBuilder[T]) WithDuty(duty string) *AgentStepBuilder[T] {
+	b.duty = duty
+	return b
+}
+
 func (b *AgentStepBuilder[T]) WithRules(rules func(error) []string) *AgentStepBuilder[T] {
 	if rules != nil {
 		b.rules = rules
@@ -203,6 +211,7 @@ func (b *AgentStepBuilder[T]) Build() AgentStep[T] {
 	return AgentStep[T]{
 		agent:       b.agent,
 		name:        b.name,
+		duty:        b.duty,
 		maxRetry:    b.maxRetry,
 		plainOutput: b.plainOutput,
 		rules:       b.rules,
@@ -231,14 +240,15 @@ func (s AgentStep[T]) Run(ctx context.Context, msgs []*einoschema.Message) (T, e
 		return parsed, nil
 	}
 
-	return s.compensate(ctx, output.Content, err)
+	return s.compensate(ctx, err)
 }
 
-// compensate 解析失败后带着重新约束继续对话，直至解析成功或耗尽重试次数。
-func (s AgentStep[T]) compensate(ctx context.Context, firstContent string, firstErr error) (T, error) {
+// compensate re-prompts on parse failure until success or retries are exhausted.
+// The previous output stays in the agent context (React accumulates messages), so
+// the compensate message only carries the step duty and the parse error.
+func (s AgentStep[T]) compensate(ctx context.Context, firstErr error) (T, error) {
 	var zero T
-	lastContent, lastErr := firstContent, firstErr
-	msgs := append([]*einoschema.Message{}, s.agent.AccumulatedMessages()...)
+	lastErr := firstErr
 
 	for attempt := 1; attempt <= s.maxRetry; attempt++ {
 		slog.WarnContext(ctx, "agent output invalid, compensating",
@@ -249,14 +259,14 @@ func (s AgentStep[T]) compensate(ctx context.Context, firstContent string, first
 			slog.Any("usage", s.agent.TokenUsage()),
 		)
 
-		compensateMsgs := append([]*einoschema.Message{}, msgs...)
+		var compensateMsg *einoschema.Message
 		if s.plainOutput {
-			compensateMsgs = append(compensateMsgs, BuildCompensatePlainMessage(lastContent, s.rules(lastErr)))
+			compensateMsg = BuildCompensatePlainMessage(s.duty, s.rules(lastErr))
 		} else {
-			compensateMsgs = append(compensateMsgs, BuildCompensateMessage(lastContent, s.rules(lastErr)))
+			compensateMsg = BuildCompensateMessage(s.duty, s.rules(lastErr))
 		}
 
-		llmResp, genErr := s.agent.BaseLLM().Generate(ctx, compensateMsgs, s.agent.Options()...)
+		llmResp, genErr := s.agent.React(ctx, []*einoschema.Message{compensateMsg})
 		if genErr != nil {
 			return zero, errors.WithMessagef(errors.ErrLLM, "%s compensate generate failed on attempt %d, err=%v", s.name, attempt, genErr)
 		}
@@ -266,12 +276,7 @@ func (s AgentStep[T]) compensate(ctx context.Context, firstContent string, first
 			return parsed, nil
 		}
 
-		lastContent = llmResp.Content
 		lastErr = err
-		msgs = append(compensateMsgs, &einoschema.Message{
-			Role:    einoschema.Assistant,
-			Content: lastContent,
-		})
 	}
 
 	return zero, errors.WithMessagef(errors.ErrLLM, "%s agent output invalid after %d retries, err=%v", s.name, s.maxRetry, lastErr)

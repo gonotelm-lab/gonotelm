@@ -103,6 +103,7 @@ func (g *transcriptGenerator) generate(
 		WithParse(func(ctx context.Context, content string) (*podcastTranscriptExpectation, error) {
 			return g.parse(ctx, content, outline)
 		}).
+		WithDuty("Produce the JSON podcast transcript (title/segments) matching the outline, based on the given source content").
 		WithRules(g.compensateRules).
 		Build()
 	return step.Run(ctx, msgs)
@@ -111,10 +112,6 @@ func (g *transcriptGenerator) generate(
 func (g *transcriptGenerator) compensateRules(error) []string {
 	return []string{
 		"JSON must contain only `title` and `segments`",
-		"`title` must match the outline title",
-		"`segments` count must match the outline; each element has `name` and `dialogue`",
-		"`dialogue` is an array; each element has `speaker`, `text`, and `voice_instruction`",
-		"`voice_instruction` is a voice direction",
 	}
 }
 
@@ -169,7 +166,6 @@ func (g *transcriptGenerator) parse(
 			slog.DebugContext(ctx,
 				"podcast transcript direct unmarshal did not match, fallback to json extraction",
 				slog.String("err", types.TruncateForLog(err.Error())),
-				slog.String("raw_content", types.TruncateForLog(content)),
 			)
 		},
 	}

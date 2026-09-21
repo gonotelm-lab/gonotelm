@@ -63,6 +63,7 @@ func (g *flashcardGenerator) generate(
 
 	step := types.NewAgentStepBuilder[*flashcardExpectation](ag, "flashcard").
 		WithParse(g.parse).
+		WithDuty("Produce the JSON flashcards (title/flashcard) based on the given source content").
 		WithRules(flashcardCompensateRules).
 		Build()
 	return step.Run(ctx, msgs)
@@ -71,9 +72,6 @@ func (g *flashcardGenerator) generate(
 func flashcardCompensateRules(error) []string {
 	return []string{
 		"JSON must contain only `title` and `flashcard`",
-		"`flashcard` must contain only a `cards` array",
-		"each card must include `front`, `back`, and `hint`; `front` and `back` must be non-empty",
-		"`title` length preferably 10-30 characters",
 	}
 }
 
@@ -88,8 +86,7 @@ func (g *flashcardGenerator) parse(ctx context.Context, content string) (*flashc
 		DisallowUnknownFields: true,
 		LogOnDirectFailure: func(err error, _ []byte) {
 			slog.DebugContext(ctx, "flashcard direct unmarshal did not match, fallback to json extraction",
-				slog.String("err", types.TruncateForLog(err.Error())),
-				slog.String("raw_content", types.TruncateForLog(content)))
+				slog.String("err", types.TruncateForLog(err.Error())))
 		},
 	}
 	if err := decoder.Unmarshal(pkgstring.AsBytes(content), &expect); err != nil {

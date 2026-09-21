@@ -53,6 +53,7 @@ func (g *reportGenerator) generate(
 	step := types.NewAgentStepBuilder[*reportExpectation](ag, "report").
 		WithParse(g.parse).
 		WithRetry(reportMaxCompensateRetry).
+		WithDuty("Produce the JSON report (title/report) based on the given source content").
 		WithRules(reportCompensateRules).
 		Build()
 	return step.Run(ctx, msgs)
@@ -61,8 +62,6 @@ func (g *reportGenerator) generate(
 func reportCompensateRules(validateErr error) []string {
 	rules := []string{
 		"JSON must contain only `title` and `report`",
-		"`title` is a single-line title, preferably 10-25 characters",
-		"`report` is the Markdown report body; newlines inside it must be escaped as \\n",
 	}
 	if validateErr != nil {
 		rules = append(rules, "Previous validation error: "+validateErr.Error())
@@ -81,8 +80,7 @@ func (g *reportGenerator) parse(ctx context.Context, content string) (*reportExp
 		DisallowUnknownFields: true,
 		LogOnDirectFailure: func(err error, _ []byte) {
 			slog.DebugContext(ctx, "report direct unmarshal did not match, fallback to json extraction",
-				slog.String("err", types.TruncateForLog(err.Error())),
-				slog.String("raw_content", types.TruncateForLog(content)))
+				slog.String("err", types.TruncateForLog(err.Error())))
 		},
 	}
 	if err := decoder.Unmarshal(pkgstring.AsBytes(content), &expect); err != nil {

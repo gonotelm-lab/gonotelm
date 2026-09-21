@@ -81,6 +81,7 @@ func (g *outlineGenerator) generate(
 
 	step := types.NewAgentStepBuilder[*podcastOutlineExpectation](ag, "podcast outline").
 		WithParse(g.parse).
+		WithDuty("Produce the JSON podcast outline (title/segments) based on the given source content").
 		WithRules(g.compensateRules).
 		Build()
 	return step.Run(ctx, msgs)
@@ -89,8 +90,6 @@ func (g *outlineGenerator) generate(
 func (g *outlineGenerator) compensateRules(error) []string {
 	return []string{
 		"JSON must contain only `title` and `segments`",
-		"`title` should be short and concise",
-		"`segments` is an array; each element has `name` and `content`",
 	}
 }
 
@@ -141,7 +140,6 @@ func (g *outlineGenerator) parse(ctx context.Context, content string) (*podcastO
 			slog.DebugContext(ctx,
 				"podcast outline direct unmarshal did not match, fallback to json extraction",
 				slog.String("err", types.TruncateForLog(err.Error())),
-				slog.String("raw_content", types.TruncateForLog(content)),
 			)
 		},
 	}

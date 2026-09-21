@@ -47,6 +47,7 @@ func (g *dataTableGenerator) generate(
 	step := types.NewAgentStepBuilder[*dataTableExpectation](ag, "datatable").
 		WithParse(g.parse).
 		WithRetry(dataTableMaxCompensateRetry).
+		WithDuty("Produce the JSON data table (title/table) based on the given source content").
 		WithRules(dataTableCompensateRules).
 		Build()
 	return step.Run(ctx, msgs)
@@ -55,10 +56,6 @@ func (g *dataTableGenerator) generate(
 func dataTableCompensateRules(validateErr error) []string {
 	rules := []string{
 		"JSON must contain only `title` and `table`",
-		"`title` is a single-line title, preferably 10-25 characters",
-		"`table` is one GFM Markdown pipe table; newlines inside it must be escaped as \\n",
-		"`table` must include a header row, a separator row (---|---), and at least one data row",
-		"All rows must have the same column count; no paragraphs/headings/lists outside the table",
 	}
 	if validateErr != nil {
 		rules = append(rules, "Previous failure reason: "+validateErr.Error())
@@ -77,8 +74,7 @@ func (g *dataTableGenerator) parse(ctx context.Context, content string) (*dataTa
 		DisallowUnknownFields: true,
 		LogOnDirectFailure: func(err error, _ []byte) {
 			slog.DebugContext(ctx, "datatable direct unmarshal did not match, fallback to json extraction",
-				slog.String("err", types.TruncateForLog(err.Error())),
-				slog.String("raw_content", types.TruncateForLog(content)))
+				slog.String("err", types.TruncateForLog(err.Error())))
 		},
 	}
 	if err := decoder.Unmarshal(pkgstring.AsBytes(content), &expect); err != nil {

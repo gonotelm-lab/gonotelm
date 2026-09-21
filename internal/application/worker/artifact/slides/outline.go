@@ -79,6 +79,7 @@ func (g *outlineGenerator) generate(
 	step := types.NewAgentStepBuilder[*slidesOutlineExpectation](ag, "slides outline").
 		WithParse(g.parse).
 		WithRetry(slidesMaxCompensateRetry).
+		WithDuty("Produce the JSON PPT outline (title/outline) based on the given source content").
 		WithRules(slidesOutlineCompensateRules).
 		Build()
 	return step.Run(ctx, msgs)
@@ -87,8 +88,6 @@ func (g *outlineGenerator) generate(
 func slidesOutlineCompensateRules(validateErr error) []string {
 	rules := []string{
 		"JSON must contain only `title` and `outline`",
-		"`title` is the PPT title, preferably 10-30 characters",
-		"`outline` is a Markdown outline string",
 	}
 	if validateErr != nil {
 		rules = append(rules, "Error: "+validateErr.Error())
@@ -142,8 +141,7 @@ func (g *outlineGenerator) parse(ctx context.Context, content string) (*slidesOu
 		DisallowUnknownFields: true,
 		LogOnDirectFailure: func(err error, _ []byte) {
 			slog.DebugContext(ctx, "slides outline direct unmarshal did not match, fallback to json extraction",
-				slog.String("err", types.TruncateForLog(err.Error())),
-				slog.String("raw_content", types.TruncateForLog(content)))
+				slog.String("err", types.TruncateForLog(err.Error())))
 		},
 	}
 	if err := decoder.Unmarshal(pkgstring.AsBytes(content), &expect); err != nil {

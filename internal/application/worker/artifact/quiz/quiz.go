@@ -47,12 +47,6 @@ func newQuizGenerator(deps *types.WorkerDeps) *quizGenerator {
 func quizCompensateRules(validateErr error) []string {
 	rules := []string{
 		"JSON must contain only `title` and `quiz`",
-		"`quiz` must include `questions`, `themes`, and `follow_up_hint`",
-		"each question must have exactly 4 non-empty `options`",
-		"`answer_index` must be non-empty; values must be unique integers in 0-3",
-		"each question must include a non-empty `explanation` (why correct / why distractors are wrong)",
-		"single-choice first (`answer_index` length 1), then multi-choice (length >= 2)",
-		"`title` length preferably 10-30 characters",
 	}
 	if validateErr != nil {
 		rules = append(rules, "Previous validation error: "+validateErr.Error())
@@ -87,6 +81,7 @@ func (g *quizGenerator) generate(
 	step := types.NewAgentStepBuilder[*quizExpectation](ag, "quiz").
 		WithParse(g.parse).
 		WithRetry(quizMaxCompensateRetry).
+		WithDuty("Produce the JSON quiz (title/quiz) based on the given source content").
 		WithRules(quizCompensateRules).
 		Build()
 	return step.Run(ctx, msgs)
@@ -103,8 +98,7 @@ func (g *quizGenerator) parse(ctx context.Context, content string) (*quizExpecta
 		DisallowUnknownFields: true,
 		LogOnDirectFailure: func(err error, _ []byte) {
 			slog.DebugContext(ctx, "quiz direct unmarshal did not match, fallback to json extraction",
-				slog.String("err", types.TruncateForLog(err.Error())),
-				slog.String("raw_content", types.TruncateForLog(content)))
+				slog.String("err", types.TruncateForLog(err.Error())))
 		},
 	}
 	if err := decoder.Unmarshal(pkgstring.AsBytes(content), &expect); err != nil {

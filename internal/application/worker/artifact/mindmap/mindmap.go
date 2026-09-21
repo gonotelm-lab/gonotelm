@@ -44,6 +44,7 @@ func (g *mindmapGenerator) generate(
 
 	step := types.NewAgentStepBuilder[*mindmapExpectation](ag, "mindmap").
 		WithParse(g.parse).
+		WithDuty("Produce the JSON mindmap (title/mindmap) based on the given source content").
 		WithRules(mindmapCompensateRules).
 		Build()
 	return step.Run(ctx, msgs)
@@ -52,8 +53,6 @@ func (g *mindmapGenerator) generate(
 func mindmapCompensateRules(error) []string {
 	return []string{
 		"JSON must contain only `title` and `mindmap`",
-		"`title` length must be 10-30 characters",
-		"`mindmap` must be a complete mermaid mindmap code-block string",
 	}
 }
 
@@ -69,7 +68,6 @@ func (g *mindmapGenerator) parse(ctx context.Context, content string) (*mindmapE
 		LogOnDirectFailure: func(err error, _ []byte) {
 			slog.DebugContext(ctx, "mindmap direct unmarshal did not match, fallback to json extraction",
 				slog.String("err", types.TruncateForLog(err.Error())),
-				slog.String("raw_content", types.TruncateForLog(content)),
 			)
 		},
 	}

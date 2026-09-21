@@ -78,6 +78,7 @@ func (g *imagePromptGenerator) generate(
 
 	step := types.NewAgentStepBuilder[*infoGraphicExpectation](ag, "infographic").
 		WithParse(g.parse).
+		WithDuty("Produce the JSON infographic prompt (title/image_prompt) based on the given source content").
 		WithRules(infoGraphicCompensateRules).
 		Build()
 	return step.Run(ctx, msgs)
@@ -86,8 +87,6 @@ func (g *imagePromptGenerator) generate(
 func infoGraphicCompensateRules(error) []string {
 	return []string{
 		"JSON must contain only `title` and `image_prompt`",
-		"`title` length must be 10-30 characters",
-		"`image_prompt` must be a complete text-to-image prompt string",
 	}
 }
 
@@ -147,7 +146,6 @@ func (g *imagePromptGenerator) parse(
 			slog.DebugContext(ctx,
 				"infographic direct unmarshal did not match, fallback to json extraction",
 				slog.String("err", types.TruncateForLog(err.Error())),
-				slog.String("raw_content", types.TruncateForLog(content)),
 			)
 		},
 	}

@@ -163,6 +163,7 @@ func (g *scriptGenerator) generate(
 	step := types.NewAgentStepBuilder[*videoScript](ag, "video script").
 		WithParse(g.parse).
 		WithRetry(scriptCompensate).
+		WithDuty("First explore the given sources (StatSource/ReadSource), then produce the JSON video script (title/voice_baseline/segments) from the source content; do not fabricate without reading the sources").
 		WithRules(g.compensateRules).
 		Build()
 	return step.Run(ctx, msgs)
@@ -171,17 +172,6 @@ func (g *scriptGenerator) generate(
 func (g *scriptGenerator) compensateRules(validateErr error) []string {
 	rules := []string{
 		"JSON must contain only `title`, `voice_baseline` and `segments`",
-		"`voice_baseline` is required and holds the ONE baseline voice direction for the whole script — spoken-narration style, medium pace, consistent tone/intonation — matching the video's overall style and the source content's register",
-		"`segments` is a non-empty array; each element has `name`, `content`, and `lines`",
-		"`content` is the segment plan (what to cover), not the spoken narration",
-		"`lines` is an array of objects; each element has `text`, plus `voice_instruction` ONLY when that line deviates from the baseline",
-		"`text` is one short spoken sentence for TTS, no long paragraphs",
-		"`text` must be spoken-style plain text, no markdown, emoji, urls, parentheses asides, or newlines",
-		"`voice_instruction` is a short natural-language note on the LOCAL adjustment (never fast here / slow there), not a restatement of `text`; omit it when the line follows the baseline",
-		"keep common English acronyms / product names as-is (TTS reads them); only resolve genuinely ambiguous marks (Roman numerals, single letters, mixed symbols) by context",
-		"keep the same reading consistent across the script",
-		"never include system internals in title/name/content/text/voice_baseline/voice_instruction: source ids, tool names, checkpoint/artifact fields, or meta narration about tools",
-		"plan each segment (name+content) first, then write lines",
 	}
 	if validateErr != nil {
 		rules = append(rules, "Error: "+validateErr.Error())
@@ -222,7 +212,6 @@ func (g *scriptGenerator) parse(ctx context.Context, content string) (*videoScri
 			slog.DebugContext(ctx,
 				"video script direct unmarshal did not match, fallback to json extraction",
 				slog.String("err", types.TruncateForLog(err.Error())),
-				slog.String("raw_content", types.TruncateForLog(content)),
 			)
 		},
 	}

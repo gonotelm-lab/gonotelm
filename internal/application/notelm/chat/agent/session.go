@@ -20,6 +20,8 @@ type SessionState struct {
 	// sourceDoc
 	sourceDocCitations []valobj.Id
 
+	citationRegistered bool
+
 	accumulatedId    int64
 	cancel           context.CancelFunc
 	finalPhaseMarked bool

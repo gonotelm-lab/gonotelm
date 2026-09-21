@@ -411,6 +411,10 @@ func (s *Service) CheckSourceDocAllowAccess(
 	sourceIds []valobj.Id,
 	sourceDocIds []valobj.Id,
 ) error {
+	if len(sourceDocIds) == 0 {
+		return nil
+	}
+
 	targetDocs, err := s.sourceDocRepo.BatchFind(ctx, notebookId, uuid.EmptyUUID(), sourceDocIds)
 	if err != nil {
 		return fmt.Errorf("batch find source docs failed err=%w", err)

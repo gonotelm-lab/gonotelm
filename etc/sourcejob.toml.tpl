@@ -60,7 +60,7 @@ level = "${GONOTELM_LOG_LEVEL:-debug}"
 modelProvider = "${GONOTELM_SOURCE_PROVIDER:-deepseek}"
 model = "${GONOTELM_SOURCE_MODEL:-deepseek-flash}"
 imageModelProvider = "${GONOTELM_SOURCE_IMAGE_MODEL_PROVIDER:-deepseek}"
-imageModel = "${GONOTELM_SOURCE_IMAGE_MODEL:-deepseek-flash-vision-exp}"
+imageModel = "${GONOTELM_SOURCE_IMAGE_MODEL:-deepseek-flash}"
 
 [chunking]
 size = ${GONOTELM_CHUNKING_SIZE:-500}

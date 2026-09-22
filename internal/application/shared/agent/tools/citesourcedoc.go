@@ -97,7 +97,7 @@ func (t *CiteSourceDocTool) InvokableRun(
 	}
 
 	if err := t.checker.Check(ctx, sourceDocIds); err != nil {
-		return "", fmt.Errorf("%w (note: source_doc_ids must be 'doc_id' values returned by QuerySource; a source_id is not a valid doc_id)", err)
+		return "", err
 	}
 
 	if t.collector != nil {

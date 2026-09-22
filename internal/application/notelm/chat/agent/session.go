@@ -46,6 +46,11 @@ func (s *SessionState) isInRunPhase1() bool {
 	return s.curRunPhase == runPhase1
 }
 
+// shouldEndPhase1 阶段一是否可提前结束：处于阶段一、is_final 已标记、且引用已登记。
+func (s *SessionState) shouldEndPhase1() bool {
+	return s.isInRunPhase1() && s.finalPhaseMarked && s.citationRegistered
+}
+
 func (s *SessionState) ChatId() valobj.Id {
 	return s.chat.Id
 }

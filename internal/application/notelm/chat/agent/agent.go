@@ -402,13 +402,8 @@ func (a *Agent) bindHooksV2(domainAgent *ChatAgent, req *RunRequest) {
 	domainAgent.OnAfterRound(func(ctx context.Context, round int, state *SessionState, roundMsg *pkgagt.EinoMessage) (bool, error) {
 		// is_final 已标记且引用已登记时才结束阶段一；仅标记未登记则继续，
 		// 给模型补调 CiteSourceDoc 的机会，避免正文出现 <sup> 却无引用落库。
-		return shouldEndPhase1(state), nil
+		return state.shouldEndPhase1(), nil
 	})
-}
-
-// shouldEndPhase1 阶段一是否可提前结束：处于阶段一、is_final 已标记、且引用已登记。
-func shouldEndPhase1(state *SessionState) bool {
-	return state.isInRunPhase1() && state.finalPhaseMarked && state.citationRegistered
 }
 
 func (a *Agent) buildPromptVars(req *RunRequest) (PromptTemplateVars, error) {

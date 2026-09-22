@@ -16,6 +16,7 @@ const (
 	ContextKeySceneGroupId = contextKey("_scene_group_id")
 	ContextLang            = contextKey("_lang")
 	ContextOperatorType    = contextKey("_operator_type")
+	ContextKeySubagent     = contextKey("_subagent")
 )
 
 func WithReqId(ctx context.Context, reqId requestid.ID) context.Context {
@@ -106,4 +107,13 @@ func WithAgentOperate(ctx context.Context) context.Context {
 
 func GetAgentOperate(ctx context.Context) bool {
 	return GetOperatorType(ctx) == OperatorTypeAgent
+}
+
+func WithSubagent(ctx context.Context) context.Context {
+	return context.WithValue(ctx, ContextKeySubagent, true)
+}
+
+func IsSubagent(ctx context.Context) bool {
+	subagent, ok := ctx.Value(ContextKeySubagent).(bool)
+	return ok && subagent
 }

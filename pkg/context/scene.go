@@ -15,14 +15,34 @@ const (
 	SourcePrepareScene = SceneType("source.prepare")
 
 	// studio artifact scenario
-	StudioMindmapScene       = SceneType("studio.mindmap")
-	StudioReportScene        = SceneType("studio.report")
-	StudioInfographicScene   = SceneType("studio.info_graphic")
-	StudioAudioOverviewScene = SceneType("studio.audio_overview")
-	StudioFlashcardScene     = SceneType("studio.flashcard")
-	StudioQuizScene          = SceneType("studio.quiz")
-	StudioDataTableScene     = SceneType("studio.data_table")
+	StudioMindmapScene = SceneType("studio.mindmap")
+
+	StudioReportScene = SceneType("studio.report")
+
+	StudioInfographicScene       = SceneType("studio.info_graphic")
+	StudioInfoGraphicPromptScene = SceneType("studio.info_graphic.prompt")
+	StudioInfoGraphicImageScene  = SceneType("studio.info_graphic.image")
+
+	StudioAudioOverviewScene           = SceneType("studio.audio_overview")
+	StudioAudioOverviewOutlineScene    = SceneType("studio.audio_overview.outline")
+	StudioAudioOverviewTranscriptScene = SceneType("studio.audio_overview.transcript")
+	StudioAudioOverviewAudioScene      = SceneType("studio.audio_overview.audio")
+
+	StudioFlashcardScene = SceneType("studio.flashcard")
+
+	StudioQuizScene = SceneType("studio.quiz")
+
+	StudioDataTableScene = SceneType("studio.data_table")
+
 	StudioSlidesScene        = SceneType("studio.slides")
+	StudioSlidesOutlineScene = SceneType("studio.slides.outline")
+	StudioSlidesPPTXScene    = SceneType("studio.slides.pptx")
+
+	StudioVideoOverviewScene            = SceneType("studio.video_overview")
+	StudioVideoOverviewScriptScene      = SceneType("studio.video_overview.script")
+	StudioVideoOverviewAudioScene       = SceneType("studio.video_overview.audio")
+	StudioVideoOverviewStoryboardScene  = SceneType("studio.video_overview.storyboard")
+	StudioVideoOverviewHyperframesScene = SceneType("studio.video_overview.hyperframes")
 )
 
 func (s SceneType) String() string {

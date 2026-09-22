@@ -118,7 +118,7 @@ func TestOnEndWithStreamOutputDoesNotMutateSharedCallbackOutput(t *testing.T) {
 	interceptorSR, agentSR := copies[0], copies[1]
 
 	rec := newCaptureRecorder()
-	interceptor := newInterceptor(context.Background(), rec)
+	interceptor := newInterceptor(context.Background(), rec, true)
 
 	runInfo := &callbacks.RunInfo{
 		Name:      "test",

@@ -15,6 +15,7 @@ func newChatModel(
 	providerType Provider,
 	cfg *ProviderConfig,
 	recorder Recorder,
+	recordTruncate bool,
 ) (model.ToolCallingChatModel, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("config must not be nil")
@@ -46,5 +47,5 @@ func newChatModel(
 		return nil, err
 	}
 
-	return newWrappedChatModel(ctx, tcm, providerType, maxConcurrency, recorder), nil
+	return newWrappedChatModel(ctx, tcm, providerType, maxConcurrency, recorder, recordTruncate), nil
 }

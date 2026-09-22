@@ -43,7 +43,7 @@ func NewCiteSourceDocTool(
 var _ tool.InvokableTool = &CiteSourceDocTool{}
 
 type CiteSourceDocToolInput struct {
-	SourceDocIds []string `json:"source_doc_ids" jsonschema:"title=source document unique identifiers,description=Ordered list of source document ids for the final answer. Index 1 in the answer maps to the first id, index 2 to the second, and so on. Each id must be a valid 32-character UUID obtained from source tools such as QuerySource."`
+	SourceDocIds []string `json:"source_doc_ids" jsonschema:"title=source document unique identifiers,description=Ordered list of source document ids for the final answer. Index 1 in the answer maps to the first id, index 2 to the second, and so on. Each id must be a 'doc_id' (32-character UUID) returned by QuerySource's 'doc_id' column. A 'source_id' is NOT a valid doc_id. Call this tool only when the answer's evidence comes from QuerySource results."`
 }
 
 func (i *CiteSourceDocToolInput) Normalize() ([]valobj.Id, error) {
@@ -69,7 +69,10 @@ func (t *CiteSourceDocTool) Info(ctx context.Context) (*schema.ToolInfo, error) 
 		Name: CiteSourceDocToolName,
 		Desc: "Record the ordered citation list for the final answer. " +
 			"Call this tool exactly once per conversation turn, immediately before outputting the final answer. " +
-			"Pass source document ids returned by QuerySource or other source tools. " +
+			"Only call it when the evidence in your answer comes from QuerySource results: source_doc_ids must be " +
+			"the 'doc_id' values returned by QuerySource. StatSource/ReadSource/GrepSource do NOT return doc ids. " +
+			"If you did not call QuerySource, or have no doc ids, you MUST NOT call this tool and MUST NOT write " +
+			"<sup>idx</sup> markers in the answer. A source_id is NOT a valid doc_id and will be rejected. " +
 			"The order of source_doc_ids determines inline citation indices: the first id is <sup>1</sup>, the second is <sup>2</sup>, and so on (1-based). " +
 			"Each source document id must be a valid UUID that the user has access to. " +
 			"Returns 'OK' on success.",

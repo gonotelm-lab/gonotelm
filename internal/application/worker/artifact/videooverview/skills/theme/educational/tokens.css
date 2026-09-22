@@ -1,0 +1,74 @@
+/* ─────────────────────────────────────────────────────────────────────
+ * Theme · educational (Sharp & Educational)
+ *   教科书科普：高对比、几何分区清晰、冷静易读。
+ *
+ *   调色映射（沿用旧五色原值）：
+ *     bg       #f8fafc  → --surface
+ *     light    #e2e8f0  → --surface-2
+ *     primary  #1e293b  → --text
+ *     secondary#475569  → --text-2
+ *     accent   #0d9488  → --accent
+ *
+ *   character knobs:
+ *     • hero numbers — 等宽 700，tabular-nums
+ *     • rule         — 1px 实线发丝
+ *     • card radius  — 2px，直角几何
+ *     • signature    — 网格纸 + 几何分区，克制精确
+ *     • motion       — 克制精确，不弹跳（400 / 650 / 900ms）
+ * ───────────────────────────────────────────────────────────────────── */
+:root {
+  /* ─── palette ─── */
+  --shell:        #eef2f6;
+  --surface:      #f8fafc;
+  --surface-2:    #e2e8f0;
+  --surface-3:    #cbd5e1;
+  --text:         #1e293b;
+  --text-2:       #475569;
+  --text-mute:    #94a3b8;
+  --text-faint:   #cbd5e1;
+  --rule:         #dbe3ec;
+  --accent:       #0d9488;
+  --accent-soft:  rgba(13, 148, 136, 0.13);
+  --accent-glow:  rgba(13, 148, 136, 0.42);
+
+  /* ─── fonts ─── */
+  --font-display-cn: "PingFang SC", "Noto Sans SC", "Source Han Sans SC",
+                     "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-display-en: "Montserrat", "Inter", "Helvetica Neue",
+                     -apple-system, sans-serif;
+  --font-body:       "Inter", "PingFang SC", "Noto Sans SC",
+                     -apple-system, sans-serif;
+  --font-mono:       "IBM Plex Mono", "SF Mono", ui-monospace, monospace;
+  --font-features:   "tnum", "ss01", "cv05";
+
+  /* ─── motion: precise, never bouncy ─── */
+  --dur-base:       400ms;
+  --dur-slow:       650ms;
+  --dur-cinematic:  900ms;
+
+  /* ─── design identity ─── */
+  --r-card:        2px;
+  --r-stage:       0;
+  --rule-w:        1px;
+  --rule-style:    solid;
+  --hero-num-font:    var(--font-mono);
+  --hero-num-style:   normal;
+  --hero-num-weight:  700;
+  --hero-num-track:   -0.02em;
+  --stage-pad-x:   120px;
+  --stage-pad-y:   88px;
+
+  /* ─── surfaces ─── */
+  --card-shadow:   0 1px 0 rgba(30, 41, 59, 0.04) inset;
+  --card-glass-bg:     rgba(30, 41, 59, 0.04);
+  --card-glass-border: rgba(30, 41, 59, 0.10);
+  --shadow-stage:  0 40px 120px rgba(15, 23, 42, 0.18);
+
+  /* ─── decoration: 网格纸 + 极淡冷光，无颗粒 ─── */
+  --surface-vignette:
+    radial-gradient(115% 85% at 50% 38%,
+      rgba(13, 148, 136, 0.05) 0%,
+      transparent 58%),
+    radial-gradient(circle at 50% 50%,
+      transparent 30%, rgba(15, 23, 42, 0.10) 100%);
+}

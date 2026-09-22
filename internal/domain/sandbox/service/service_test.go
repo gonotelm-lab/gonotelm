@@ -16,14 +16,17 @@ import (
 )
 
 type stubSandbox struct {
-	id  string
-	key entity.SandboxKey
+	id      string
+	key     entity.SandboxKey
+	pingErr error
 }
 
 func (s *stubSandbox) Id() string { return s.id }
 func (s *stubSandbox) Description() entity.SandboxDescription {
 	return entity.SandboxDescription{Id: s.id, Key: s.key, Runtime: "test"}
 }
+
+func (s *stubSandbox) Ping(context.Context) error { return s.pingErr }
 
 func (s *stubSandbox) Run(context.Context, entity.Command) (entity.Execution, error) {
 	return entity.Execution{}, nil
@@ -90,10 +93,25 @@ type fakeMgr struct {
 	createCount int
 	sandboxes   map[string]entity.Sandbox
 	getCalls    []string
+	evictCalls  []string
+	renewCalls  []renewCall
+	renewErr    error
+}
+
+type renewCall struct {
+	id  string
+	ttl time.Duration
 }
 
 func newFakeMgr() *fakeMgr {
 	return &fakeMgr{sandboxes: make(map[string]entity.Sandbox)}
+}
+
+func (m *fakeMgr) RenewSandbox(_ context.Context, sandboxId string, ttl time.Duration) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.renewCalls = append(m.renewCalls, renewCall{id: sandboxId, ttl: ttl})
+	return m.renewErr
 }
 
 func (m *fakeMgr) CreateSandbox(_ context.Context, key entity.SandboxKey, spec entity.Spec) (entity.Sandbox, error) {
@@ -121,6 +139,14 @@ func (m *fakeMgr) GetSandbox(_ context.Context, sandboxId string) (entity.Sandbo
 func (m *fakeMgr) DeleteSandbox(_ context.Context, sandboxId string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	delete(m.sandboxes, sandboxId)
+	return nil
+}
+
+func (m *fakeMgr) EvictSandbox(_ context.Context, sandboxId string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.evictCalls = append(m.evictCalls, sandboxId)
 	delete(m.sandboxes, sandboxId)
 	return nil
 }
@@ -217,6 +243,27 @@ func TestGetOrCreateSandbox_DoubleCheckReusesExisting(t *testing.T) {
 	require.Equal(t, 0, mgr.createCount)
 }
 
+func TestGetOrCreateSandbox_ReuseRefreshesTTL(t *testing.T) {
+	key := testKey(t)
+	repo := newFakeRepo()
+	mgr := newFakeMgr()
+
+	existing := &stubSandbox{id: "sb-existing", key: key}
+	mgr.sandboxes[existing.id] = existing
+	require.NoError(t, repo.SetSandbox(context.Background(), key, existing.Description(), time.Minute))
+
+	svc := New(repo, mgr, &recordingLock{})
+	ttl := 2 * time.Hour
+	sb, err := svc.GetOrCreateSandbox(context.Background(), key, entity.Spec{TTL: ttl})
+	require.NoError(t, err)
+	require.Equal(t, "sb-existing", sb.Id())
+	require.Equal(t, 0, mgr.createCount)
+
+	// 复用沙箱时：沙箱过期时间与 Redis 绑定 TTL 都要刷新为本次 TTL
+	require.Equal(t, []renewCall{{id: "sb-existing", ttl: ttl}}, mgr.renewCalls)
+	require.Equal(t, ttl, repo.ttls[repo.cacheKey(key)])
+}
+
 func TestGetOrCreateSandbox_StaleCacheClearedOnce(t *testing.T) {
 	key := testKey(t)
 	repo := newFakeRepo()
@@ -236,4 +283,54 @@ func TestGetOrCreateSandbox_StaleCacheClearedOnce(t *testing.T) {
 
 	// 快路径发现失效后应删缓存，锁内不应再对死 id Get 一次
 	require.Equal(t, []string{"sb-dead"}, mgr.getCalls)
+}
+
+func TestGetOrCreateSandbox_ReuseDeadSandboxRecreates(t *testing.T) {
+	key := testKey(t)
+	repo := newFakeRepo()
+	mgr := newFakeMgr()
+
+	// Redis 有绑定，句柄也还在内存里，但沙箱已经连不上（存活检查失败）
+	dead := &stubSandbox{id: "sb-dead", key: key, pingErr: pkgerr.ErrNoRecord.Msg("connection refused")}
+	mgr.sandboxes[dead.id] = dead
+	require.NoError(t, repo.SetSandbox(context.Background(), key, dead.Description(), time.Hour))
+
+	svc := New(repo, mgr, &recordingLock{})
+	sb, err := svc.GetOrCreateSandbox(context.Background(), key, entity.Spec{})
+	require.NoError(t, err)
+	require.Equal(t, 1, mgr.createCount)
+	require.NotEqual(t, "sb-dead", sb.Id())
+
+	// 死沙箱只 Get 一次，存活检查失败后删绑定，锁内不再重复 Get
+	require.Equal(t, []string{"sb-dead"}, mgr.getCalls)
+
+	// 失效句柄应从 manager 内存缓存中主动驱逐
+	require.Equal(t, []string{"sb-dead"}, mgr.evictCalls)
+
+	// 绑定应被替换为新沙箱
+	desc, err := repo.GetSandbox(context.Background(), key)
+	require.NoError(t, err)
+	require.Equal(t, sb.Id(), desc.Id)
+}
+
+func TestGetOrCreateSandbox_RenewFailureKeepsBindingTTL(t *testing.T) {
+	key := testKey(t)
+	repo := newFakeRepo()
+	mgr := newFakeMgr()
+
+	// 沙箱存活，但续期失败：不能把 Redis 绑定 TTL 续成新值
+	alive := &stubSandbox{id: "sb-existing", key: key}
+	mgr.sandboxes[alive.id] = alive
+	mgr.renewErr = pkgerr.ErrNoRecord.Msg("renew failed")
+	require.NoError(t, repo.SetSandbox(context.Background(), key, alive.Description(), time.Minute))
+
+	svc := New(repo, mgr, &recordingLock{})
+	sb, err := svc.GetOrCreateSandbox(context.Background(), key, entity.Spec{TTL: 2 * time.Hour})
+	require.NoError(t, err)
+	require.Equal(t, "sb-existing", sb.Id())
+	require.Equal(t, 0, mgr.createCount)
+	require.Equal(t, []renewCall{{id: "sb-existing", ttl: 2 * time.Hour}}, mgr.renewCalls)
+
+	// 续期失败：Redis TTL 不应被续成 2h，保持原值
+	require.Equal(t, time.Minute, repo.ttls[repo.cacheKey(key)])
 }

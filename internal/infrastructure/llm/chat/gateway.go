@@ -24,6 +24,9 @@ const (
 	wrappedChatModelRunName = "gateway-chat-model"
 
 	defaultMaxConcurrency = 250
+
+	// defaultRecordTruncate is the default of whether recorded input content is truncated.
+	defaultRecordTruncate = true
 )
 
 type Gateway struct {
@@ -32,7 +35,8 @@ type Gateway struct {
 	mu        sync.RWMutex
 	providers map[Provider]*ModelProvider
 
-	recorder Recorder
+	recorder       Recorder
+	recordTruncate bool
 }
 
 type ModelProvider struct {
@@ -56,6 +60,9 @@ func (m *ModelProvider) Model(name string) (Model, bool) {
 
 type gatewayOption struct {
 	recorder Recorder
+	// recordTruncate is nil when the caller does not set it, so that
+	// defaultRecordTruncate takes effect.
+	recordTruncate *bool
 }
 
 type GatewayOption func(o *gatewayOption)
@@ -63,6 +70,14 @@ type GatewayOption func(o *gatewayOption)
 func WithRecorder(r Recorder) GatewayOption {
 	return func(o *gatewayOption) {
 		o.recorder = r
+	}
+}
+
+// WithRecordTruncate controls whether the recorder truncates over-long input
+// content. It defaults to true when not set.
+func WithRecordTruncate(truncate bool) GatewayOption {
+	return func(o *gatewayOption) {
+		o.recordTruncate = &truncate
 	}
 }
 
@@ -74,10 +89,16 @@ func New(ctx context.Context, cfg *ProviderConfig, opts ...GatewayOption) (*Gate
 		}
 	}
 
+	recordTruncate := defaultRecordTruncate
+	if opt.recordTruncate != nil {
+		recordTruncate = *opt.recordTruncate
+	}
+
 	g := &Gateway{
-		rootCtx:   ctx,
-		providers: make(map[Provider]*ModelProvider),
-		recorder:  opt.recorder,
+		rootCtx:        ctx,
+		providers:      make(map[Provider]*ModelProvider),
+		recorder:       opt.recorder,
+		recordTruncate: recordTruncate,
 	}
 
 	err := g.initProviders(cfg)
@@ -89,7 +110,7 @@ func New(ctx context.Context, cfg *ProviderConfig, opts ...GatewayOption) (*Gate
 }
 
 func (g *Gateway) initProviders(cfg *ProviderConfig) error {
-	deepseekModel, err := newChatModel(g.rootCtx, ProviderDeepSeek, cfg, g.recorder)
+	deepseekModel, err := newChatModel(g.rootCtx, ProviderDeepSeek, cfg, g.recorder, g.recordTruncate)
 	if err != nil {
 		return err
 	}
@@ -99,7 +120,7 @@ func (g *Gateway) initProviders(cfg *ProviderConfig) error {
 		tc:       deepseekModel,
 	}
 
-	openaiModel, err := newChatModel(g.rootCtx, ProviderOpenAI, cfg, g.recorder)
+	openaiModel, err := newChatModel(g.rootCtx, ProviderOpenAI, cfg, g.recorder, g.recordTruncate)
 	if err != nil {
 		return err
 	}
@@ -109,7 +130,7 @@ func (g *Gateway) initProviders(cfg *ProviderConfig) error {
 		tc:       openaiModel,
 	}
 
-	qwenModel, err := newChatModel(g.rootCtx, ProviderQwen, cfg, g.recorder)
+	qwenModel, err := newChatModel(g.rootCtx, ProviderQwen, cfg, g.recorder, g.recordTruncate)
 	if err != nil {
 		return err
 	}
@@ -119,7 +140,7 @@ func (g *Gateway) initProviders(cfg *ProviderConfig) error {
 		tc:       qwenModel,
 	}
 
-	agnesModel, err := newChatModel(g.rootCtx, ProviderAgnes, cfg, g.recorder)
+	agnesModel, err := newChatModel(g.rootCtx, ProviderAgnes, cfg, g.recorder, g.recordTruncate)
 	if err != nil {
 		return err
 	}
@@ -164,6 +185,7 @@ type wrappedChatModel struct {
 	maxConcurrency int
 	sem            *semaphore.Weighted
 	recorder       Recorder
+	recordTruncate bool
 }
 
 func newWrappedChatModel(
@@ -172,6 +194,7 @@ func newWrappedChatModel(
 	provider Provider,
 	maxConcurrency int,
 	recorder Recorder,
+	recordTruncate bool,
 ) *wrappedChatModel {
 	typ, ok := components.GetType(impl)
 	if !ok {
@@ -192,6 +215,7 @@ func newWrappedChatModel(
 		maxConcurrency: maxConcurrency,
 		sem:            sem,
 		recorder:       recorder,
+		recordTruncate: recordTruncate,
 	}
 }
 
@@ -211,7 +235,7 @@ func (g *wrappedChatModel) Generate(
 		Name:      wrappedChatModelRunName,
 		Type:      g.typ,
 		Component: components.ComponentOfChatModel,
-	}, newInterceptor(g.rootCtx, g.recorder))
+	}, newInterceptor(g.rootCtx, g.recorder, g.recordTruncate))
 
 	err := g.sem.Acquire(ctx, 1)
 	if err != nil {
@@ -245,7 +269,7 @@ func (g *wrappedChatModel) Stream(
 		Name:      wrappedChatModelRunName,
 		Type:      g.typ,
 		Component: components.ComponentOfChatModel,
-	}, newInterceptor(g.rootCtx, g.recorder))
+	}, newInterceptor(g.rootCtx, g.recorder, g.recordTruncate))
 
 	err := g.sem.Acquire(ctx, 1)
 	if err != nil {
@@ -313,7 +337,7 @@ func (g *wrappedChatModel) WithTools(
 		return nil, err
 	}
 
-	return newWrappedChatModel(g.rootCtx, impl, g.provider, g.maxConcurrency, g.recorder), nil
+	return newWrappedChatModel(g.rootCtx, impl, g.provider, g.maxConcurrency, g.recorder, g.recordTruncate), nil
 }
 
 func extractOptionModelName(opts ...einomodel.Option) string {

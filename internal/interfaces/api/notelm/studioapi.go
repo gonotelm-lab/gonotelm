@@ -52,6 +52,7 @@ func (s *Server) GenerateStudioArtifact(ctx context.Context, c *app.RequestConte
 			Quiz:          req.Quiz.ToPayload(),
 			DataTable:     req.DataTable.ToPayload(),
 			Slides:        req.Slides.ToPayload(),
+			VideoOverview: req.VideoOverview.ToPayload(),
 			Note:          req.Note.ToPayload(),
 		})
 	if err != nil {
@@ -76,8 +77,9 @@ func (s *Server) GetStudioArtifactStatus(ctx context.Context, c *app.RequestCont
 	}
 
 	http.OkResp(c, schema.GetArtifactStatusResponse{
-		TaskId: req.TaskId.String(),
-		Status: resp.Status,
+		TaskId:    req.TaskId.String(),
+		Status:    resp.Status,
+		Timestamp: resp.CreatedAt.Value(),
 	})
 }
 
@@ -109,6 +111,7 @@ func (s *Server) GetStudioArtifact(ctx context.Context, c *app.RequestContext) {
 		TaskId:      req.TaskId.String(),
 		ContentKind: string(info.ResultKind),
 		Status:      string(info.Status),
+		Timestamp:   info.CreatedAt.Value(),
 	}
 	http.OkResp(c, &result)
 }

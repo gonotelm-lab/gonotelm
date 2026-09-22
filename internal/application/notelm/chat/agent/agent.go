@@ -182,6 +182,7 @@ func (a *Agent) prepareRun(req *RunRequest) (*ChatAgent, *SessionState, error) {
 			sourceDocPermissionChecker,
 			tools.CitationCollectorFunc(func(sourceDocIds []valobj.Id) {
 				session.sourceDocCitations = sourceDocIds
+				session.citationRegistered = true
 			}),
 		),
 	})
@@ -399,11 +400,9 @@ func (a *Agent) bindHooksV2(domainAgent *ChatAgent, req *RunRequest) {
 	a.bindBasicHooks(domainAgent, req)
 
 	domainAgent.OnAfterRound(func(ctx context.Context, round int, state *SessionState, roundMsg *pkgagt.EinoMessage) (bool, error) {
-		// 工具调用中出现了最后一个就Phase提前结束
-		if state.isInRunPhase1() && state.finalPhaseMarked {
-			return true, nil
-		}
-		return false, nil
+		// is_final 已标记且引用已登记时才结束阶段一；仅标记未登记则继续，
+		// 给模型补调 CiteSourceDoc 的机会，避免正文出现 <sup> 却无引用落库。
+		return state.shouldEndPhase1(), nil
 	})
 }
 

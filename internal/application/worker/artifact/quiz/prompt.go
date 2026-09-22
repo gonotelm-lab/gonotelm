@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"strings"
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
@@ -21,6 +22,7 @@ type RenderVars struct {
 	SourceIds  []string
 	Count      string
 	Difficulty string
+	Tip        string
 }
 
 func (v RenderVars) promptVars() map[string]any {
@@ -28,6 +30,7 @@ func (v RenderVars) promptVars() map[string]any {
 		"SourceIds":  types.NormalizeStrings(v.SourceIds),
 		"Count":      v.Count,
 		"Difficulty": v.Difficulty,
+		"Tip":        strings.TrimSpace(v.Tip),
 	}
 }
 
@@ -48,6 +51,7 @@ func RenderQuiz(
 		SourceIds:  sourceIds,
 		Count:      count.String(),
 		Difficulty: difficulty.String(),
+		Tip:        tip,
 	}.promptVars())
 	if err != nil {
 		return nil, fmt.Errorf("render quiz prompt: %w", err)

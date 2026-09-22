@@ -183,7 +183,7 @@ func NewServer(
 			deps.EventBus,
 			deps.TitleMaker,
 		),
-		getArtifactStatusHandler:     artifactapp.NewGetArtifactStatusHandler(deps.ArtifactRepo, deps.FlowClient, deps.StorageGateway),
+		getArtifactStatusHandler:     artifactapp.NewGetArtifactStatusHandler(deps.ArtifactRepo, deps.StorageGateway),
 		listNotebookArtifactsHandler: artifactapp.NewListArtifactsHandler(deps.NotebookRepo, deps.ArtifactRepo),
 		cancelArtifactHandler:        artifactapp.NewCancelArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.EventBus),
 		deleteArtifactHandler:        artifactapp.NewDeleteArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.StorageGateway),

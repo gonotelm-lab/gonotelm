@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"strings"
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 
@@ -18,16 +19,18 @@ var dataTableTpl = prompt.FromMessages(einoschema.Jinja2, einoschema.SystemMessa
 
 type RenderVars struct {
 	SourceIds []string
+	Tip       string
 }
 
 func (v RenderVars) promptVars() map[string]any {
 	return map[string]any{
 		"SourceIds": types.NormalizeStrings(v.SourceIds),
+		"Tip":       strings.TrimSpace(v.Tip),
 	}
 }
 
 func RenderDataTable(ctx context.Context, sourceIds []string, tip string) ([]*einoschema.Message, error) {
-	msgs, err := dataTableTpl.Format(ctx, RenderVars{SourceIds: sourceIds}.promptVars())
+	msgs, err := dataTableTpl.Format(ctx, RenderVars{SourceIds: sourceIds, Tip: tip}.promptVars())
 	if err != nil {
 		return nil, fmt.Errorf("render datatable prompt: %w", err)
 	}

@@ -2,58 +2,27 @@ package quiz
 
 import (
 	"context"
-	"fmt"
-	"log/slog"
-	"strings"
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
-	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
-	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
-	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 
 	"github.com/bytedance/sonic"
-	einomodel "github.com/cloudwego/eino/components/model"
-	einoschema "github.com/cloudwego/eino/schema"
 )
 
-const quizMaxCompensateRetry = 3
-
-const quizOptionCount = 4
-
-type QuizQuestion struct {
-	Question    string   `json:"question"`
-	Options     []string `json:"options"`
-	AnswerIndex []int    `json:"answer_index"`
-	Explanation string   `json:"explanation"`
-}
-
-type QuizContent struct {
-	Questions    []QuizQuestion `json:"questions"`
-	Themes       []string       `json:"themes"`
-	FollowUpHint []string       `json:"follow_up_hint"`
-}
-
-type quizExpectation struct {
-	Title string      `json:"title"`
-	Quiz  QuizContent `json:"quiz"`
-}
-
 type Generator struct {
-	deps *types.WorkerDeps
+	step *quizGenerator
 }
 
 var _ types.Generator = &Generator{}
 
 func New(deps *types.WorkerDeps) *Generator {
-	return &Generator{deps: deps}
+	return &Generator{step: newQuizGenerator(deps)}
 }
 
 func (g *Generator) Generate(ctx context.Context, req *types.Request) (*types.Response, error) {
-	expect, err := g.generate(ctx, req)
+	expect, err := g.step.generate(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -68,173 +37,4 @@ func (g *Generator) Generate(ctx context.Context, req *types.Request) (*types.Re
 		Result:     resultBytes,
 		ResultKind: artifactentity.ResultKindInline,
 	}, nil
-}
-
-func (g *Generator) llmOptions() []einomodel.Option {
-	var (
-		provider = conf.WorkerGlobal().Studio.Quiz.ModelProvider
-		model    = conf.WorkerGlobal().Studio.Quiz.Model
-	)
-	return []einomodel.Option{
-		chat.WithModel(model),
-		chat.WithResponseJsonObject(provider),
-		chat.WithThinking(provider, false),
-	}
-}
-
-func quizCompensateRules(validateErr error) []string {
-	rules := []string{
-		"JSON must contain only `title` and `quiz`",
-		"`quiz` must include `questions`, `themes`, and `follow_up_hint`",
-		"each question must have exactly 4 non-empty `options`",
-		"`answer_index` must be non-empty; values must be unique integers in 0-3",
-		"each question must include a non-empty `explanation` (why correct / why distractors are wrong)",
-		"single-choice first (`answer_index` length 1), then multi-choice (length >= 2)",
-		"`title` length preferably 10-30 characters",
-	}
-	if validateErr != nil {
-		rules = append(rules, "Previous validation error: "+validateErr.Error())
-	}
-	return rules
-}
-
-func (g *Generator) generate(
-	ctx context.Context,
-	req *types.Request,
-) (*quizExpectation, error) {
-	llmOptions := g.llmOptions()
-
-	p := artifactentity.PayloadAs[*artifactentity.QuizPayload](req.Payload)
-	count := artifactentity.QuizCountDefaultValue()
-	if p.Count.Supported() {
-		count = p.Count
-	}
-	difficulty := artifactentity.QuizDifficultyDefault()
-	if p.Difficulty.Supported() {
-		difficulty = p.Difficulty
-	}
-	tip := p.GetTip()
-
-	ag, err := types.BuildSourceExploreAgent(
-		g.deps,
-		conf.WorkerGlobal().Studio.Quiz.ModelProvider,
-		conf.WorkerGlobal().Studio.Quiz.Model,
-		conf.WorkerGlobal().Studio.Quiz.MaxRound,
-		llmOptions,
-		req.NotebookId,
-		req.SourceIds,
-		true,
-	)
-	if err != nil {
-		return nil, errors.Wrapf(errors.ErrInner, "failed to build source explore agent for quiz, err=%v", err)
-	}
-
-	sourceIds := types.SourceIDsToStrings(req.SourceIds)
-	msgs, err := RenderQuiz(ctx, sourceIds, count, difficulty, tip)
-	if err != nil {
-		return nil, errors.Wrapf(errors.ErrInner, "generate quiz message failed, err=%v", err)
-	}
-	output, err := ag.React(ctx, msgs)
-	if err != nil {
-		return nil, errors.Wrapf(errors.ErrInner, "generate quiz output failed, err=%v", err)
-	}
-
-	slog.InfoContext(ctx, fmt.Sprintf("generate quiz agent usage: %+v", ag.TokenUsage()))
-
-	expect, parseErr := parseAgentOutput(ctx, output.Content)
-	if parseErr == nil {
-		return expect, nil
-	}
-
-	lastContent := output.Content
-	lastErr := parseErr
-	msgs = append([]*einoschema.Message{}, ag.AccumulatedMessages()...)
-
-	for attempt := 1; attempt <= quizMaxCompensateRetry; attempt++ {
-		slog.WarnContext(ctx, "quiz agent output invalid, compensating",
-			slog.String("notebook_id", req.NotebookId.String()),
-			slog.Int("attempt", attempt),
-			slog.Int("max_retry", quizMaxCompensateRetry),
-			slog.Any("err", lastErr),
-			slog.Any("usage", ag.TokenUsage()),
-		)
-
-		compensateMsgs := append([]*einoschema.Message{}, msgs...)
-		compensateMsgs = append(compensateMsgs, types.BuildCompensateMessage(lastContent, quizCompensateRules(lastErr)))
-
-		llmResp, genErr := ag.BaseLLM().Generate(ctx, compensateMsgs, llmOptions...)
-		if genErr != nil {
-			return nil, errors.Wrapf(errors.ErrLLM,
-				"quiz compensate generate failed on attempt %d, err=%v",
-				attempt,
-				genErr,
-			)
-		}
-
-		expect, parseErr = parseAgentOutput(ctx, llmResp.Content)
-		if parseErr == nil {
-			return expect, nil
-		}
-
-		lastContent = llmResp.Content
-		lastErr = parseErr
-		// Continue conversation: previous compensate request + model reply.
-		msgs = append(compensateMsgs, &einoschema.Message{
-			Role:    einoschema.Assistant,
-			Content: lastContent,
-		})
-	}
-
-	return nil, errors.Wrapf(errors.ErrLLM,
-		"quiz agent output invalid after %d retries, last_output=%q, err=%v",
-		quizMaxCompensateRetry,
-		lastContent,
-		lastErr,
-	)
-}
-
-func parseAgentOutput(ctx context.Context, content string) (*quizExpectation, error) {
-	content = pkgstring.StripJSONPrefix(content)
-	if content == "" {
-		return nil, fmt.Errorf("empty output")
-	}
-
-	var expect quizExpectation
-	decoder := pkgjson.Decoder{
-		DisallowUnknownFields: true,
-		LogOnDirectFailure: func(err error, _ []byte) {
-			slog.DebugContext(ctx, "quiz direct unmarshal did not match, fallback to json extraction",
-				slog.Any("err", err),
-				slog.String("raw_content", types.TruncateForLog(content)))
-		},
-	}
-	if err := decoder.Unmarshal(pkgstring.AsBytes(content), &expect); err != nil {
-		slog.WarnContext(ctx, "quiz output unmarshal failed after compatibility fallback",
-			slog.Any("err", err),
-			slog.String("raw_content", types.TruncateForLog(content)))
-		return nil, err
-	}
-
-	expect.Title = types.NormalizeTitle(expect.Title)
-	for i := range expect.Quiz.Questions {
-		expect.Quiz.Questions[i].Question = strings.TrimSpace(expect.Quiz.Questions[i].Question)
-		for j := range expect.Quiz.Questions[i].Options {
-			expect.Quiz.Questions[i].Options[j] = strings.TrimSpace(expect.Quiz.Questions[i].Options[j])
-		}
-	}
-	for i := range expect.Quiz.Themes {
-		expect.Quiz.Themes[i] = strings.TrimSpace(expect.Quiz.Themes[i])
-	}
-	for i := range expect.Quiz.FollowUpHint {
-		expect.Quiz.FollowUpHint[i] = strings.TrimSpace(expect.Quiz.FollowUpHint[i])
-	}
-
-	if expect.Title == "" {
-		return nil, fmt.Errorf("title empty")
-	}
-	if err := ValidateQuizContent(expect.Quiz); err != nil {
-		return nil, err
-	}
-
-	return &expect, nil
 }

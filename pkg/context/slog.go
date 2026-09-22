@@ -10,6 +10,7 @@ const (
 	AttrKeyUserID       = "user_id"
 	AttrKeySceneType    = "scene"
 	AttrKeyOperatorType = "operator"
+	AttrKeySubagent     = "subagent"
 )
 
 func getReqIdSlogAttr(ctx context.Context) (slog.Attr, bool) {
@@ -52,11 +53,20 @@ func getOperatorSlogAttr(ctx context.Context) (slog.Attr, bool) {
 	return attr, true
 }
 
+func getSubagentSlogAttr(ctx context.Context) (slog.Attr, bool) {
+	if !IsSubagent(ctx) {
+		return slog.Attr{}, false
+	}
+
+	return slog.Bool(AttrKeySubagent, true), true
+}
+
 var defaultSlogAttrsExtractors = []SlogAttrExtractor{
 	getReqIdSlogAttr,
 	getUserIdSlogAttr,
 	getSceneSlogAttr,
 	getOperatorSlogAttr,
+	getSubagentSlogAttr,
 }
 
 func ToSlogAttrs(ctx context.Context) []slog.Attr {

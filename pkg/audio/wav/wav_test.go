@@ -188,3 +188,37 @@ func TestParse_NonPCMFormatValue(t *testing.T) {
 	}
 	_ = errors.Is // 保留 errors 包引用
 }
+
+func TestPCM_DurationMs(t *testing.T) {
+	// 16000 采样点 @16000Hz 单声道 16bit => 1 秒
+	mono := &PCM{Data: make([]byte, 16000*2), NumChannels: 1, SampleRate: 16000, BitsPerSample: 16}
+	if got := mono.DurationMs(); got != 1000 {
+		t.Fatalf("mono DurationMs = %d, want 1000", got)
+	}
+
+	// 44100 帧 @44100Hz 立体声 16bit => 1 秒
+	stereo := &PCM{Data: make([]byte, 44100*2*2), NumChannels: 2, SampleRate: 44100, BitsPerSample: 16}
+	if got := stereo.DurationMs(); got != 1000 {
+		t.Fatalf("stereo DurationMs = %d, want 1000", got)
+	}
+
+	// 半秒
+	half := &PCM{Data: make([]byte, 8000*2), NumChannels: 1, SampleRate: 16000, BitsPerSample: 16}
+	if got := half.DurationMs(); got != 500 {
+		t.Fatalf("half DurationMs = %d, want 500", got)
+	}
+}
+
+func TestPCM_DurationMs_Invalid(t *testing.T) {
+	cases := []*PCM{
+		nil,
+		{Data: []byte{1, 2}},
+		{Data: []byte{1, 2}, SampleRate: 16000},
+		{Data: []byte{1, 2}, SampleRate: 16000, NumChannels: 1},
+	}
+	for i, c := range cases {
+		if got := c.DurationMs(); got != 0 {
+			t.Fatalf("case %d DurationMs = %d, want 0", i, got)
+		}
+	}
+}

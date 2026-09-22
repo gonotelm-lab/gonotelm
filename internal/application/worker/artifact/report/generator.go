@@ -2,117 +2,32 @@ package report
 
 import (
 	"context"
-	"fmt"
-	"log/slog"
-	"strings"
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
-	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
-	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 
-	einomodel "github.com/cloudwego/eino/components/model"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 )
 
 type Generator struct {
-	deps *types.WorkerDeps
+	step *reportGenerator
 }
 
 var _ types.Generator = &Generator{}
 
 func New(deps *types.WorkerDeps) *Generator {
-	return &Generator{deps: deps}
+	return &Generator{step: newReportGenerator(deps)}
 }
 
-func (r *Generator) Generate(ctx context.Context, req *types.Request) (*types.Response, error) {
-	reportText, err := r.generate(ctx, req)
+func (g *Generator) Generate(ctx context.Context, req *types.Request) (*types.Response, error) {
+	expect, err := g.step.generate(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 
-	title := r.generateTitle(ctx, reportText, req)
-
 	return &types.Response{
-		Title:      title,
-		Result:     pkgstring.AsBytes(reportText),
+		Title:      expect.Title,
+		Result:     pkgstring.AsBytes(expect.Report),
 		ResultKind: artifactentity.ResultKindInline,
 	}, nil
-}
-
-func (r *Generator) generate(
-	ctx context.Context,
-	req *types.Request,
-) (string, error) {
-	var (
-		reportModel         = conf.WorkerGlobal().Studio.Report.Model
-		reportModelProvider = conf.WorkerGlobal().Studio.Report.ModelProvider
-		modelOption         = chat.WithModel(reportModel)
-		maxRound            = conf.WorkerGlobal().Studio.Report.MaxRound
-		style               = artifactentity.ReportStyleDefaultStyle()
-	)
-
-	p := artifactentity.PayloadAs[*artifactentity.ReportPayload](req.Payload)
-	if p.Style.Supported() {
-		style = p.Style
-	}
-
-	ag, err := types.BuildSourceExploreAgent(
-		r.deps,
-		reportModelProvider,
-		reportModel,
-		maxRound,
-		[]einomodel.Option{modelOption},
-		req.NotebookId,
-		req.SourceIds,
-		true,
-	)
-	if err != nil {
-		return "", errors.Wrapf(errors.ErrInner, "build source explore agent for report failed, err=%v", err)
-	}
-
-	sourceIds := types.SourceIDsToStrings(req.SourceIds)
-	msgs, err := RenderReport(ctx, sourceIds, style, p.Language, p.GetTip())
-	if err != nil {
-		return "", errors.Wrapf(errors.ErrInner, "generate report message failed, err=%v", err)
-	}
-
-	output, err := ag.React(ctx, msgs)
-	if err != nil {
-		return "", errors.Wrapf(errors.ErrInner, "generate report output failed, err=%v", err)
-	}
-
-	slog.InfoContext(ctx, fmt.Sprintf("generate report agent usage: %+v", ag.TokenUsage()))
-
-	return string(output.Content), nil
-}
-
-func (r *Generator) generateTitle(ctx context.Context, report string, req *types.Request) string {
-	title := ""
-	titleMakerMsgs, err := RenderTitleMaker(ctx, report)
-	if err != nil {
-		slog.ErrorContext(ctx, "generate title maker message failed", slog.String("artifact_id", req.ArtifactId.String()), slog.Any("err", err))
-	} else {
-		modelOption := chat.WithModel(conf.WorkerGlobal().Studio.Report.Model)
-		tcm, err := r.deps.LLMGateway.GetChatModel(conf.WorkerGlobal().Studio.Report.ModelProvider)
-		if err != nil {
-			slog.ErrorContext(ctx, "get llm provider for title generation failed", slog.Any("err", err))
-		} else {
-			result, err := tcm.Generate(ctx, titleMakerMsgs, modelOption)
-			if err == nil {
-				title = strings.TrimSpace(result.Content)
-			} else {
-				slog.ErrorContext(ctx, "generate title failed", slog.Any("err", err))
-			}
-		}
-		if title == "" {
-			idx := strings.Index(report, "\n")
-			if idx > 0 {
-				title = strings.TrimSpace(report[:idx])
-			}
-		}
-	}
-
-	return types.NormalizeTitle(title)
 }

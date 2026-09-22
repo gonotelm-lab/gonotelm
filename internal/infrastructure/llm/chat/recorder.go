@@ -18,11 +18,32 @@ const (
 	RecordMetaStreaming  = "streaming"
 	RecordMetaThinking   = "thinking"
 	RecordMetaJSONObject = "json_object"
+	RecordMetaSubagent   = "subagent"
 )
 
 const (
-	maxRecordToolResultRune = 300
+	maxRecordToolResultRune = 500
 )
+
+// RecordConfig configures how LLM call records are built before they are handed to a Recorder.
+type RecordConfig struct {
+	// Truncate controls whether over-long recorded input content is truncated.
+	// It defaults to true when unset.
+	Truncate *bool `toml:"truncate"`
+}
+
+func (c *RecordConfig) Init() {
+	if c.Truncate == nil {
+		enabled := true
+		c.Truncate = &enabled
+	}
+}
+
+// TruncateEnabled reports whether recorded input content should be truncated.
+// A nil config or unset field is treated as enabled.
+func (c *RecordConfig) TruncateEnabled() bool {
+	return c == nil || c.Truncate == nil || *c.Truncate
+}
 
 type RecordTokenUsage struct {
 	PromptTokens       int // Total prompt input tokens, including cache hit and cache miss
@@ -132,7 +153,7 @@ func toRecordInputParts(parts []schema.MessageInputPart) []*RecordInputPart {
 	return ips
 }
 
-func toRecordInputMessages(msgs []*schema.Message) []*RecordInputMessage {
+func toRecordInputMessages(msgs []*schema.Message, truncate bool) []*RecordInputMessage {
 	inputs := make([]*RecordInputMessage, 0, len(msgs))
 	for _, msg := range msgs {
 		im := &RecordInputMessage{
@@ -143,12 +164,12 @@ func toRecordInputMessages(msgs []*schema.Message) []*RecordInputMessage {
 			ToolCalls:    toToolCalls(msg.ToolCalls),
 		}
 		// truncate content if too long
-		var truncated bool
-		if im.Content != "" {
-			im.Content, truncated = pkgstr.TruncateRuneV2(msg.Content, maxRecordToolResultRune)
+		if truncate && im.Content != "" {
+			content, truncated := pkgstr.TruncateRuneV2(msg.Content, maxRecordToolResultRune)
 			if truncated {
-				im.Content = im.Content + " (...truncated)"
+				content = content + " (...truncated)"
 			}
+			im.Content = content
 		}
 
 		im.InputParts = toRecordInputParts(msg.UserInputMultiContent)
@@ -249,6 +270,9 @@ func buildRecord(ctx context.Context, endTime time.Time) *Record {
 		metadatas[RecordMetaThinking] = thinking
 	}
 	metadatas[RecordMetaJSONObject] = getJSONObject(ctx)
+	if pkgcontext.IsSubagent(ctx) {
+		metadatas[RecordMetaSubagent] = true
+	}
 
 	return &Record{
 		Provider:  getProvider(ctx),
@@ -264,10 +288,11 @@ func buildEndRecord(
 	input *model.CallbackInput,
 	output *model.CallbackOutput,
 	endTime time.Time,
+	truncate bool,
 ) *Record {
 	r := buildRecord(ctx, endTime)
 	if input != nil {
-		r.Input = toRecordInputMessages(input.Messages)
+		r.Input = toRecordInputMessages(input.Messages, truncate)
 		r.InputTools = toRecordInputTool(input.Tools)
 		r.Parameters = toModelParameters(input.Config) // same as output.Config
 	}
@@ -283,10 +308,11 @@ func buildErrorRecord(
 	err error,
 	input *model.CallbackInput,
 	endTime time.Time,
+	truncate bool,
 ) *Record {
 	r := buildRecord(ctx, endTime)
 	if input != nil {
-		r.Input = toRecordInputMessages(input.Messages)
+		r.Input = toRecordInputMessages(input.Messages, truncate)
 		r.InputTools = toRecordInputTool(input.Tools)
 		r.Parameters = toModelParameters(input.Config)
 	}

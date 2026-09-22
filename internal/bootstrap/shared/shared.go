@@ -156,7 +156,10 @@ func initLLMGateway(ctx context.Context, cfg *confshared.InfraConfig, infra *Inf
 		infra.OlapDatabase.LLMLogStore,
 		infra.LLMBillingMeter,
 	)
-	llmGateway, err := llmchat.New(ctx, &cfg.Provider, llmchat.WithRecorder(recorder))
+	llmGateway, err := llmchat.New(ctx, &cfg.Provider,
+		llmchat.WithRecorder(recorder),
+		llmchat.WithRecordTruncate(cfg.LLMRecord.TruncateEnabled()),
+	)
 	if err != nil {
 		return fmt.Errorf("llm gateway: %w", err)
 	}

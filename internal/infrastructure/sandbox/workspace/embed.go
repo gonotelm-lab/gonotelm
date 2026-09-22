@@ -15,7 +15,12 @@ func Vendors() map[string]fs.File {
 	if err != nil {
 		panic(err)
 	}
+	gsap, err := vendor.Open("vendor/gsap.browser.js")
+	if err != nil {
+		panic(err)
+	}
 	return map[string]fs.File{
-		"standalone.cjs": standalone,
+		"standalone.cjs":  standalone,
+		"gsap.browser.js": gsap,
 	}
 }

@@ -30,12 +30,27 @@ func (a *CustomSandbox) Id() string {
 	return a.s.ID()
 }
 
+func (a *CustomSandbox) Ping(ctx context.Context) error {
+	if err := a.s.Ping(ctx); err != nil {
+		return pkgerr.Wrapf(err, "custom sandbox ping failed")
+	}
+
+	return nil
+}
+
 func (a *CustomSandbox) Description() entity.SandboxDescription {
 	return entity.SandboxDescription{
 		Id:      a.s.ID(),
 		Key:     a.key,
 		Runtime: a.runtime,
 	}
+}
+
+func commandTimeoutMs(cmd entity.Command) int64 {
+	if cmd.Timeout <= 0 {
+		return 0
+	}
+	return cmd.Timeout.Milliseconds()
 }
 
 func (a *CustomSandbox) Run(ctx context.Context, cmd entity.Command) (entity.Execution, error) {
@@ -47,8 +62,8 @@ func (a *CustomSandbox) Run(ctx context.Context, cmd entity.Command) (entity.Exe
 	if req.Cwd == "" {
 		req.Cwd = a.key.WorkspaceDir()
 	}
-	if cmd.Timeout > 0 {
-		req.Timeout = int64(cmd.Timeout.Seconds())
+	if timeoutMs := commandTimeoutMs(cmd); timeoutMs > 0 {
+		req.Timeout = timeoutMs
 	}
 
 	start := time.Now()

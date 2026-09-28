@@ -10,7 +10,6 @@ import (
 	einoschema "github.com/cloudwego/eino/schema"
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
-	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	workerentity "github.com/gonotelm-lab/gonotelm/internal/domain/worker/entity"
@@ -19,6 +18,7 @@ import (
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/pipeline"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 )
 
@@ -98,39 +98,45 @@ func (s *videoScript) renderSegmentsMarkdown(meta *audioCheckpointMeta) string {
 	return strings.TrimSpace(b.String())
 }
 
-// scriptGenerator 一次探索生成口播稿（先构思板块再写 lines），写入 checkpoint.field1。
-type scriptGenerator struct {
+// scriptStep 一次探索生成口播稿（先构思板块再写 lines），写入 checkpoint.field1。
+type scriptStep struct {
 	deps          *types.WorkerDeps
 	checkpoints   *types.CheckpointStore
 	audioProvider text2audio.Text2AudioProvider
 }
 
-func newScriptGenerator(deps *types.WorkerDeps, checkpoints *types.CheckpointStore) *scriptGenerator {
-	return &scriptGenerator{
-		deps:          deps,
-		checkpoints:   checkpoints,
-		audioProvider: conf.WorkerGlobal().Studio.VideoOverview.AudioModelProvider,
+func (s *scriptStep) Name() string { return "script" }
+
+func (s *scriptStep) Execute(ctx context.Context, data *pipeline.Data) error {
+	req := types.RequestFrom(data)
+	script, ckpt, restored, err := s.ensure(ctx, req, payloadFrom(req), checkpointFrom(data))
+	if err != nil {
+		return errors.WithMessagef(err, "generate video script failed")
 	}
+	data.Set(dataKeyScript, script)
+	data.Set(dataKeyCheckpoint, ckpt)
+	data.Set(dataKeyScriptRestored, restored)
+	return nil
 }
 
-func (g *scriptGenerator) ensure(
+func (s *scriptStep) ensure(
 	ctx context.Context,
 	req *types.Request,
 	payload *artifactentity.VideoOverviewPayload,
 	ckpt *workerentity.Checkpoint,
 ) (*videoScript, *workerentity.Checkpoint, bool, error) {
-	if script := g.restore(ctx, req.ArtifactId, ckpt); script != nil {
+	if script := s.restore(ctx, req.ArtifactId, ckpt); script != nil {
 		slog.InfoContext(ctx, "video script restored from checkpoint",
 			slog.String("artifact_id", req.ArtifactId.String()))
 		return script, ckpt, true, nil
 	}
 
-	script, err := g.generate(ctx, req, payload)
+	script, err := s.generate(ctx, req, payload)
 	if err != nil {
 		return nil, ckpt, false, err
 	}
 
-	ckpt, err = g.save(ctx, req.ArtifactId, ckpt, script)
+	ckpt, err = s.save(ctx, req.ArtifactId, ckpt, script)
 	if err != nil {
 		return nil, nil, false, errors.WithMessagef(err, "save video script checkpoint failed")
 	}
@@ -138,7 +144,7 @@ func (g *scriptGenerator) ensure(
 	return script, ckpt, false, nil
 }
 
-func (g *scriptGenerator) generate(
+func (s *scriptStep) generate(
 	ctx context.Context,
 	req *types.Request,
 	payload *artifactentity.VideoOverviewPayload,
@@ -151,25 +157,25 @@ func (g *scriptGenerator) generate(
 		return nil, errors.WithMessagef(err, "render video script prompt failed")
 	}
 
-	if skill := voices.GetProviderSkill(g.audioProvider); skill != "" {
+	if skill := voices.GetProviderSkill(s.audioProvider); skill != "" {
 		msgs = append(msgs, einoschema.UserMessage(skill))
 	}
 
-	ag, err := newVideoScriptAgent(g.deps, req)
+	ag, err := newVideoScriptAgent(s.deps, req)
 	if err != nil {
 		return nil, err
 	}
 
 	step := types.NewAgentStepBuilder[*videoScript](ag, "video script").
-		WithParse(g.parse).
+		WithParse(s.parse).
 		WithRetry(scriptCompensate).
 		WithDuty("First explore the given sources (StatSource/ReadSource), then produce the JSON video script (title/voice_baseline/segments) from the source content; do not fabricate without reading the sources").
-		WithRules(g.compensateRules).
+		WithRules(s.compensateRules).
 		Build()
 	return step.Run(ctx, msgs)
 }
 
-func (g *scriptGenerator) compensateRules(validateErr error) []string {
+func (s *scriptStep) compensateRules(validateErr error) []string {
 	rules := []string{
 		"JSON must contain only `title`, `voice_baseline` and `segments`",
 	}
@@ -179,7 +185,7 @@ func (g *scriptGenerator) compensateRules(validateErr error) []string {
 	return rules
 }
 
-func (g *scriptGenerator) save(
+func (s *scriptStep) save(
 	ctx context.Context,
 	artifactId valobj.Id,
 	ckpt *workerentity.Checkpoint,
@@ -193,13 +199,13 @@ func (g *scriptGenerator) save(
 		ckpt = workerentity.NewCheckpoint(artifactId)
 	}
 	ckpt.UpdateField1(data)
-	if err := g.checkpoints.Save(ctx, ckpt); err != nil {
+	if err := s.checkpoints.Save(ctx, ckpt); err != nil {
 		return nil, err
 	}
 	return ckpt, nil
 }
 
-func (g *scriptGenerator) parse(ctx context.Context, content string) (*videoScript, error) {
+func (s *scriptStep) parse(ctx context.Context, content string) (*videoScript, error) {
 	content = pkgstring.StripJSONPrefix(content)
 	if content == "" {
 		return nil, fmt.Errorf("empty output")
@@ -261,7 +267,7 @@ func (g *scriptGenerator) parse(ctx context.Context, content string) (*videoScri
 	return &script, nil
 }
 
-func (g *scriptGenerator) restore(ctx context.Context, artifactId valobj.Id, ckpt *workerentity.Checkpoint) *videoScript {
+func (s *scriptStep) restore(ctx context.Context, artifactId valobj.Id, ckpt *workerentity.Checkpoint) *videoScript {
 	if ckpt == nil || ckpt.Field1 == nil {
 		return nil
 	}

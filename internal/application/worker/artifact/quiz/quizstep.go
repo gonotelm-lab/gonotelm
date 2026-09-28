@@ -9,6 +9,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/pipeline"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
@@ -36,12 +37,20 @@ type quizExpectation struct {
 	Quiz  QuizContent `json:"quiz"`
 }
 
-type quizGenerator struct {
+// quizStep 生成并解析测验题。
+type quizStep struct {
 	deps *types.WorkerDeps
 }
 
-func newQuizGenerator(deps *types.WorkerDeps) *quizGenerator {
-	return &quizGenerator{deps: deps}
+func (s *quizStep) Name() string { return "quiz" }
+
+func (s *quizStep) Execute(ctx context.Context, data *pipeline.Data) error {
+	expect, err := s.generate(ctx, types.RequestFrom(data))
+	if err != nil {
+		return err
+	}
+	data.Set(dataKeyResult, expect)
+	return nil
 }
 
 func quizCompensateRules(validateErr error) []string {
@@ -54,7 +63,7 @@ func quizCompensateRules(validateErr error) []string {
 	return rules
 }
 
-func (g *quizGenerator) generate(
+func (s *quizStep) generate(
 	ctx context.Context,
 	req *types.Request,
 ) (*quizExpectation, error) {
@@ -73,13 +82,13 @@ func (g *quizGenerator) generate(
 		return nil, errors.WithMessagef(err, "generate quiz message failed")
 	}
 
-	ag, err := newQuizAgent(g.deps, req)
+	ag, err := newQuizAgent(s.deps, req)
 	if err != nil {
 		return nil, err
 	}
 
 	step := types.NewAgentStepBuilder[*quizExpectation](ag, "quiz").
-		WithParse(g.parse).
+		WithParse(s.parse).
 		WithRetry(quizMaxCompensateRetry).
 		WithDuty("Produce the JSON quiz (title/quiz) based on the given source content").
 		WithRules(quizCompensateRules).
@@ -87,7 +96,7 @@ func (g *quizGenerator) generate(
 	return step.Run(ctx, msgs)
 }
 
-func (g *quizGenerator) parse(ctx context.Context, content string) (*quizExpectation, error) {
+func (s *quizStep) parse(ctx context.Context, content string) (*quizExpectation, error) {
 	content = pkgstring.StripJSONPrefix(content)
 	if content == "" {
 		return nil, fmt.Errorf("empty output")

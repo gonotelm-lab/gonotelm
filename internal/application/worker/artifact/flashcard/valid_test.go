@@ -20,7 +20,7 @@ func TestFlashcardGeneratorParse_Valid(t *testing.T) {
     ]
   }
 }`
-	got, err := newFlashcardGenerator(nil).parse(t.Context(), raw)
+	got, err := (&flashcardStep{}).parse(t.Context(), raw)
 	require.NoError(t, err)
 	assert.Equal(t, "Rust所有权核心闪卡合集", got.Title)
 	require.Len(t, got.Flashcard.Cards, 1)
@@ -31,7 +31,7 @@ func TestFlashcardGeneratorParse_Valid(t *testing.T) {
 
 func TestFlashcardGeneratorParse_RejectsEmptyCards(t *testing.T) {
 	raw := `{"title":"空闪卡标题示例文本","flashcard":{"cards":[]}}`
-	_, err := newFlashcardGenerator(nil).parse(t.Context(), raw)
+	_, err := (&flashcardStep{}).parse(t.Context(), raw)
 	require.Error(t, err)
 }
 
@@ -44,7 +44,7 @@ func TestFlashcardGeneratorParse_RejectsMissingFront(t *testing.T) {
     ]
   }
 }`
-	_, err := newFlashcardGenerator(nil).parse(t.Context(), raw)
+	_, err := (&flashcardStep{}).parse(t.Context(), raw)
 	require.Error(t, err)
 }
 

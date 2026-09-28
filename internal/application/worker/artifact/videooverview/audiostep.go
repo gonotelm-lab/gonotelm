@@ -28,6 +28,7 @@ import (
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/httpclient"
+	"github.com/gonotelm-lab/gonotelm/pkg/pipeline"
 	"github.com/gonotelm-lab/gonotelm/pkg/safe"
 )
 
@@ -73,8 +74,8 @@ type synthesizedLine struct {
 	VoiceInstruction string
 }
 
-// audioSynthizer 按口播稿逐句 TTS 并上传 OSS，写入 field2；不做整轨拼接。
-type audioSynthizer struct {
+// audioStep 按口播稿逐句 TTS 并上传 OSS，写入 field2；不做整轨拼接。
+type audioStep struct {
 	text2audio     *text2audio.Text2AudioGateway
 	storage        storage.Storage
 	checkpoints    *types.CheckpointStore
@@ -85,13 +86,13 @@ type audioSynthizer struct {
 	concurrency int
 }
 
-func newAudioSynthizer(deps *types.WorkerDeps, checkpoints *types.CheckpointStore) *audioSynthizer {
+func newAudioStep(deps *types.WorkerDeps, checkpoints *types.CheckpointStore) *audioStep {
 	cfg := conf.WorkerGlobal().Studio.VideoOverview
 	concurrency := cfg.AudioSynthConcurrency
 	if concurrency <= 0 {
 		concurrency = 1
 	}
-	return &audioSynthizer{
+	return &audioStep{
 		text2audio:     deps.Text2Audio,
 		storage:        deps.ObjectStorage,
 		checkpoints:    checkpoints,
@@ -102,7 +103,27 @@ func newAudioSynthizer(deps *types.WorkerDeps, checkpoints *types.CheckpointStor
 	}
 }
 
-func (s *audioSynthizer) collectLines(script *videoScript) []synthesizedLine {
+func (s *audioStep) Name() string { return "audio" }
+
+func (s *audioStep) Execute(ctx context.Context, data *pipeline.Data) error {
+	req := types.RequestFrom(data)
+	ckpt := checkpointFrom(data)
+
+	// 口播稿被重新生成（field1 新写入）时，field2 仍是旧脚本的逐句音频，需丢弃后重新合成。
+	if !pipeline.Get[bool](data, dataKeyScriptRestored) {
+		s.discardStale(ctx, req.ArtifactId, ckpt)
+	}
+
+	meta, restored, err := s.generate(ctx, req, payloadFrom(req), scriptFrom(data), ckpt)
+	if err != nil {
+		return errors.WithMessagef(err, "generate video overview audio failed")
+	}
+	data.Set(dataKeyAudioMeta, meta)
+	data.Set(dataKeyAudioRestored, restored)
+	return nil
+}
+
+func (s *audioStep) collectLines(script *videoScript) []synthesizedLine {
 	if script == nil {
 		return nil
 	}
@@ -131,7 +152,7 @@ func resolveVoiceInstruction(baseline, line string) string {
 }
 
 // generate 逐句 TTS；第二个返回值表示 field2 在进入本步前已完整，无需新合成。
-func (s *audioSynthizer) generate(
+func (s *audioStep) generate(
 	ctx context.Context,
 	req *types.Request,
 	payload *artifactentity.VideoOverviewPayload,
@@ -211,7 +232,7 @@ type lineSynthJob struct {
 	callOpts   []audios.Option
 }
 
-func (s *audioSynthizer) synthesizePendingLines(ctx context.Context, job *lineSynthJob) error {
+func (s *audioStep) synthesizePendingLines(ctx context.Context, job *lineSynthJob) error {
 	done := len(job.meta.Parts)
 	if done >= len(job.lines) {
 		slog.DebugContext(ctx, "[video] all lines already synthesized, skip",
@@ -258,7 +279,7 @@ func (s *audioSynthizer) synthesizePendingLines(ctx context.Context, job *lineSy
 	return synthErr
 }
 
-func (s *audioSynthizer) synthesizeLinesConcurrent(
+func (s *audioStep) synthesizeLinesConcurrent(
 	ctx context.Context,
 	job *lineSynthJob,
 	pendingIdx []int,
@@ -276,7 +297,7 @@ func (s *audioSynthizer) synthesizeLinesConcurrent(
 	return gp.Wait()
 }
 
-func (s *audioSynthizer) synthesizeOneLine(
+func (s *audioStep) synthesizeOneLine(
 	ctx context.Context,
 	job *lineSynthJob,
 	index int,
@@ -341,7 +362,7 @@ func (s *audioSynthizer) synthesizeOneLine(
 	}
 }
 
-func (s *audioSynthizer) persistLineSynthResults(
+func (s *audioStep) persistLineSynthResults(
 	ctx context.Context,
 	job *lineSynthJob,
 	results <-chan lineSynthResult,
@@ -377,7 +398,7 @@ func (s *audioSynthizer) persistLineSynthResults(
 }
 
 // discardStale 口播稿重算后清理 field2 中的逐句音频。
-func (s *audioSynthizer) discardStale(ctx context.Context, artifactId valobj.Id, ckpt *workerentity.Checkpoint) {
+func (s *audioStep) discardStale(ctx context.Context, artifactId valobj.Id, ckpt *workerentity.Checkpoint) {
 	meta := s.restoreAudioMeta(ckpt)
 	if meta == nil || len(meta.Parts) == 0 {
 		if ckpt != nil && len(ckpt.Field2) > 0 {
@@ -407,7 +428,7 @@ func (s *audioSynthizer) discardStale(ctx context.Context, artifactId valobj.Id,
 	}
 }
 
-func (s *audioSynthizer) snapshotAudioCheckpoint(ckpt *workerentity.Checkpoint, meta *audioCheckpointMeta) (*workerentity.Checkpoint, error) {
+func (s *audioStep) snapshotAudioCheckpoint(ckpt *workerentity.Checkpoint, meta *audioCheckpointMeta) (*workerentity.Checkpoint, error) {
 	if ckpt == nil {
 		return nil, errors.New("video audio checkpoint is nil")
 	}
@@ -420,7 +441,7 @@ func (s *audioSynthizer) snapshotAudioCheckpoint(ckpt *workerentity.Checkpoint, 
 	return &snap, nil
 }
 
-func (s *audioSynthizer) restoreAudioMeta(ckpt *workerentity.Checkpoint) *audioCheckpointMeta {
+func (s *audioStep) restoreAudioMeta(ckpt *workerentity.Checkpoint) *audioCheckpointMeta {
 	if ckpt == nil || len(ckpt.Field2) == 0 {
 		return &audioCheckpointMeta{Version: audioCheckpointVersion}
 	}
@@ -437,7 +458,7 @@ func (s *audioSynthizer) restoreAudioMeta(ckpt *workerentity.Checkpoint) *audioC
 	return &meta
 }
 
-func (s *audioSynthizer) formatLineAudioStoreKey(
+func (s *audioStep) formatLineAudioStoreKey(
 	notebookId, artifactId valobj.Id,
 	segmentIndex, lineIndex int,
 ) string {

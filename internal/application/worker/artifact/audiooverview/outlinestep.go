@@ -15,6 +15,7 @@ import (
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/pipeline"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 )
 
@@ -28,32 +29,41 @@ type podcastOutlineExpectation struct {
 	Segments []podcastOutlineSegment `json:"segments"`
 }
 
-// outlineGenerator 生成/恢复播客大纲，写入 checkpoint.field1。
-type outlineGenerator struct {
+// outlineStep 生成/恢复播客大纲，写入 checkpoint.field1。
+type outlineStep struct {
 	deps        *types.WorkerDeps
 	checkpoints *types.CheckpointStore
 }
 
-func newOutlineGenerator(deps *types.WorkerDeps, checkpoints *types.CheckpointStore) *outlineGenerator {
-	return &outlineGenerator{deps: deps, checkpoints: checkpoints}
+func (s *outlineStep) Name() string { return "outline" }
+
+func (s *outlineStep) Execute(ctx context.Context, data *pipeline.Data) error {
+	req := types.RequestFrom(data)
+	outline, ckpt, err := s.ensure(ctx, req, payloadFrom(req), checkpointFrom(data))
+	if err != nil {
+		return errors.WithMessagef(err, "generate outline failed")
+	}
+	data.Set(dataKeyOutline, outline)
+	data.Set(dataKeyCheckpoint, ckpt)
+	return nil
 }
 
-func (g *outlineGenerator) ensure(
+func (s *outlineStep) ensure(
 	ctx context.Context,
 	req *types.Request,
 	payload *artifactentity.AudioOverviewPayload,
 	ckpt *workerentity.Checkpoint,
 ) (*podcastOutlineExpectation, *workerentity.Checkpoint, error) {
-	if outline := g.restore(ctx, req.ArtifactId, ckpt); outline != nil {
+	if outline := s.restore(ctx, req.ArtifactId, ckpt); outline != nil {
 		return outline, ckpt, nil
 	}
 
-	outline, err := g.generate(ctx, req, payload)
+	outline, err := s.generate(ctx, req, payload)
 	if err != nil {
 		return nil, ckpt, err
 	}
 
-	ckpt, err = g.save(ctx, req.ArtifactId, ckpt, outline)
+	ckpt, err = s.save(ctx, req.ArtifactId, ckpt, outline)
 	if err != nil {
 		return nil, nil, errors.WithMessagef(err, "save outline checkpoint failed")
 	}
@@ -61,7 +71,7 @@ func (g *outlineGenerator) ensure(
 	return outline, ckpt, nil
 }
 
-func (g *outlineGenerator) generate(
+func (s *outlineStep) generate(
 	ctx context.Context,
 	req *types.Request,
 	payload *artifactentity.AudioOverviewPayload,
@@ -74,26 +84,26 @@ func (g *outlineGenerator) generate(
 		return nil, errors.WithMessagef(err, "render podcast outline prompt failed")
 	}
 
-	ag, err := newAudioAgent(g.deps, req)
+	ag, err := newAudioAgent(s.deps, req)
 	if err != nil {
 		return nil, err
 	}
 
 	step := types.NewAgentStepBuilder[*podcastOutlineExpectation](ag, "podcast outline").
-		WithParse(g.parse).
+		WithParse(s.parse).
 		WithDuty("Produce the JSON podcast outline (title/segments) based on the given source content").
-		WithRules(g.compensateRules).
+		WithRules(s.compensateRules).
 		Build()
 	return step.Run(ctx, msgs)
 }
 
-func (g *outlineGenerator) compensateRules(error) []string {
+func (s *outlineStep) compensateRules(error) []string {
 	return []string{
 		"JSON must contain only `title` and `segments`",
 	}
 }
 
-func (g *outlineGenerator) save(
+func (s *outlineStep) save(
 	ctx context.Context,
 	artifactId valobj.Id,
 	ckpt *workerentity.Checkpoint,
@@ -107,13 +117,13 @@ func (g *outlineGenerator) save(
 		ckpt = workerentity.NewCheckpoint(artifactId)
 	}
 	ckpt.UpdateField1(data)
-	if err := g.checkpoints.Save(ctx, ckpt); err != nil {
+	if err := s.checkpoints.Save(ctx, ckpt); err != nil {
 		return nil, err
 	}
 	return ckpt, nil
 }
 
-func (g *outlineGenerator) restore(ctx context.Context, artifactId valobj.Id, ckpt *workerentity.Checkpoint) *podcastOutlineExpectation {
+func (s *outlineStep) restore(ctx context.Context, artifactId valobj.Id, ckpt *workerentity.Checkpoint) *podcastOutlineExpectation {
 	if ckpt == nil || ckpt.Field1 == nil {
 		return nil
 	}
@@ -127,7 +137,7 @@ func (g *outlineGenerator) restore(ctx context.Context, artifactId valobj.Id, ck
 	return &outline
 }
 
-func (g *outlineGenerator) parse(ctx context.Context, content string) (*podcastOutlineExpectation, error) {
+func (s *outlineStep) parse(ctx context.Context, content string) (*podcastOutlineExpectation, error) {
 	content = pkgstring.StripJSONPrefix(content)
 	if content == "" {
 		return nil, fmt.Errorf("empty output")

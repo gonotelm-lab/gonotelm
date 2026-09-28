@@ -2,81 +2,84 @@ package audiooverview
 
 import (
 	"context"
-	"log/slog"
 
 	"github.com/bytedance/sonic"
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
+	workerentity "github.com/gonotelm-lab/gonotelm/internal/domain/worker/entity"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/pipeline"
 )
 
-// Generator 编排播客产物的各生成步骤：大纲 → 文字稿 → 音频合成。
+// 步骤之间通过 pipeline.Data 传递的键。
+const (
+	dataKeyCheckpoint         = "audiooverview.checkpoint"
+	dataKeyOutline            = "audiooverview.outline"
+	dataKeyTranscript         = "audiooverview.transcript"
+	dataKeyTranscriptRestored = "audiooverview.transcript_restored"
+	dataKeyAudioResult        = "audiooverview.audio_result"
+)
+
+// Generator 用 pipeline 编排播客产物：大纲（field1）→ 文字稿（field2）→ 逐段合成并拼接音频（field3）。
 type Generator struct {
+	deps        *types.WorkerDeps
 	checkpoints *types.CheckpointStore
-	outline     *outlineGenerator
-	transcript  *transcriptGenerator
-	audio       *audioSynthizer
 }
 
 var _ types.Generator = &Generator{}
 
 func New(deps *types.WorkerDeps) *Generator {
-	checkpoints := types.NewCheckpointStore(deps.CheckpointRepository)
 	return &Generator{
-		checkpoints: checkpoints,
-		outline:     newOutlineGenerator(deps, checkpoints),
-		transcript:  newTranscriptGenerator(deps, checkpoints, conf.WorkerGlobal().Studio.AudioOverview.AudioModelProvider),
-		audio:       newAudioSynthizer(deps, checkpoints),
+		deps:        deps,
+		checkpoints: types.NewCheckpointStore(deps.CheckpointRepository),
 	}
 }
 
-// Generate 流程：大纲（field1）→ 文字稿（field2）→ 逐段合成并拼接音频（field3）。
-func (a *Generator) Generate(ctx context.Context, req *types.Request) (*types.Response, error) {
-	payload := entity.PayloadAs[*entity.AudioOverviewPayload](req.Payload)
+func (g *Generator) Generate(ctx context.Context, req *types.Request) (*types.Response, error) {
+	data := types.NewPipelineData(req)
+	data.Set(dataKeyCheckpoint, g.checkpoints.Load(ctx, req.ArtifactId))
 
-	ckpt := a.checkpoints.Load(ctx, req.ArtifactId)
+	p := pipeline.New("worker.audiooverview")
+	p.AddSteps(
+		&outlineStep{deps: g.deps, checkpoints: g.checkpoints},
+		&transcriptStep{
+			deps:          g.deps,
+			checkpoints:   g.checkpoints,
+			audioProvider: conf.WorkerGlobal().Studio.AudioOverview.AudioModelProvider,
+		},
+		newAudioStep(g.deps, g.checkpoints),
+	)
 
-	outline, ckpt, err := a.outline.ensure(ctx, req, payload, ckpt)
-	if err != nil {
-		return nil, errors.WithMessagef(err, "generate outline failed")
+	if err := p.Execute(ctx, data); err != nil {
+		return nil, err
 	}
 
-	transcript, ckpt, transcriptRestored, err := a.transcript.ensure(ctx, req, payload, ckpt, outline)
-	if err != nil {
-		return nil, errors.WithMessagef(err, "generate transcript failed")
-	}
-
-	if !transcriptRestored && ckpt != nil && ckpt.Field3 != nil {
-		a.audio.discardStale(ctx, req.ArtifactId, ckpt)
-	}
-
-	audioResult, err := a.audio.generate(ctx, req, payload, transcript, ckpt)
-	if err != nil {
-		slog.ErrorContext(ctx, "generate audio failed",
-			slog.String("artifact_id", req.ArtifactId.String()),
-			slog.String("notebook_id", payload.NotebookId.String()),
-			slog.String("style", string(payload.Style)),
-			slog.Any("err", err),
-		)
-		return nil, errors.WithMessagef(err, "generate audio failed")
-	}
-
-	return a.buildAudioResponse(transcript, audioResult)
-}
-
-func (a *Generator) buildAudioResponse(
-	transcript *podcastTranscriptExpectation,
-	audioResult *AudioStorageResult,
-) (*types.Response, error) {
-	result, err := sonic.Marshal(audioResult)
+	result, err := sonic.Marshal(pipeline.Get[*AudioStorageResult](data, dataKeyAudioResult))
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrSerde, "marshal podcast audio result err=%v", err)
 	}
+
 	return &types.Response{
-		Title:      transcript.Title,
+		Title:      pipeline.Get[*podcastTranscriptExpectation](data, dataKeyTranscript).Title,
 		Result:     result,
 		ResultKind: entity.ResultKindStorage,
 	}, nil
+}
+
+func payloadFrom(req *types.Request) *entity.AudioOverviewPayload {
+	return entity.PayloadAs[*entity.AudioOverviewPayload](req.Payload)
+}
+
+func checkpointFrom(data *pipeline.Data) *workerentity.Checkpoint {
+	return pipeline.Get[*workerentity.Checkpoint](data, dataKeyCheckpoint)
+}
+
+func outlineFrom(data *pipeline.Data) *podcastOutlineExpectation {
+	return pipeline.Get[*podcastOutlineExpectation](data, dataKeyOutline)
+}
+
+func transcriptFrom(data *pipeline.Data) *podcastTranscriptExpectation {
+	return pipeline.Get[*podcastTranscriptExpectation](data, dataKeyTranscript)
 }

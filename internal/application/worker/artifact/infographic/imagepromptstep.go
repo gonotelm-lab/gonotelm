@@ -15,6 +15,7 @@ import (
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/pipeline"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 )
 
@@ -23,35 +24,44 @@ type infoGraphicExpectation struct {
 	ImagePrompt string `json:"image_prompt"`
 }
 
-// imagePromptGenerator 生成/恢复文生图 prompt，写入 checkpoint.field1。
-type imagePromptGenerator struct {
+// imagePromptStep 生成/恢复文生图 prompt，写入 checkpoint.field1。
+type imagePromptStep struct {
 	deps        *types.WorkerDeps
 	checkpoints *types.CheckpointStore
 }
 
-func newImagePromptGenerator(deps *types.WorkerDeps, checkpoints *types.CheckpointStore) *imagePromptGenerator {
-	return &imagePromptGenerator{deps: deps, checkpoints: checkpoints}
+func (s *imagePromptStep) Name() string { return "image-prompt" }
+
+func (s *imagePromptStep) Execute(ctx context.Context, data *pipeline.Data) error {
+	req := types.RequestFrom(data)
+	expect, ckpt, err := s.ensure(ctx, req, payloadFrom(req), checkpointFrom(data))
+	if err != nil {
+		return err
+	}
+	data.Set(dataKeyExpectation, expect)
+	data.Set(dataKeyCheckpoint, ckpt)
+	return nil
 }
 
-func (g *imagePromptGenerator) ensure(
+func (s *imagePromptStep) ensure(
 	ctx context.Context,
 	req *types.Request,
 	payload *artifactentity.InfoGraphicPayload,
 	ckpt *workerentity.Checkpoint,
 ) (*infoGraphicExpectation, *workerentity.Checkpoint, error) {
-	if expect := g.restore(ctx, req.ArtifactId, ckpt); expect != nil {
+	if expect := s.restore(ctx, req.ArtifactId, ckpt); expect != nil {
 		return expect, ckpt, nil
 	}
 
-	expect, err := g.generate(ctx, req, payload)
+	expect, err := s.generate(ctx, req, payload)
 	if err != nil {
 		return nil, ckpt, err
 	}
 
-	return expect, g.save(ctx, req.ArtifactId, ckpt, expect), nil
+	return expect, s.save(ctx, req.ArtifactId, ckpt, expect), nil
 }
 
-func (g *imagePromptGenerator) generate(
+func (s *imagePromptStep) generate(
 	ctx context.Context,
 	req *types.Request,
 	payload *artifactentity.InfoGraphicPayload,
@@ -71,13 +81,13 @@ func (g *imagePromptGenerator) generate(
 		return nil, errors.WithMessagef(err, "render infographic prompt failed")
 	}
 
-	ag, err := newInfoGraphicAgent(g.deps, req, payload.DetailLevel != artifactentity.InfoGraphicDetailLevelConcise)
+	ag, err := newInfoGraphicAgent(s.deps, req, payload.DetailLevel != artifactentity.InfoGraphicDetailLevelConcise)
 	if err != nil {
 		return nil, err
 	}
 
 	step := types.NewAgentStepBuilder[*infoGraphicExpectation](ag, "infographic").
-		WithParse(g.parse).
+		WithParse(s.parse).
 		WithDuty("Produce the JSON infographic prompt (title/image_prompt) based on the given source content").
 		WithRules(infoGraphicCompensateRules).
 		Build()
@@ -90,7 +100,7 @@ func infoGraphicCompensateRules(error) []string {
 	}
 }
 
-func (g *imagePromptGenerator) save(
+func (s *imagePromptStep) save(
 	ctx context.Context,
 	artifactId valobj.Id,
 	ckpt *workerentity.Checkpoint,
@@ -106,14 +116,14 @@ func (g *imagePromptGenerator) save(
 		ckpt = workerentity.NewCheckpoint(artifactId)
 	}
 	ckpt.UpdateField1(promptBytes)
-	if err := g.checkpoints.Save(ctx, ckpt); err != nil {
+	if err := s.checkpoints.Save(ctx, ckpt); err != nil {
 		slog.WarnContext(ctx, "save checkpoint failed",
 			slog.String("artifact_id", artifactId.String()), slog.Any("err", err))
 	}
 	return ckpt
 }
 
-func (g *imagePromptGenerator) restore(
+func (s *imagePromptStep) restore(
 	ctx context.Context,
 	artifactId valobj.Id,
 	ckpt *workerentity.Checkpoint,
@@ -130,7 +140,7 @@ func (g *imagePromptGenerator) restore(
 	return &expect
 }
 
-func (g *imagePromptGenerator) parse(
+func (s *imagePromptStep) parse(
 	ctx context.Context,
 	content string,
 ) (*infoGraphicExpectation, error) {

@@ -11,19 +11,28 @@ import (
 	sandboxent "github.com/gonotelm-lab/gonotelm/internal/domain/sandbox/entity"
 	sandboxservice "github.com/gonotelm-lab/gonotelm/internal/domain/sandbox/service"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/pipeline"
 )
 
-type sandboxProvider struct {
+// sandboxStep 获取或创建沙箱。
+type sandboxStep struct {
 	deps *types.WorkerDeps
 }
 
-func newSandboxProvider(deps *types.WorkerDeps) *sandboxProvider {
-	return &sandboxProvider{deps: deps}
+func (s *sandboxStep) Name() string { return "sandbox" }
+
+func (s *sandboxStep) Execute(ctx context.Context, data *pipeline.Data) error {
+	sandbox, err := s.ensure(ctx, types.RequestFrom(data))
+	if err != nil {
+		return errors.WithMessage(err, "ensure sandbox failed")
+	}
+	data.Set(dataKeySandbox, sandbox)
+	return nil
 }
 
-// 保留沙箱等待自然过期
-func (p *sandboxProvider) ensure(ctx context.Context, req *types.Request) (sandboxent.Sandbox, error) {
-	ss, err := p.getService()
+// ensure 保留沙箱等待自然过期
+func (s *sandboxStep) ensure(ctx context.Context, req *types.Request) (sandboxent.Sandbox, error) {
+	ss, err := s.getService()
 	if err != nil {
 		return nil, err
 	}
@@ -45,13 +54,13 @@ func (p *sandboxProvider) ensure(ctx context.Context, req *types.Request) (sandb
 	return sandbox, nil
 }
 
-func (p *sandboxProvider) getService() (*sandboxservice.Service, error) {
-	mgr, err := p.deps.Sandbox.GetManager(conf.WorkerGlobal().Studio.Slides.SandboxProvider)
+func (s *sandboxStep) getService() (*sandboxservice.Service, error) {
+	mgr, err := s.deps.Sandbox.GetManager(conf.WorkerGlobal().Studio.Slides.SandboxProvider)
 	if err != nil {
 		return nil, errors.WithMessage(err, "slides worker get provider failed")
 	}
 
-	service := sandboxservice.New(p.deps.SandboxRepository, mgr, p.deps.DistLock)
+	service := sandboxservice.New(s.deps.SandboxRepository, mgr, s.deps.DistLock)
 	return service, nil
 }
 

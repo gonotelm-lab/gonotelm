@@ -481,7 +481,7 @@ func (h *CreateMessageHandler) initStreamTask(
 		safe.Do(ctx, func() error {
 			h.consumeStreamTaskEvents(ctx, cancel, newTask.Id, eventChan)
 			return nil
-		})()
+		})
 	})
 
 	return newTask, eventChan, consumerDone, nil

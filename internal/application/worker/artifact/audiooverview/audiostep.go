@@ -26,6 +26,7 @@ import (
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/httpclient"
+	"github.com/gonotelm-lab/gonotelm/pkg/pipeline"
 	"github.com/gonotelm-lab/gonotelm/pkg/safe"
 )
 
@@ -68,8 +69,8 @@ type audioTurnPart struct {
 	StoreKey string `json:"store_key"`
 }
 
-// audioSynthizer 负责播客音频合成：逐轮 TTS、上传 OSS、拼接成完整 WAV、断点续跑与陈旧音频清理。
-type audioSynthizer struct {
+// audioStep 负责播客音频合成：逐轮 TTS、上传 OSS、拼接成完整 WAV、断点续跑与陈旧音频清理。
+type audioStep struct {
 	text2audio     *text2audio.Text2AudioGateway
 	storage        storage.Storage
 	checkpoints    *types.CheckpointStore
@@ -80,13 +81,13 @@ type audioSynthizer struct {
 	concurrency int
 }
 
-func newAudioSynthizer(deps *types.WorkerDeps, checkpoints *types.CheckpointStore) *audioSynthizer {
+func newAudioStep(deps *types.WorkerDeps, checkpoints *types.CheckpointStore) *audioStep {
 	cfg := conf.WorkerGlobal().Studio.AudioOverview
 	concurrency := cfg.AudioSynthConcurrency
 	if concurrency <= 0 {
 		concurrency = 1
 	}
-	return &audioSynthizer{
+	return &audioStep{
 		text2audio:     deps.Text2Audio,
 		storage:        deps.ObjectStorage,
 		checkpoints:    checkpoints,
@@ -95,6 +96,25 @@ func newAudioSynthizer(deps *types.WorkerDeps, checkpoints *types.CheckpointStor
 		model:          cfg.AudioModel,
 		concurrency:    concurrency,
 	}
+}
+
+func (s *audioStep) Name() string { return "audio" }
+
+func (s *audioStep) Execute(ctx context.Context, data *pipeline.Data) error {
+	req := types.RequestFrom(data)
+	ckpt := checkpointFrom(data)
+
+	// transcript 被重新生成（field2 新写入）但 field3 仍是旧音频时，旧音频与新文字稿不匹配，需丢弃重合成。
+	if !pipeline.Get[bool](data, dataKeyTranscriptRestored) && ckpt != nil && ckpt.Field3 != nil {
+		s.discardStale(ctx, req.ArtifactId, ckpt)
+	}
+
+	result, err := s.generate(ctx, req, payloadFrom(req), transcriptFrom(data), ckpt)
+	if err != nil {
+		return errors.WithMessagef(err, "generate audio failed")
+	}
+	data.Set(dataKeyAudioResult, result)
+	return nil
 }
 
 // collectTurns 将 transcript 展平为按播放顺序排列的发言序列。
@@ -162,7 +182,7 @@ func resolveVoice(langMap map[string]string, lang artifactentity.Language) strin
 
 // Generate 逐段调用 TTS 并上传中间 WAV 到 OSS，最后下载/拼接、上传最终 WAV 并清理中间键。
 // 重试时跳过已合成 index、稀疏补齐失败的 index。
-func (s *audioSynthizer) generate(
+func (s *audioStep) generate(
 	ctx context.Context,
 	req *types.Request,
 	payload *artifactentity.AudioOverviewPayload,
@@ -327,7 +347,7 @@ type turnSynthJob struct {
 }
 
 // synthesizePendingTurns 并发 TTS/上传尚未完成的 turn，经 channel 顺序落 checkpoint。
-func (s *audioSynthizer) synthesizePendingTurns(ctx context.Context, job *turnSynthJob) error {
+func (s *audioStep) synthesizePendingTurns(ctx context.Context, job *turnSynthJob) error {
 	done := len(job.meta.Parts)
 	if done >= len(job.turns) {
 		slog.DebugContext(ctx, "[audio] all turns already synthesized, skip",
@@ -386,7 +406,7 @@ func (s *audioSynthizer) synthesizePendingTurns(ctx context.Context, job *turnSy
 }
 
 // synthesizeTurnsConcurrent 并发生成并上传各 turn，成功结果写入 results。
-func (s *audioSynthizer) synthesizeTurnsConcurrent(
+func (s *audioStep) synthesizeTurnsConcurrent(
 	ctx context.Context,
 	job *turnSynthJob,
 	pendingIdx []int,
@@ -406,7 +426,7 @@ func (s *audioSynthizer) synthesizeTurnsConcurrent(
 }
 
 // synthesizeOneTurn 单段 TTS → 解析 → 上传中间 WAV，再投递到 results。
-func (s *audioSynthizer) synthesizeOneTurn(
+func (s *audioStep) synthesizeOneTurn(
 	ctx context.Context,
 	job *turnSynthJob,
 	index int,
@@ -503,7 +523,7 @@ func (s *audioSynthizer) synthesizeOneTurn(
 }
 
 // persistTurnSynthResults 单消费者顺序落 checkpoint；格式失败时 cancel 并排空 channel。
-func (s *audioSynthizer) persistTurnSynthResults(
+func (s *audioStep) persistTurnSynthResults(
 	ctx context.Context,
 	job *turnSynthJob,
 	results <-chan turnSynthResult,
@@ -552,7 +572,7 @@ func (s *audioSynthizer) persistTurnSynthResults(
 }
 
 // assembleOrderedPCMs 按 turn index 从 OSS 读回所有逐段 PCM，形成 [0..N-1] 保序切片。
-func (s *audioSynthizer) assembleOrderedPCMs(
+func (s *audioStep) assembleOrderedPCMs(
 	ctx context.Context,
 	total int,
 	meta *audioCheckpointMeta,
@@ -585,7 +605,7 @@ func (s *audioSynthizer) assembleOrderedPCMs(
 }
 
 // downloadTurnPCM 从 OSS 下载逐段 WAV 并解析为 PCM。
-func (s *audioSynthizer) downloadTurnPCM(ctx context.Context, key string) (*pkgaudio.PCM, error) {
+func (s *audioStep) downloadTurnPCM(ctx context.Context, key string) (*pkgaudio.PCM, error) {
 	resp, err := s.storage.GetObject(ctx, &storage.GetObjectRequest{Key: key})
 	if err != nil {
 		return nil, err
@@ -595,7 +615,7 @@ func (s *audioSynthizer) downloadTurnPCM(ctx context.Context, key string) (*pkga
 }
 
 // cleanupIntermediateAudio 在最终 WAV 合并上传成功后批量删除中间音频，失败仅记日志。
-func (s *audioSynthizer) cleanupIntermediateAudio(ctx context.Context, meta *audioCheckpointMeta) {
+func (s *audioStep) cleanupIntermediateAudio(ctx context.Context, meta *audioCheckpointMeta) {
 	if meta == nil || len(meta.Parts) == 0 {
 		return
 	}
@@ -619,7 +639,7 @@ func (s *audioSynthizer) cleanupIntermediateAudio(ctx context.Context, meta *aud
 // DiscardStale 清理废弃的中间音频并清空 field3。
 // 当 transcript 被重新生成（field2 是新写入的）但 checkpoint.field3 仍有旧数据时，
 // 旧音频与新 transcript 不匹配，必须丢弃并从零重新合成。
-func (s *audioSynthizer) discardStale(ctx context.Context, artifactId valobj.Id, ckpt *workerentity.Checkpoint) {
+func (s *audioStep) discardStale(ctx context.Context, artifactId valobj.Id, ckpt *workerentity.Checkpoint) {
 	meta := restoreAudioMeta(ckpt)
 	if meta == nil || len(meta.Parts) == 0 {
 		return
@@ -656,7 +676,7 @@ func snapshotAudioCheckpoint(ckpt *workerentity.Checkpoint, meta *audioCheckpoin
 }
 
 // persistAudioCheckpoint 无并发场景下直接序列化并保存 checkpoint（如失败重置路径）。
-func (s *audioSynthizer) persistAudioCheckpoint(
+func (s *audioStep) persistAudioCheckpoint(
 	ctx context.Context,
 	artifactId valobj.Id,
 	ckpt *workerentity.Checkpoint,

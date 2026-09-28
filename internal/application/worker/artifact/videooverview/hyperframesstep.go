@@ -25,6 +25,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/pipeline"
 )
 
 type videoStorageResult struct {
@@ -32,7 +33,8 @@ type videoStorageResult struct {
 	ContentType string `json:"content_type"`
 }
 
-type hyperframesVideoGenerator struct {
+// hyperframesStep 在沙箱中按分镜渲染 MP4 并上传。
+type hyperframesStep struct {
 	deps *types.WorkerDeps
 }
 
@@ -72,11 +74,23 @@ func shotSubagentConcurrency() int {
 	return defaultShotSubagentConcurrency
 }
 
-func newHyperframesVideoGenerator(deps *types.WorkerDeps) *hyperframesVideoGenerator {
-	return &hyperframesVideoGenerator{deps: deps}
+func newHyperframesStep(deps *types.WorkerDeps) *hyperframesStep {
+	return &hyperframesStep{deps: deps}
 }
 
-func (g *hyperframesVideoGenerator) generate(
+func (s *hyperframesStep) Name() string { return "hyperframes" }
+
+func (s *hyperframesStep) Execute(ctx context.Context, data *pipeline.Data) error {
+	req := types.RequestFrom(data)
+	result, err := s.generate(ctx, req, payloadFrom(req), storyboardFrom(data), audioMetaFrom(data))
+	if err != nil {
+		return errors.WithMessagef(err, "generate hyperframes video failed")
+	}
+	data.Set(dataKeyResult, result)
+	return nil
+}
+
+func (s *hyperframesStep) generate(
 	ctx context.Context,
 	req *types.Request,
 	payload *artifactentity.VideoOverviewPayload,
@@ -85,7 +99,7 @@ func (g *hyperframesVideoGenerator) generate(
 ) (*videoStorageResult, error) {
 	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioVideoOverviewHyperframesScene)
 
-	sandbox, err := g.ensureSandbox(ctx, req)
+	sandbox, err := s.ensureSandbox(ctx, req)
 	if err != nil {
 		return nil, errors.WithMessage(err, "ensure video sandbox failed")
 	}
@@ -104,16 +118,16 @@ func (g *hyperframesVideoGenerator) generate(
 		return nil, errors.WithMessage(err, "sync components to sandbox failed")
 	}
 
-	if err := g.syncAudioToSandbox(ctx, sandbox, workspaceDir, audioMeta); err != nil {
+	if err := s.syncAudioToSandbox(ctx, sandbox, workspaceDir, audioMeta); err != nil {
 		return nil, errors.WithMessage(err, "sync audio to sandbox failed")
 	}
 
-	agent, err := newHyperframesAgent(g.deps, req)
+	agent, err := newHyperframesAgent(s.deps, req)
 	if err != nil {
 		return nil, err
 	}
 
-	checkMP4Tool, err := g.getCheckMP4ValidTool(sandbox)
+	checkMP4Tool, err := s.getCheckMP4ValidTool(sandbox)
 	if err != nil {
 		return nil, errors.WithMessage(err, "infer check mp4 tool failed")
 	}
@@ -129,7 +143,7 @@ func (g *hyperframesVideoGenerator) generate(
 	}
 
 	subagentConcurrency := shotSubagentConcurrency()
-	shotSubagentTool, err := g.getShotSubagentTool(ctx, payload, agent, workspaceDir, sandboxTools, subagentConcurrency)
+	shotSubagentTool, err := s.getShotSubagentTool(ctx, payload, agent, workspaceDir, sandboxTools, subagentConcurrency)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +191,7 @@ func (g *hyperframesVideoGenerator) generate(
 	}()
 
 	storeKey := formatVideoStoreKey(req.NotebookId, req.ArtifactId)
-	if err := types.UploadReader(ctx, g.deps.ObjectStorage, storeKey, mimeTypeMP4, mp4Reader); err != nil {
+	if err := types.UploadReader(ctx, s.deps.ObjectStorage, storeKey, mimeTypeMP4, mp4Reader); err != nil {
 		return nil, errors.Wrapf(err, "upload video object failed, artifact_id=%s", req.ArtifactId)
 	}
 
@@ -187,7 +201,7 @@ func (g *hyperframesVideoGenerator) generate(
 	}, nil
 }
 
-func (g *hyperframesVideoGenerator) getShotSubagentTool(
+func (s *hyperframesStep) getShotSubagentTool(
 	ctx context.Context,
 	payload *artifactentity.VideoOverviewPayload,
 	agent *types.Agent,
@@ -234,8 +248,8 @@ func (g *hyperframesVideoGenerator) getShotSubagentTool(
 	return shotSubagentTool, nil
 }
 
-func (g *hyperframesVideoGenerator) ensureSandbox(ctx context.Context, req *types.Request) (sandboxent.Sandbox, error) {
-	ss, err := g.getSandboxService()
+func (s *hyperframesStep) ensureSandbox(ctx context.Context, req *types.Request) (sandboxent.Sandbox, error) {
+	ss, err := s.getSandboxService()
 	if err != nil {
 		return nil, err
 	}
@@ -261,12 +275,12 @@ func (g *hyperframesVideoGenerator) ensureSandbox(ctx context.Context, req *type
 	return sandbox, nil
 }
 
-func (g *hyperframesVideoGenerator) getSandboxService() (*sandboxservice.Service, error) {
-	mgr, err := g.deps.Sandbox.GetManager(conf.WorkerGlobal().Studio.VideoOverview.SandboxProvider)
+func (s *hyperframesStep) getSandboxService() (*sandboxservice.Service, error) {
+	mgr, err := s.deps.Sandbox.GetManager(conf.WorkerGlobal().Studio.VideoOverview.SandboxProvider)
 	if err != nil {
 		return nil, errors.WithMessage(err, "video overview get sandbox provider failed")
 	}
-	return sandboxservice.New(g.deps.SandboxRepository, mgr, g.deps.DistLock), nil
+	return sandboxservice.New(s.deps.SandboxRepository, mgr, s.deps.DistLock), nil
 }
 
 // sandbox 工作目录结构如下：
@@ -311,7 +325,7 @@ func ensureVideoOverviewWorkspace(ctx context.Context, sandbox sandboxent.Sandbo
 	return nil
 }
 
-func (g *hyperframesVideoGenerator) syncAudioToSandbox(
+func (s *hyperframesStep) syncAudioToSandbox(
 	ctx context.Context,
 	sandbox sandboxent.Sandbox,
 	workspaceDir string,
@@ -332,7 +346,7 @@ func (g *hyperframesVideoGenerator) syncAudioToSandbox(
 	for _, part := range parts {
 		p := part
 		gp.Go(func() error {
-			obj, err := g.deps.ObjectStorage.GetObject(gctx,
+			obj, err := s.deps.ObjectStorage.GetObject(gctx,
 				&storage.GetObjectRequest{Key: p.StoreKey},
 			)
 			if err != nil {
@@ -367,7 +381,7 @@ type checkMP4ToolInput struct {
 	Filename string `json:"filename" jsonschema_description:"title=target file path,description=The target MP4 file path"`
 }
 
-func (g *hyperframesVideoGenerator) getCheckMP4ValidTool(sandbox sandboxent.Sandbox) (einotool.InvokableTool, error) {
+func (s *hyperframesStep) getCheckMP4ValidTool(sandbox sandboxent.Sandbox) (einotool.InvokableTool, error) {
 	tool, err := einotoolutils.InferTool(
 		checkMP4ValidToolName,
 		"Validate an MP4 file. Input is the filename of the MP4 you just rendered. "+

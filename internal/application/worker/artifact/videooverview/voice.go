@@ -8,7 +8,7 @@ import (
 // videoNarratorSpeakerKey 视频旁白固定使用单一解说音色。
 const videoNarratorSpeakerKey = "athena"
 
-func (s *audioSynthizer) resolveNarratorVoice(lang entity.Language) (string, error) {
+func (s *audioStep) resolveNarratorVoice(lang entity.Language) (string, error) {
 	sp, ok := entity.BuiltinSpeakers[videoNarratorSpeakerKey]
 	if !ok {
 		return "", errors.ErrInner.Msgf("video narrator speaker %q not found", videoNarratorSpeakerKey)

@@ -9,6 +9,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/pipeline"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
@@ -21,15 +22,23 @@ type reportExpectation struct {
 	Report string `json:"report"`
 }
 
-type reportGenerator struct {
+// reportStep 生成并解析报告。
+type reportStep struct {
 	deps *types.WorkerDeps
 }
 
-func newReportGenerator(deps *types.WorkerDeps) *reportGenerator {
-	return &reportGenerator{deps: deps}
+func (s *reportStep) Name() string { return "report" }
+
+func (s *reportStep) Execute(ctx context.Context, data *pipeline.Data) error {
+	expect, err := s.generate(ctx, types.RequestFrom(data))
+	if err != nil {
+		return err
+	}
+	data.Set(dataKeyResult, expect)
+	return nil
 }
 
-func (g *reportGenerator) generate(
+func (s *reportStep) generate(
 	ctx context.Context,
 	req *types.Request,
 ) (*reportExpectation, error) {
@@ -45,13 +54,13 @@ func (g *reportGenerator) generate(
 		return nil, errors.WithMessagef(err, "generate report message failed")
 	}
 
-	ag, err := newReportAgent(g.deps, req)
+	ag, err := newReportAgent(s.deps, req)
 	if err != nil {
 		return nil, err
 	}
 
 	step := types.NewAgentStepBuilder[*reportExpectation](ag, "report").
-		WithParse(g.parse).
+		WithParse(s.parse).
 		WithRetry(reportMaxCompensateRetry).
 		WithDuty("Produce the JSON report (title/report) based on the given source content").
 		WithRules(reportCompensateRules).
@@ -69,7 +78,7 @@ func reportCompensateRules(validateErr error) []string {
 	return rules
 }
 
-func (g *reportGenerator) parse(ctx context.Context, content string) (*reportExpectation, error) {
+func (s *reportStep) parse(ctx context.Context, content string) (*reportExpectation, error) {
 	content = pkgstring.StripJSONPrefix(content)
 	if content == "" {
 		return nil, fmt.Errorf("empty output")

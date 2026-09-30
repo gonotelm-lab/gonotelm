@@ -14,6 +14,7 @@ import (
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/pipeline"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 )
 
@@ -24,33 +25,41 @@ type slidesOutlineExpectation struct {
 	Outline string `json:"outline"`
 }
 
-// outlineGenerator 生成/恢复幻灯片大纲，写入 checkpoint.field1。
-type outlineGenerator struct {
+// outlineStep 生成/恢复幻灯片大纲，写入 checkpoint.field1。
+type outlineStep struct {
 	deps        *types.WorkerDeps
 	checkpoints *types.CheckpointStore
 }
 
-func newOutlineGenerator(deps *types.WorkerDeps, checkpoints *types.CheckpointStore) *outlineGenerator {
-	return &outlineGenerator{deps: deps, checkpoints: checkpoints}
+func (s *outlineStep) Name() string { return "outline" }
+
+func (s *outlineStep) Execute(ctx context.Context, data *pipeline.Data) error {
+	outline, ckpt, err := s.ensure(ctx, types.RequestFrom(data), sourcesFrom(data), checkpointFrom(data))
+	if err != nil {
+		return errors.WithMessage(err, "ensure outline failed")
+	}
+	data.Set(dataKeyOutline, outline)
+	data.Set(dataKeyCheckpoint, ckpt)
+	return nil
 }
 
-func (g *outlineGenerator) ensure(
+func (s *outlineStep) ensure(
 	ctx context.Context,
 	req *types.Request,
 	sources []OutlineSource,
 	ckpt *workerentity.Checkpoint,
 ) (*slidesOutlineExpectation, *workerentity.Checkpoint, error) {
-	if outline := g.restore(ctx, req.ArtifactId, ckpt); outline != nil {
+	if outline := s.restore(ctx, req.ArtifactId, ckpt); outline != nil {
 		slog.InfoContext(ctx, "slides generator restore from checkpoint 1", slog.String("artifact_id", req.ArtifactId.String()))
 		return outline, ckpt, nil
 	}
 
-	outline, err := g.generate(ctx, req, sources)
+	outline, err := s.generate(ctx, req, sources)
 	if err != nil {
 		return nil, ckpt, err
 	}
 
-	ckpt, err = g.save(ctx, req.ArtifactId, ckpt, outline)
+	ckpt, err = s.save(ctx, req.ArtifactId, ckpt, outline)
 	if err != nil {
 		return nil, nil, errors.Wrapf(errors.ErrInner, "save slides outline checkpoint failed, err=%v", err)
 	}
@@ -58,7 +67,7 @@ func (g *outlineGenerator) ensure(
 	return outline, ckpt, nil
 }
 
-func (g *outlineGenerator) generate(
+func (s *outlineStep) generate(
 	ctx context.Context,
 	req *types.Request,
 	sources []OutlineSource,
@@ -71,13 +80,13 @@ func (g *outlineGenerator) generate(
 		return nil, errors.WithMessagef(err, "generate slides outline message failed")
 	}
 
-	ag, err := newSlidesOutlineAgent(g.deps, req)
+	ag, err := newSlidesOutlineAgent(s.deps, req)
 	if err != nil {
 		return nil, err
 	}
 
 	step := types.NewAgentStepBuilder[*slidesOutlineExpectation](ag, "slides outline").
-		WithParse(g.parse).
+		WithParse(s.parse).
 		WithRetry(slidesMaxCompensateRetry).
 		WithDuty("Produce the JSON PPT outline (title/outline) based on the given source content").
 		WithRules(slidesOutlineCompensateRules).
@@ -95,7 +104,7 @@ func slidesOutlineCompensateRules(validateErr error) []string {
 	return rules
 }
 
-func (g *outlineGenerator) save(
+func (s *outlineStep) save(
 	ctx context.Context,
 	artifactId valobj.Id,
 	ckpt *workerentity.Checkpoint,
@@ -110,13 +119,13 @@ func (g *outlineGenerator) save(
 	}
 	ckpt.UpdateField1(data)
 
-	if err := g.checkpoints.Save(ctx, ckpt); err != nil {
+	if err := s.checkpoints.Save(ctx, ckpt); err != nil {
 		return nil, err
 	}
 	return ckpt, nil
 }
 
-func (g *outlineGenerator) restore(ctx context.Context, artifactId valobj.Id, ckpt *workerentity.Checkpoint) *slidesOutlineExpectation {
+func (s *outlineStep) restore(ctx context.Context, artifactId valobj.Id, ckpt *workerentity.Checkpoint) *slidesOutlineExpectation {
 	if ckpt == nil || ckpt.Field1 == nil {
 		return nil
 	}
@@ -130,7 +139,7 @@ func (g *outlineGenerator) restore(ctx context.Context, artifactId valobj.Id, ck
 	return &outline
 }
 
-func (g *outlineGenerator) parse(ctx context.Context, content string) (*slidesOutlineExpectation, error) {
+func (s *outlineStep) parse(ctx context.Context, content string) (*slidesOutlineExpectation, error) {
 	content = pkgstring.StripJSONPrefix(content)
 	if content == "" {
 		return nil, fmt.Errorf("empty output")

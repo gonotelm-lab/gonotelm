@@ -10,6 +10,7 @@ import (
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/pipeline"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 )
 
@@ -18,15 +19,23 @@ type mindmapExpectation struct {
 	Mindmap string `json:"mindmap"`
 }
 
-type mindmapGenerator struct {
+// mindmapStep 生成并解析思维导图。
+type mindmapStep struct {
 	deps *types.WorkerDeps
 }
 
-func newMindmapGenerator(deps *types.WorkerDeps) *mindmapGenerator {
-	return &mindmapGenerator{deps: deps}
+func (s *mindmapStep) Name() string { return "mindmap" }
+
+func (s *mindmapStep) Execute(ctx context.Context, data *pipeline.Data) error {
+	expect, err := s.generate(ctx, types.RequestFrom(data))
+	if err != nil {
+		return err
+	}
+	data.Set(dataKeyResult, expect)
+	return nil
 }
 
-func (g *mindmapGenerator) generate(
+func (s *mindmapStep) generate(
 	ctx context.Context,
 	req *types.Request,
 ) (*mindmapExpectation, error) {
@@ -37,13 +46,13 @@ func (g *mindmapGenerator) generate(
 		return nil, errors.WithMessagef(err, "generate mindmap message failed")
 	}
 
-	ag, err := newMindmapAgent(g.deps, req)
+	ag, err := newMindmapAgent(s.deps, req)
 	if err != nil {
 		return nil, err
 	}
 
 	step := types.NewAgentStepBuilder[*mindmapExpectation](ag, "mindmap").
-		WithParse(g.parse).
+		WithParse(s.parse).
 		WithDuty("Produce the JSON mindmap (title/mindmap) based on the given source content").
 		WithRules(mindmapCompensateRules).
 		Build()
@@ -56,7 +65,7 @@ func mindmapCompensateRules(error) []string {
 	}
 }
 
-func (g *mindmapGenerator) parse(ctx context.Context, content string) (*mindmapExpectation, error) {
+func (s *mindmapStep) parse(ctx context.Context, content string) (*mindmapExpectation, error) {
 	content = pkgstring.StripJSONPrefix(content)
 	if content == "" {
 		return nil, fmt.Errorf("empty output")

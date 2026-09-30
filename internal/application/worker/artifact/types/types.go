@@ -14,7 +14,23 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image"
 	infrasandbox "github.com/gonotelm-lab/gonotelm/internal/infrastructure/sandbox"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
+	"github.com/gonotelm-lab/gonotelm/pkg/pipeline"
 )
+
+// DataKeyRequest 是各产物 pipeline 在 pipeline.Data 中存放 *Request 的统一键。
+const DataKeyRequest = "artifact.request"
+
+// RequestFrom 从 pipeline.Data 取出当前产物的生成请求。
+func RequestFrom(data *pipeline.Data) *Request {
+	return pipeline.Get[*Request](data, DataKeyRequest)
+}
+
+// NewPipelineData 创建 pipeline.Data 并写入当前产物的生成请求。
+func NewPipelineData(req *Request) *pipeline.Data {
+	data := pipeline.NewData()
+	data.Set(DataKeyRequest, req)
+	return data
+}
 
 type Request struct {
 	ArtifactId valobj.Id

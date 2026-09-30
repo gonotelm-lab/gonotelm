@@ -29,7 +29,7 @@ func TestQuizGeneratorParse_Valid(t *testing.T) {
     "follow_up_hint": ["生命周期", "智能指针"]
   }
 }`
-	got, err := newQuizGenerator(nil).parse(t.Context(), raw)
+	got, err := (&quizStep{}).parse(t.Context(), raw)
 	require.NoError(t, err)
 	assert.Equal(t, "Rust所有权测验题组示例", got.Title)
 	require.Len(t, got.Quiz.Questions, 2)
@@ -53,7 +53,7 @@ func TestQuizGeneratorParse_RejectsWrongOptionCount(t *testing.T) {
     "follow_up_hint": ["h"]
   }
 }`
-	_, err := newQuizGenerator(nil).parse(t.Context(), raw)
+	_, err := (&quizStep{}).parse(t.Context(), raw)
 	require.Error(t, err)
 }
 
@@ -79,7 +79,7 @@ func TestQuizGeneratorParse_RejectsMultiBeforeSingle(t *testing.T) {
     "follow_up_hint": ["h"]
   }
 }`
-	_, err := newQuizGenerator(nil).parse(t.Context(), raw)
+	_, err := (&quizStep{}).parse(t.Context(), raw)
 	require.Error(t, err)
 }
 

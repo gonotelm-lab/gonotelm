@@ -18,6 +18,7 @@ import (
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/pipeline"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 )
 
@@ -37,38 +38,44 @@ type podcastTranscriptExpectation struct {
 	Segments []podcastTranscriptSegment `json:"segments"`
 }
 
-// transcriptGenerator 基于大纲生成/恢复播客文字稿，写入 checkpoint.field2。
-type transcriptGenerator struct {
+// transcriptStep 基于大纲生成/恢复播客文字稿，写入 checkpoint.field2。
+type transcriptStep struct {
 	deps          *types.WorkerDeps
 	checkpoints   *types.CheckpointStore
 	audioProvider text2audio.Text2AudioProvider
 }
 
-func newTranscriptGenerator(
-	deps *types.WorkerDeps,
-	checkpoints *types.CheckpointStore,
-	audioProvider text2audio.Text2AudioProvider,
-) *transcriptGenerator {
-	return &transcriptGenerator{deps: deps, checkpoints: checkpoints, audioProvider: audioProvider}
+func (s *transcriptStep) Name() string { return "transcript" }
+
+func (s *transcriptStep) Execute(ctx context.Context, data *pipeline.Data) error {
+	req := types.RequestFrom(data)
+	transcript, ckpt, restored, err := s.ensure(ctx, req, payloadFrom(req), checkpointFrom(data), outlineFrom(data))
+	if err != nil {
+		return errors.WithMessagef(err, "generate transcript failed")
+	}
+	data.Set(dataKeyTranscript, transcript)
+	data.Set(dataKeyCheckpoint, ckpt)
+	data.Set(dataKeyTranscriptRestored, restored)
+	return nil
 }
 
-func (g *transcriptGenerator) ensure(
+func (s *transcriptStep) ensure(
 	ctx context.Context,
 	req *types.Request,
 	payload *artifactentity.AudioOverviewPayload,
 	ckpt *workerentity.Checkpoint,
 	outline *podcastOutlineExpectation,
 ) (*podcastTranscriptExpectation, *workerentity.Checkpoint, bool, error) {
-	if transcript := g.restore(ctx, req.ArtifactId, ckpt); transcript != nil {
+	if transcript := s.restore(ctx, req.ArtifactId, ckpt); transcript != nil {
 		return transcript, ckpt, true, nil
 	}
 
-	transcript, err := g.generate(ctx, req, payload, outline)
+	transcript, err := s.generate(ctx, req, payload, outline)
 	if err != nil {
 		return nil, ckpt, false, err
 	}
 
-	ckpt, err = g.save(ctx, req.ArtifactId, ckpt, transcript)
+	ckpt, err = s.save(ctx, req.ArtifactId, ckpt, transcript)
 	if err != nil {
 		return nil, nil, false, errors.WithMessagef(err, "save transcript checkpoint failed")
 	}
@@ -76,7 +83,7 @@ func (g *transcriptGenerator) ensure(
 	return transcript, ckpt, false, nil
 }
 
-func (g *transcriptGenerator) generate(
+func (s *transcriptStep) generate(
 	ctx context.Context,
 	req *types.Request,
 	payload *artifactentity.AudioOverviewPayload,
@@ -90,32 +97,32 @@ func (g *transcriptGenerator) generate(
 		return nil, errors.WithMessagef(err, "render podcast transcript prompt failed")
 	}
 
-	if skills := voices.GetProviderSkill(g.audioProvider); len(skills) > 0 {
+	if skills := voices.GetProviderSkill(s.audioProvider); len(skills) > 0 {
 		msgs = append(msgs, einoschema.UserMessage(skills))
 	}
 
-	ag, err := newAudioAgent(g.deps, req)
+	ag, err := newAudioAgent(s.deps, req)
 	if err != nil {
 		return nil, err
 	}
 
 	step := types.NewAgentStepBuilder[*podcastTranscriptExpectation](ag, "podcast transcript").
 		WithParse(func(ctx context.Context, content string) (*podcastTranscriptExpectation, error) {
-			return g.parse(ctx, content, outline)
+			return s.parse(ctx, content, outline)
 		}).
 		WithDuty("Produce the JSON podcast transcript (title/segments) matching the outline, based on the given source content").
-		WithRules(g.compensateRules).
+		WithRules(s.compensateRules).
 		Build()
 	return step.Run(ctx, msgs)
 }
 
-func (g *transcriptGenerator) compensateRules(error) []string {
+func (s *transcriptStep) compensateRules(error) []string {
 	return []string{
 		"JSON must contain only `title` and `segments`",
 	}
 }
 
-func (g *transcriptGenerator) save(
+func (s *transcriptStep) save(
 	ctx context.Context,
 	artifactId valobj.Id,
 	ckpt *workerentity.Checkpoint,
@@ -129,13 +136,13 @@ func (g *transcriptGenerator) save(
 		ckpt = workerentity.NewCheckpoint(artifactId)
 	}
 	ckpt.UpdateField2(data)
-	if err := g.checkpoints.Save(ctx, ckpt); err != nil {
+	if err := s.checkpoints.Save(ctx, ckpt); err != nil {
 		return nil, err
 	}
 	return ckpt, nil
 }
 
-func (g *transcriptGenerator) restore(ctx context.Context, artifactId valobj.Id, ckpt *workerentity.Checkpoint) *podcastTranscriptExpectation {
+func (s *transcriptStep) restore(ctx context.Context, artifactId valobj.Id, ckpt *workerentity.Checkpoint) *podcastTranscriptExpectation {
 	if ckpt == nil || ckpt.Field2 == nil {
 		return nil
 	}
@@ -149,7 +156,7 @@ func (g *transcriptGenerator) restore(ctx context.Context, artifactId valobj.Id,
 	return &transcript
 }
 
-func (g *transcriptGenerator) parse(
+func (s *transcriptStep) parse(
 	ctx context.Context,
 	content string,
 	outline *podcastOutlineExpectation,

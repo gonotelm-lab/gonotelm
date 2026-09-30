@@ -18,6 +18,7 @@ import (
 	sourceentitiy "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/pipeline"
 
 	einotool "github.com/cloudwego/eino/components/tool"
 	einotoolutils "github.com/cloudwego/eino/components/tool/utils"
@@ -29,15 +30,23 @@ type checkPPTXToolInput struct {
 	Filename string `json:"filename" jsonschema_description:"title=targe file path,description=The target file path"`
 }
 
-type pptxGenerator struct {
+// pptxStep 在沙箱中生成 PPTX 并上传。
+type pptxStep struct {
 	deps *types.WorkerDeps
 }
 
-func newPPTXGenerator(deps *types.WorkerDeps) *pptxGenerator {
-	return &pptxGenerator{deps: deps}
+func (s *pptxStep) Name() string { return "pptx" }
+
+func (s *pptxStep) Execute(ctx context.Context, data *pipeline.Data) error {
+	result, err := s.generate(ctx, types.RequestFrom(data), outlineFrom(data), sandboxFrom(data), sourcesFrom(data))
+	if err != nil {
+		return errors.WithMessage(err, "generate slides failed")
+	}
+	data.Set(dataKeyResult, result)
+	return nil
 }
 
-func (g *pptxGenerator) generate(
+func (s *pptxStep) generate(
 	ctx context.Context,
 	req *types.Request,
 	outlineExp *slidesOutlineExpectation,
@@ -47,12 +56,12 @@ func (g *pptxGenerator) generate(
 	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.StudioSlidesPPTXScene)
 
 	// use thinking in pptx generation, it will take much longer
-	agent, err := newSlidesPPTXAgent(g.deps, req)
+	agent, err := newSlidesPPTXAgent(s.deps, req)
 	if err != nil {
 		return nil, err
 	}
 
-	checkPPTXTool, err := g.getCheckPPTXValidTool(sandbox)
+	checkPPTXTool, err := s.getCheckPPTXValidTool(sandbox)
 	if err != nil {
 		return nil, errors.WithMessage(err, "infer check pptx tool failed")
 	}
@@ -108,7 +117,7 @@ func (g *pptxGenerator) generate(
 	}()
 
 	storeKey := formatSlidesStoreKey(req.NotebookId, req.ArtifactId)
-	if err := types.UploadReader(ctx, g.deps.ObjectStorage, storeKey, sourceentitiy.MimeTypePPTX, pptxReader); err != nil {
+	if err := types.UploadReader(ctx, s.deps.ObjectStorage, storeKey, sourceentitiy.MimeTypePPTX, pptxReader); err != nil {
 		return nil, errors.Wrapf(err, "upload slides object failed, artifact_id=%s", req.ArtifactId)
 	}
 
@@ -122,7 +131,7 @@ func formatSlidesStoreKey(notebookId, artifactId valobj.Id) string {
 	return fmt.Sprintf("artifact/%s/%s.pptx", notebookId.String(), artifactId.String())
 }
 
-func (g *pptxGenerator) getCheckPPTXValidTool(sandbox sandboxent.Sandbox) (einotool.InvokableTool, error) {
+func (s *pptxStep) getCheckPPTXValidTool(sandbox sandboxent.Sandbox) (einotool.InvokableTool, error) {
 	tool, err := einotoolutils.InferTool(
 		checkPPTXValidToolName,
 		"Validate a PPTX file. Input is the filename of the PPTX you just generated. "+
@@ -130,7 +139,7 @@ func (g *pptxGenerator) getCheckPPTXValidTool(sandbox sandboxent.Sandbox) (einot
 			"Returns 'OK' if the file is a valid PPTX; otherwise it returns an error message describing what is wrong, "+
 			"and you must fix the file and validate again.",
 		func(ctx context.Context, input *checkPPTXToolInput) (output string, err error) {
-			if err := g.checkPPTXArtifactValid(ctx, sandbox, input.Filename); err != nil {
+			if err := s.checkPPTXArtifactValid(ctx, sandbox, input.Filename); err != nil {
 				return "", err
 			}
 			return "OK", nil
@@ -143,7 +152,7 @@ func (g *pptxGenerator) getCheckPPTXValidTool(sandbox sandboxent.Sandbox) (einot
 	return tool, nil
 }
 
-func (g *pptxGenerator) checkPPTXArtifactValid(ctx context.Context, sandbox sandboxent.Sandbox, filePath string) error {
+func (s *pptxStep) checkPPTXArtifactValid(ctx context.Context, sandbox sandboxent.Sandbox, filePath string) error {
 	fileContent, err := sandbox.ReadFile(ctx, filePath, sandboxent.WithReadMaxBytes(4096))
 	if err != nil {
 		return fmt.Errorf("can not read pptx file: %s, err: %w", filePath, err)

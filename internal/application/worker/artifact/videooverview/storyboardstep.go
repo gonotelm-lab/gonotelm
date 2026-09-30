@@ -12,20 +12,37 @@ import (
 	workerentity "github.com/gonotelm-lab/gonotelm/internal/domain/worker/entity"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/pipeline"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 )
 
-// storyboardGenerator 生成分镜 Markdown：模型读写固定草稿文件，成功后写入 checkpoint.field3。
-type storyboardGenerator struct {
+// storyboardStep 生成分镜 Markdown：模型读写固定草稿文件，成功后写入 checkpoint.field3。
+type storyboardStep struct {
 	deps        *types.WorkerDeps
 	checkpoints *types.CheckpointStore
 }
 
-func newStoryboardGenerator(deps *types.WorkerDeps, checkpoints *types.CheckpointStore) *storyboardGenerator {
-	return &storyboardGenerator{deps: deps, checkpoints: checkpoints}
+func (s *storyboardStep) Name() string { return "storyboard" }
+
+func (s *storyboardStep) Execute(ctx context.Context, data *pipeline.Data) error {
+	req := types.RequestFrom(data)
+	ckpt := checkpointFrom(data)
+
+	// 上游口播稿或音频被重算时，field3 分镜已过期，清除后重新生成。
+	if !pipeline.Get[bool](data, dataKeyScriptRestored) || !pipeline.Get[bool](data, dataKeyAudioRestored) {
+		s.discardStale(ctx, req.ArtifactId, ckpt)
+	}
+
+	md, ckpt, _, err := s.ensure(ctx, req, payloadFrom(req), scriptFrom(data), audioMetaFrom(data), ckpt)
+	if err != nil {
+		return errors.WithMessagef(err, "generate video storyboard failed")
+	}
+	data.Set(dataKeyStoryboard, md)
+	data.Set(dataKeyCheckpoint, ckpt)
+	return nil
 }
 
-func (g *storyboardGenerator) ensure(
+func (s *storyboardStep) ensure(
 	ctx context.Context,
 	req *types.Request,
 	payload *artifactentity.VideoOverviewPayload,
@@ -33,18 +50,18 @@ func (g *storyboardGenerator) ensure(
 	audioMeta *audioCheckpointMeta,
 	ckpt *workerentity.Checkpoint,
 ) (string, *workerentity.Checkpoint, bool, error) {
-	if md := g.restore(ctx, req.ArtifactId, ckpt); md != "" {
+	if md := s.restore(ctx, req.ArtifactId, ckpt); md != "" {
 		slog.InfoContext(ctx, "video storyboard restored from checkpoint",
 			slog.String("artifact_id", req.ArtifactId.String()))
 		return md, ckpt, true, nil
 	}
 
-	md, err := g.generate(ctx, req, payload, script, audioMeta)
+	md, err := s.generate(ctx, req, payload, script, audioMeta)
 	if err != nil {
 		return "", ckpt, false, err
 	}
 
-	ckpt, err = g.save(ctx, req.ArtifactId, ckpt, md)
+	ckpt, err = s.save(ctx, req.ArtifactId, ckpt, md)
 	if err != nil {
 		return "", nil, false, errors.WithMessagef(err, "save video storyboard checkpoint failed")
 	}
@@ -52,7 +69,7 @@ func (g *storyboardGenerator) ensure(
 	return md, ckpt, false, nil
 }
 
-func (g *storyboardGenerator) generate(
+func (s *storyboardStep) generate(
 	ctx context.Context,
 	req *types.Request,
 	payload *artifactentity.VideoOverviewPayload,
@@ -81,7 +98,7 @@ func (g *storyboardGenerator) generate(
 		return "", errors.WithMessagef(err, "render video storyboard prompt failed")
 	}
 
-	ag, err := newStoryboardAgent(g.deps, req)
+	ag, err := newStoryboardAgent(s.deps, req)
 	if err != nil {
 		return "", err
 	}
@@ -121,7 +138,7 @@ func readStoryboardDraft(ctx context.Context, req *types.Request) (string, error
 	return md, nil
 }
 
-func (g *storyboardGenerator) save(
+func (s *storyboardStep) save(
 	ctx context.Context,
 	artifactId valobj.Id,
 	ckpt *workerentity.Checkpoint,
@@ -131,13 +148,13 @@ func (g *storyboardGenerator) save(
 		ckpt = workerentity.NewCheckpoint(artifactId)
 	}
 	ckpt.UpdateField3(pkgstring.AsBytes(markdown))
-	if err := g.checkpoints.Save(ctx, ckpt); err != nil {
+	if err := s.checkpoints.Save(ctx, ckpt); err != nil {
 		return nil, err
 	}
 	return ckpt, nil
 }
 
-func (g *storyboardGenerator) parse(_ context.Context, content string) (string, error) {
+func (s *storyboardStep) parse(_ context.Context, content string) (string, error) {
 	md := normalizeStoryboardMarkdown(content)
 	if md == "" {
 		return "", fmt.Errorf("empty storyboard markdown")
@@ -145,7 +162,7 @@ func (g *storyboardGenerator) parse(_ context.Context, content string) (string, 
 	return md, nil
 }
 
-func (g *storyboardGenerator) restore(ctx context.Context, artifactId valobj.Id, ckpt *workerentity.Checkpoint) string {
+func (s *storyboardStep) restore(ctx context.Context, artifactId valobj.Id, ckpt *workerentity.Checkpoint) string {
 	if ckpt == nil || len(ckpt.Field3) == 0 {
 		return ""
 	}
@@ -153,7 +170,7 @@ func (g *storyboardGenerator) restore(ctx context.Context, artifactId valobj.Id,
 	if md == "" {
 		return ""
 	}
-	if _, err := g.parse(ctx, md); err != nil {
+	if _, err := s.parse(ctx, md); err != nil {
 		slog.WarnContext(ctx, "video storyboard checkpoint invalid, treat as miss",
 			slog.String("artifact_id", artifactId.String()), slog.Any("err", err))
 		return ""
@@ -162,7 +179,7 @@ func (g *storyboardGenerator) restore(ctx context.Context, artifactId valobj.Id,
 }
 
 // discardStale 上游口播或音频重算后清空 field3。
-func (g *storyboardGenerator) discardStale(ctx context.Context, artifactId valobj.Id, ckpt *workerentity.Checkpoint) {
+func (s *storyboardStep) discardStale(ctx context.Context, artifactId valobj.Id, ckpt *workerentity.Checkpoint) {
 	if ckpt == nil || len(ckpt.Field3) == 0 {
 		return
 	}
@@ -171,7 +188,7 @@ func (g *storyboardGenerator) discardStale(ctx context.Context, artifactId valob
 		slog.Int("bytes", len(ckpt.Field3)),
 	)
 	ckpt.UpdateField3(nil)
-	if err := g.checkpoints.Save(ctx, ckpt); err != nil {
+	if err := s.checkpoints.Save(ctx, ckpt); err != nil {
 		slog.ErrorContext(ctx, "clear stale video storyboard checkpoint failed",
 			slog.String("artifact_id", artifactId.String()), slog.Any("err", err))
 	}

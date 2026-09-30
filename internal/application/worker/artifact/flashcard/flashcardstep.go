@@ -9,6 +9,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/pipeline"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 
 	"github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
@@ -29,15 +30,23 @@ type flashcardExpectation struct {
 	Flashcard FlashcardContent `json:"flashcard"`
 }
 
-type flashcardGenerator struct {
+// flashcardStep 生成并解析闪卡。
+type flashcardStep struct {
 	deps *types.WorkerDeps
 }
 
-func newFlashcardGenerator(deps *types.WorkerDeps) *flashcardGenerator {
-	return &flashcardGenerator{deps: deps}
+func (s *flashcardStep) Name() string { return "flashcard" }
+
+func (s *flashcardStep) Execute(ctx context.Context, data *pipeline.Data) error {
+	expect, err := s.generate(ctx, types.RequestFrom(data))
+	if err != nil {
+		return err
+	}
+	data.Set(dataKeyResult, expect)
+	return nil
 }
 
-func (g *flashcardGenerator) generate(
+func (s *flashcardStep) generate(
 	ctx context.Context,
 	req *types.Request,
 ) (*flashcardExpectation, error) {
@@ -56,13 +65,13 @@ func (g *flashcardGenerator) generate(
 		return nil, errors.WithMessagef(err, "generate flashcard message failed")
 	}
 
-	ag, err := newFlashcardAgent(g.deps, req)
+	ag, err := newFlashcardAgent(s.deps, req)
 	if err != nil {
 		return nil, err
 	}
 
 	step := types.NewAgentStepBuilder[*flashcardExpectation](ag, "flashcard").
-		WithParse(g.parse).
+		WithParse(s.parse).
 		WithDuty("Produce the JSON flashcards (title/flashcard) based on the given source content").
 		WithRules(flashcardCompensateRules).
 		Build()
@@ -75,7 +84,7 @@ func flashcardCompensateRules(error) []string {
 	}
 }
 
-func (g *flashcardGenerator) parse(ctx context.Context, content string) (*flashcardExpectation, error) {
+func (s *flashcardStep) parse(ctx context.Context, content string) (*flashcardExpectation, error) {
 	content = pkgstring.StripJSONPrefix(content)
 	if content == "" {
 		return nil, fmt.Errorf("empty output")

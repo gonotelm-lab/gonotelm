@@ -21,25 +21,39 @@ import (
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/httpclient"
+	"github.com/gonotelm-lab/gonotelm/pkg/pipeline"
 	t2ischema "github.com/gonotelm-lab/multimodal/image/schema"
 	t2iutil "github.com/gonotelm-lab/multimodal/image/util"
 )
 
 const imageDownloadTimeout = 5 * time.Minute
 
-type imageGenerator struct {
+// imageStep 依据文生图 prompt 生成图片并上传。
+type imageStep struct {
 	deps           *types.WorkerDeps
 	downloadClient *http.Client
 }
 
-func newImageGenerator(deps *types.WorkerDeps) *imageGenerator {
-	return &imageGenerator{
+func newImageStep(deps *types.WorkerDeps) *imageStep {
+	return &imageStep{
 		deps:           deps,
 		downloadClient: httpclient.NewBuilder(nil).WithTimeout(imageDownloadTimeout).Build(),
 	}
 }
 
-func (g *imageGenerator) generate(
+func (s *imageStep) Name() string { return "image" }
+
+func (s *imageStep) Execute(ctx context.Context, data *pipeline.Data) error {
+	req := types.RequestFrom(data)
+	result, err := s.generate(ctx, req.ArtifactId, payloadFrom(req), expectationFrom(data).ImagePrompt)
+	if err != nil {
+		return err
+	}
+	data.Set(dataKeyResult, result)
+	return nil
+}
+
+func (s *imageStep) generate(
 	ctx context.Context,
 	artifactId valobj.Id,
 	payload *artifactentity.InfoGraphicPayload,
@@ -49,7 +63,7 @@ func (g *imageGenerator) generate(
 
 	cfg := conf.WorkerGlobal().Studio.InfoGraphic
 
-	generator, err := g.deps.Text2Image.GetProvider(cfg.ImageModelProvider)
+	generator, err := s.deps.Text2Image.GetProvider(cfg.ImageModelProvider)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "get text2image provider failed")
 	}
@@ -67,7 +81,7 @@ func (g *imageGenerator) generate(
 
 	imageReader, err := t2iutil.ResolveResponse(resp,
 		t2iutil.WithResolveContext(ctx),
-		t2iutil.WithResolveHttpClient(g.downloadClient),
+		t2iutil.WithResolveHttpClient(s.downloadClient),
 	)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "resolve generated image failed")
@@ -86,7 +100,7 @@ func (g *imageGenerator) generate(
 	contentType := mimeType.String()
 	storeKey := formatArtifactStoreKey(payload.NotebookId, artifactId, ext)
 
-	if err := types.UploadReader(ctx, g.deps.ObjectStorage, storeKey, contentType, stream); err != nil {
+	if err := types.UploadReader(ctx, s.deps.ObjectStorage, storeKey, contentType, stream); err != nil {
 		return nil, errors.WithMessagef(err, "upload infographic image failed")
 	}
 

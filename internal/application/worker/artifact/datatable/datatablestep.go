@@ -8,6 +8,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/pipeline"
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 
 	"github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
@@ -20,15 +21,23 @@ type dataTableExpectation struct {
 	Table string `json:"table"`
 }
 
-type dataTableGenerator struct {
+// dataTableStep 生成并解析数据表。
+type dataTableStep struct {
 	deps *types.WorkerDeps
 }
 
-func newDataTableGenerator(deps *types.WorkerDeps) *dataTableGenerator {
-	return &dataTableGenerator{deps: deps}
+func (s *dataTableStep) Name() string { return "datatable" }
+
+func (s *dataTableStep) Execute(ctx context.Context, data *pipeline.Data) error {
+	expect, err := s.generate(ctx, types.RequestFrom(data))
+	if err != nil {
+		return err
+	}
+	data.Set(dataKeyResult, expect)
+	return nil
 }
 
-func (g *dataTableGenerator) generate(
+func (s *dataTableStep) generate(
 	ctx context.Context,
 	req *types.Request,
 ) (*dataTableExpectation, error) {
@@ -39,13 +48,13 @@ func (g *dataTableGenerator) generate(
 		return nil, errors.WithMessagef(err, "generate datatable message failed")
 	}
 
-	ag, err := newDataTableAgent(g.deps, req)
+	ag, err := newDataTableAgent(s.deps, req)
 	if err != nil {
 		return nil, err
 	}
 
 	step := types.NewAgentStepBuilder[*dataTableExpectation](ag, "datatable").
-		WithParse(g.parse).
+		WithParse(s.parse).
 		WithRetry(dataTableMaxCompensateRetry).
 		WithDuty("Produce the JSON data table (title/table) based on the given source content").
 		WithRules(dataTableCompensateRules).
@@ -63,7 +72,7 @@ func dataTableCompensateRules(validateErr error) []string {
 	return rules
 }
 
-func (g *dataTableGenerator) parse(ctx context.Context, content string) (*dataTableExpectation, error) {
+func (s *dataTableStep) parse(ctx context.Context, content string) (*dataTableExpectation, error) {
 	content = pkgstring.StripJSONPrefix(content)
 	if content == "" {
 		return nil, fmt.Errorf("empty output")

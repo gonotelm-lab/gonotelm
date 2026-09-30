@@ -23,12 +23,22 @@ import (
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/safe"
+	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 
 	einomodel "github.com/cloudwego/eino/components/model"
 	einoschema "github.com/cloudwego/eino/schema"
 )
 
 const maxMessageForSuggestionLimit = 30
+
+// maxSuggestionQuestions 与提示词约定的问题数量保持一致，超出部分会被截断。
+const maxSuggestionQuestions = 3
+
+// suggestionGenerateAttempts 是生成建议的总尝试次数：首次 + 2 次重试。
+const suggestionGenerateAttempts = 3
+
+// maxParseErrorOutputRune 限制解析失败时写入错误信息的模型输出长度。
+const maxParseErrorOutputRune = 256
 
 const suggestionLockKeyPrefix = "notelm:suggestion:lock:"
 
@@ -256,7 +266,7 @@ Conversation history format: each message is prefixed with "## role" (user/assis
 ---
 
 Output requirements:
-- Output ONLY a JSON array of strings, for example: ["What is the capital of France?", "What is the capital of Germany?", "What is the capital of Italy?"]
+- Output ONLY a JSON object whose "questions" field is the array of questions, for example: {"questions": ["What is the capital of France?", "What is the capital of Germany?", "What is the capital of Italy?"]}
 - No markdown code blocks, no explanations, no prefixes or suffixes.
 
 `
@@ -281,7 +291,7 @@ Notebook sources:
 ---
 
 Output requirements:
-- Output ONLY a JSON array of strings, for example: ["What is the capital of France?", "What is the capital of Germany?", "What is the capital of Italy?"]
+- Output ONLY a JSON object whose "questions" field is the array of questions, for example: {"questions": ["What is the capital of France?", "What is the capital of Germany?", "What is the capital of Italy?"]}
 - No markdown code blocks, no explanations, no prefixes or suffixes.
 
 `
@@ -303,19 +313,64 @@ func (h *Service) getChatSuggestModel() (einomodel.ToolCallingChatModel, []einom
 	return tcm, opts, nil
 }
 
+// suggestOutput 是提示词约定的模型输出结构。
+type suggestOutput struct {
+	Questions []string `json:"questions"`
+}
+
+// parseChatModelOutput 严格按提示词约定的 {"questions": [...]} 解析模型输出。
+// 模型输出不符合约定时返回错误，由调用方重试。
 func parseChatModelOutput(s string) ([]string, error) {
-	s = strings.TrimSpace(s)
-	if s == "" {
+	raw := strings.TrimSpace(s)
+	if raw == "" {
 		return nil, errors.ErrLLM.Msg("chat model returned empty output")
 	}
 
-	var result []string
-	err := pkgjson.Unmarshal([]byte(s), &result)
-	if err != nil {
-		return nil, errors.Wrapf(errors.ErrInner, "failed to unmarshal chat model output, err=%s", err.Error())
+	var output suggestOutput
+	if err := pkgjson.Unmarshal([]byte(raw), &output); err != nil {
+		return nil, errors.ErrLLM.Msgf("failed to parse chat model output, err=%s, output=%s",
+			err.Error(), truncateOutputForError(raw))
 	}
 
-	return result, nil
+	questions := normalizeQuestions(output.Questions)
+	if len(questions) == 0 {
+		return nil, errors.ErrLLM.Msgf("chat model output contains no questions, output=%s", truncateOutputForError(raw))
+	}
+
+	return questions, nil
+}
+
+// truncateOutputForError 截断写入错误信息的模型输出，避免日志/响应体过大。
+func truncateOutputForError(s string) string {
+	output, truncated := pkgstring.TruncateRuneV2(s, maxParseErrorOutputRune)
+	if truncated {
+		output += " (...truncated)"
+	}
+
+	return output
+}
+
+// normalizeQuestions 去空白、去重并按 maxSuggestionQuestions 截断。
+func normalizeQuestions(questions []string) []string {
+	result := make([]string, 0, len(questions))
+	seen := make(map[string]struct{}, len(questions))
+	for _, question := range questions {
+		question = strings.TrimSpace(question)
+		if question == "" {
+			continue
+		}
+		if _, ok := seen[question]; ok {
+			continue
+		}
+
+		seen[question] = struct{}{}
+		result = append(result, question)
+		if len(result) == maxSuggestionQuestions {
+			break
+		}
+	}
+
+	return result
 }
 
 func (h *Service) callChatModelForResult(ctx context.Context, promptMsgs []*einoschema.Message) ([]string, error) {
@@ -324,17 +379,47 @@ func (h *Service) callChatModelForResult(ctx context.Context, promptMsgs []*eino
 		return nil, err
 	}
 
-	output, err := chatModel.Generate(ctx, promptMsgs, opts...)
-	if err != nil {
-		return nil, errors.Wrapf(errors.ErrLLM, "failed to generate llm output, err=%s", err.Error())
+	// 模型输出必须严格符合提示词约定的 {"questions": [...]}，
+	// 调用失败或格式不符时重试，仍失败则返回最后一次的错误。
+	return generateQuestionsWithRetry(ctx, func(ctx context.Context) (string, error) {
+		output, err := chatModel.Generate(ctx, promptMsgs, opts...)
+		if err != nil {
+			return "", errors.Wrapf(errors.ErrLLM, "failed to generate llm output, err=%s", err.Error())
+		}
+
+		return output.Content, nil
+	})
+}
+
+// generateQuestionsWithRetry 反复获取模型输出并严格解析，最多尝试 suggestionGenerateAttempts 次。
+func generateQuestionsWithRetry(
+	ctx context.Context,
+	generate func(ctx context.Context) (string, error),
+) ([]string, error) {
+	var lastErr error
+	for attempt := 1; attempt <= suggestionGenerateAttempts; attempt++ {
+		content, err := generate(ctx)
+		if err == nil {
+			var questions []string
+			if questions, err = parseChatModelOutput(content); err == nil {
+				return questions, nil
+			}
+		}
+		lastErr = err
+
+		slog.WarnContext(ctx, "suggestion generate attempt failed",
+			slog.Int("attempt", attempt),
+			slog.Int("max_attempts", suggestionGenerateAttempts),
+			slog.Any("err", err),
+		)
+
+		// 上下文已结束（超时/取消）时重试没有意义
+		if ctx.Err() != nil {
+			break
+		}
 	}
 
-	result, err := parseChatModelOutput(output.Content)
-	if err != nil {
-		return nil, errors.Wrapf(errors.ErrLLM, "failed to parse chat model output, err=%s", err.Error())
-	}
-
-	return result, nil
+	return nil, lastErr
 }
 
 // 追问建议

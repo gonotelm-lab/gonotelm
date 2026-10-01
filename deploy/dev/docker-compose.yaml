@@ -1,0 +1,335 @@
+# GoNoteLM 本地开发基础设施（只起中间件，app 在宿主机 go run）
+# 用法：make -C deploy/dev up | up-all | down | ps；取值来自仓库根目录的 .env，清单见 .env.example
+# profile：默认=必需中间件，ui=flow-web，trace=jaeger，full=ui+trace
+name: gonotelm-dev
+
+services:
+  postgres:
+    image: ${GONOTELM_DEV_POSTGRES_IMAGE:-postgres:18.3}
+    container_name: gonotelm-postgres-dev
+    restart: unless-stopped
+    stop_grace_period: 1m
+    ports:
+      - "${GONOTELM_DB_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${GONOTELM_DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${GONOTELM_DB_PASSWORD:?GONOTELM_DB_PASSWORD 未设置，请用 --env-file 指向仓库根目录的 .env}
+      # 不设 POSTGRES_DB：gonotelm 由 migration/db/postgres18/0001.sql 建，flowdb 由 flow-server 自建
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - ${GONOTELM_DEV_PG_DATA:-gonotelm_postgres_data_dev}:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${GONOTELM_DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - gonotelm-dev
+
+  redis:
+    image: ${GONOTELM_DEV_REDIS_IMAGE:-redis:7.4}
+    container_name: gonotelm-redis-dev
+    restart: unless-stopped
+    ports:
+      - "${GONOTELM_REDIS_PORT:-7542}:6379"
+    environment:
+      # 留空 = 不启用 AUTH
+      REDIS_PASSWORD: ${GONOTELM_REDIS_PASSWORD:-}
+    command:
+      - sh
+      - -c
+      - |
+        if [ -n "$$REDIS_PASSWORD" ]; then
+          exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"
+        fi
+        exec redis-server --appendonly yes
+    volumes:
+      - ${GONOTELM_DEV_REDIS_DATA:-gonotelm_redis_data_dev}:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli $${REDIS_PASSWORD:+-a \"$$REDIS_PASSWORD\"} ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gonotelm-dev
+
+  clickhouse:
+    image: ${GONOTELM_DEV_CLICKHOUSE_IMAGE:-clickhouse/clickhouse-server:25.8}
+    container_name: gonotelm-clickhouse-dev
+    restart: unless-stopped
+    stop_grace_period: 1m
+    ports:
+      - "${GONOTELM_OLAP_HTTP_PORT:-8123}:8123"
+      # 宿主 9009 避开 minio 的 9000，需与 GONOTELM_OLAP_DB_PORT 一致
+      - "${GONOTELM_OLAP_DB_PORT:-9009}:9000"
+    environment:
+      CLICKHOUSE_DB: ${GONOTELM_OLAP_DB_NAME:-gonotelm}
+      CLICKHOUSE_USER: ${GONOTELM_OLAP_DB_USER:-clickhouse}
+      CLICKHOUSE_PASSWORD: ${GONOTELM_OLAP_DB_PASSWORD:?GONOTELM_OLAP_DB_PASSWORD 未设置，请用 --env-file 指向仓库根目录的 .env}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    volumes:
+      - ${GONOTELM_DEV_CLICKHOUSE_DATA:-gonotelm_clickhouse_data_dev}:/var/lib/clickhouse
+      - ${GONOTELM_DEV_CLICKHOUSE_LOGS:-gonotelm_clickhouse_logs_dev}:/var/log/clickhouse-server
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - gonotelm-dev
+
+  # 容器内互访用 PLAINTEXT:9092；宿主机 app 用 EXTERNAL:${GONOTELM_KAFKA_EXTERNAL_PORT}（SASL）
+  kafka:
+    image: ${GONOTELM_DEV_KAFKA_IMAGE:-bitnami/kafka:latest}
+    container_name: gonotelm-kafka-dev
+    restart: unless-stopped
+    stop_grace_period: 1m
+    ports:
+      - "${GONOTELM_KAFKA_PORT:-9092}:9092"
+      - "${GONOTELM_KAFKA_EXTERNAL_PORT:-9094}:9094"
+    environment:
+      # 必须是 22 字符 base64 UUID，否则新数据卷格式化成败（kafka-storage.sh random-uuid 生成）
+      KAFKA_KRAFT_CLUSTER_ID: ${GONOTELM_KAFKA_CLUSTER_ID:-al6tIt4uS8q1M76IljffhQ}
+      KAFKA_CFG_NODE_ID: "0"
+      KAFKA_CFG_PROCESS_ROLES: controller,broker
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://${GONOTELM_KAFKA_ADVERTISED_HOST:-127.0.0.1}:${GONOTELM_KAFKA_EXTERNAL_PORT:-9094}
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,EXTERNAL:SASL_PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 0@kafka:9093
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_CLIENT_USERS: ${GONOTELM_KAFKA_USERNAME:-kafka}
+      KAFKA_CLIENT_PASSWORDS: ${GONOTELM_KAFKA_PASSWORD:?GONOTELM_KAFKA_PASSWORD 未设置，请用 --env-file 指向仓库根目录的 .env}
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+    volumes:
+      - ${GONOTELM_DEV_KAFKA_DATA:-gonotelm_kafka_data_dev}:/bitnami
+    networks:
+      - gonotelm-dev
+
+  kafka-init:
+    image: ${GONOTELM_DEV_KAFKA_IMAGE:-bitnami/kafka:latest}
+    container_name: gonotelm-kafka-init-dev
+    depends_on:
+      kafka:
+        condition: service_started
+    environment:
+      KAFKA_TOPICS: ${GONOTELM_KAFKA_TOPICS:-gonotelm.source.preparation}
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        for i in $$(seq 1 30); do
+          if kafka-topics.sh --bootstrap-server kafka:9092 --list >/dev/null 2>&1; then
+            break
+          fi
+          echo "[kafka-init] waiting for kafka ($$i/30)"
+          sleep 2
+        done
+        for topic in $$KAFKA_TOPICS; do
+          kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists \
+            --topic "$$topic" --partitions 1 --replication-factor 1
+          echo "[kafka-init] topic $$topic ready"
+        done
+    restart: "no"
+    networks:
+      - gonotelm-dev
+
+  minio:
+    image: ${GONOTELM_DEV_MINIO_IMAGE:-quay.io/minio/minio:latest}
+    container_name: gonotelm-minio-dev
+    restart: unless-stopped
+    ports:
+      - "${GONOTELM_MINIO_PORT:-9000}:9000"
+      - "${GONOTELM_MINIO_CONSOLE_PORT:-9001}:9001"
+    environment:
+      MINIO_ROOT_USER: ${GONOTELM_MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${GONOTELM_MINIO_SECRET_KEY:?GONOTELM_MINIO_SECRET_KEY 未设置，请用 --env-file 指向仓库根目录的 .env}
+    command: server /data --console-address ":9001"
+    volumes:
+      - ${GONOTELM_DEV_MINIO_DATA:-gonotelm_minio_data_dev}:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 10s
+    networks:
+      - gonotelm-dev
+
+  # app 不会自动建 bucket；用 minio 镜像自带的 mc，不额外拉镜像
+  minio-init:
+    image: ${GONOTELM_DEV_MINIO_MC_IMAGE:-quay.io/minio/minio:latest}
+    container_name: gonotelm-minio-init-dev
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MC_HOST_local: http://${GONOTELM_MINIO_ACCESS_KEY:-minioadmin}:${GONOTELM_MINIO_SECRET_KEY:?GONOTELM_MINIO_SECRET_KEY 未设置，请用 --env-file 指向仓库根目录的 .env}@minio:9000
+      MC_CONFIG_DIR: /tmp/mc
+    entrypoint: ["mc"]
+    command: ["mb", "--ignore-existing", "local/${GONOTELM_MINIO_BUCKET:-gonotelm}"]
+    restart: "no"
+    networks:
+      - gonotelm-dev
+
+  # 具名卷初始属主是 root，etcd 以非 root 跑会 permission denied，所以先 chown；属主非 root 时跳过
+  etcd-init:
+    image: ${GONOTELM_DEV_ETCD_IMAGE:-bitnami/etcd:latest}
+    container_name: gonotelm-etcd-init-dev
+    user: "0:0"
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        set -e
+        owner=$$(stat -c %u /bitnami/etcd)
+        if [ "$$owner" = "0" ]; then
+          echo "[etcd-init] chown /bitnami/etcd -> $$ETCD_USER"
+          chown -R "$$ETCD_USER" /bitnami/etcd
+        else
+          echo "[etcd-init] /bitnami/etcd already owned by uid $$owner, skip"
+        fi
+    environment:
+      ETCD_USER: ${GONOTELM_DEV_ETCD_USER:-1001:1001}
+    volumes:
+      - ${GONOTELM_DEV_ETCD_DATA:-gonotelm_etcd_data_dev}:/bitnami/etcd
+    restart: "no"
+    networks:
+      - gonotelm-dev
+
+  etcd:
+    image: ${GONOTELM_DEV_ETCD_IMAGE:-bitnami/etcd:latest}
+    container_name: gonotelm-etcd-dev
+    restart: unless-stopped
+    # 必须和数据目录属主一致（复用宿主目录时通常是 1000:1000）
+    user: "${GONOTELM_DEV_ETCD_USER:-1001:1001}"
+    environment:
+      ETCD_NAME: ${GONOTELM_DEV_ETCD_NAME:-etcd-01}
+      ALLOW_NONE_AUTHENTICATION: "yes"
+      ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
+      ETCD_ADVERTISE_CLIENT_URLS: http://etcd:2379
+    volumes:
+      - ${GONOTELM_DEV_ETCD_DATA:-gonotelm_etcd_data_dev}:/bitnami/etcd
+    healthcheck:
+      test: ["CMD", "etcdctl", "--endpoints=127.0.0.1:2379", "endpoint", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      etcd-init:
+        condition: service_completed_successfully
+    networks:
+      - gonotelm-dev
+
+  milvus:
+    image: ${GONOTELM_DEV_MILVUS_IMAGE:-milvusdb/milvus:v2.6.15}
+    container_name: gonotelm-milvus-dev
+    restart: unless-stopped
+    security_opt:
+      - seccomp:unconfined
+    command: ["milvus", "run", "standalone"]
+    environment:
+      DEPLOY_MODE: STANDALONE
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+      MINIO_REGION: ${GONOTELM_MINIO_REGION:-us-east-1}
+      MINIO_ACCESS_KEY_ID: ${GONOTELM_MINIO_ACCESS_KEY:-minioadmin}
+      # 只能是 MINIO_SECRET_ACCESS_KEY；写成 MINIO_SECRET_KEY 会被忽略并导致 signature 不匹配
+      MINIO_SECRET_ACCESS_KEY: ${GONOTELM_MINIO_SECRET_KEY:?GONOTELM_MINIO_SECRET_KEY 未设置，请用 --env-file 指向仓库根目录的 .env}
+    ports:
+      - "${GONOTELM_MILVUS_PORT:-19530}:19530"
+      - "${GONOTELM_MILVUS_HEALTH_PORT:-9091}:9091"
+    volumes:
+      - ${GONOTELM_DEV_MILVUS_DATA:-gonotelm_milvus_data_dev}:/var/lib/milvus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 30s
+      start_period: 90s
+      timeout: 20s
+      retries: 3
+    depends_on:
+      # milvus 连不上 etcd 会直接 panic 退出，所以要等 etcd healthy
+      etcd:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - gonotelm-dev
+
+  flow-server:
+    image: ${GONOTELM_DEV_FLOW_SERVER_IMAGE:-ghcr.io/gonotelm-lab/flow/server:v0.3.0}
+    container_name: gonotelm-flow-server-dev
+    restart: unless-stopped
+    ports:
+      - "${GONOTELM_FLOW_HTTP_PORT:-7090}:7090"
+      - "${GONOTELM_FLOW_PORT:-7091}:7091"
+    environment:
+      FLOW_DB_DRIVER: pgsql
+      FLOW_DB_HOST: postgres
+      FLOW_DB_PORT: "5432"
+      FLOW_DB_USER: ${GONOTELM_DB_USER:-postgres}
+      FLOW_DB_PASS: ${GONOTELM_DB_PASSWORD:?GONOTELM_DB_PASSWORD 未设置，请用 --env-file 指向仓库根目录的 .env}
+      FLOW_DB_NAME: ${GONOTELM_FLOW_DB_NAME:-flowdb}
+      FLOW_DB_AUTO_INIT: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - gonotelm-dev
+
+  flow-web:
+    image: ${GONOTELM_DEV_FLOW_WEB_IMAGE:-ghcr.io/gonotelm-lab/flow/web:v0.3.0}
+    container_name: gonotelm-flow-web-dev
+    restart: unless-stopped
+    profiles:
+      - ui
+      - full
+    ports:
+      - "${GONOTELM_FLOW_WEB_PORT:-7089}:80"
+    volumes:
+      - ./flow-web-nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - flow-server
+    networks:
+      - gonotelm-dev
+
+  jaeger:
+    image: ${GONOTELM_DEV_JAEGER_IMAGE:-cr.jaegertracing.io/jaegertracing/jaeger:2.20.0}
+    container_name: gonotelm-jaeger-dev
+    restart: unless-stopped
+    profiles:
+      - trace
+      - full
+    command: ["--config", "/etc/jaeger/config.yaml"]
+    environment:
+      # jaeger-config.yaml 里所有监听地址都是 ${env:JAEGER_LISTEN_HOST}
+      JAEGER_LISTEN_HOST: 0.0.0.0
+    ports:
+      - "${GONOTELM_OTEL_GRPC_PORT:-4317}:4317"
+      - "${GONOTELM_OTEL_HTTP_PORT:-4318}:4318"
+      - "${GONOTELM_JAEGER_UI_PORT:-16686}:16686"
+    volumes:
+      - ./jaeger-config.yaml:/etc/jaeger/config.yaml:ro
+    networks:
+      - gonotelm-dev
+
+networks:
+  gonotelm-dev:
+    driver: bridge
+
+volumes:
+  gonotelm_postgres_data_dev:
+  gonotelm_redis_data_dev:
+  gonotelm_clickhouse_data_dev:
+  gonotelm_clickhouse_logs_dev:
+  gonotelm_kafka_data_dev:
+  gonotelm_minio_data_dev:
+  gonotelm_etcd_data_dev:
+  gonotelm_milvus_data_dev:

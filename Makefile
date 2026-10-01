@@ -38,3 +38,36 @@ run-sourcejob:
 .PHONY: run-notelm
 run-notelm:
 	@set -a && . ./.env && set +a && go run ./cmd/notelm/main.go
+
+# deploy/dev 中间件（app 用上面的 run-* 跑在宿主机）：dev-up / dev-up-all / dev-down / dev-down-v /
+# dev-ps / dev-logs / dev-migrate；变量取 ./.env（ENV_FILE=... 可换），细节见 deploy/dev/README.md
+DEV_DIR := deploy/dev
+DEV_MAKE = $(MAKE) --no-print-directory -C $(DEV_DIR)
+
+.PHONY: dev-up
+dev-up:
+	@$(DEV_MAKE) up
+
+.PHONY: dev-up-all
+dev-up-all:
+	@$(DEV_MAKE) up-all
+
+.PHONY: dev-down
+dev-down:
+	@$(DEV_MAKE) down
+
+.PHONY: dev-down-v
+dev-down-v:
+	@$(DEV_MAKE) down-v
+
+.PHONY: dev-ps
+dev-ps:
+	@$(DEV_MAKE) ps
+
+.PHONY: dev-logs
+dev-logs:
+	@$(DEV_MAKE) logs
+
+.PHONY: dev-migrate
+dev-migrate:
+	@$(DEV_MAKE) migrate

@@ -118,10 +118,15 @@ func (g *Google) GetUserInfo(ctx context.Context, code, verifier string) (*idp.U
 		return nil, fmt.Errorf("get google user info: %w", err)
 	}
 
+	name := user.Name
+	if name == "" {
+		name = user.GivenName + " " + user.FamilyName
+	}
+
 	return &idp.UserInfo{
 		Issuer:    issuer,
 		Subject:   user.Sub,
-		Name:      user.Name,
+		Name:      name,
 		AvatarURL: user.Picture,
 		Raw:       user.raw(),
 	}, nil

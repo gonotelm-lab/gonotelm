@@ -67,6 +67,17 @@ set -a && . ./.env && set +a && migration/storage/minio.sh
 mc admin user svcacct rm <alias> <旧 AK>   # 之后重跑脚本即可
 ```
 
+### 谁用哪份 MinIO 凭据
+
+| 使用者 | 桶 | 凭据 |
+| --- | --- | --- |
+| app（`notelm` / `worker` / `sourcejob`） | `gonotelm` | `GONOTELM_MINIO_ACCESS_KEY` / `SECRET_KEY`，桶级策略 `gonotelm-rw` |
+| `minio-init` | 建桶、建桶用户 | `GONOTELM_DEV_MINIO_ROOT_*`（默认 `minioadmin`） |
+| milvus | `a-bucket`（Milvus 自己的存储后端） | `GONOTELM_DEV_MINIO_ROOT_*` |
+
+milvus 不共用 app 的桶凭据：那份凭据只授权 `gonotelm`，milvus 用它读不了 `a-bucket`。
+所以 compose 里 milvus 直接走 root；生产环境应换成 milvus 专属用户 + `a-bucket` 策略。
+
 ## 首次在新数据卷上初始化
 
 `up` 起来的是一套空中间件，schema 还要跑一次项目自带的迁移：

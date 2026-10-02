@@ -149,7 +149,7 @@ services:
       - "${GONOTELM_MINIO_PORT:-9000}:9000"
       - "${GONOTELM_MINIO_CONSOLE_PORT:-9001}:9001"
     environment:
-      # root 只用来建桶/建桶用户；app 用的桶 AK/SK 见下面的 minio-init
+      # root 给 minio-init 建桶/建桶用户，以及 milvus 访问它自己的 a-bucket；app 用的桶 AK/SK 见下面的 minio-init
       - MINIO_ROOT_USER=${GONOTELM_DEV_MINIO_ROOT_USER:-minioadmin}
       - MINIO_ROOT_PASSWORD=${GONOTELM_DEV_MINIO_ROOT_PASSWORD:-minioadmin}
     command: server /data --console-address ":9001"
@@ -251,9 +251,11 @@ services:
       ETCD_ENDPOINTS: etcd:2379
       MINIO_ADDRESS: minio:9000
       MINIO_REGION: ${GONOTELM_MINIO_REGION:-us-east-1}
-      MINIO_ACCESS_KEY_ID: ${GONOTELM_MINIO_ACCESS_KEY:-minioadmin}
+      # milvus 自己的桶是 a-bucket，不跟 app 共用 GONOTELM_MINIO_ACCESS_KEY（那份凭据只授权 gonotelm 桶），
+      # 所以这里直接用 minio 的 root。生产环境应改成 milvus 专属用户 + a-bucket 策略。
+      MINIO_ACCESS_KEY_ID: ${GONOTELM_DEV_MINIO_ROOT_USER:-minioadmin}
       # 只能是 MINIO_SECRET_ACCESS_KEY；写成 MINIO_SECRET_KEY 会被忽略并导致 signature 不匹配
-      MINIO_SECRET_ACCESS_KEY: ${GONOTELM_MINIO_SECRET_KEY:?GONOTELM_MINIO_SECRET_KEY 未设置，请用 --env-file 指向仓库根目录的 .env}
+      MINIO_SECRET_ACCESS_KEY: ${GONOTELM_DEV_MINIO_ROOT_PASSWORD:-minioadmin}
     ports:
       - "${GONOTELM_MILVUS_PORT:-19530}:19530"
       - "${GONOTELM_MILVUS_HEALTH_PORT:-9091}:9091"

@@ -63,10 +63,10 @@ func CORS(cfg CORSConfig) app.HandlerFunc {
 	allowAll := false
 	for _, origin := range cfg.AllowOrigins {
 		origin = strings.TrimSpace(origin)
-		switch {
-		case origin == "":
+		switch origin {
+		case "":
 			continue
-		case origin == "*":
+		case "*":
 			allowAll = true
 		default:
 			allowed[origin] = struct{}{}

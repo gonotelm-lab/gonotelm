@@ -29,12 +29,8 @@ func (s *Server) csrfMiddleware() app.HandlerFunc {
 func (s *Server) authMiddleware() app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		sid := string(c.Cookie(schema.AuthSessionCookieName))
-		if sid == "" {
-			http.ErrResp(c, pkgerrors.ErrNotLogin)
-			return
-		}
 
-		session, err := s.userSessionRepo.Get(ctx, sid)
+		authn, err := s.authHandler.Authenticate(ctx, sid)
 		if err != nil {
 			if pkgerrors.Is(err, errors.ErrUserSessionNotFound) {
 				http.ErrResp(c, pkgerrors.ErrNotLogin)
@@ -45,7 +41,7 @@ func (s *Server) authMiddleware() app.HandlerFunc {
 			return
 		}
 
-		ctx = pkgcontext.WithUserId(ctx, session.UserId)
+		ctx = pkgcontext.WithUserId(ctx, authn.UserId)
 		c.Next(ctx)
 	}
 }

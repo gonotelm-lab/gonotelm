@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	identityentity "github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
@@ -23,7 +24,13 @@ func NewUserSessionRepository(cache cache.UserSessionCache) identityrepo.UserSes
 }
 
 func (r *UserSessionRepositoryImpl) Save(ctx context.Context, session *identityentity.UserSession) error {
-	err := r.cache.Set(ctx, session.Id, mapper.UserSessionToSchema(session), session.Expiration)
+	// TTL 取会话当前的闲置过期时间点;滑动续期后 ExpireAt 前移,TTL 随之延长。
+	ttl := time.Until(session.ExpireAt.Time())
+	if ttl <= 0 {
+		return errors.ErrParams.Msg("user session already expired")
+	}
+
+	err := r.cache.Set(ctx, session.Id, mapper.UserSessionToSchema(session), ttl)
 	if err != nil {
 		return errors.WithMessage(err, "failed to save user session")
 	}

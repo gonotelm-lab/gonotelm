@@ -105,9 +105,8 @@ type Server struct {
 	authLoginHandler     *authapp.LoginHandler
 	authCallbackHandler  *authapp.CallbackHandler
 	authProvidersHandler *authapp.ProvidersHandler
+	authHandler          *authapp.AuthHandler
 	getMeHandler         *userapp.GetMeHandler
-
-	userSessionRepo identrepo.UserSessionRepository
 }
 
 func NewServer(
@@ -221,9 +220,8 @@ func NewServer(
 		authLoginHandler:     authapp.NewLoginHandler(deps.LoginInfoRepo, deps.UserSessionRepo),
 		authCallbackHandler:  authapp.NewCallbackHandler(deps.LoginInfoRepo, deps.UserService, deps.UserSessionRepo),
 		authProvidersHandler: authapp.NewProvidersHandler(deps.LoginInfoRepo),
+		authHandler:          authapp.NewAuthHandler(deps.UserSessionRepo),
 		getMeHandler:         userapp.NewGetMeHandler(deps.UserRepo),
-
-		userSessionRepo: deps.UserSessionRepo,
 	}
 
 	s.registerRoutes()

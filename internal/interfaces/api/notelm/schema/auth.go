@@ -16,7 +16,8 @@ const (
 	AuthLoginStateCookieTTL  = 600 // 10 minutes
 
 	AuthSessionCookieName = "gnlm_user_sid"
-	AuthSessionCookieTTL  = int(entity.UserSessionExpiration / time.Second)
+	// cookie 生命周期对齐会话的绝对上限;会话本身可能因闲置提前失效。
+	AuthSessionCookieTTL = int(entity.UserSessionMaxAge / time.Second)
 
 	AuthUserIdCookieName = "gnlm_user_id"
 

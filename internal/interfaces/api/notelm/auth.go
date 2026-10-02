@@ -90,11 +90,9 @@ func (s *Server) AuthLogin(ctx context.Context, c *app.RequestContext) {
 
 func (s *Server) AuthLogout(ctx context.Context, c *app.RequestContext) {
 	sid := string(c.Cookie(schema.AuthSessionCookieName))
-	if sid != "" {
-		if err := s.userSessionRepo.Delete(ctx, sid); err != nil {
-			http.ErrResp(c, err)
-			return
-		}
+	if err := s.authHandler.SignOut(ctx, sid); err != nil {
+		http.ErrResp(c, err)
+		return
 	}
 
 	c.SetCookie(schema.AuthSessionCookieName, "", -1, "/", "", protocol.CookieSameSiteLaxMode, true, true)

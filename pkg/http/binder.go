@@ -1,6 +1,7 @@
 package http
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -18,6 +19,12 @@ import (
 
 type SelfValidator interface {
 	Validate() error
+}
+
+// Either use this or SelfValidator, not both
+// If both are implemented, SelfValidator will be used
+type SelfValidatorWithRequest interface {
+	Validate(req *protocol.Request) error
 }
 
 type CanonicalBinder struct {
@@ -82,6 +89,10 @@ func NewCanonicalBinder() *CanonicalBinder {
 			return selfValidator.Validate()
 		}
 
+		if selfValidatorWithRequest, ok := v.(SelfValidatorWithRequest); ok && selfValidatorWithRequest != nil {
+			return selfValidatorWithRequest.Validate(req)
+		}
+
 		return nil
 	}
 	return &CanonicalBinder{
@@ -94,6 +105,14 @@ var _ binding.Binder = (*CanonicalBinder)(nil)
 func (b *CanonicalBinder) wrapError(err error) error {
 	if err == nil {
 		return nil
+	}
+
+	// SelfValidator / SelfValidatorWithRequest may already return a canonical
+	// xerror.InnerError (e.g. ErrUnauthorized with http.StatusUnauthorized).
+	// Keep it as-is instead of flattening it into a 200/INVALID_PARAMETERS
+	// error, otherwise the original status code and biz code are lost.
+	if ie, ok := errors.AsType[*xerror.InnerError](err); ok {
+		return ie
 	}
 
 	// invalid params returns http.StatusOK

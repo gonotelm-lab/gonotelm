@@ -6,10 +6,18 @@
 ## 快速开始
 
 ```bash
-make dev-up        # 起默认那套中间件（= make -C deploy/dev up）
-make dev-up-all    # 再带上 flow-web 控制台和 jaeger
+make dev-up        # 起默认那套中间件 + jaeger（= make -C deploy/dev up）
+make dev-up-all    # 再带上 flow-web 控制台
 make dev-ps        # 看状态（含跑完即退出的 init 容器）
 make dev-down      # 停止，保留数据卷；down-v 连数据卷一起删
+```
+
+`up` 默认带 `--profile trace` 起 **jaeger**：app 侧 `trace.Init` 是无条件调用的，endpoint 默认
+`127.0.0.1:4317`（`etc/*.toml.tpl` 里 `OTEL_TRACE_ENDPOINT` 的默认值）。jaeger 不在时 exporter 会
+一直重试导出，日志被 `[otel] error` 刷屏。只想要中间件、不要 jaeger 时：
+
+```bash
+make dev-up-notrace   # = make -C deploy/dev up-notrace
 ```
 
 变量默认取仓库根目录的 `.env`（也就是 app 用的那份），优先级：**shell 里 export 的 > `--env-file` 指定的**。
@@ -29,24 +37,28 @@ make dev-down      # 停止，保留数据卷；down-v 连数据卷一起删
 | etcd | 不发布 | 只给 milvus 用 |
 | milvus | 19530 / 9091（健康检查） | `GONOTELM_MILVUS_ADDR` |
 | flow-server | 7091（gRPC）/ 7090（HTTP） | `GONOTELM_FLOW_ADDR` |
-| flow-web（profile `ui`） | 7089 | 无 |
-| jaeger（profile `trace`） | 4317 / 4318 / 16686 | `OTEL_TRACE_ENDPOINT` |
+| flow-web（profile `ui`，`up-all` 带） | 7089 | 无 |
+| jaeger（profile `trace`，`up` 默认带） | 4317 / 4318 / 16686 | `OTEL_TRACE_ENDPOINT` |
 
 一次性容器跑完即退出（`Exited (0)` 正常）：`kafka-init` 建 topic、`minio-init` 建 bucket、
 `etcd-init` 修 etcd 数据目录属主。
 
 ## 首次在新数据卷上初始化
 
-`up` 起来的是一套空中间件，schema 还要跑一次项目自带的迁移（**只在全新数据卷上执行，脚本非幂等**）：
+`up` 起来的是一套空中间件，schema 还要跑一次项目自带的迁移：
 
 ```bash
 make dev-migrate
 ```
 
-依次执行 `migration/db/postgres18/0001.sql`（自建 `gonotelm` 库和表）、
-`migration/db/clickhouse/unclustered/0001.up.sql`、`migration/db/milvus/milvus-*.sh`；
+* postgres：`go run ./cmd/migrate`（建 `gonotelm` 库 + goose 增量迁移 `migration/db/postgres18`，
+  可重复执行）。`-baseline` 兼容引入 goose 之前用 psql 建的旧库：会把已存在的旧 schema
+  标记为迁移 0001 已应用，不会重复建表。
+* clickhouse / milvus：`migration/db/clickhouse/unclustered/0001.up.sql`、`migration/db/milvus/milvus-*.sh`，
+  **脚本非幂等，只在全新数据卷上跑一次**。
+
 `flowdb` 由 flow-server 的 `FLOW_DB_AUTO_INIT` 自己创建。
-**接上已有数据目录时不要跑它**，库/表/collection 都已经存在。
+**接上已有数据目录时**，postgres 可以直接跑（会自动 baseline），clickhouse/milvus 的脚本不要重复执行。
 
 ## 接上已有的本地数据目录
 

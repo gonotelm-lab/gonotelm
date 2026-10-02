@@ -1,10 +1,13 @@
 package http
 
 import (
+	stderrors "errors"
+	stdhttp "net/http"
 	"testing"
 
 	"github.com/cloudwego/hertz/pkg/protocol"
 	"github.com/cloudwego/hertz/pkg/route/param"
+	xerror "github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 
@@ -84,5 +87,59 @@ func TestCanonicalBinder_BindQueryUUIDArrayInvalid(t *testing.T) {
 	var out bindQueryUUIDArrayRequest
 	if err := binder.BindQuery(req, &out); err == nil {
 		t.Fatal("BindQuery() expected error for invalid uuid array, got nil")
+	}
+}
+
+type bindSelfValidatorRequest struct {
+	State string `query:"state,required"`
+}
+
+func (r *bindSelfValidatorRequest) Validate(req *protocol.Request) error {
+	return xerror.ErrUnauthorized.Msg("cookie state mismatch")
+}
+
+// SelfValidator errors that are already canonical must keep their http status.
+func TestCanonicalBinder_ValidatePreservesInnerError(t *testing.T) {
+	binder := NewCanonicalBinder()
+	req := &protocol.Request{}
+	req.SetRequestURI("/?state=abc")
+
+	var out bindSelfValidatorRequest
+	err := binder.Validate(req, &out)
+	if err == nil {
+		t.Fatal("Validate() expected error, got nil")
+	}
+
+	var ie *xerror.InnerError
+	if !stderrors.As(err, &ie) {
+		t.Fatalf("Validate() error type = %T, want *xerror.InnerError", err)
+	}
+	if ie.Status != stdhttp.StatusUnauthorized {
+		t.Fatalf("Validate() status = %d, want %d", ie.Status, stdhttp.StatusUnauthorized)
+	}
+	if ie.Code != xerror.CodeUnauthorized {
+		t.Fatalf("Validate() code = %d, want %d", ie.Code, xerror.CodeUnauthorized)
+	}
+}
+
+// Plain (non canonical) errors still become a 200/INVALID_PARAMETERS result.
+func TestCanonicalBinder_BindErrorBecomesInvalidParams(t *testing.T) {
+	binder := NewCanonicalBinder()
+	req := &protocol.Request{}
+	req.SetRequestURI("/?ids=not-a-uuid")
+
+	var out bindQueryUUIDArrayRequest
+	err := binder.BindQuery(req, &out)
+	if err == nil {
+		t.Fatal("BindQuery() expected error, got nil")
+	}
+
+	var ie *xerror.InnerError
+	if !stderrors.As(err, &ie) {
+		t.Fatalf("BindQuery() error type = %T, want *xerror.InnerError", err)
+	}
+	if ie.Status != stdhttp.StatusOK || ie.Code != xerror.CodeInvalidParams {
+		t.Fatalf("BindQuery() got status=%d code=%d, want status=%d code=%d",
+			ie.Status, ie.Code, stdhttp.StatusOK, xerror.CodeInvalidParams)
 	}
 }

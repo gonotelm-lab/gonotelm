@@ -5,7 +5,8 @@ gofmt:
 TEST_PKGS := \
 	./internal/infrastructure/database/postgres/... \
 	./internal/infrastructure/cache/redis/... \
-	./internal/infrastructure/olap/...
+	./internal/infrastructure/olap/... \
+	./migration/...
 
 TEST_GCFLAGS := all=-l
 
@@ -39,14 +40,24 @@ run-sourcejob:
 run-notelm:
 	@set -a && . ./.env && set +a && go run ./cmd/notelm/main.go
 
-# deploy/dev 中间件（app 用上面的 run-* 跑在宿主机）：dev-up / dev-up-all / dev-down / dev-down-v /
-# dev-ps / dev-logs / dev-migrate；变量取 ./.env（ENV_FILE=... 可换），细节见 deploy/dev/README.md
+# goose 迁移：建库（不存在时）+ 执行未应用的迁移；-baseline 兼容引入 goose 前的旧库
+.PHONY: migrate
+migrate:
+	@set -a && . ./.env && set +a && go run ./cmd/migrate -baseline
+
+# deploy/dev 中间件（app 用上面的 run-* 跑在宿主机）：dev-up / dev-up-notrace / dev-up-all /
+# dev-down / dev-down-v / dev-ps / dev-logs / dev-migrate；变量取 ./.env（ENV_FILE=... 可换），
+# 细节见 deploy/dev/README.md
 DEV_DIR := deploy/dev
 DEV_MAKE = $(MAKE) --no-print-directory -C $(DEV_DIR)
 
 .PHONY: dev-up
 dev-up:
 	@$(DEV_MAKE) up
+
+.PHONY: dev-up-notrace
+dev-up-notrace:
+	@$(DEV_MAKE) up-notrace
 
 .PHONY: dev-up-all
 dev-up-all:

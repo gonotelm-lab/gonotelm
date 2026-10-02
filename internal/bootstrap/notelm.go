@@ -11,6 +11,7 @@ import (
 	chatsuggest "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/suggestion"
 	bootshared "github.com/gonotelm-lab/gonotelm/internal/bootstrap/shared"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
+	identityservice "github.com/gonotelm-lab/gonotelm/internal/domain/identity/service"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	flowcli "github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
@@ -87,6 +88,13 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 	artifactRepo := repository.NewArtifactRepository(infra.Database.ArtifactStore)
 	streamTaskRepo := repository.NewStreamTaskRepository(infra.Cache.ChatMessageStreamCache)
 	suggestionRepo := repository.NewSuggestionRepository(infra.Cache.ChatSuggestionCache)
+	loginInfoRepo, err := repository.NewLoginInfoRepository(rootCtx, infra.Cache.LoginInfoCache, cfg.ToIDPConfig())
+	if err != nil {
+		return nil, err
+	}
+	userRepo := repository.NewUserRepository(infra.Database.UserStore)
+	userService := identityservice.NewUserService(userRepo)
+	userSessionRepo := repository.NewUserSessionRepository(infra.Cache.UserSessionCache)
 
 	// ── 3. Event Bus ──
 	inprocessBus := eventbus.NewInProcessEventBus()
@@ -180,6 +188,10 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 			ChatSuggestionRepo:     suggestionRepo,
 			ChatSuggestService:     suggestionService,
 			ArtifactRepo:           artifactRepo,
+			LoginInfoRepo:          loginInfoRepo,
+			UserRepo:               userRepo,
+			UserService:            userService,
+			UserSessionRepo:        userSessionRepo,
 
 			EventBus:   eventBus,
 			WaitGroup:  wg,

@@ -3,20 +3,49 @@ package notelm
 import (
 	"context"
 
+	"github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
+	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/schema"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
-	"github.com/gonotelm-lab/gonotelm/pkg/ulid"
+	pkgerrors "github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/http"
+	"github.com/gonotelm-lab/gonotelm/pkg/http/middleware"
 
 	"github.com/cloudwego/hertz/pkg/app"
+	"github.com/cloudwego/hertz/pkg/protocol"
 )
 
-const devFixedUserId = "01hf7yat00vtpvxvyaztxbw001"
+func (s *Server) csrfMiddleware() app.HandlerFunc {
+	return middleware.CSRF(middleware.CSRFConfig{
+		CookieName: schema.CSRFCookieName,
+		HeaderName: schema.CSRFHeaderName,
+		Secure:     true,
+		SameSite:   protocol.CookieSameSiteLaxMode,
+		OnError: func(_ context.Context, c *app.RequestContext) {
+			http.ErrResp(c, pkgerrors.ErrCSRF)
+		},
+	})
+}
 
 func (s *Server) authMiddleware() app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
-		// TODO for test here we injust test user
+		sid := string(c.Cookie(schema.AuthSessionCookieName))
+		if sid == "" {
+			http.ErrResp(c, pkgerrors.ErrNotLogin)
+			return
+		}
 
-		ctx = pkgcontext.WithUserId(ctx, ulid.MustParseString(devFixedUserId))
+		session, err := s.userSessionRepo.Get(ctx, sid)
+		if err != nil {
+			if pkgerrors.Is(err, errors.ErrUserSessionNotFound) {
+				http.ErrResp(c, pkgerrors.ErrNotLogin)
+				return
+			}
 
+			http.ErrResp(c, err)
+			return
+		}
+
+		ctx = pkgcontext.WithUserId(ctx, session.UserId)
 		c.Next(ctx)
 	}
 }

@@ -27,7 +27,7 @@ func NewChatSuggestionCacheImpl(
 
 var _ cache.ChatSuggestionCache = &ChatSuggestionCacheImpl{}
 
-func suggestionCacheKey(chatId string) string {
+func (c *ChatSuggestionCacheImpl) cacheKey(chatId string) string {
 	return fmt.Sprintf("gonotelm:chat:suggestion:%s", chatId)
 }
 
@@ -41,7 +41,7 @@ func (c *ChatSuggestionCacheImpl) Set(
 		return errors.Wrap(errors.ErrSerde, err.Error())
 	}
 
-	err = c.rd.Set(ctx, suggestionCacheKey(chatId), encBytes, 6*time.Hour).Err() // 6 hours of expiration
+	err = c.rd.Set(ctx, c.cacheKey(chatId), encBytes, 6*time.Hour).Err() // 6 hours of expiration
 	if err != nil {
 		return errors.Wrapf(errors.ErrCache, "set chat suggestion failed: %s", err.Error())
 	}
@@ -53,7 +53,7 @@ func (c *ChatSuggestionCacheImpl) Get(
 	ctx context.Context,
 	chatId string,
 ) (*schema.ChatSuggestion, error) {
-	encSuggestion, err := c.rd.Get(ctx, suggestionCacheKey(chatId)).Result()
+	encSuggestion, err := c.rd.Get(ctx, c.cacheKey(chatId)).Result()
 	if err != nil {
 		if errors.Is(err, goredis.Nil) {
 			return nil, nil // 不存在，非错误
@@ -71,7 +71,7 @@ func (c *ChatSuggestionCacheImpl) Get(
 }
 
 func (c *ChatSuggestionCacheImpl) Delete(ctx context.Context, chatId string) error {
-	err := c.rd.Del(ctx, suggestionCacheKey(chatId)).Err()
+	err := c.rd.Del(ctx, c.cacheKey(chatId)).Err()
 	if err != nil {
 		return errors.Wrapf(errors.ErrCache, "delete chat suggestion failed: %s", err.Error())
 	}

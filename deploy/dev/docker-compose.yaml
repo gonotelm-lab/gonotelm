@@ -1,6 +1,6 @@
 # GoNoteLM 本地开发基础设施（只起中间件，app 在宿主机 go run）
-# 用法：make -C deploy/dev up | up-all | down | ps；取值来自仓库根目录的 .env，清单见 .env.example
-# profile：默认=必需中间件，ui=flow-web，trace=jaeger，full=ui+trace
+# 用法：make -C deploy/dev up | up-notrace | up-all | down | ps；取值来自仓库根目录的 .env，清单见 .env.example
+# profile：默认=必需中间件，trace=jaeger（up 默认带），ui=flow-web（up-all 一起带），full=ui+trace
 name: gonotelm-dev
 
 services:
@@ -14,7 +14,7 @@ services:
     environment:
       POSTGRES_USER: ${GONOTELM_DB_USER:-postgres}
       POSTGRES_PASSWORD: ${GONOTELM_DB_PASSWORD:?GONOTELM_DB_PASSWORD 未设置，请用 --env-file 指向仓库根目录的 .env}
-      # 不设 POSTGRES_DB：gonotelm 由 migration/db/postgres18/0001.sql 建，flowdb 由 flow-server 自建
+      # 不设 POSTGRES_DB：gonotelm 由 cmd/migrate 建，flowdb 由 flow-server 自建
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - ${GONOTELM_DEV_PG_DATA:-gonotelm_postgres_data_dev}:/var/lib/postgresql/data
@@ -149,8 +149,8 @@ services:
       - "${GONOTELM_MINIO_PORT:-9000}:9000"
       - "${GONOTELM_MINIO_CONSOLE_PORT:-9001}:9001"
     environment:
-      MINIO_ROOT_USER: ${GONOTELM_MINIO_ACCESS_KEY:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${GONOTELM_MINIO_SECRET_KEY:?GONOTELM_MINIO_SECRET_KEY 未设置，请用 --env-file 指向仓库根目录的 .env}
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
     command: server /data --console-address ":9001"
     volumes:
       - ${GONOTELM_DEV_MINIO_DATA:-gonotelm_minio_data_dev}:/data

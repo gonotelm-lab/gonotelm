@@ -32,6 +32,10 @@ type WorkerConfig struct {
 	OtelTrace trace.Config         `toml:"otelTrace"`
 }
 
+func (c *WorkerConfig) IsDev() bool {
+	return shared.IsDevEnv(c.DeployEnv)
+}
+
 type WorkerPoolConfig struct {
 	MaxConcurrency int           `toml:"maxConcurrency"`
 	Heartbeat      time.Duration `toml:"heartbeat"`
@@ -119,7 +123,7 @@ type StudioConfig struct {
 
 func LoadWorkerConfig(path string) (*WorkerConfig, error) {
 	cfg := &WorkerConfig{}
-	if err := LoadTOML(path, cfg); err != nil {
+	if err := shared.LoadTOML(path, cfg); err != nil {
 		return nil, err
 	}
 

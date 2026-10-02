@@ -15,6 +15,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/httpclient"
 	"github.com/gonotelm-lab/gonotelm/pkg/idp"
 	"github.com/gonotelm-lab/gonotelm/pkg/idp/github"
+	"github.com/gonotelm-lab/gonotelm/pkg/idp/google"
 )
 
 type LoginInfoRepositoryImpl struct {
@@ -42,18 +43,36 @@ func NewLoginInfoRepository(ctx context.Context,
 }
 
 func (r *LoginInfoRepositoryImpl) initProviders(ctx context.Context, providersConfig map[string]idp.Config) error {
+	client := httpclient.NewBuilder(nil).Build()
+
 	for k, v := range providersConfig {
-		switch entity.ProviderType(k) {
+		providerType := entity.ProviderType(k)
+
+		// 未配置凭据的提供商直接跳过，避免前端拿到一个无法完成登录的入口
+		if v.ClientID == "" || v.ClientSecret == "" {
+			slog.WarnContext(ctx, "skip login provider without credentials", slog.String("provider_type", k))
+			continue
+		}
+
+		var (
+			impl idp.Provider
+			err  error
+		)
+
+		switch providerType {
 		case entity.ProviderTypeGithub:
-			provider, err := newGithubLoginProvider(v)
-			if err != nil {
-				slog.ErrorContext(ctx, fmt.Sprintf("init login provider %s failed", k), slog.Any("err", err))
-				continue
-			}
-			r.providers[entity.ProviderTypeGithub] = provider
+			impl, err = github.New(v, github.WithHTTPClient(client))
+		case entity.ProviderTypeGoogle:
+			impl, err = google.New(v, google.WithHTTPClient(client))
 		default:
 			return errors.Errorf("invalid provider type: %s", k)
 		}
+		if err != nil {
+			slog.ErrorContext(ctx, fmt.Sprintf("init login provider %s failed", k), slog.Any("err", err))
+			continue
+		}
+
+		r.providers[providerType] = newOAuthLoginProvider(providerType, v, impl)
 	}
 
 	return nil
@@ -111,30 +130,29 @@ func (r *LoginInfoRepositoryImpl) AvailableProviders() []entity.Provider {
 	return providers
 }
 
-type githubLoginProvider struct {
-	config idp.Config
-	impl   idp.Provider
+// oauthLoginProvider adapts an idp.Provider to the identity domain Provider
+// interface for all OAuth2/OIDC providers.
+type oauthLoginProvider struct {
+	providerType entity.ProviderType
+	config       idp.Config
+	impl         idp.Provider
 }
 
-func newGithubLoginProvider(config idp.Config) (*githubLoginProvider, error) {
-	client := httpclient.NewBuilder(nil).Build()
-	impl, err := github.New(config, github.WithHTTPClient(client))
-	if err != nil {
-		return nil, err
+func newOAuthLoginProvider(providerType entity.ProviderType, config idp.Config, impl idp.Provider) *oauthLoginProvider {
+	return &oauthLoginProvider{
+		providerType: providerType,
+		config:       config,
+		impl:         impl,
 	}
-	return &githubLoginProvider{
-		config: config,
-		impl:   impl,
-	}, nil
 }
 
-var _ entity.Provider = &githubLoginProvider{}
+var _ entity.Provider = &oauthLoginProvider{}
 
-func (p *githubLoginProvider) Type() entity.ProviderType {
-	return entity.ProviderTypeGithub
+func (p *oauthLoginProvider) Type() entity.ProviderType {
+	return p.providerType
 }
 
-func (p *githubLoginProvider) LoginInfo(ctx context.Context, request *entity.LoginInfoRequest) (*entity.ProviderLoginInfo, error) {
+func (p *oauthLoginProvider) LoginInfo(ctx context.Context, request *entity.LoginInfoRequest) (*entity.ProviderLoginInfo, error) {
 	url, state, err := p.impl.AuthURL()
 	if err != nil {
 		return nil, errors.Wrapf(domainerr.ErrIDPError, "failed to get auth url, err=%s", err.Error())
@@ -147,12 +165,12 @@ func (p *githubLoginProvider) LoginInfo(ctx context.Context, request *entity.Log
 		CodeVerifier:        state.CodeVerifier,
 		CodeChallenge:       state.CodeChallenge,
 		CodeChallengeMethod: state.CodeChallengeMethod,
-		ProviderType:        entity.ProviderTypeGithub,
+		ProviderType:        p.providerType,
 		ReturnTo:            request.ReturnTo,
 	}, nil
 }
 
-func (p *githubLoginProvider) GetUserInfo(ctx context.Context, code string, state *entity.TransientProviderLoginInfo) (*entity.ProviderUserInfo, error) {
+func (p *oauthLoginProvider) GetUserInfo(ctx context.Context, code string, state *entity.TransientProviderLoginInfo) (*entity.ProviderUserInfo, error) {
 	userInfo, err := p.impl.GetUserInfo(ctx, code, state.CodeVerifier)
 	if err != nil {
 		return nil, errors.Wrapf(domainerr.ErrIDPExchangeError, "get user info: %s", err.Error())

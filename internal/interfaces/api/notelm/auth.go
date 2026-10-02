@@ -31,6 +31,8 @@ func (s *Server) registerAuthRoutes(g *route.RouterGroup) {
 		{
 			// GET /api/v1/auth/callback/github
 			callbackGroup.GET("/github", s.AuthCallback(entity.ProviderTypeGithub))
+			// GET /api/v1/auth/callback/google
+			callbackGroup.GET("/google", s.AuthCallback(entity.ProviderTypeGoogle))
 		}
 	}
 }

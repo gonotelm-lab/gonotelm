@@ -12,6 +12,7 @@ type Type string
 
 const (
 	TypeGithub Type = "github"
+	TypeGoogle Type = "google"
 )
 
 type UserInfo struct {

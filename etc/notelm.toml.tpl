@@ -276,3 +276,11 @@ redirectUri = "${GONOTELM_OAUTH_REDIRECT_URI:-http://127.0.0.1:7099/api/v1/auth/
 scopes = ["read:user", "user:email"]
 authEndpoint = ""
 tokenEndpoint = ""
+
+[idp.google]
+clientId = "${GONOTELM_OAUTH_GOOGLE_CLIENT_ID}"
+clientSecret = "${GONOTELM_OAUTH_GOOGLE_CLIENT_SECRET}"
+redirectUri = "${GONOTELM_OAUTH_GOOGLE_REDIRECT_URI:-http://127.0.0.1:7099/api/v1/auth/callback/google}"
+scopes = ["openid", "email", "profile"]
+authEndpoint = ""
+tokenEndpoint = ""

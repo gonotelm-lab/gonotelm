@@ -15,14 +15,14 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
-	identityerrors "github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
+	domainerr "github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/httpclient"
 )
 
 const (
-	maxAvatarBytes     = 5 << 20 // 头像下载上限 5MB
+	maxAvatarBytes     = 2 << 20
 	avatarFetchTimeout = 10 * time.Second
 )
 
@@ -92,7 +92,7 @@ func (s *UserService) Register(ctx context.Context, params RegisterParams) (*ent
 	if err == nil {
 		return existing, nil
 	}
-	if !errors.Is(err, identityerrors.ErrUserNotFound) {
+	if !errors.Is(err, domainerr.ErrUserNotFound) {
 		return nil, errors.WithMessagef(err, "get user failed, provider=%s", params.Provider)
 	}
 

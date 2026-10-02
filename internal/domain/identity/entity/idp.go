@@ -6,10 +6,12 @@ type ProviderType string
 
 const (
 	ProviderTypeGithub ProviderType = "github"
+	ProviderTypeGoogle ProviderType = "google"
 )
 
 var validProviderTypes = map[ProviderType]bool{
 	ProviderTypeGithub: true,
+	ProviderTypeGoogle: true,
 }
 
 func (t ProviderType) String() string {
@@ -20,6 +22,8 @@ func (t ProviderType) Iss() string {
 	switch t {
 	case ProviderTypeGithub:
 		return "https://github.com/login/oauth"
+	case ProviderTypeGoogle:
+		return "https://accounts.google.com"
 	default:
 		return ""
 	}

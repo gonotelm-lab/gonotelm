@@ -116,8 +116,11 @@ func (s *pptxStep) generate(
 		}
 	}()
 
-	storeKey := formatSlidesStoreKey(req.NotebookId, req.ArtifactId)
-	if err := types.UploadReader(ctx, s.deps.ObjectStorage, storeKey, sourceentitiy.MimeTypePPTX, pptxReader); err != nil {
+	storeKey, err := s.deps.KeyFactory.New(slidesObjectPath(req.NotebookId, req.ArtifactId), false)
+	if err != nil {
+		return nil, errors.Wrapf(err, "create slides store key failed, artifact_id=%s", req.ArtifactId)
+	}
+	if err := s.deps.ObjectStorage.UploadReader(ctx, storeKey, sourceentitiy.MimeTypePPTX, pptxReader); err != nil {
 		return nil, errors.Wrapf(err, "upload slides object failed, artifact_id=%s", req.ArtifactId)
 	}
 
@@ -127,7 +130,7 @@ func (s *pptxStep) generate(
 	}, nil
 }
 
-func formatSlidesStoreKey(notebookId, artifactId valobj.Id) string {
+func slidesObjectPath(notebookId, artifactId valobj.Id) string {
 	return fmt.Sprintf("artifact/%s/%s.pptx", notebookId.String(), artifactId.String())
 }
 

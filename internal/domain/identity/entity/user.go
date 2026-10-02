@@ -1,8 +1,9 @@
 package entity
 
-import "github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-
-type UserAvatar string
+import (
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+)
 
 type UserStatus string
 
@@ -11,9 +12,12 @@ const (
 	UserStatusBanned UserStatus = "banned"
 )
 
+// 头像路径模板属于用户领域，桶名由 StoreKeyFactory 补（头像放公有桶）。
+const userAvatarObjectPathPrefix = "users/avatar/"
+
 type User struct {
 	Id        valobj.Uid
-	Avatar    UserAvatar
+	Avatar    valobj.StoreKey
 	Status    UserStatus
 	Nickname  string
 	Email     string
@@ -37,6 +41,16 @@ func NewUser(nickname string, provider ProviderType, subject string) *User {
 	return u
 }
 
+// NewAvatarKey 产出新的头像 StoreKey（isPublic=true，即公有读桶），不写入 u.Avatar。
+func (u *User) NewAvatarKey(keyFactory adapter.StoreKeyFactory) (valobj.StoreKey, error) {
+	return keyFactory.New(userAvatarObjectPathPrefix+valobj.NewUnOrderedId().String(), true)
+}
+
+func (u *User) SetAvatar(avatar valobj.StoreKey) {
+	u.Avatar = avatar
+	u.UpdatedAt = valobj.NewTime()
+}
+
 func (u *User) SetEmail(email string) {
 	u.Email = email
 	u.UpdatedAt = valobj.NewTime()
@@ -44,11 +58,6 @@ func (u *User) SetEmail(email string) {
 
 func (u *User) SetNickname(nickname string) {
 	u.Nickname = nickname
-	u.UpdatedAt = valobj.NewTime()
-}
-
-func (u *User) SetAvatar(avatar UserAvatar) {
-	u.Avatar = avatar
 	u.UpdatedAt = valobj.NewTime()
 }
 

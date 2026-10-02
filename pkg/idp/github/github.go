@@ -67,10 +67,11 @@ func (g *GitHub) GetUserInfo(ctx context.Context, code, verifier string) (*idp.U
 	}
 
 	return &idp.UserInfo{
-		Issuer:  issuer,
-		Subject: strconv.FormatInt(user.ID, 10),
-		Name:    user.Login,
-		Raw:     user.raw(),
+		Issuer:    issuer,
+		Subject:   strconv.FormatInt(user.ID, 10),
+		Name:      user.Login,
+		AvatarURL: user.AvatarURL,
+		Raw:       user.raw(),
 	}, nil
 }
 

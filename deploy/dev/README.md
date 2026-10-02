@@ -48,10 +48,14 @@ make dev-up-notrace   # = make -C deploy/dev up-notrace
 `minio-init` 跑的是仓库里的 `migration/storage/minio.sh`（挂载进容器用 `/bin/sh` 执行，宿主机也能直接跑），
 用 root（`GONOTELM_DEV_MINIO_ROOT_USER` / `GONOTELM_DEV_MINIO_ROOT_PASSWORD`，默认 `minioadmin`）做管理操作：
 
-* 建 `GONOTELM_MINIO_BUCKET`（默认 `gonotelm`），已存在则原样保留数据；
-* 桶访问策略设为 private，匿名不能读也不能写；
-* 用 `GONOTELM_MINIO_ACCESS_KEY` / `GONOTELM_MINIO_SECRET_KEY` 建桶自己的凭据，只授予该桶读写
-  （策略 `gonotelm-rw`），并摘掉可能存在的全局 `readwrite` / `writeonly` / `readonly`。
+* 建 `GONOTELM_MINIO_BUCKET`（默认 `gonotelm`），已存在则原样保留数据；匿名访问设为 private，
+  读写都走 `GONOTELM_MINIO_ACCESS_KEY`；
+* 建 `GONOTELM_PUBLIC_MINIO_BUCKET`（默认 `gonotelm-public`），已存在则原样保留数据；匿名桶策略用
+  `mc anonymous set-json` 只授 `s3:GetObject`，**不授** `s3:ListBucket` / `s3:GetBucketLocation`
+  （匿名只能按已知 URL 取对象，不能枚举；`mc anonymous set download` 会连列表一起放开，所以没用它），
+  写入必须带 `GONOTELM_PUBLIC_MINIO_ACCESS_KEY`；
+* 两个桶各建一份桶级策略（`gonotelm-rw` / `gonotelm-public-rw`），只覆盖自己的桶，并摘掉可能存在的全局
+  `readwrite` / `writeonly` / `readonly`。
 
 脚本可重复执行：不会清空桶，改完 `.env` 里的 AK/SK 重跑即轮换密钥。宿主机手动执行：
 
@@ -72,6 +76,8 @@ mc admin user svcacct rm <alias> <旧 AK>   # 之后重跑脚本即可
 | 使用者 | 桶 | 凭据 |
 | --- | --- | --- |
 | app（`notelm` / `worker` / `sourcejob`） | `gonotelm` | `GONOTELM_MINIO_ACCESS_KEY` / `SECRET_KEY`，桶级策略 `gonotelm-rw` |
+| app 里需要公开访问的资源 | `gonotelm-public` | `GONOTELM_PUBLIC_MINIO_ACCESS_KEY` / `SECRET_KEY`，桶级策略 `gonotelm-public-rw` |
+| 匿名访问者 | `gonotelm-public` | 无凭据，只能 `GetObject` |
 | `minio-init` | 建桶、建桶用户 | `GONOTELM_DEV_MINIO_ROOT_*`（默认 `minioadmin`） |
 | milvus | `a-bucket`（Milvus 自己的存储后端） | `GONOTELM_DEV_MINIO_ROOT_*` |
 

@@ -3,6 +3,7 @@ package source
 import (
 	"context"
 
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
@@ -12,18 +13,16 @@ import (
 
 type GetSourceHandler struct {
 	*baseHandler
-	storageRepo   sourcerepo.StorageRepository
 	sourceService sourceservice.Service
 }
 
 func NewGetSourceHandler(
 	sourceRepo sourcerepo.Repository,
-	storageRepo sourcerepo.StorageRepository,
+	objectStore adapter.ObjectStore,
 ) *GetSourceHandler {
 	return &GetSourceHandler{
 		baseHandler:   newBaseHandler(sourceRepo),
-		sourceService: sourceservice.New(storageRepo),
-		storageRepo:   storageRepo,
+		sourceService: sourceservice.New(objectStore),
 	}
 }
 

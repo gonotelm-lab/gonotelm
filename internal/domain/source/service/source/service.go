@@ -3,19 +3,19 @@ package source
 import (
 	"context"
 
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
-	repository "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/pkg/batch"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type Service struct {
-	storageRepo repository.StorageRepository
+	objectStore adapter.ObjectStore
 }
 
-func New(storageRepo repository.StorageRepository) Service {
+func New(objectStore adapter.ObjectStore) Service {
 	return Service{
-		storageRepo: storageRepo,
+		objectStore: objectStore,
 	}
 }
 
@@ -28,12 +28,12 @@ func (s *Service) GetSourceDetail(
 		Access: &entity.SourceAccess{},
 	}
 
-	if source.ParsedContentKey != "" {
-		prr, err := s.storageRepo.PresignGet(ctx, source.ParsedContentKey)
+	if source.ParsedContentKey.Valid() {
+		url, err := s.objectStore.PresignGet(ctx, source.ParsedContentKey)
 		if err != nil {
 			return nil, errors.WithMessagef(err, "presign get parsed content failed, source_id=%s", source.Id)
 		}
-		sourceDetail.Access.ParsedContentUrl = prr.Url
+		sourceDetail.Access.ParsedContentUrl = url
 	}
 
 	if source.Kind.IsFile() {
@@ -42,11 +42,11 @@ func (s *Service) GetSourceDetail(
 			return nil, errors.WithMessagef(err, "get file content failed, source_id=%s", source.Id)
 		}
 
-		prr, err := s.storageRepo.PresignGet(ctx, fc.StoreKey)
+		url, err := s.objectStore.PresignGet(ctx, fc.StoreKey)
 		if err != nil {
 			return nil, errors.WithMessagef(err, "presign get file content failed, source_id=%s", source.Id)
 		}
-		sourceDetail.Access.FileContentUrl = prr.Url
+		sourceDetail.Access.FileContentUrl = url
 	}
 
 	return sourceDetail, nil

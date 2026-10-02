@@ -40,7 +40,7 @@ func (r *UserRepositoryImpl) GetById(ctx context.Context, id valobj.Uid) (*ident
 		return nil, errors.WithMessage(err, "failed to get user by id")
 	}
 
-	return mapper.UserFromSchema(sch), nil
+	return mapper.UserFromSchema(sch)
 }
 
 func (r *UserRepositoryImpl) GetByProviderSub(
@@ -57,5 +57,5 @@ func (r *UserRepositoryImpl) GetByProviderSub(
 		return nil, errors.WithMessage(err, "failed to get user by issuer and sub")
 	}
 
-	return mapper.UserFromSchema(sch), nil
+	return mapper.UserFromSchema(sch)
 }

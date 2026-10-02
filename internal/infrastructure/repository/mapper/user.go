@@ -4,6 +4,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	identityentity "github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/schema"
+	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 func UserToSchema(u *identityentity.User) *schema.User {
@@ -12,7 +13,7 @@ func UserToSchema(u *identityentity.User) *schema.User {
 		Email:     u.Email,
 		Nickname:  u.Nickname,
 		Status:    string(u.Status),
-		Avatar:    string(u.Avatar),
+		Avatar:    u.Avatar.Encode(),
 		Provider:  string(u.Provider),
 		Sub:       u.Sub,
 		CreatedAt: u.CreatedAt.Value(),
@@ -20,10 +21,15 @@ func UserToSchema(u *identityentity.User) *schema.User {
 	}
 }
 
-func UserFromSchema(u *schema.User) *identityentity.User {
+func UserFromSchema(u *schema.User) (*identityentity.User, error) {
+	avatar, err := valobj.DecodeStoreKey(u.Avatar)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "decode user avatar failed, user_id=%s", u.Id)
+	}
+
 	return &identityentity.User{
 		Id:        u.Id,
-		Avatar:    identityentity.UserAvatar(u.Avatar),
+		Avatar:    avatar,
 		Status:    identityentity.UserStatus(u.Status),
 		Nickname:  u.Nickname,
 		Email:     u.Email,
@@ -31,5 +37,5 @@ func UserFromSchema(u *schema.User) *identityentity.User {
 		Sub:       u.Sub,
 		CreatedAt: valobj.NewTimeFrom(u.CreatedAt),
 		UpdatedAt: valobj.NewTimeFrom(u.UpdatedAt),
-	}
+	}, nil
 }

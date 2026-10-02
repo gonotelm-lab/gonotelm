@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourceerr "github.com/gonotelm-lab/gonotelm/internal/domain/source/errors"
-	"github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	myparser "github.com/gonotelm-lab/gonotelm/internal/domain/source/service/index/convertdoc/parser"
 	mytransformer "github.com/gonotelm-lab/gonotelm/internal/domain/source/service/index/convertdoc/transformer"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -21,7 +21,7 @@ import (
 var _ Handler = (*FileObjectHandler)(nil)
 
 type FileObjectHandler struct {
-	objectStorage repository.FileObjectGetter
+	objectStorage adapter.ObjectGetter
 	baseHandler   *baseHandler
 
 	c HandlerConfig
@@ -29,7 +29,7 @@ type FileObjectHandler struct {
 
 func NewFileObjectHandler(
 	hc HandlerConfig,
-	objGetter repository.FileObjectGetter,
+	objGetter adapter.ObjectGetter,
 	imageInterpreter adapter.ImageInterpreter,
 ) *FileObjectHandler {
 	return &FileObjectHandler{
@@ -90,11 +90,11 @@ func fileConversionOptions(fs *entity.FileSourceContent) ([]einoparser.Option, [
 	return parseOpts, transformOpts
 }
 
-func (h *FileObjectHandler) loadObjectBody(ctx context.Context, storeKey string) ([]byte, bool, error) {
+func (h *FileObjectHandler) loadObjectBody(ctx context.Context, storeKey valobj.StoreKey) ([]byte, bool, error) {
 	objBody, info, err := h.objectStorage.GetObject(ctx, storeKey)
 	if err != nil {
-		if errors.Is(err, repository.ErrObjectNotFound) {
-			slog.ErrorContext(ctx, "file source object not found", "store_key", storeKey)
+		if errors.Is(err, adapter.ErrObjectNotFound) {
+			slog.ErrorContext(ctx, "file source object not found", "store_key", storeKey.String())
 			return nil, false, nil
 		}
 

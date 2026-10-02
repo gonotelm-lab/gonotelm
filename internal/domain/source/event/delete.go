@@ -12,10 +12,10 @@ type DeleteEvent struct {
 
 	sourceId   valobj.Id
 	notebookId valobj.Id
-	objectKeys []string
+	objectKeys []valobj.StoreKey
 }
 
-func NewDeleteEvent(sourceId, notebookId valobj.Id, objectKeys []string) *DeleteEvent {
+func NewDeleteEvent(sourceId, notebookId valobj.Id, objectKeys []valobj.StoreKey) *DeleteEvent {
 	return &DeleteEvent{
 		sourceId:   sourceId,
 		notebookId: notebookId,
@@ -31,7 +31,7 @@ func (e *DeleteEvent) NotebookId() valobj.Id {
 	return e.notebookId
 }
 
-func (e *DeleteEvent) ObjectStoreKeys() []string {
+func (e *DeleteEvent) ObjectStoreKeys() []valobj.StoreKey {
 	return e.objectKeys
 }
 

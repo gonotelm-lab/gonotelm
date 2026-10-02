@@ -159,9 +159,10 @@ func (p *githubLoginProvider) GetUserInfo(ctx context.Context, code string, stat
 	}
 
 	return &entity.ProviderUserInfo{
-		Issuer:  userInfo.Issuer,
-		Subject: userInfo.Subject,
-		Name:    userInfo.Name,
-		Raw:     userInfo.Raw,
+		Issuer:    userInfo.Issuer,
+		Subject:   userInfo.Subject,
+		Name:      userInfo.Name,
+		Raw:       userInfo.Raw,
+		AvatarURL: userInfo.AvatarURL,
 	}, nil
 }

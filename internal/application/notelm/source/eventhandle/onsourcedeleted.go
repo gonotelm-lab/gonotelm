@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/event"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	sourceevent "github.com/gonotelm-lab/gonotelm/internal/domain/source/event"
@@ -13,17 +14,17 @@ import (
 )
 
 type OnSourceDeletedEventHandler struct {
-	sourceDocRepo     sourcerepo.SourceDocRepository
-	sourceStorageRepo sourcerepo.StorageRepository
+	sourceDocRepo sourcerepo.SourceDocRepository
+	objectStore   adapter.ObjectStore
 }
 
 func NewOnSourceDeletedEventHandler(
 	sourceDocRepo sourcerepo.SourceDocRepository,
-	sourceStorageRepo sourcerepo.StorageRepository,
+	objectStore adapter.ObjectStore,
 ) *OnSourceDeletedEventHandler {
 	return &OnSourceDeletedEventHandler{
-		sourceDocRepo:     sourceDocRepo,
-		sourceStorageRepo: sourceStorageRepo,
+		sourceDocRepo: sourceDocRepo,
+		objectStore:   objectStore,
 	}
 }
 
@@ -36,10 +37,10 @@ func (h *OnSourceDeletedEventHandler) Handle(ctx context.Context, evt *sourceeve
 	}
 
 	for _, key := range evt.ObjectStoreKeys() {
-		if err := h.sourceStorageRepo.DeleteObject(ctx, key); err != nil {
+		if err := h.objectStore.DeleteObject(ctx, key); err != nil {
 			slog.WarnContext(ctx, "delete source object failed",
 				slog.String("source_id", sourceId.String()),
-				slog.String("store_key", key),
+				slog.String("store_key", key.String()),
 				slog.Any("err", err),
 			)
 		}

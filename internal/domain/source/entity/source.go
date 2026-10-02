@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/gabriel-vasile/mimetype"
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	coreentity "github.com/gonotelm-lab/gonotelm/internal/core/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/entity/vo"
@@ -85,7 +86,7 @@ type Source struct {
 	Abstract         string
 	OwnerId          valobj.Uid
 	Content          SourceContent
-	ParsedContentKey string
+	ParsedContentKey valobj.StoreKey
 }
 
 func NewSource(
@@ -163,7 +164,11 @@ func (p *UploadFileParams) validate() error {
 	return nil
 }
 
-func (s *Source) UploadFile(ctx context.Context, params *UploadFileParams) error {
+func (s *Source) UploadFile(
+	ctx context.Context,
+	params *UploadFileParams,
+	keyFactory adapter.StoreKeyFactory,
+) error {
 	if err := s.checkUploadable(); err != nil {
 		return err
 	}
@@ -172,7 +177,10 @@ func (s *Source) UploadFile(ctx context.Context, params *UploadFileParams) error
 		return errors.WithMessage(err, "validate upload file params failed")
 	}
 
-	storeKey := s.formatFileStoreKey(params)
+	storeKey, err := keyFactory.New(s.fileObjectPath(params), false)
+	if err != nil {
+		return errors.WithMessage(err, "create file store key failed")
+	}
 
 	fileContent := &FileSourceContent{
 		StoreKey: storeKey,
@@ -187,8 +195,12 @@ func (s *Source) UploadFile(ctx context.Context, params *UploadFileParams) error
 	return nil
 }
 
-func (s *Source) UploadParsedContent() error {
-	storeKey := s.formatParsedContentStoreKey()
+func (s *Source) UploadParsedContent(keyFactory adapter.StoreKeyFactory) error {
+	storeKey, err := keyFactory.New(s.parsedContentObjectPath(), false)
+	if err != nil {
+		return errors.WithMessage(err, "create parsed content store key failed")
+	}
+
 	s.UpdateTime = valobj.NewTime()
 	s.ParsedContentKey = storeKey
 
@@ -229,7 +241,8 @@ func (s *Source) CheckProcessable(p *CheckProcessableParams) error {
 	return nil
 }
 
-func (s *Source) formatFileStoreKey(params *UploadFileParams) string {
+// fileObjectPath 只产出桶内路径；桶名由 adapter.StoreKeyFactory 补齐。
+func (s *Source) fileObjectPath(params *UploadFileParams) string {
 	var (
 		notebookId = s.NotebookId.String()
 		sourceId   = s.Id.String()
@@ -239,7 +252,8 @@ func (s *Source) formatFileStoreKey(params *UploadFileParams) string {
 	return fmt.Sprintf("file/%s/%s%s", notebookId, sourceId, ext)
 }
 
-func (s *Source) formatParsedContentStoreKey() string {
+// parsedContentObjectPath 只产出桶内路径；桶名由 adapter.StoreKeyFactory 补齐。
+func (s *Source) parsedContentObjectPath() string {
 	const parsedContentStorePrefix = "parsed_file/"
 	var (
 		notebookId = s.NotebookId.String()
@@ -375,16 +389,16 @@ func (s *Source) addDeleteEvent() {
 	s.AddEvent(sourceevent.NewDeleteEvent(s.Id, s.NotebookId, s.objectStoreKeys()))
 }
 
-func (s *Source) ObjectStoreKeys() []string {
+func (s *Source) ObjectStoreKeys() []valobj.StoreKey {
 	return s.objectStoreKeys()
 }
 
-func (s *Source) objectStoreKeys() []string {
-	keys := make([]string, 0, 2)
-	if s.ParsedContentKey != "" {
+func (s *Source) objectStoreKeys() []valobj.StoreKey {
+	keys := make([]valobj.StoreKey, 0, 2)
+	if s.ParsedContentKey.Valid() {
 		keys = append(keys, s.ParsedContentKey)
 	}
-	if fileContent, err := s.GetFileContent(); err == nil && fileContent.StoreKey != "" {
+	if fileContent, err := s.GetFileContent(); err == nil && fileContent.StoreKey.Valid() {
 		keys = append(keys, fileContent.StoreKey)
 	}
 	return keys

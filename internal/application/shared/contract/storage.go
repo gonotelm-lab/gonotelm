@@ -1,8 +1,8 @@
-package slides
+package contract
 
 import "github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 
-type SlidesStorageResult struct {
+type StorageResult struct {
 	StoreKey    valobj.StoreKey `json:"store_key"`
 	ContentType string          `json:"content_type"`
 }

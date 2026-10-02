@@ -44,7 +44,7 @@ type CreateMessageHandler struct {
 	chatContextMessageRepo chatrepo.ContextMessageRepository
 	streamTaskRepo         chatrepo.StreamTaskRepository
 	sourceRepo             sourcerepo.Repository
-	sourceStorageRepo      sourcerepo.StorageRepository
+	objectStore            adapter.ObjectStore
 	sourceDocRepo          sourcerepo.SourceDocRepository
 	sourceAgentizeService  *agentize.Service
 	chatGateway            *llmchat.Gateway
@@ -62,7 +62,7 @@ func NewCreateMessageHandler(
 	chatContextMessageRepo chatrepo.ContextMessageRepository,
 	streamTaskRepo chatrepo.StreamTaskRepository,
 	sourceRepo sourcerepo.Repository,
-	sourceStorageRepo sourcerepo.StorageRepository,
+	objectStore adapter.ObjectStore,
 	sourceDocRepo sourcerepo.SourceDocRepository,
 	chatGateway *llmchat.Gateway,
 	eventBus eventbus.Publisher,
@@ -70,7 +70,7 @@ func NewCreateMessageHandler(
 	sourceAgentizeService := agentize.NewService(
 		agentize.Config{},
 		sourceRepo,
-		sourceStorageRepo,
+		objectStore,
 		sourceDocRepo,
 	)
 	return &CreateMessageHandler{
@@ -82,7 +82,7 @@ func NewCreateMessageHandler(
 		chatContextMessageRepo: chatContextMessageRepo,
 		streamTaskRepo:         streamTaskRepo,
 		sourceRepo:             sourceRepo,
-		sourceStorageRepo:      sourceStorageRepo,
+		objectStore:            objectStore,
 		sourceDocRepo:          sourceDocRepo,
 		sourceAgentizeService:  sourceAgentizeService,
 		chatGateway:            chatGateway,

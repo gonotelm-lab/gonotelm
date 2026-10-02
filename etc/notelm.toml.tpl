@@ -52,6 +52,10 @@ bucket = "gonotelm"
 region = "${GONOTELM_MINIO_REGION:-us-east-1}"
 secure = ${GONOTELM_MINIO_SECURE:-false}
 presignExpiry = "${GONOTELM_MINIO_PRESIGN_EXPIRY:-15m}"
+publicBucket = "${GONOTELM_PUBLIC_MINIO_BUCKET:-gonotelm-public}"
+publicAccessKey = "${GONOTELM_PUBLIC_MINIO_ACCESS_KEY:-}"
+publicSecretKey = "${GONOTELM_PUBLIC_MINIO_SECRET_KEY:-}"
+publicBaseURL = "${GONOTELM_PUBLIC_MINIO_BASE_URL:-http://127.0.0.1:9000}"
 
 [messageQueue]
 type = "kafka"

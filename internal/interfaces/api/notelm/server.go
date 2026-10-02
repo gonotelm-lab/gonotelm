@@ -34,7 +34,8 @@ type ServerDeps struct {
 
 	NotebookRepo           notebookrepo.Repository
 	SourceRepo             sourcerepo.Repository
-	SourceStorageRepo      sourcerepo.StorageRepository
+	ObjectStore            adapter.ObjectStore
+	KeyFactory             adapter.StoreKeyFactory
 	SourceDocRepo          sourcerepo.SourceDocRepository
 	ArtifactRepo           artifactrepo.Repository
 	ChatRepo               chatrepo.ChatRepository
@@ -54,9 +55,8 @@ type ServerDeps struct {
 	DistLock           adapter.DistributedLock
 	Summarizer         adapter.Summarizer
 
-	FlowClient     flow.TaskClient
-	Poller         artifactapp.Poller
-	StorageGateway adapter.StorageAdapter
+	FlowClient flow.TaskClient
+	Poller     artifactapp.Poller
 
 	TitleMaker adapter.TitleMaker
 }
@@ -143,11 +143,11 @@ func NewServer(
 			deps.Summarizer,
 		),
 
-		getSourceHandler:              sourceapp.NewGetSourceHandler(deps.SourceRepo, deps.SourceStorageRepo),
+		getSourceHandler:              sourceapp.NewGetSourceHandler(deps.SourceRepo, deps.ObjectStore),
 		createSourceHandler:           sourceapp.NewCreateSourceHandler(deps.SourceRepo, deps.NotebookRepo, deps.EventBus),
 		deleteSourceHandler:           sourceapp.NewDeleteSourceHandler(deps.SourceRepo, deps.EventBus),
-		presignUploadFileHandler:      sourceapp.NewPresignUploadFileHandler(deps.SourceRepo, deps.SourceStorageRepo),
-		pollSourceStatusHandler:       sourceapp.NewPollSourceStatusHandler(deps.SourceRepo, deps.SourceStorageRepo, deps.EventBus),
+		presignUploadFileHandler:      sourceapp.NewPresignUploadFileHandler(deps.SourceRepo, deps.ObjectStore, deps.KeyFactory),
+		pollSourceStatusHandler:       sourceapp.NewPollSourceStatusHandler(deps.SourceRepo, deps.ObjectStore, deps.EventBus),
 		retrySourcePreparationHandler: sourceapp.NewRetrySourcePreparationHandler(deps.SourceRepo, deps.EventBus),
 		updateSourceTitleHandler:      sourceapp.NewUpdateSourceTitleHandler(deps.SourceRepo),
 
@@ -155,7 +155,7 @@ func NewServer(
 		batchGetSourceDocHandler: sourceapp.NewBatchGetSourceDocsHandler(deps.SourceRepo, deps.SourceDocRepo),
 
 		createChatHandler:  chatapp.NewCreateChatHandler(deps.NotebookRepo, deps.ChatRepo),
-		listSourcesHandler: sourceapp.NewListSourcesHandler(deps.NotebookRepo, deps.SourceRepo, deps.SourceStorageRepo),
+		listSourcesHandler: sourceapp.NewListSourcesHandler(deps.NotebookRepo, deps.SourceRepo, deps.ObjectStore),
 		getChatSuggestionsHandler: chatapp.NewChatSuggestHandler(
 			deps.ChatRepo,
 			deps.ChatSuggestService,
@@ -170,7 +170,7 @@ func NewServer(
 			deps.ChatContextMessageRepo,
 			deps.ChatStreamTaskRepo,
 			deps.SourceRepo,
-			deps.SourceStorageRepo,
+			deps.ObjectStore,
 			deps.SourceDocRepo,
 			deps.LLMGateway,
 			deps.EventBus,
@@ -203,17 +203,18 @@ func NewServer(
 			deps.EventBus,
 			deps.TitleMaker,
 		),
-		getArtifactStatusHandler:     artifactapp.NewGetArtifactStatusHandler(deps.ArtifactRepo, deps.StorageGateway),
+		getArtifactStatusHandler:     artifactapp.NewGetArtifactStatusHandler(deps.ArtifactRepo, deps.ObjectStore),
 		listNotebookArtifactsHandler: artifactapp.NewListArtifactsHandler(deps.NotebookRepo, deps.ArtifactRepo),
 		cancelArtifactHandler:        artifactapp.NewCancelArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.EventBus),
-		deleteArtifactHandler:        artifactapp.NewDeleteArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.StorageGateway),
+		deleteArtifactHandler:        artifactapp.NewDeleteArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.ObjectStore),
 		retryArtifactHandler:         artifactapp.NewRetryArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.Poller, deps.EventBus),
 		updateArtifactHandler:        artifactapp.NewUpdateArtifactHandler(deps.ArtifactRepo),
 		convertNoteToSourceHandler: artifactapp.NewConvertNoteToSourceHandler(
 			deps.ArtifactRepo,
 			deps.SourceRepo,
 			deps.NotebookRepo,
-			deps.SourceStorageRepo,
+			deps.ObjectStore,
+			deps.KeyFactory,
 			deps.EventBus,
 		),
 
@@ -221,7 +222,7 @@ func NewServer(
 		authCallbackHandler:  authapp.NewCallbackHandler(deps.LoginInfoRepo, deps.UserService, deps.UserSessionRepo),
 		authProvidersHandler: authapp.NewProvidersHandler(deps.LoginInfoRepo),
 		authHandler:          authapp.NewAuthHandler(deps.UserSessionRepo),
-		getMeHandler:         userapp.NewGetMeHandler(deps.UserRepo),
+		getMeHandler:         userapp.NewGetMeHandler(deps.UserRepo, deps.ObjectStore),
 	}
 
 	s.registerRoutes()

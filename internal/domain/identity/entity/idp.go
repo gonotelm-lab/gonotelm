@@ -61,10 +61,11 @@ type LoginInfoRequest struct {
 }
 
 type ProviderUserInfo struct {
-	Issuer  string
-	Subject string
-	Name    string
-	Raw     map[string]any
+	Issuer    string
+	Subject   string
+	Name      string
+	AvatarURL string
+	Raw       map[string]any
 }
 
 type Provider interface {

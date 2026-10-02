@@ -19,11 +19,11 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	workerentity "github.com/gonotelm-lab/gonotelm/internal/domain/worker/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	pkgaudio "github.com/gonotelm-lab/gonotelm/pkg/audio/wav"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -33,7 +33,7 @@ import (
 )
 
 // audioCheckpointVersion 音频产物缓存版本；朗读规则变化时递增，使旧音频失效并重新合成。
-const audioCheckpointVersion = 2
+const audioCheckpointVersion = 3
 
 // audioCheckpointMeta 持久化到 checkpoint.field2
 type audioCheckpointMeta struct {
@@ -59,12 +59,12 @@ func (m *audioCheckpointMeta) sortedAudioParts() []audioLinePart {
 }
 
 type audioLinePart struct {
-	Index        int    `json:"index"`
-	SegmentIndex int    `json:"segment_index"`
-	LineIndex    int    `json:"line_index"`
-	Text         string `json:"text"`
-	StoreKey     string `json:"store_key"`
-	DurationMs   int64  `json:"duration_ms"`
+	Index        int             `json:"index"`
+	SegmentIndex int             `json:"segment_index"`
+	LineIndex    int             `json:"line_index"`
+	Text         string          `json:"text"`
+	StoreKey     valobj.StoreKey `json:"store_key"`
+	DurationMs   int64           `json:"duration_ms"`
 }
 
 type synthesizedLine struct {
@@ -77,7 +77,8 @@ type synthesizedLine struct {
 // audioStep 按口播稿逐句 TTS 并上传 OSS，写入 field2；不做整轨拼接。
 type audioStep struct {
 	text2audio     *text2audio.Text2AudioGateway
-	storage        storage.Storage
+	objectStore    adapter.ObjectStore
+	keyFactory     adapter.StoreKeyFactory
 	checkpoints    *types.CheckpointStore
 	downloadClient *http.Client
 
@@ -94,7 +95,8 @@ func newAudioStep(deps *types.WorkerDeps, checkpoints *types.CheckpointStore) *a
 	}
 	return &audioStep{
 		text2audio:     deps.Text2Audio,
-		storage:        deps.ObjectStorage,
+		objectStore:    deps.ObjectStorage,
+		keyFactory:     deps.KeyFactory,
 		checkpoints:    checkpoints,
 		downloadClient: httpclient.NewBuilder(nil).WithTimeout(5 * time.Minute).Build(),
 		provider:       cfg.AudioModelProvider,
@@ -217,7 +219,7 @@ type lineSynthResult struct {
 	segmentIndex int
 	lineIndex    int
 	text         string
-	partKey      string
+	partKey      valobj.StoreKey
 	pcm          *pkgaudio.PCM
 }
 
@@ -338,12 +340,11 @@ func (s *audioStep) synthesizeOneLine(
 		return errors.Wrapf(errors.ErrInner, "parse wav for line %d failed, err=%v", index, err)
 	}
 
-	partKey := s.formatLineAudioStoreKey(job.payload.NotebookId, job.artifactId, line.SegmentIndex, line.LineIndex)
-	if err = s.storage.UploadObject(ctx, &storage.UploadObjectRequest{
-		Key:         partKey,
-		Body:        raw,
-		ContentType: "audio/wav",
-	}); err != nil {
+	partKey, err := s.keyFactory.New(lineAudioObjectPath(job.payload.NotebookId, job.artifactId, line.SegmentIndex, line.LineIndex), false)
+	if err != nil {
+		return errors.Wrapf(errors.ErrInner, "create line audio store key for line %d failed, err=%v", index, err)
+	}
+	if err = s.objectStore.Upload(ctx, partKey, raw, "audio/wav"); err != nil {
 		return errors.Wrapf(errors.ErrInner, "upload line audio for line %d failed, err=%v", index, err)
 	}
 
@@ -408,7 +409,7 @@ func (s *audioStep) discardStale(ctx context.Context, artifactId valobj.Id, ckpt
 		return
 	}
 
-	keys := make([]string, 0, len(meta.Parts))
+	keys := make([]valobj.StoreKey, 0, len(meta.Parts))
 	for _, p := range meta.Parts {
 		keys = append(keys, p.StoreKey)
 	}
@@ -416,7 +417,7 @@ func (s *audioStep) discardStale(ctx context.Context, artifactId valobj.Id, ckpt
 		slog.String("artifact_id", artifactId.String()),
 		slog.Int("part_count", len(keys)),
 	)
-	if err := s.storage.BatchDeleteObject(ctx, &storage.BatchDeleteObjectRequest{Keys: keys}); err != nil {
+	if err := s.objectStore.BatchDeleteObject(ctx, keys); err != nil {
 		slog.ErrorContext(ctx, "cleanup stale video audio failed",
 			slog.Int("count", len(keys)), slog.Any("err", err))
 	}
@@ -458,7 +459,7 @@ func (s *audioStep) restoreAudioMeta(ckpt *workerentity.Checkpoint) *audioCheckp
 	return &meta
 }
 
-func (s *audioStep) formatLineAudioStoreKey(
+func lineAudioObjectPath(
 	notebookId, artifactId valobj.Id,
 	segmentIndex, lineIndex int,
 ) string {

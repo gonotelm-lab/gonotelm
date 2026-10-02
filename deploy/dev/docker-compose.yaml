@@ -165,8 +165,9 @@ services:
       - gonotelm-dev
 
   # app 不会自动建 bucket，也不建桶用户：用 minio 镜像自带的 mc + /bin/sh 跑仓库里的
-  # migration/storage/minio.sh（同一份逻辑，宿主机也能直接跑）。建用户/策略用 root，
-  # 桶自己拿到的是 GONOTELM_MINIO_ACCESS_KEY / GONOTELM_MINIO_SECRET_KEY，且只授权 gonotelm 桶读写。
+  # migration/storage/minio.sh（同一份逻辑，宿主机也能直接跑）。建用户/策略用 root；
+  # gonotelm 桶用 GONOTELM_MINIO_ACCESS_KEY（私有读写），gonotelm-public 桶用
+  # GONOTELM_PUBLIC_MINIO_ACCESS_KEY（公开读、私有写），两份凭据各自只授权自己的桶。
   minio-init:
     image: ${GONOTELM_DEV_MINIO_MC_IMAGE:-quay.io/minio/minio:latest}
     container_name: gonotelm-minio-init-dev
@@ -179,9 +180,12 @@ services:
       GONOTELM_DEV_MINIO_ROOT_PASSWORD: ${GONOTELM_DEV_MINIO_ROOT_PASSWORD:-minioadmin}
       GONOTELM_MINIO_ACCESS_KEY: ${GONOTELM_MINIO_ACCESS_KEY:?GONOTELM_MINIO_ACCESS_KEY 未设置，请用 --env-file 指向仓库根目录的 .env}
       GONOTELM_MINIO_SECRET_KEY: ${GONOTELM_MINIO_SECRET_KEY:?GONOTELM_MINIO_SECRET_KEY 未设置，请用 --env-file 指向仓库根目录的 .env}
+      GONOTELM_PUBLIC_MINIO_ACCESS_KEY: ${GONOTELM_PUBLIC_MINIO_ACCESS_KEY:?GONOTELM_PUBLIC_MINIO_ACCESS_KEY 未设置，请用 --env-file 指向仓库根目录的 .env}
+      GONOTELM_PUBLIC_MINIO_SECRET_KEY: ${GONOTELM_PUBLIC_MINIO_SECRET_KEY:?GONOTELM_PUBLIC_MINIO_SECRET_KEY 未设置，请用 --env-file 指向仓库根目录的 .env}
       # 容器内走 compose 网络，固定覆盖掉宿主机 .env 里的 127.0.0.1:9000
       GONOTELM_MINIO_ENDPOINT: minio:9000
       GONOTELM_MINIO_BUCKET: ${GONOTELM_MINIO_BUCKET:-gonotelm}
+      GONOTELM_PUBLIC_MINIO_BUCKET: ${GONOTELM_PUBLIC_MINIO_BUCKET:-gonotelm-public}
       GONOTELM_MINIO_SECURE: "false"
     entrypoint: ["/bin/sh", "/migration/minio.sh"]
     volumes:

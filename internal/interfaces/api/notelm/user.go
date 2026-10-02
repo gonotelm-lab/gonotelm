@@ -26,7 +26,8 @@ func (s *Server) GetMe(ctx context.Context, c *app.RequestContext) {
 	}
 
 	http.OkResp(c, schema.MeResponse{
-		UserId:   resp.UserId,
-		Nickname: resp.Nickname,
+		UserId:    resp.UserId,
+		Nickname:  resp.Nickname,
+		AvatarUrl: resp.AvatarUrl,
 	})
 }

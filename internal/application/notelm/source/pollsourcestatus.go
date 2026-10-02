@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/gabriel-vasile/mimetype"
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/entity/vo"
@@ -14,18 +15,18 @@ import (
 
 type PollSourceStatusHandler struct {
 	*baseHandler
-	storageRepo repo.StorageRepository
+	objectStore adapter.ObjectStore
 	eventBus    eventbus.Publisher
 }
 
 func NewPollSourceStatusHandler(
 	sourceRepo repo.Repository,
-	storageRepo repo.StorageRepository,
+	objectStore adapter.ObjectStore,
 	eventBus eventbus.Publisher,
 ) *PollSourceStatusHandler {
 	return &PollSourceStatusHandler{
 		baseHandler: newBaseHandler(sourceRepo),
-		storageRepo: storageRepo,
+		objectStore: objectStore,
 		eventBus:    eventBus,
 	}
 }
@@ -70,11 +71,11 @@ func (h *PollSourceStatusHandler) pollFileSourceStatus(
 
 	// maybe is uploading, check if file already uploaded
 	uploaded := true
-	partial, objectInfo, err := h.storageRepo.GetPartialObject(ctx, fileContent.StoreKey, 0, 3072)
+	partial, objectInfo, err := h.objectStore.GetPartialObject(ctx, fileContent.StoreKey, 0, 3072)
 	if err != nil {
 		uploaded = false
-		if !errors.Is(err, repo.ErrObjectNotFound) {
-			return "", errors.WithMessagef(err, "check file exist failed, store_key=%s", fileContent.StoreKey)
+		if !errors.Is(err, adapter.ErrObjectNotFound) {
+			return "", errors.WithMessagef(err, "check file exist failed, store_key=%s", fileContent.StoreKey.String())
 		}
 	}
 

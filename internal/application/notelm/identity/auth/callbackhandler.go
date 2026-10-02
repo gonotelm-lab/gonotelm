@@ -90,13 +90,21 @@ func (h *CallbackHandler) Handle(ctx context.Context, cmd *CallbackHandleCommand
 		return nil, errors.WithMessage(err, "failed to get user info")
 	}
 
-	user, err := h.userService.GetOrRegister(ctx, identityservice.RegisterParams{
-		Provider: cmd.ProviderType,
-		Subject:  userInfo.Subject,
-		Nickname: userInfo.Name,
-	})
+	user, err := h.userService.Get(ctx, cmd.ProviderType, userInfo.Subject)
 	if err != nil {
-		return nil, errors.WithMessage(err, "failed to get or register user")
+		if !errors.Is(err, domainerr.ErrUserNotFound) {
+			return nil, errors.WithMessage(err, "failed to get user")
+		}
+
+		user, err = h.userService.Register(ctx, identityservice.RegisterParams{
+			Provider:       cmd.ProviderType,
+			Subject:        userInfo.Subject,
+			Nickname:       userInfo.Name,
+			OuterAvatarURL: userInfo.AvatarURL,
+		})
+		if err != nil {
+			return nil, errors.WithMessage(err, "failed to register user")
+		}
 	}
 
 	// 登录后轮换会话：先作废旧会话，再签发新会话，防止 session fixation
@@ -120,6 +128,7 @@ func (h *CallbackHandler) Handle(ctx context.Context, cmd *CallbackHandleCommand
 		slog.String("subject", userInfo.Subject),
 		slog.String("user_id", user.Id.String()),
 		slog.String("session_id", session.Id),
+		slog.String("avatar", user.Avatar.String()),
 	)
 
 	return &CallbackHandleResult{

@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS users (
   email VARCHAR(255) NOT NULL DEFAULT '',
   nickname VARCHAR(255) NOT NULL,
   status VARCHAR(16) NOT NULL DEFAULT 'active',
-  avatar TEXT NOT NULL,
+  avatar VARCHAR(255) NOT NULL,
   provider VARCHAR(128) NOT NULL, -- custom (provider)issuer enum
   sub VARCHAR(512) NOT NULL, -- subject in jwt token
   created_at BIGINT NOT NULL DEFAULT 0,

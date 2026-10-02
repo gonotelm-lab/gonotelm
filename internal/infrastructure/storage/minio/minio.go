@@ -28,9 +28,14 @@ type Storage struct {
 	bucket        string
 	region        string
 	presignExpiry time.Duration
+	cfg           *storage.Config
+	publicBase    *url.URL
 }
 
-var _ storage.Storage = (*Storage)(nil)
+var (
+	_ storage.Storage           = (*Storage)(nil)
+	_ storage.PublicReadStorage = (*Storage)(nil)
+)
 
 func New(cfg *storage.Config) (*Storage, error) {
 	if cfg == nil {
@@ -53,16 +58,27 @@ func New(cfg *storage.Config) (*Storage, error) {
 		return nil, errors.Wrap(err, "create minio client failed")
 	}
 
+	publicBase, err := parsePublicBaseURL(cfg.PublicBaseURL, cfg.Secure)
+	if err != nil {
+		return nil, errors.Wrap(err, "parse public base url failed")
+	}
+
 	return &Storage{
 		client:        client,
 		bucket:        cfg.Bucket,
 		region:        cfg.Region,
 		presignExpiry: cfg.PresignExpiry,
+		cfg:           cfg,
+		publicBase:    publicBase,
 	}, nil
 }
 
 func (s *Storage) Name() string {
 	return "minio"
+}
+
+func (s *Storage) Bucket() string {
+	return s.bucket
 }
 
 // startSpan 为一次存储操作创建 S3 风格 client span，
@@ -451,6 +467,42 @@ func (s *Storage) PresignedGetObject(
 	return &storage.PresignedGetObjectResponse{
 		Url: presignedURL.String(),
 	}, nil
+}
+
+func (s *Storage) GetObjectUrl(_ context.Context, key string) string {
+	u := *s.client.EndpointURL()
+	if s.publicBase != nil {
+		u = *s.publicBase
+	}
+
+	u.RawPath = ""
+	u.Path = strings.TrimSuffix(u.Path, "/") + "/" + s.bucket + "/" + strings.TrimPrefix(key, "/")
+
+	return u.String()
+}
+
+func parsePublicBaseURL(raw string, secure bool) (*url.URL, error) {
+	if raw == "" {
+		return nil, nil
+	}
+
+	if !strings.Contains(raw, "://") {
+		scheme := "http"
+		if secure {
+			scheme = "https"
+		}
+		raw = scheme + "://" + raw
+	}
+
+	u, err := url.Parse(raw)
+	if err != nil {
+		return nil, errors.Wrapf(err, "invalid public base url %q", raw)
+	}
+	if u.Host == "" {
+		return nil, errors.Errorf("invalid public base url %q: host is empty", raw)
+	}
+
+	return u, nil
 }
 
 func isNotFoundErr(err error) bool {

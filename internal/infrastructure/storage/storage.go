@@ -22,6 +22,8 @@ type ObjectInfo struct {
 
 type Provider interface {
 	Name() string
+	// Bucket 返回本实例绑定的桶名。
+	Bucket() string
 }
 
 type ObjectGetter interface {
@@ -46,9 +48,15 @@ type Storage interface {
 	ObjectUploader
 
 	PresignedPostPolicy(ctx context.Context, req *PresignedPostPolicyRequest) (*PresignedPostPolicyResponse, error)
-
 	PresignedGetObject(ctx context.Context, req *PresignedGetObjectRequest) (*PresignedGetObjectResponse, error)
 }
+
+type PublicReadStorage interface {
+	Storage
+
+	GetObjectUrl(ctx context.Context, key string) string
+}
+
 type StatObjectRequest struct {
 	Key string
 }
@@ -221,6 +229,8 @@ type Config struct {
 	SecretKey string `toml:"secret_key" json:"secret_key"`
 	Secure    bool   `toml:"secure"     json:"secure"`
 
+	PublicBaseURL string `toml:"public_base_url" json:"public_base_url"`
+
 	PresignExpiry time.Duration `toml:"presign_expiry" json:"presign_expiry"`
 
 	Extra map[string]string `toml:"extra" json:"extra"`
@@ -245,6 +255,19 @@ type MinioConfig struct {
 	Region        string        `toml:"region"`
 	Secure        bool          `toml:"secure"`
 	PresignExpiry time.Duration `toml:"presignExpiry"`
+
+	PublicBucket    string `toml:"publicBucket"`
+	PublicAccessKey string `toml:"publicAccessKey"`
+	PublicSecretKey string `toml:"publicSecretKey"`
+	PublicBaseURL   string `toml:"publicBaseURL"`
+}
+
+func (c *MinioConfig) presignExpiryOrDefault() time.Duration {
+	if c.PresignExpiry != 0 {
+		return c.PresignExpiry
+	}
+
+	return 15 * time.Minute
 }
 
 func (c *StorageTypeConfig) Bucket() string {
@@ -259,11 +282,6 @@ func (c *StorageTypeConfig) Bucket() string {
 func (c *StorageTypeConfig) ObjectStorageConfig() (*Config, error) {
 	switch c.Type {
 	case Minio:
-		presignExpiry := 15 * time.Minute
-		if c.Minio.PresignExpiry != 0 {
-			presignExpiry = c.Minio.PresignExpiry
-		}
-
 		return &Config{
 			Endpoint:      c.Minio.Endpoint,
 			Region:        c.Minio.Region,
@@ -271,7 +289,36 @@ func (c *StorageTypeConfig) ObjectStorageConfig() (*Config, error) {
 			AccessKey:     c.Minio.AccessKey,
 			SecretKey:     c.Minio.SecretKey,
 			Secure:        c.Minio.Secure,
-			PresignExpiry: presignExpiry,
+			PresignExpiry: c.Minio.presignExpiryOrDefault(),
+		}, nil
+	default:
+		return nil, fmt.Errorf("storage type %q is not supported", c.Type)
+	}
+}
+
+func (c *StorageTypeConfig) PublicObjectStorageConfig() (*Config, error) {
+	switch c.Type {
+	case Minio:
+		if c.Minio.PublicBucket == "" {
+			return nil, nil
+		}
+		if c.Minio.PublicAccessKey == "" || c.Minio.PublicSecretKey == "" {
+			return nil, stderrors.New(
+				"public_access_key and public_secret_key are required when public_bucket is set")
+		}
+		if c.Minio.PublicBucket == c.Minio.Bucket {
+			return nil, fmt.Errorf("public_bucket must differ from bucket, both are %q", c.Minio.Bucket)
+		}
+
+		return &Config{
+			Endpoint:      c.Minio.Endpoint,
+			Region:        c.Minio.Region,
+			Bucket:        c.Minio.PublicBucket,
+			AccessKey:     c.Minio.PublicAccessKey,
+			SecretKey:     c.Minio.PublicSecretKey,
+			Secure:        c.Minio.Secure,
+			PresignExpiry: c.Minio.presignExpiryOrDefault(),
+			PublicBaseURL: c.Minio.PublicBaseURL,
 		}, nil
 	default:
 		return nil, fmt.Errorf("storage type %q is not supported", c.Type)

@@ -6,6 +6,7 @@ import (
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourcevo "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity/vo"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/schema"
+	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 func SourceToSchema(source *sourceentity.Source) *schema.Source {
@@ -16,7 +17,7 @@ func SourceToSchema(source *sourceentity.Source) *schema.Source {
 		Status:           string(source.Status),
 		Title:            source.Title,
 		Content:          source.Content.Bytes(),
-		ParsedContentKey: source.ParsedContentKey,
+		ParsedContentKey: source.ParsedContentKey.Encode(),
 		Abstract:         source.Abstract,
 		OwnerId:          source.OwnerId,
 		UpdatedAt:        source.UpdateTime.Value(),
@@ -24,6 +25,11 @@ func SourceToSchema(source *sourceentity.Source) *schema.Source {
 }
 
 func SourceFromSchema(source *schema.Source) (*sourceentity.Source, error) {
+	parsedContentKey, err := valobj.DecodeStoreKey(source.ParsedContentKey)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "decode parsed content key failed, source_id=%s", source.Id)
+	}
+
 	domainSource := &sourceentity.Source{
 		Base: entity.Base{
 			Id:         source.Id,
@@ -35,7 +41,7 @@ func SourceFromSchema(source *schema.Source) (*sourceentity.Source, error) {
 		Status:     sourcevo.SourceStatus(source.Status),
 		Title:      source.Title,
 		// Content: source.Content, // TODO
-		ParsedContentKey: source.ParsedContentKey,
+		ParsedContentKey: parsedContentKey,
 		Abstract:         source.Abstract,
 		OwnerId:          source.OwnerId,
 	}

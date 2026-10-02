@@ -40,8 +40,32 @@ make dev-up-notrace   # = make -C deploy/dev up-notrace
 | flow-web（profile `ui`，`up-all` 带） | 7089 | 无 |
 | jaeger（profile `trace`，`up` 默认带） | 4317 / 4318 / 16686 | `OTEL_TRACE_ENDPOINT` |
 
-一次性容器跑完即退出（`Exited (0)` 正常）：`kafka-init` 建 topic、`minio-init` 建 bucket、
-`etcd-init` 修 etcd 数据目录属主。
+一次性容器跑完即退出（`Exited (0)` 正常）：`kafka-init` 建 topic、`etcd-init` 修 etcd 数据目录属主、
+`minio-init` 建 bucket + 建桶凭据。
+
+### MinIO 的桶凭据
+
+`minio-init` 跑的是仓库里的 `migration/storage/minio.sh`（挂载进容器用 `/bin/sh` 执行，宿主机也能直接跑），
+用 root（`GONOTELM_DEV_MINIO_ROOT_USER` / `GONOTELM_DEV_MINIO_ROOT_PASSWORD`，默认 `minioadmin`）做管理操作：
+
+* 建 `GONOTELM_MINIO_BUCKET`（默认 `gonotelm`），已存在则原样保留数据；
+* 桶访问策略设为 private，匿名不能读也不能写；
+* 用 `GONOTELM_MINIO_ACCESS_KEY` / `GONOTELM_MINIO_SECRET_KEY` 建桶自己的凭据，只授予该桶读写
+  （策略 `gonotelm-rw`），并摘掉可能存在的全局 `readwrite` / `writeonly` / `readonly`。
+
+脚本可重复执行：不会清空桶，改完 `.env` 里的 AK/SK 重跑即轮换密钥。宿主机手动执行：
+
+```bash
+set -a && . ./.env && set +a && migration/storage/minio.sh
+```
+
+注意 AK 必须是**未被占用**的：如果它已经是某个 service account（MinIO 控制台建的 app 凭据常见这种），
+`mc admin user add` 只会回一句 `Credential is not allowed to be same as admin access key`。脚本会提前拦住并提示，
+此时要么换一个 `GONOTELM_MINIO_ACCESS_KEY`，要么先删掉旧的：
+
+```bash
+mc admin user svcacct rm <alias> <旧 AK>   # 之后重跑脚本即可
+```
 
 ## 首次在新数据卷上初始化
 

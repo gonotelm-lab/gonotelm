@@ -1,10 +1,12 @@
 package postgres
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
 
+	"github.com/gonotelm-lab/gonotelm/migration/db/postgres18"
 	sqltestsuite "github.com/gonotelm-lab/gonotelm/pkg/testsuite/sql"
 
 	"gorm.io/gorm"
@@ -17,16 +19,16 @@ var (
 	testChatMessageStore      *ChatMessageStoreImpl
 	testArtifactStore         *ArtifactStoreImpl
 	testWorkerCheckpointStore *WorkerCheckpointStoreImpl
+	testUserStore             *UserStoreImpl
 )
 
 func TestMain(m *testing.M) {
-	const migrationFilePath = "../../../../migration/db/postgres18/0001.sql"
-
 	testDatabase, err := sqltestsuite.NewTestGormDBFromEnv("pgsql")
 	if err != nil {
 		panic(err)
 	}
-	if err := testDatabase.Setup(migrationFilePath); err != nil {
+	// 与 cmd/migrate 共用 goose 迁移文件。
+	if err := testDatabase.Setup(context.Background(), postgres18.Migrate); err != nil {
 		panic(err)
 	}
 	testDB = testDatabase.GetDB()
@@ -35,6 +37,7 @@ func TestMain(m *testing.M) {
 	testChatMessageStore = NewChatMessageStoreImpl(testDB)
 	testArtifactStore = NewArtifactStoreImpl(testDB)
 	testWorkerCheckpointStore = NewWorkerCheckpointStoreImpl(testDB)
+	testUserStore = NewUserStoreImpl(testDB)
 
 	m.Run()
 

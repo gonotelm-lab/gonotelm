@@ -1,0 +1,99 @@
+# Jaeger v2 configuration - memory storage backend (temporary, not persisted)
+# Based on the official all-in-one config.
+# NOTE: Elasticsearch storage is temporarily disabled (see jaeger_storage below).
+service:
+  extensions: [jaeger_storage, jaeger_query, remote_sampling, healthcheckv2, expvar, zpages]
+  pipelines:
+    traces:
+      receivers: [otlp, jaeger, zipkin]
+      processors: [batch]
+      exporters: [jaeger_storage_exporter]
+  telemetry:
+    resource:
+      service.name: jaeger
+    metrics:
+      level: detailed
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: "${env:JAEGER_LISTEN_HOST:-localhost}"
+                port: 8888
+    logs:
+      level: info
+
+extensions:
+  jaeger_query:
+    storage:
+      traces: some_storage
+
+  jaeger_storage:
+    backends:
+      some_storage:
+        # ===== Elasticsearch storage (temporarily disabled) =====
+        # Persisting to ES has been disabled for now. To re-enable,
+        # uncomment the block below and restart the jaeger service.
+        # elasticsearch:
+        #   server_urls:
+        #     - http://elasticsearch-db:9200
+        #   auth:
+        #     basic:
+        #       username: elastic
+        #       password: "7d295cb736779b1bc4907be970631ebb"
+        #   indices:
+        #     index_prefix: "jaeger"
+        #   max_span_age: 120h
+        # =========================================================
+        memory:
+          max_traces: 100000
+
+  remote_sampling:
+    file:
+      path:
+      default_sampling_probability: 1
+      reload_interval: 1s
+    http:
+      endpoint: "${env:JAEGER_LISTEN_HOST:-localhost}:5778"
+    grpc:
+      endpoint: "${env:JAEGER_LISTEN_HOST:-localhost}:5779"
+
+  healthcheckv2:
+    use_v2: true
+    http:
+      endpoint: "${env:JAEGER_LISTEN_HOST:-localhost}:13133"
+    grpc:
+
+  expvar:
+    endpoint: "${env:JAEGER_LISTEN_HOST:-localhost}:27777"
+
+  zpages:
+    endpoint: "${env:JAEGER_LISTEN_HOST:-localhost}:27778"
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: "${env:JAEGER_LISTEN_HOST:-localhost}:4317"
+      http:
+        endpoint: "${env:JAEGER_LISTEN_HOST:-localhost}:4318"
+
+  jaeger:
+    protocols:
+      grpc:
+        endpoint: "${env:JAEGER_LISTEN_HOST:-localhost}:14250"
+      thrift_http:
+        endpoint: "${env:JAEGER_LISTEN_HOST:-localhost}:14268"
+      thrift_binary:
+        endpoint: "${env:JAEGER_LISTEN_HOST:-localhost}:6832"
+      thrift_compact:
+        endpoint: "${env:JAEGER_LISTEN_HOST:-localhost}:6831"
+
+  zipkin:
+    endpoint: "${env:JAEGER_LISTEN_HOST:-localhost}:9411"
+
+processors:
+  batch:
+
+exporters:
+  jaeger_storage_exporter:
+    trace_storage: some_storage

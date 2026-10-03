@@ -8,6 +8,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	domainerr "github.com/gonotelm-lab/gonotelm/internal/domain/source/errors"
@@ -24,7 +25,7 @@ import (
 type Service struct {
 	config        Config
 	soruceRepo    sourcerepo.Repository
-	storageRepo   sourcerepo.StorageRepository
+	objectStore   adapter.ObjectStore
 	sourceDocRepo sourcerepo.SourceDocRepository
 
 	cache *bigcache.BigCache
@@ -47,7 +48,7 @@ func (c *Config) normalize() {
 func NewService(
 	config Config,
 	soruceRepo sourcerepo.Repository,
-	storageRepo sourcerepo.StorageRepository,
+	objectStore adapter.ObjectStore,
 	sourceDocRepo sourcerepo.SourceDocRepository,
 ) *Service {
 	config.normalize()
@@ -55,7 +56,7 @@ func NewService(
 	s := &Service{
 		config:        config,
 		soruceRepo:    soruceRepo,
-		storageRepo:   storageRepo,
+		objectStore:   objectStore,
 		sourceDocRepo: sourceDocRepo,
 	}
 
@@ -311,12 +312,12 @@ func (s *Service) fetchSourceContent(
 		return nil, "", fmt.Errorf("find source failed, id=%s, err=%w", sourceId, err)
 	}
 
-	if src.ParsedContentKey == "" {
+	if !src.ParsedContentKey.Valid() {
 		return nil, "", fmt.Errorf("source does not contain any valid parsed content key")
 	}
 
 	// parsed content is considered to be smaller so we can get the whole object here
-	content, _, err := s.storageRepo.GetObject(ctx, src.ParsedContentKey)
+	content, _, err := s.objectStore.GetObject(ctx, src.ParsedContentKey)
 	if err != nil {
 		return nil, "", fmt.Errorf("get parsed content failed, id=%s, err=%w", sourceId, err)
 	}

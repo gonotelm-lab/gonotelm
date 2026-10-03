@@ -27,7 +27,7 @@ func NewSandboxCacheImpl(
 
 var _ cache.SandboxCache = &SandboxCacheImpl{}
 
-func sandboxCacheKey(userId, notebookId string) string {
+func (c *SandboxCacheImpl) cacheKey(userId, notebookId string) string {
 	return fmt.Sprintf("gonotelm:sandbox:%s:%s", userId, notebookId)
 }
 
@@ -42,7 +42,7 @@ func (c *SandboxCacheImpl) Set(
 		return errors.Wrap(errors.ErrSerde, err.Error())
 	}
 
-	err = c.rd.Set(ctx, sandboxCacheKey(userId, notebookId), encBytes, ttl).Err()
+	err = c.rd.Set(ctx, c.cacheKey(userId, notebookId), encBytes, ttl).Err()
 	if err != nil {
 		return errors.Wrapf(errors.ErrCache, "set sandbox failed: %s", err.Error())
 	}
@@ -54,7 +54,7 @@ func (c *SandboxCacheImpl) Get(
 	ctx context.Context,
 	userId, notebookId string,
 ) (*schema.SandboxDescription, error) {
-	encDesc, err := c.rd.Get(ctx, sandboxCacheKey(userId, notebookId)).Result()
+	encDesc, err := c.rd.Get(ctx, c.cacheKey(userId, notebookId)).Result()
 	if err != nil {
 		if errors.Is(err, goredis.Nil) {
 			return nil, nil // 不存在，非错误
@@ -72,7 +72,7 @@ func (c *SandboxCacheImpl) Get(
 }
 
 func (c *SandboxCacheImpl) Delete(ctx context.Context, userId, notebookId string) error {
-	err := c.rd.Del(ctx, sandboxCacheKey(userId, notebookId)).Err()
+	err := c.rd.Del(ctx, c.cacheKey(userId, notebookId)).Err()
 	if err != nil {
 		return errors.Wrapf(errors.ErrCache, "delete sandbox failed: %s", err.Error())
 	}

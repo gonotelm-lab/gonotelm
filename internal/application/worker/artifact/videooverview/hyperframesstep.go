@@ -22,15 +22,14 @@ import (
 	sandboxent "github.com/gonotelm-lab/gonotelm/internal/domain/sandbox/entity"
 	sandboxservice "github.com/gonotelm-lab/gonotelm/internal/domain/sandbox/service"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/pipeline"
 )
 
 type videoStorageResult struct {
-	StoreKey    string `json:"store_key"`
-	ContentType string `json:"content_type"`
+	StoreKey    valobj.StoreKey `json:"store_key"`
+	ContentType string          `json:"content_type"`
 }
 
 // hyperframesStep 在沙箱中按分镜渲染 MP4 并上传。
@@ -190,8 +189,11 @@ func (s *hyperframesStep) generate(
 		}
 	}()
 
-	storeKey := formatVideoStoreKey(req.NotebookId, req.ArtifactId)
-	if err := types.UploadReader(ctx, s.deps.ObjectStorage, storeKey, mimeTypeMP4, mp4Reader); err != nil {
+	storeKey, err := s.deps.KeyFactory.New(videoObjectPath(req.NotebookId, req.ArtifactId), false)
+	if err != nil {
+		return nil, errors.Wrapf(err, "create video store key failed, artifact_id=%s", req.ArtifactId)
+	}
+	if err := s.deps.ObjectStorage.UploadReader(ctx, storeKey, mimeTypeMP4, mp4Reader); err != nil {
 		return nil, errors.Wrapf(err, "upload video object failed, artifact_id=%s", req.ArtifactId)
 	}
 
@@ -346,14 +348,12 @@ func (s *hyperframesStep) syncAudioToSandbox(
 	for _, part := range parts {
 		p := part
 		gp.Go(func() error {
-			obj, err := s.deps.ObjectStorage.GetObject(gctx,
-				&storage.GetObjectRequest{Key: p.StoreKey},
-			)
+			obj, _, err := s.deps.ObjectStorage.GetObject(gctx, p.StoreKey)
 			if err != nil {
-				return errors.WithMessagef(err, "get audio object failed: %s", p.StoreKey)
+				return errors.WithMessagef(err, "get audio object failed: %s", p.StoreKey.String())
 			}
 			dest := audioSandboxPath(workspaceDir, p.SegmentIndex, p.LineIndex)
-			if err := sandbox.WriteFile(gctx, dest, bytes.NewReader(obj.Body)); err != nil {
+			if err := sandbox.WriteFile(gctx, dest, bytes.NewReader(obj)); err != nil {
 				return errors.WithMessagef(err, "write audio to sandbox failed: %s", dest)
 			}
 			return nil
@@ -371,7 +371,7 @@ func (s *hyperframesStep) syncAudioToSandbox(
 	return nil
 }
 
-func formatVideoStoreKey(notebookId, artifactId valobj.Id) string {
+func videoObjectPath(notebookId, artifactId valobj.Id) string {
 	return fmt.Sprintf("artifact/%s/%s.mp4", notebookId.String(), artifactId.String())
 }
 

@@ -10,12 +10,13 @@ import (
 )
 
 type EventDeps struct {
-	SourceRepo        sourcerepo.Repository
-	SourceStorageRepo sourcerepo.StorageRepository
-	SourceDocRepo     sourcerepo.SourceDocRepository
-	EventBus          *eventbus.CompositeEventBus
-	Summarizer        adapterdefine.Summarizer
-	ImageInterpreter  adapterdefine.ImageInterpreter
+	SourceRepo       sourcerepo.Repository
+	ObjectStore      adapterdefine.ObjectStore
+	KeyFactory       adapterdefine.StoreKeyFactory
+	SourceDocRepo    sourcerepo.SourceDocRepository
+	EventBus         *eventbus.CompositeEventBus
+	Summarizer       adapterdefine.Summarizer
+	ImageInterpreter adapterdefine.ImageInterpreter
 }
 
 func Init(ctx context.Context, deps *EventDeps) {
@@ -23,7 +24,8 @@ func Init(ctx context.Context, deps *EventDeps) {
 		deps.EventBus.InterProcess,
 		source.NewPrepareSourceHandler(
 			deps.SourceRepo,
-			deps.SourceStorageRepo,
+			deps.ObjectStore,
+			deps.KeyFactory,
 			deps.SourceDocRepo,
 			deps.Summarizer,
 			deps.EventBus,

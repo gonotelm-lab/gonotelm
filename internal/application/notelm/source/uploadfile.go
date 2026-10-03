@@ -3,6 +3,7 @@ package source
 import (
 	"context"
 
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -11,16 +12,19 @@ import (
 
 type PresignUploadFileHandler struct {
 	*baseHandler
-	storageRepo sourcerepo.StorageRepository
+	objectStore adapter.ObjectStore
+	keyFactory  adapter.StoreKeyFactory
 }
 
 func NewPresignUploadFileHandler(
 	sourceRepo sourcerepo.Repository,
-	storageRepo sourcerepo.StorageRepository,
+	objectStore adapter.ObjectStore,
+	keyFactory adapter.StoreKeyFactory,
 ) *PresignUploadFileHandler {
 	return &PresignUploadFileHandler{
 		baseHandler: newBaseHandler(sourceRepo),
-		storageRepo: storageRepo,
+		objectStore: objectStore,
+		keyFactory:  keyFactory,
 	}
 }
 
@@ -35,7 +39,7 @@ type PresignUploadFileHandleCommand struct {
 func (h *PresignUploadFileHandler) Handle(
 	ctx context.Context,
 	cmd *PresignUploadFileHandleCommand,
-) (*sourcerepo.PresignUploadResult, error) {
+) (*adapter.PresignUploadResult, error) {
 	targetSource, err := h.handle(ctx, cmd.SourceId)
 	if err != nil {
 		return nil, err
@@ -46,7 +50,7 @@ func (h *PresignUploadFileHandler) Handle(
 		MimeType: cmd.MimeType,
 		Size:     cmd.Size,
 		Md5:      cmd.Md5,
-	})
+	}, h.keyFactory)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "upload file failed, source_id=%s", cmd.SourceId)
 	}
@@ -57,7 +61,12 @@ func (h *PresignUploadFileHandler) Handle(
 	}
 
 	// get presign url for uploading the target file
-	presignResult, err := h.storageRepo.PresignUpload(ctx, fileContent)
+	presignResult, err := h.objectStore.PresignUpload(ctx, fileContent.StoreKey, &adapter.UploadOptions{
+		ContentType:   fileContent.Format,
+		ContentLength: fileContent.Size,
+		Filename:      fileContent.Filename,
+		Md5:           fileContent.Md5,
+	})
 	if err != nil {
 		return nil, errors.WithMessagef(err, "presign upload object failed, source_id=%s", cmd.SourceId)
 	}

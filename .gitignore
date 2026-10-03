@@ -42,3 +42,4 @@ __pycache__
 /worker
 /docs/superpowers
 node_modules
+/.research

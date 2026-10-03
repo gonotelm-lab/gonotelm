@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
@@ -32,7 +33,8 @@ type ConvertNoteToSourceHandler struct {
 	*baseHandler
 	notebookRepo notebookrepo.Repository
 	sourceRepo   sourcerepo.Repository
-	storageRepo  sourcerepo.StorageRepository
+	objectStore  adapter.ObjectStore
+	keyFactory   adapter.StoreKeyFactory
 	eventBus     eventbus.Publisher
 }
 
@@ -40,14 +42,16 @@ func NewConvertNoteToSourceHandler(
 	artifactRepo artifactrepo.Repository,
 	sourceRepo sourcerepo.Repository,
 	notebookRepo notebookrepo.Repository,
-	storageRepo sourcerepo.StorageRepository,
+	objectStore adapter.ObjectStore,
+	keyFactory adapter.StoreKeyFactory,
 	eventBus eventbus.Publisher,
 ) *ConvertNoteToSourceHandler {
 	return &ConvertNoteToSourceHandler{
 		baseHandler:  newBaseHandler(artifactRepo),
 		notebookRepo: notebookRepo,
 		sourceRepo:   sourceRepo,
-		storageRepo:  storageRepo,
+		objectStore:  objectStore,
+		keyFactory:   keyFactory,
 		eventBus:     eventBus,
 	}
 }
@@ -109,7 +113,7 @@ func (h *ConvertNoteToSourceHandler) Handle(
 		MimeType: sourceentity.MimeTypeText,
 		Size:     fileSize,
 		Md5:      md5Hex,
-	}); err != nil {
+	}, h.keyFactory); err != nil {
 		return nil, errors.WithMessagef(err, "set file content failed, source_id=%s", newSource.Id)
 	}
 	newSource.UpdateTitle(title)
@@ -125,7 +129,7 @@ func (h *ConvertNoteToSourceHandler) Handle(
 	}
 
 	// 将笔记文本作为 .txt 文件上传到对象存储
-	if err := h.storageRepo.UploadObject(
+	if err := h.objectStore.Upload(
 		ctx,
 		fileContent.StoreKey,
 		artifact.Result,
@@ -133,17 +137,17 @@ func (h *ConvertNoteToSourceHandler) Handle(
 	); err != nil {
 		return nil, errors.WithMessagef(err,
 			"upload note content failed, source_id=%s, store_key=%s",
-			newSource.Id, fileContent.StoreKey)
+			newSource.Id, fileContent.StoreKey.String())
 	}
 
 	// 上传成功后进入 preparing，触发下游解析
 	newSource.MarkPreparing()
 	if err := h.sourceRepo.Save(ctx, newSource); err != nil {
 		// 回滚：删除已上传的对象，避免遗留孤儿文件
-		if rollbackErr := h.storageRepo.DeleteObject(ctx, fileContent.StoreKey); rollbackErr != nil {
+		if rollbackErr := h.objectStore.DeleteObject(ctx, fileContent.StoreKey); rollbackErr != nil {
 			slog.ErrorContext(ctx, "rollback delete uploaded object failed",
 				slog.String("source_id", newSource.Id.String()),
-				slog.String("store_key", fileContent.StoreKey),
+				slog.String("store_key", fileContent.StoreKey.String()),
 				slog.Any("err", rollbackErr),
 			)
 		}

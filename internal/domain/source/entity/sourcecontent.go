@@ -4,6 +4,7 @@ import (
 	"net/url"
 
 	"github.com/bytedance/sonic"
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/entity/vo"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
@@ -44,11 +45,11 @@ func (u *UrlSourceContent) Bytes() []byte {
 }
 
 type FileSourceContent struct {
-	StoreKey string `json:"store_key,omitempty"`
-	Filename string `json:"filename,omitempty"`
-	Md5      string `json:"md5,omitempty"`
-	Size     int64  `json:"size,omitempty"`
-	Format   string `json:"format,omitempty"`
+	StoreKey valobj.StoreKey `json:"store_key"`
+	Filename string          `json:"filename,omitempty"`
+	Md5      string          `json:"md5,omitempty"`
+	Size     int64           `json:"size,omitempty"`
+	Format   string          `json:"format,omitempty"`
 }
 
 var _ SourceContent = (*FileSourceContent)(nil)

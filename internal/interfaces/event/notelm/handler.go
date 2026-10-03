@@ -7,6 +7,7 @@ import (
 	chat "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/eventhandle"
 	"github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/suggestion"
 	source "github.com/gonotelm-lab/gonotelm/internal/application/notelm/source/eventhandle"
+	adapterdefine "github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
@@ -20,9 +21,9 @@ type EventDeps struct {
 
 	NotebookRepo notebookrepo.Repository
 
-	SourceRepo        sourcerepo.Repository
-	SourceStorageRepo sourcerepo.StorageRepository
-	SourceDocRepo     sourcerepo.SourceDocRepository
+	SourceRepo    sourcerepo.Repository
+	ObjectStore   adapterdefine.ObjectStore
+	SourceDocRepo sourcerepo.SourceDocRepository
 
 	ChatRepo               chatrepo.ChatRepository
 	ChatMessageRepo        chatrepo.MessageRepository
@@ -55,7 +56,7 @@ func initSourceEventConsumers(deps *EventDeps) error {
 		deps.EventBus.InProcess,
 		source.NewOnSourceDeletedEventHandler(
 			deps.SourceDocRepo,
-			deps.SourceStorageRepo,
+			deps.ObjectStore,
 		),
 	); err != nil {
 		return err
@@ -81,7 +82,7 @@ func initNotebookEventConsumers(deps *EventDeps) error {
 		source.NewOnNotebookEventHandler(
 			deps.SourceRepo,
 			deps.SourceDocRepo,
-			deps.SourceStorageRepo,
+			deps.ObjectStore,
 		),
 	); err != nil {
 		return err

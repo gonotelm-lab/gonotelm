@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/event"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	notebookevent "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/event"
@@ -16,20 +17,20 @@ import (
 const notebookSourcesPageSize = 50
 
 type OnNotebookEventHandler struct {
-	sourceRepo        sourcerepo.Repository
-	sourceDocRepo     sourcerepo.SourceDocRepository
-	sourceStorageRepo sourcerepo.StorageRepository
+	sourceRepo    sourcerepo.Repository
+	sourceDocRepo sourcerepo.SourceDocRepository
+	objectStore   adapter.ObjectStore
 }
 
 func NewOnNotebookEventHandler(
 	sourceRepo sourcerepo.Repository,
 	sourceDocRepo sourcerepo.SourceDocRepository,
-	sourceStorageRepo sourcerepo.StorageRepository,
+	objectStore adapter.ObjectStore,
 ) *OnNotebookEventHandler {
 	return &OnNotebookEventHandler{
-		sourceRepo:        sourceRepo,
-		sourceDocRepo:     sourceDocRepo,
-		sourceStorageRepo: sourceStorageRepo,
+		sourceRepo:    sourceRepo,
+		sourceDocRepo: sourceDocRepo,
+		objectStore:   objectStore,
 	}
 }
 
@@ -62,10 +63,10 @@ func (h *OnNotebookEventHandler) Handle(
 	}
 
 	for _, key := range objectKeys {
-		if err := h.sourceStorageRepo.DeleteObject(ctx, key); err != nil {
+		if err := h.objectStore.DeleteObject(ctx, key); err != nil {
 			slog.WarnContext(ctx, "delete source object failed",
 				slog.String("notebook_id", notebookId.String()),
-				slog.String("store_key", key),
+				slog.String("store_key", key.String()),
 				slog.Any("err", err),
 			)
 		}
@@ -88,9 +89,9 @@ func (h *OnNotebookEventHandler) Handle(
 func (h *OnNotebookEventHandler) collectNotebookSources(
 	ctx context.Context,
 	notebookId valobj.Id,
-) ([]valobj.Id, []string, error) {
+) ([]valobj.Id, []valobj.StoreKey, error) {
 	sourceIds := make([]valobj.Id, 0, notebookSourcesPageSize)
-	objectKeys := make([]string, 0, notebookSourcesPageSize*2)
+	objectKeys := make([]valobj.StoreKey, 0, notebookSourcesPageSize*2)
 
 	for offset := 0; ; offset += notebookSourcesPageSize {
 		sources, err := h.sourceRepo.ListByNotebookId(ctx, notebookId, &sourcerepo.ListSpec{

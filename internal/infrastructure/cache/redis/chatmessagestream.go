@@ -35,21 +35,21 @@ func NewChatMessageStreamCacheImpl(
 
 var _ cache.ChatMessageStreamCache = &ChatMessageStreamCacheImpl{}
 
-func streamTaskCacheKey(taskId string) string {
+func (c *ChatMessageStreamCacheImpl) streamTaskCacheKey(taskId string) string {
 	// redis type string
 	// key: gonotelm:stream:task:123
 	// value: {task data}
 	return fmt.Sprintf("gonotelm:stream:task:%s", taskId)
 }
 
-func streamTaskUserChatIdCacheKey(userId, chatId string) string {
+func (c *ChatMessageStreamCacheImpl) streamTaskUserChatIdCacheKey(userId, chatId string) string {
 	// redis type string
 	// key: gonotelm:stream:task:user:123:chat:456
 	// value: taskId
 	return fmt.Sprintf("gonotelm:stream:task:user:%s:chat:%s", userId, chatId)
 }
 
-func streamTaskEventCacheKey(taskId string) string {
+func (c *ChatMessageStreamCacheImpl) streamTaskEventCacheKey(taskId string) string {
 	// redis type stream
 	// key: gonotelm:stream:task:event:123
 	// value: {event data}
@@ -77,8 +77,8 @@ func (c *ChatMessageStreamCacheImpl) SetTask(
 		return task.Id, errors.Wrap(errors.ErrSerde, err.Error())
 	}
 
-	taskKey := streamTaskCacheKey(task.Id)
-	taskUserChatIdKey := streamTaskUserChatIdCacheKey(task.UserId, task.ChatId)
+	taskKey := c.streamTaskCacheKey(task.Id)
+	taskUserChatIdKey := c.streamTaskUserChatIdCacheKey(task.UserId, task.ChatId)
 	// we need to set task data and user data associated with the task
 	_, err = c.rd.TxPipelined(ctx, func(p goredis.Pipeliner) error {
 		p.Set(ctx, taskKey, taskEncBytes, task.ExpireDuration)
@@ -96,7 +96,7 @@ func (c *ChatMessageStreamCacheImpl) GetTask(
 	ctx context.Context,
 	taskId string,
 ) (*schema.ChatMessageTask, error) {
-	encTask, err := c.rd.Get(ctx, streamTaskCacheKey(taskId)).Result()
+	encTask, err := c.rd.Get(ctx, c.streamTaskCacheKey(taskId)).Result()
 	if err != nil {
 		if errors.Is(err, goredis.Nil) {
 			return nil, cacheerrors.ErrTaskNotFound
@@ -114,7 +114,7 @@ func (c *ChatMessageStreamCacheImpl) GetTask(
 }
 
 func (c *ChatMessageStreamCacheImpl) GetTaskByUserAndChatId(ctx context.Context, userId, chatId string) (*schema.ChatMessageTask, error) {
-	taskUserChatIdKey := streamTaskUserChatIdCacheKey(userId, chatId)
+	taskUserChatIdKey := c.streamTaskUserChatIdCacheKey(userId, chatId)
 	taskId, err := c.rd.Get(ctx, taskUserChatIdKey).Result()
 	if err != nil {
 		if errors.Is(err, goredis.Nil) {
@@ -133,7 +133,7 @@ func (c *ChatMessageStreamCacheImpl) GetTaskByUserAndChatId(ctx context.Context,
 
 func (c *ChatMessageStreamCacheImpl) DeleteTask(ctx context.Context, taskId string) error {
 	// get then delete
-	taskKey := streamTaskCacheKey(taskId)
+	taskKey := c.streamTaskCacheKey(taskId)
 	var encTaskResult *goredis.StringCmd
 	_, err := c.rd.TxPipelined(ctx, func(p goredis.Pipeliner) error {
 		encTaskResult = p.Get(ctx, taskKey)
@@ -166,7 +166,7 @@ func (c *ChatMessageStreamCacheImpl) DeleteTask(ctx context.Context, taskId stri
 	}
 
 	// delete task data and user data associated with the task
-	taskUserChatIdKey := streamTaskUserChatIdCacheKey(decTask.UserId, decTask.ChatId)
+	taskUserChatIdKey := c.streamTaskUserChatIdCacheKey(decTask.UserId, decTask.ChatId)
 	if err := c.rd.Del(ctx, taskUserChatIdKey).Err(); err != nil {
 		return errors.Wrap(errors.ErrCache, err.Error())
 	}
@@ -193,7 +193,7 @@ func (c *ChatMessageStreamCacheImpl) AppendEventStream(
 	}
 
 	xaddArgs := &goredis.XAddArgs{
-		Stream: streamTaskEventCacheKey(taskId),
+		Stream: c.streamTaskEventCacheKey(taskId),
 		Values: map[string]any{
 			streamEventDataKey: encEvent,
 		},
@@ -211,7 +211,7 @@ func (c *ChatMessageStreamCacheImpl) AppendEventStream(
 }
 
 func (c *ChatMessageStreamCacheImpl) DeleteEventStream(ctx context.Context, taskId string) error {
-	if err := c.rd.Del(ctx, streamTaskEventCacheKey(taskId)).Err(); err != nil {
+	if err := c.rd.Del(ctx, c.streamTaskEventCacheKey(taskId)).Err(); err != nil {
 		return errors.Wrap(errors.ErrCache, err.Error())
 	}
 	return nil
@@ -222,7 +222,7 @@ func (c *ChatMessageStreamCacheImpl) SetEventStreamTTL(
 	taskId string,
 	ttl time.Duration,
 ) error {
-	if err := c.rd.Expire(ctx, streamTaskEventCacheKey(taskId), ttl).Err(); err != nil {
+	if err := c.rd.Expire(ctx, c.streamTaskEventCacheKey(taskId), ttl).Err(); err != nil {
 		return errors.Wrap(errors.ErrCache, err.Error())
 	}
 
@@ -234,7 +234,7 @@ func (c *ChatMessageStreamCacheImpl) PullEventStream(
 	taskId string,
 	args schema.PullEventStreamArgs,
 ) ([]*schema.ChatMessageStreamEvent, error) {
-	key := streamTaskEventCacheKey(taskId)
+	key := c.streamTaskEventCacheKey(taskId)
 
 	if args.LastId == "" {
 		args.LastId = "0-0"

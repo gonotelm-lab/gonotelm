@@ -13,10 +13,10 @@ import (
 type DeleteArtifactHandler struct {
 	*baseHandler
 	flowc   flow.TaskClient
-	storage adapter.StorageAdapter
+	storage adapter.ObjectStore
 }
 
-func NewDeleteArtifactHandler(repo artifactrepo.Repository, flowc flow.TaskClient, storage adapter.StorageAdapter) *DeleteArtifactHandler {
+func NewDeleteArtifactHandler(repo artifactrepo.Repository, flowc flow.TaskClient, storage adapter.ObjectStore) *DeleteArtifactHandler {
 	return &DeleteArtifactHandler{baseHandler: newBaseHandler(repo), flowc: flowc, storage: storage}
 }
 
@@ -32,7 +32,7 @@ func (h *DeleteArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error
 	}
 	if a.ResultKind.Storage() && a.Result != nil {
 		storeKey := extractStoreKey(a.Result)
-		if storeKey != "" {
+		if storeKey.Valid() {
 			_ = h.storage.DeleteObject(ctx, storeKey)
 		}
 	}

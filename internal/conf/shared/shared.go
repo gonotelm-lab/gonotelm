@@ -2,6 +2,8 @@ package shared
 
 import (
 	_ "embed"
+	"fmt"
+	"os"
 	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache"
@@ -14,6 +16,9 @@ import (
 	storageimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
 	"github.com/gonotelm-lab/gonotelm/pkg/sql"
+
+	"github.com/BurntSushi/toml"
+	"github.com/a8m/envsubst"
 )
 
 type LoggingConfig struct {
@@ -146,4 +151,22 @@ func (c *InfraConfig) SQLConfig() *sql.Config {
 
 func IsDevEnv(deployEnv string) bool {
 	return deployEnv == "dev"
+}
+
+func LoadTOML(path string, cfg any) error {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read config file %q failed: %w", path, err)
+	}
+
+	expanded, err := envsubst.String(string(raw))
+	if err != nil {
+		return fmt.Errorf("expand env in config file %q failed: %w", path, err)
+	}
+
+	if _, err := toml.Decode(expanded, cfg); err != nil {
+		return fmt.Errorf("decode config file %q failed: %w", path, err)
+	}
+
+	return nil
 }

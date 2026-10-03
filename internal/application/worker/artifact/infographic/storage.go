@@ -1,7 +1,9 @@
 package infographic
 
+import "github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+
 type StorageResult struct {
-	StoreKey    string              `json:"store_key"`
+	StoreKey    valobj.StoreKey     `json:"store_key"`
 	ContentType string              `json:"content_type"`
 	Image       *StorageResultImage `json:"image,omitempty"`
 }

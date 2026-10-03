@@ -28,19 +28,12 @@ type ChatContextMessageCache interface {
 
 type ChatMessageStreamCache interface {
 	SetTask(ctx context.Context, task *schema.ChatMessageTask) (string, error)
-
 	GetTask(ctx context.Context, taskId string) (*schema.ChatMessageTask, error)
-
 	GetTaskByUserAndChatId(ctx context.Context, userId, chatId string) (*schema.ChatMessageTask, error)
-
 	DeleteTask(ctx context.Context, taskId string) error
-
 	AppendEventStream(ctx context.Context, taskId string, event *schema.ChatMessageStreamEvent) (string, error)
-
 	DeleteEventStream(ctx context.Context, taskId string) error
-
 	SetEventStreamTTL(ctx context.Context, taskId string, ttl time.Duration) error
-
 	PullEventStream(ctx context.Context, taskId string, args schema.PullEventStreamArgs) ([]*schema.ChatMessageStreamEvent, error)
 }
 
@@ -60,11 +53,26 @@ type SandboxCache interface {
 	Delete(ctx context.Context, userId, notebookId string) error
 }
 
+type TransientProviderLoginInfoCache interface {
+	Set(ctx context.Context, state string, loginInfo *schema.TransientProviderLoginInfo) error
+	Get(ctx context.Context, state string) (*schema.TransientProviderLoginInfo, error)
+	Delete(ctx context.Context, state string) error
+}
+
+type UserSessionCache interface {
+	Set(ctx context.Context, id string, session *schema.UserSession, ttl time.Duration) error
+	Get(ctx context.Context, id string) (*schema.UserSession, error)
+	Delete(ctx context.Context, id string) error
+	DeleteByUserId(ctx context.Context, userId string) error
+}
+
 type Cache struct {
 	ChatMessageContextCache ChatContextMessageCache
 	ChatMessageStreamCache  ChatMessageStreamCache
 	ChatSuggestionCache     ChatSuggestionCache
 	SandboxCache            SandboxCache
+	LoginInfoCache          TransientProviderLoginInfoCache
+	UserSessionCache        UserSessionCache
 }
 
 var (

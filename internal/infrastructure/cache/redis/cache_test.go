@@ -16,6 +16,7 @@ var (
 	testChatMessageStreamCache  cache.ChatMessageStreamCache
 	testChatSuggestionCache     cache.ChatSuggestionCache
 	testSandboxCache            cache.SandboxCache
+	testUserSessionCache        cache.UserSessionCache
 )
 
 func TestMain(m *testing.M) {
@@ -34,6 +35,7 @@ func TestMain(m *testing.M) {
 	testChatMessageStreamCache = NewChatMessageStreamCacheImpl(testRedis)
 	testChatSuggestionCache = NewChatSuggestionCacheImpl(testRedis)
 	testSandboxCache = NewSandboxCacheImpl(testRedis)
+	testUserSessionCache = NewUserSessionCacheImpl(testRedis)
 
 	code := m.Run()
 

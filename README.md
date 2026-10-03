@@ -75,3 +75,28 @@ GoNoteLM turns a pile of PDFs, links, and notes into real understanding. Upload 
   </tbody>
 </table>
 
+## Getting Started Locally
+
+Prerequisites: Go (see `go.mod`), Docker with Compose, and `make`.
+
+```bash
+# 1. environment variables (all optional — defaults live in etc/*.toml.tpl)
+cp .env.example .env
+
+# 2. start local middleware: postgres / redis / clickhouse / kafka / minio / milvus / flow-server (+ jaeger)
+make dev-up            # make dev-up-notrace to skip jaeger; make dev-down to stop
+
+# 3. initialize the database schema (first run only)
+make dev-migrate
+
+# 4. run the services, each in its own terminal
+make run-notelm        # HTTP API, listens on :7099 by default
+make run-worker        # async artifact jobs (studio generation)
+make run-sourcejob     # source ingestion jobs
+```
+
+The `run-*` targets load `.env` automatically, so values exported in your shell win over the file.
+Middleware ports are published on the host and must match the `GONOTELM_*` addresses in `.env`;
+see [deploy/dev/README.md](deploy/dev/README.md) for the full port table, data-volume reuse, and how to
+run alongside an existing local stack.
+

@@ -125,7 +125,7 @@ func (s *UserService) attachAvatar(
 		return valobj.StoreKey{}, false
 	}
 
-	avatarKey, err := user.NewAvatarKey(s.keyFactory)
+	avatarKey, err := user.GenerateAvatarKey(s.keyFactory)
 	if err != nil {
 		slog.WarnContext(ctx, "create avatar store key failed, register without avatar",
 			slog.String("avatar_url", outerAvatarURL),

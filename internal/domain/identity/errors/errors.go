@@ -12,6 +12,7 @@ const (
 	CodeUserSessionNotFound = 106007
 	CodeUserBanned          = 106008
 	CodeInvalidNickname     = 106009
+	CodeInvalidAvatar       = 106010
 )
 
 var (
@@ -25,4 +26,5 @@ var (
 	ErrUserBanned          = errors.ErrPermission.ErrCode(CodeUserBanned).Msg("user banned")
 
 	ErrInvalidNickname = errors.ErrParams.ErrCode(CodeInvalidNickname).Msg("invalid nickname")
+	ErrInvalidAvatar   = errors.ErrParams.ErrCode(CodeInvalidAvatar).Msg("invalid avatar")
 )

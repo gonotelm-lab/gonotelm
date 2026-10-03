@@ -64,8 +64,8 @@ func NewUser(nickname string, provider ProviderType, subject string) *User {
 	return u
 }
 
-// NewAvatarKey 产出新的头像 StoreKey（isPublic=true，即公有读桶）
-func (u *User) NewAvatarKey(keyFactory adapter.StoreKeyFactory) (valobj.StoreKey, error) {
+// 生成一个新的头像存储Key
+func (u *User) GenerateAvatarKey(keyFactory adapter.StoreKeyFactory) (valobj.StoreKey, error) {
 	return keyFactory.New(userAvatarObjectPathPrefix+valobj.NewUnOrderedId().String(), true)
 }
 

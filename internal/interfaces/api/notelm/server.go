@@ -108,6 +108,7 @@ type Server struct {
 	authHandler          *authapp.AuthHandler
 	getMeHandler         *userapp.GetMeHandler
 	updateProfileHandler *userapp.UpdateProfileHandler
+	updateAvatarHandler  *userapp.UpdateAvatarHandler
 }
 
 func NewServer(
@@ -225,6 +226,7 @@ func NewServer(
 		authHandler:          authapp.NewAuthHandler(deps.UserRepo, deps.UserSessionRepo),
 		getMeHandler:         userapp.NewGetMeHandler(deps.UserRepo, deps.ObjectStore),
 		updateProfileHandler: userapp.NewUpdateProfileHandler(deps.UserRepo),
+		updateAvatarHandler:  userapp.NewUpdateAvatarHandler(deps.UserRepo, deps.ObjectStore, deps.KeyFactory),
 	}
 
 	s.registerRoutes()

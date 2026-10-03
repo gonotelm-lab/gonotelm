@@ -62,6 +62,7 @@ func (h *LoginHandler) Handle(ctx context.Context, cmd *LoginHandleCommand) (*Lo
 
 	request := &entity.LoginInfoRequest{
 		ReturnTo: cmd.ReturnTo,
+		Device:   cmd.LoginFrom,
 	}
 
 	loginInfo, err := provider.LoginInfo(ctx, request)

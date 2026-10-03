@@ -138,7 +138,6 @@ func (s *Server) AuthCallback(providerType entity.ProviderType) func(ctx context
 			State:            req.State,
 			Code:             req.Code,
 			ProviderType:     providerType,
-			Device:           entity.DeviceTypeWeb,
 			CurrentSessionId: currentSessionId,
 		})
 		if err != nil {

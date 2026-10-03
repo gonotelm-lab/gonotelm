@@ -168,6 +168,7 @@ func (p *oauthLoginProvider) LoginInfo(ctx context.Context, request *entity.Logi
 		CodeChallengeMethod: state.CodeChallengeMethod,
 		ProviderType:        p.providerType,
 		ReturnTo:            request.ReturnTo,
+		Device:              request.Device,
 	}, nil
 }
 

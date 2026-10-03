@@ -34,7 +34,6 @@ type CallbackHandleCommand struct {
 	State            string
 	Code             string
 	ProviderType     entity.ProviderType
-	Device           entity.DeviceType
 	CurrentSessionId string
 }
 
@@ -118,7 +117,7 @@ func (h *CallbackHandler) Handle(ctx context.Context, cmd *CallbackHandleCommand
 		return nil, err
 	}
 
-	session, err := h.issueSession(ctx, user, cmd.Device)
+	session, err := h.issueSession(ctx, user, loginState.Device)
 	if err != nil {
 		return nil, err
 	}

@@ -8,4 +8,5 @@ type TransientProviderLoginInfo struct {
 	CodeChallengeMethod string `msgpack:"code_challenge_method"`
 	ReturnTo            string `msgpack:"return_to"`
 	ProviderType        string `msgpack:"provider_type"`
+	Device              string `msgpack:"device"`
 }

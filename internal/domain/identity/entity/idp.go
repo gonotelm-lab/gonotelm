@@ -39,6 +39,7 @@ type ProviderLoginInfo struct {
 	CodeChallengeMethod string       // code challenge method, always "S256"
 	ProviderType        ProviderType // provider type
 	ReturnTo            string       // return to url to redirect after login
+	Device              DeviceType   // device the login started from, carried through to the session
 }
 
 func (info *ProviderLoginInfo) ToTransient() *TransientProviderLoginInfo {
@@ -50,6 +51,7 @@ func (info *ProviderLoginInfo) ToTransient() *TransientProviderLoginInfo {
 		CodeChallengeMethod: info.CodeChallengeMethod,
 		ProviderType:        info.ProviderType,
 		ReturnTo:            info.ReturnTo,
+		Device:              info.Device,
 	}
 }
 
@@ -61,10 +63,12 @@ type TransientProviderLoginInfo struct {
 	CodeChallengeMethod string
 	ReturnTo            string
 	ProviderType        ProviderType
+	Device              DeviceType
 }
 
 type LoginInfoRequest struct {
 	ReturnTo string // return to url to redirect after login
+	Device   DeviceType
 }
 
 type ProviderUserInfo struct {

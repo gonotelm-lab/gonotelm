@@ -14,6 +14,7 @@ func LoginInfoToSchema(l *entity.TransientProviderLoginInfo) *schema.TransientPr
 		CodeChallengeMethod: l.CodeChallengeMethod,
 		ReturnTo:            l.ReturnTo,
 		ProviderType:        string(l.ProviderType),
+		Device:              string(l.Device),
 	}
 }
 
@@ -26,5 +27,6 @@ func LoginInfoFromSchema(s *schema.TransientProviderLoginInfo) *entity.Transient
 		CodeChallengeMethod: s.CodeChallengeMethod,
 		ReturnTo:            s.ReturnTo,
 		ProviderType:        entity.ProviderType(s.ProviderType),
+		Device:              entity.DeviceType(s.Device),
 	}
 }

@@ -281,7 +281,7 @@ services:
       - gonotelm-dev
 
   flow-server:
-    image: ${GONOTELM_DEV_FLOW_SERVER_IMAGE:-ghcr.io/gonotelm-lab/flow/server:v0.3.0}
+    image: ${GONOTELM_DEV_FLOW_SERVER_IMAGE:-ghcr.io/gonotelm-lab/flow/server:0.3.1}
     container_name: gonotelm-flow-server-dev
     restart: unless-stopped
     ports:
@@ -302,7 +302,7 @@ services:
       - gonotelm-dev
 
   flow-web:
-    image: ${GONOTELM_DEV_FLOW_WEB_IMAGE:-ghcr.io/gonotelm-lab/flow/web:v0.3.0}
+    image: ${GONOTELM_DEV_FLOW_WEB_IMAGE:-ghcr.io/gonotelm-lab/flow/web:0.3.1}
     container_name: gonotelm-flow-web-dev
     restart: unless-stopped
     profiles:

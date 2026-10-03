@@ -9,13 +9,16 @@ package google
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"sync"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gonotelm-lab/gonotelm/pkg/idp"
+	"golang.org/x/oauth2"
 )
 
 // Google OpenID Connect endpoints, taken from the Discovery Document:
@@ -31,6 +34,12 @@ const (
 	// defaultUserInfoEndpoint is only a fallback for when the Discovery document
 	// cannot be reached, the value is normally read from `userinfo_endpoint`.
 	defaultUserInfoEndpoint = "https://openidconnect.googleapis.com/v1/userinfo"
+
+	// defaultOIDCIssuer is the `iss` claim Google puts in the id_token.
+	defaultOIDCIssuer = "https://accounts.google.com"
+	// defaultJWKSURL is the Discovery Document's `jwks_uri`, used to verify the
+	// id_token signature.
+	defaultJWKSURL = "https://www.googleapis.com/oauth2/v3/certs"
 
 	// issuer identifies this provider in UserInfo. The account is identified by
 	// the pair (issuer, subject), see idp.UserInfo.
@@ -55,8 +64,16 @@ type Google struct {
 	// defaultUserInfoURL is used when the Discovery document is unreachable.
 	defaultUserInfoURL string
 
+	// clientID is the audience the id_token must have been issued for.
+	clientID string
+	// oidcIssuer is the expected `iss` claim of the id_token.
+	oidcIssuer string
+	// jwksURL is the JWKS endpoint backing the id_token signature.
+	jwksURL string
+
 	mu                  sync.Mutex
 	resolvedUserInfoURL string
+	verifier            *oidc.IDTokenVerifier
 }
 
 func New(c idp.Config, opts ...Option) (*Google, error) {
@@ -88,6 +105,9 @@ func New(c idp.Config, opts ...Option) (*Google, error) {
 		discoveryURL:       discoveryURL,
 		userInfoURL:        o.userInfoURL,
 		defaultUserInfoURL: defaultUserInfoEndpoint,
+		clientID:           c.ClientID,
+		oidcIssuer:         defaultOIDCIssuer,
+		jwksURL:            defaultJWKSURL,
 	}, nil
 }
 
@@ -97,25 +117,34 @@ func (g *Google) Type() idp.Type {
 	return idp.TypeGoogle
 }
 
-// GetUserInfo exchanges the authorization code for tokens, then reads the user
-// profile from the OpenID Connect UserInfo Endpoint using the access token.
-// The endpoint is bound to the access token that Google issued to this client,
-// and returns the stable `sub` claim used as the account identifier.
+// GetUserInfo exchanges the authorization code for tokens, verifies the returned
+// id_token, then reads the user profile from the UserInfo Endpoint.
 //
 // The token response already carries an `id_token` whose claims include the
 // profile, but Google only guarantees `iss`/`sub`/`aud`/`exp`/`iat` there:
 // `name` and `picture` are documented as "never guaranteed to be present".
 // This endpoint is the documented way to obtain the profile:
 // https://developers.google.com/identity/openid-connect/openid-connect#obtaininguserprofileinformation
-func (g *Google) GetUserInfo(ctx context.Context, code, verifier string) (*idp.UserInfo, error) {
+func (g *Google) GetUserInfo(ctx context.Context, code, verifier, nonce string) (*idp.UserInfo, error) {
 	token, err := g.ExchangeOAuth2Token(ctx, code, verifier)
 	if err != nil {
 		return nil, fmt.Errorf("exchange oauth2 token: %w", err)
 	}
 
+	idToken, err := g.verifyIDToken(ctx, token, nonce)
+	if err != nil {
+		return nil, err
+	}
+
 	user, err := g.getUserInfo(ctx, token.AccessToken)
 	if err != nil {
 		return nil, fmt.Errorf("get google user info: %w", err)
+	}
+
+	// UserInfo 的 sub 必须与 id_token 的 sub 完全一致，否则 UserInfo 的值不可用。
+	// https://openid.net/specs/openid-connect-core-1_0.html#UserInfoResponse
+	if user.Sub != idToken.Subject {
+		return nil, fmt.Errorf("userinfo sub %q does not match id_token sub %q", user.Sub, idToken.Subject)
 	}
 
 	name := user.Name
@@ -130,6 +159,49 @@ func (g *Google) GetUserInfo(ctx context.Context, code, verifier string) (*idp.U
 		AvatarURL: user.Picture,
 		Raw:       user.raw(),
 	}, nil
+}
+
+// verifyIDToken 校验 token 响应里的 id_token：签名(JWKS)、iss、aud、exp 以及 nonce。
+// 这一步也能挡住"换回来的不是发给本 client 的 token"这类问题。
+func (g *Google) verifyIDToken(ctx context.Context, token *oauth2.Token, nonce string) (*oidc.IDToken, error) {
+	rawIDToken, ok := token.Extra("id_token").(string)
+	if !ok || rawIDToken == "" {
+		return nil, errors.New("id_token missing in token response, is the openid scope configured?")
+	}
+
+	idToken, err := g.verifierFor().Verify(ctx, rawIDToken)
+	if err != nil {
+		return nil, fmt.Errorf("verify id_token: %w", err)
+	}
+
+	// go-oidc 只校验签名/iss/aud/exp，nonce 由调用方负责。
+	if nonce == "" {
+		return nil, errors.New("nonce is empty, cannot verify id_token")
+	}
+	if idToken.Nonce != nonce {
+		return nil, errors.New("id_token nonce mismatch")
+	}
+
+	return idToken, nil
+}
+
+// verifierFor 惰性构建 id_token 校验器。这里用 RemoteKeySet 而不是 oidc.NewProvider，
+// 因为 issuer 和 JWKS URL 是固定的，没必要为校验再多做一次 discovery。
+func (g *Google) verifierFor() *oidc.IDTokenVerifier {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	if g.verifier == nil {
+		// NewRemoteKeySet 把 ctx 当配置载体(注入 http client)用，取消会被忽略，
+		// 因此这里用 Background 并带上自己的 client。
+		keySet := oidc.NewRemoteKeySet(
+			oidc.ClientContext(context.Background(), g.httpClient),
+			g.jwksURL,
+		)
+		g.verifier = oidc.NewVerifier(g.oidcIssuer, keySet, &oidc.Config{ClientID: g.clientID})
+	}
+
+	return g.verifier
 }
 
 // userInfo is the UserInfo Endpoint response body.

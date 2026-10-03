@@ -162,6 +162,7 @@ func (p *oauthLoginProvider) LoginInfo(ctx context.Context, request *entity.Logi
 		URL:                 url.String(),
 		ClientId:            p.config.ClientID,
 		State:               state.State,
+		Nonce:               state.Nonce,
 		CodeVerifier:        state.CodeVerifier,
 		CodeChallenge:       state.CodeChallenge,
 		CodeChallengeMethod: state.CodeChallengeMethod,
@@ -171,7 +172,7 @@ func (p *oauthLoginProvider) LoginInfo(ctx context.Context, request *entity.Logi
 }
 
 func (p *oauthLoginProvider) GetUserInfo(ctx context.Context, code string, state *entity.TransientProviderLoginInfo) (*entity.ProviderUserInfo, error) {
-	userInfo, err := p.impl.GetUserInfo(ctx, code, state.CodeVerifier)
+	userInfo, err := p.impl.GetUserInfo(ctx, code, state.CodeVerifier, state.Nonce)
 	if err != nil {
 		return nil, errors.Wrapf(domainerr.ErrIDPExchangeError, "get user info: %s", err.Error())
 	}

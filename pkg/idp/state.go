@@ -6,6 +6,7 @@ const (
 
 type State struct {
 	State               string
+	Nonce               string
 	CodeVerifier        string
 	CodeChallenge       string
 	CodeChallengeMethod string // always will be CodeChallengeMethodS256

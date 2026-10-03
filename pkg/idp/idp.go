@@ -26,7 +26,9 @@ type UserInfo struct {
 type Provider interface {
 	Type() Type
 	AuthURL() (*url.URL, *State, error)
-	GetUserInfo(ctx context.Context, code, verifier string) (*UserInfo, error)
+	// GetUserInfo gets the user profile out of code and verifier. nonce is the
+	// value sent in AuthURL, OIDC providers must check it against the id_token.
+	GetUserInfo(ctx context.Context, code, verifier, nonce string) (*UserInfo, error)
 }
 
 type BaseProvider struct {
@@ -55,8 +57,14 @@ func (b *BaseProvider) GetOAuth2() *oauth2.Config {
 }
 
 func (b *BaseProvider) GetState() (State, error) {
-	state, err := RandomString(32)
 	newState := State{}
+
+	state, err := RandomString(32)
+	if err != nil {
+		return newState, err
+	}
+
+	nonce, err := RandomString(32)
 	if err != nil {
 		return newState, err
 	}
@@ -69,6 +77,7 @@ func (b *BaseProvider) GetState() (State, error) {
 	codeChallenge := oauth2.S256ChallengeFromVerifier(codeVerifier)
 
 	newState.State = state
+	newState.Nonce = nonce
 	newState.CodeVerifier = codeVerifier
 	newState.CodeChallenge = codeChallenge
 	newState.CodeChallengeMethod = CodeChallengeMethodS256
@@ -82,7 +91,14 @@ func (b *BaseProvider) AuthURL() (*url.URL, *State, error) {
 		return nil, nil, err
 	}
 
-	u := b.oa2c.AuthCodeURL(state.State, oauth2.AccessTypeOffline, oauth2.S256ChallengeOption(state.CodeVerifier))
+	u := b.oa2c.AuthCodeURL(
+		state.State,
+		oauth2.AccessTypeOffline,
+		oauth2.S256ChallengeOption(state.CodeVerifier),
+		// OIDC provider 会把 nonce 写进 id_token；非 OIDC 的 provider(GitHub)
+		// 没有 id_token，会忽略这个参数。
+		oauth2.SetAuthURLParam("nonce", state.Nonce),
+	)
 	res, err := url.Parse(u)
 	if err != nil {
 		return nil, nil, err

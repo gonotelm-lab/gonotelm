@@ -6,6 +6,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	identityentity "github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 )
@@ -23,9 +24,12 @@ func NewGetMeHandler(
 }
 
 type MeResult struct {
-	UserId    string
-	Nickname  string
-	AvatarUrl string
+	UserId      string
+	Nickname    string
+	AvatarUrl   string
+	CreatedAt   valobj.Time
+	UpdatedAt   valobj.Time
+	LoginSource identityentity.ProviderType
 }
 
 func (h *GetMeHandler) Handle(ctx context.Context) (*MeResult, error) {
@@ -35,9 +39,12 @@ func (h *GetMeHandler) Handle(ctx context.Context) (*MeResult, error) {
 	}
 
 	return &MeResult{
-		UserId:    user.Id.String(),
-		Nickname:  user.Nickname,
-		AvatarUrl: h.avatarURL(ctx, user.Avatar),
+		UserId:      user.Id.String(),
+		Nickname:    user.Nickname,
+		AvatarUrl:   h.avatarURL(ctx, user.Avatar),
+		CreatedAt:   user.CreatedAt,
+		UpdatedAt:   user.UpdatedAt,
+		LoginSource: user.Provider,
 	}, nil
 }
 

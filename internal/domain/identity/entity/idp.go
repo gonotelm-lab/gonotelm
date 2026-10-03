@@ -33,6 +33,7 @@ type ProviderLoginInfo struct {
 	URL                 string       // full login url with query params to redirect to with http status code 302
 	ClientId            string       // client_id
 	State               string       // random state
+	Nonce               string       // random nonce, OIDC providers echo it back in the id_token
 	CodeVerifier        string       // random code verifier
 	CodeChallenge       string       // usually base64url(sha256(codeVerifier))
 	CodeChallengeMethod string       // code challenge method, always "S256"
@@ -43,6 +44,7 @@ type ProviderLoginInfo struct {
 func (info *ProviderLoginInfo) ToTransient() *TransientProviderLoginInfo {
 	return &TransientProviderLoginInfo{
 		State:               info.State,
+		Nonce:               info.Nonce,
 		CodeVerifier:        info.CodeVerifier,
 		CodeChallenge:       info.CodeChallenge,
 		CodeChallengeMethod: info.CodeChallengeMethod,
@@ -53,6 +55,7 @@ func (info *ProviderLoginInfo) ToTransient() *TransientProviderLoginInfo {
 
 type TransientProviderLoginInfo struct {
 	State               string
+	Nonce               string
 	CodeVerifier        string
 	CodeChallenge       string
 	CodeChallengeMethod string

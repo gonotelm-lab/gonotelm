@@ -1,13 +1,17 @@
 package entity
 
 import (
+	"strings"
+	"unicode/utf8"
+
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	identityerrors "github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
 	pkgstr "github.com/gonotelm-lab/gonotelm/pkg/string"
 )
 
 const (
-	maxUserNickNameRune = 255
+	MaxUserNickNameRune = 255
 
 	defaultUserNicknamePrefix = "user_"
 )
@@ -34,7 +38,7 @@ type User struct {
 }
 
 func (u *User) normalizeNickname() {
-	nickname := pkgstr.TruncateRune(u.Nickname, maxUserNickNameRune)
+	nickname := pkgstr.TruncateRune(u.Nickname, MaxUserNickNameRune)
 	if nickname == "" {
 		// assign a default name
 		nickname = defaultUserNicknamePrefix + pkgstr.LastRune(u.Id.String(), 6)
@@ -75,10 +79,17 @@ func (u *User) SetEmail(email string) {
 	u.UpdatedAt = valobj.NewTime()
 }
 
-func (u *User) SetNickname(nickname string) {
+// SetNickname 空白或超长的昵称视为非法,不做静默截断/兜底。
+func (u *User) SetNickname(nickname string) error {
+	nickname = strings.TrimSpace(nickname)
+	if nickname == "" || utf8.RuneCountInString(nickname) > MaxUserNickNameRune {
+		return identityerrors.ErrInvalidNickname
+	}
+
 	u.Nickname = nickname
 	u.UpdatedAt = valobj.NewTime()
-	u.normalizeNickname()
+
+	return nil
 }
 
 func (u *User) Activate() {
@@ -87,4 +98,12 @@ func (u *User) Activate() {
 
 func (u *User) Ban() {
 	u.Status = UserStatusBanned
+}
+
+func (u *User) IsActive() bool {
+	return u.Status == UserStatusActive
+}
+
+func (u *User) IsBanned() bool {
+	return u.Status == UserStatusBanned
 }

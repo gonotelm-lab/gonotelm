@@ -10,6 +10,8 @@ const (
 	CodeIDPExchangeError    = 106005
 	CodeUserNotFound        = 106006
 	CodeUserSessionNotFound = 106007
+	CodeUserBanned          = 106008
+	CodeInvalidNickname     = 106009
 )
 
 var (
@@ -20,4 +22,7 @@ var (
 	ErrIDPExchangeError    = errors.ErrInner.ErrCode(CodeIDPExchangeError).Msg("idp exchange error")
 	ErrUserNotFound        = errors.ErrNoRecord.ErrCode(CodeUserNotFound).Msg("user not found")
 	ErrUserSessionNotFound = errors.ErrNoRecord.ErrCode(CodeUserSessionNotFound).Msg("user session not found")
+	ErrUserBanned          = errors.ErrPermission.ErrCode(CodeUserBanned).Msg("user banned")
+
+	ErrInvalidNickname = errors.ErrParams.ErrCode(CodeInvalidNickname).Msg("invalid nickname")
 )

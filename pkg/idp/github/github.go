@@ -55,7 +55,9 @@ func (g *GitHub) Type() idp.Type {
 	return idp.TypeGithub
 }
 
-func (g *GitHub) GetUserInfo(ctx context.Context, code, verifier string) (*idp.UserInfo, error) {
+// GetUserInfo exchanges the code and reads the profile from the REST API.
+// GitHub 只实现 OAuth2、不实现 OIDC，因此没有 id_token，nonce 在授权请求里会被忽略。
+func (g *GitHub) GetUserInfo(ctx context.Context, code, verifier, _ string) (*idp.UserInfo, error) {
 	token, err := g.ExchangeOAuth2Token(ctx, code, verifier)
 	if err != nil {
 		return nil, fmt.Errorf("exchange oauth2 token: %w", err)

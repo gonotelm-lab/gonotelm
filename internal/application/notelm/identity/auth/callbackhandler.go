@@ -12,20 +12,21 @@ import (
 )
 
 type CallbackHandler struct {
-	loginInfoRepo   identrepo.LoginInfoRepository
-	userService     *identityservice.UserService
-	userSessionRepo identrepo.UserSessionRepository
+	*baseHandler
+	loginInfoRepo identrepo.LoginInfoRepository
+	userService   *identityservice.UserService
 }
 
 func NewCallbackHandler(
 	loginInfoRepo identrepo.LoginInfoRepository,
 	userService *identityservice.UserService,
+	userRepo identrepo.UserRepository,
 	userSessionRepo identrepo.UserSessionRepository,
 ) *CallbackHandler {
 	return &CallbackHandler{
-		loginInfoRepo:   loginInfoRepo,
-		userService:     userService,
-		userSessionRepo: userSessionRepo,
+		baseHandler:   newBaseHandler(userRepo, userSessionRepo),
+		loginInfoRepo: loginInfoRepo,
+		userService:   userService,
 	}
 }
 
@@ -107,19 +108,19 @@ func (h *CallbackHandler) Handle(ctx context.Context, cmd *CallbackHandleCommand
 		}
 	}
 
-	// 登录后轮换会话：先作废旧会话，再签发新会话，防止 session fixation
-	if cmd.CurrentSessionId != "" {
-		if err := h.userSessionRepo.Delete(ctx, cmd.CurrentSessionId); err != nil {
-			return nil, errors.WithMessage(err, "failed to delete previous user session")
-		}
+	// 封禁用户不允许重新登录，否则封禁只需等到下一次登录就被绕过。
+	if user.IsBanned() {
+		return nil, domainerr.ErrUserBanned
 	}
 
-	session, err := entity.NewUserSession(user, cmd.Device)
-	if err != nil {
-		return nil, errors.WithMessage(err, "failed to new user session")
+	// 登录后轮换会话：先作废旧会话，再签发新会话，防止 session fixation
+	if err := h.signOut(ctx, cmd.CurrentSessionId); err != nil {
+		return nil, err
 	}
-	if err := h.userSessionRepo.Save(ctx, session); err != nil {
-		return nil, errors.WithMessage(err, "failed to save user session")
+
+	session, err := h.issueSession(ctx, user, cmd.Device)
+	if err != nil {
+		return nil, err
 	}
 
 	slog.DebugContext(ctx, "callback handler login ok",

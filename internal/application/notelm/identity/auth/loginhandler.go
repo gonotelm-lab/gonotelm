@@ -10,17 +10,18 @@ import (
 )
 
 type LoginHandler struct {
-	loginRepo       repository.LoginInfoRepository
-	userSessionRepo repository.UserSessionRepository
+	*baseHandler
+	loginRepo repository.LoginInfoRepository
 }
 
 func NewLoginHandler(
 	loginProviderRepo repository.LoginInfoRepository,
+	userRepo repository.UserRepository,
 	userSessionRepo repository.UserSessionRepository,
 ) *LoginHandler {
 	return &LoginHandler{
-		loginRepo:       loginProviderRepo,
-		userSessionRepo: userSessionRepo,
+		baseHandler: newBaseHandler(userRepo, userSessionRepo),
+		loginRepo:   loginProviderRepo,
 	}
 }
 
@@ -38,9 +39,11 @@ type LoginHandleResult struct {
 }
 
 func (h *LoginHandler) Handle(ctx context.Context, cmd *LoginHandleCommand) (*LoginHandleResult, error) {
-	// 已登录则跳过 OAuth，直接返回
+	// 已登录则跳过 OAuth，直接返回。
+	// 复用 baseHandler.authenticate 判定登录态：它负责闲置/绝对过期校验并按需滑动续期，
+	// 避免这里的判定比正常请求更宽松（否则已失效的会话仍会被当作已登录）。
 	if cmd.CurrentSessionId != "" {
-		_, err := h.userSessionRepo.Get(ctx, cmd.CurrentSessionId)
+		_, err := h.authenticate(ctx, cmd.CurrentSessionId)
 		if err == nil {
 			return &LoginHandleResult{
 				Authenticated: true,

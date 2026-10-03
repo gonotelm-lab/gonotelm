@@ -75,7 +75,7 @@ GoNoteLM turns a pile of PDFs, links, and notes into real understanding. Upload 
   </tbody>
 </table>
 
-## Getting Started (Local)
+## Getting Started Locally
 
 Prerequisites: Go (see `go.mod`), Docker with Compose, and `make`.
 

@@ -9,7 +9,7 @@ require (
 	github.com/a8m/envsubst v1.4.2
 	github.com/alibaba/OpenSandbox/sdks/sandbox/go v1.0.5
 	github.com/allegro/bigcache/v3 v3.1.0
-	github.com/bytedance/sonic v1.15.0
+	github.com/bytedance/sonic v1.15.4
 	github.com/cloudwego/eino v0.9.13
 	github.com/cloudwego/eino-ext/components/document/parser/docx v0.0.0-20260424065505-3b3b8b5db0d0
 	github.com/cloudwego/eino-ext/components/document/transformer/splitter/html v0.0.0-20260424065505-3b3b8b5db0d0
@@ -94,7 +94,7 @@ require (
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/buger/jsonparser v1.1.2 // indirect
 	github.com/bytedance/gopkg v0.1.3 // indirect
-	github.com/bytedance/sonic/loader v0.5.0 // indirect
+	github.com/bytedance/sonic/loader v0.5.2 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect

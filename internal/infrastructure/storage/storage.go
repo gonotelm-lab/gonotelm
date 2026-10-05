@@ -267,7 +267,7 @@ func (c *MinioConfig) presignExpiryOrDefault() time.Duration {
 		return c.PresignExpiry
 	}
 
-	return 15 * time.Minute
+	return 30 * time.Minute
 }
 
 func (c *StorageTypeConfig) Bucket() string {

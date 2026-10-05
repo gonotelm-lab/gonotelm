@@ -19,6 +19,7 @@ var (
 	testChatMessageStore      *ChatMessageStoreImpl
 	testArtifactStore         *ArtifactStoreImpl
 	testWorkerCheckpointStore *WorkerCheckpointStoreImpl
+	testInitJobStore          *InitJobStoreImpl
 	testUserStore             *UserStoreImpl
 )
 
@@ -37,6 +38,7 @@ func TestMain(m *testing.M) {
 	testChatMessageStore = NewChatMessageStoreImpl(testDB)
 	testArtifactStore = NewArtifactStoreImpl(testDB)
 	testWorkerCheckpointStore = NewWorkerCheckpointStoreImpl(testDB)
+	testInitJobStore = NewInitJobStoreImpl(testDB)
 	testUserStore = NewUserStoreImpl(testDB)
 
 	m.Run()

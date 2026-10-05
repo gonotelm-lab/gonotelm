@@ -41,6 +41,7 @@ func Open(cfg *sql.Config) (*database.Dao, error) {
 		NewChatMessageStoreImpl(db),
 		NewArtifactStoreImpl(db),
 		NewWorkerCheckpointStoreImpl(db),
+		NewInitJobStoreImpl(db),
 		NewUserStoreImpl(db),
 	), nil
 }

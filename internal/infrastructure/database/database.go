@@ -92,6 +92,19 @@ type UserStore interface {
 	GetByProviderAndSub(ctx context.Context, provider, sub string) (*schema.User, error)
 }
 
+// InitJobStore persists initjob run and task records. It speaks rows only; the
+// adapter in internal/infrastructure/repository translates it to initjob.Recorder.
+type InitJobStore interface {
+	AbortStale(ctx context.Context, params *schema.InitJobAbortStaleParams) (
+		abortedRuns int64, abortedTasks int64, err error,
+	)
+	CreateRun(ctx context.Context, run *schema.InitJobRun) error
+	FinishRun(ctx context.Context, params *schema.InitJobRunFinishParams) error
+	ListSucceededTaskIDs(ctx context.Context) ([]string, error)
+	UpsertTaskRunning(ctx context.Context, task *schema.InitJobTask) error
+	UpdateTaskStatus(ctx context.Context, params *schema.InitJobTaskStatusParams) error
+}
+
 type Dao struct {
 	Closer misc.Closer
 
@@ -101,6 +114,7 @@ type Dao struct {
 	ChatMessageStore      ChatMessageStore
 	ArtifactStore         ArtifactStore
 	WorkerCheckpointStore WorkerCheckpointStore
+	InitJobStore          InitJobStore
 	UserStore             UserStore
 }
 
@@ -112,6 +126,7 @@ func NewDao(
 	chatMessageStore ChatMessageStore,
 	artifactStore ArtifactStore,
 	workerCheckpointStore WorkerCheckpointStore,
+	initJobStore InitJobStore,
 	userStore UserStore,
 ) *Dao {
 	return &Dao{
@@ -122,6 +137,7 @@ func NewDao(
 		ChatMessageStore:      chatMessageStore,
 		ArtifactStore:         artifactStore,
 		WorkerCheckpointStore: workerCheckpointStore,
+		InitJobStore:          initJobStore,
 		UserStore:             userStore,
 	}
 }

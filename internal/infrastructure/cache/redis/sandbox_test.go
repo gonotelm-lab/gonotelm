@@ -6,50 +6,43 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
+	. "github.com/smartystreets/goconvey/convey"
 )
 
 func TestSandboxCacheImpl(t *testing.T) {
-	userId := "test" + uuid.NewV7().String()
-	notebookId := "test" + uuid.NewV7().String()
-	sandboxId := "sb-" + uuid.NewV7().String()
+	Convey("SandboxCache Set/Get/Delete", t, func() {
+		ctx := t.Context()
+		userId := "test" + uuid.NewV7().String()
+		notebookId := "test" + uuid.NewV7().String()
+		sandboxId := "sb-" + uuid.NewV7().String()
 
-	err := testSandboxCache.Set(t.Context(), userId, notebookId, &schema.SandboxDescription{
-		Id:      sandboxId,
-		Key:     schema.SandboxKey{UserId: userId, NotebookId: notebookId},
-		Runtime: "test",
-	}, time.Hour)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
+		err := testSandboxCache.Set(ctx, userId, notebookId, &schema.SandboxDescription{
+			Id:      sandboxId,
+			Key:     schema.SandboxKey{UserId: userId, NotebookId: notebookId},
+			Runtime: "test",
+		}, time.Hour)
+		So(err, ShouldBeNil)
 
-	got, err := testSandboxCache.Get(t.Context(), userId, notebookId)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	if got == nil {
-		t.Fatal("expected description, got nil")
-	}
-	if got.Id != sandboxId {
-		t.Fatalf("expected id %s, got %s", sandboxId, got.Id)
-	}
-	if got.Runtime != "test" {
-		t.Fatalf("expected runtime test, got %s", got.Runtime)
-	}
-	if got.Key.UserId != userId || got.Key.NotebookId != notebookId {
-		t.Fatalf("unexpected key %+v", got.Key)
-	}
+		got, err := testSandboxCache.Get(ctx, userId, notebookId)
+		So(err, ShouldBeNil)
+		So(got, ShouldNotBeNil)
+		So(got.Id, ShouldEqual, sandboxId)
+		So(got.Runtime, ShouldEqual, "test")
+		So(got.Key.UserId, ShouldEqual, userId)
+		So(got.Key.NotebookId, ShouldEqual, notebookId)
 
-	testSandboxCache.Delete(t.Context(), userId, notebookId)
+		err = testSandboxCache.Delete(ctx, userId, notebookId)
+		So(err, ShouldBeNil)
+	})
 }
 
 func TestSandboxCacheImplNotFound(t *testing.T) {
-	userId := "test" + uuid.NewV7().String()
-	notebookId := "test" + uuid.NewV7().String()
-	got, err := testSandboxCache.Get(t.Context(), userId, notebookId)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	if got != nil {
-		t.Fatalf("expected nil, got %+v", got)
-	}
+	Convey("SandboxCache get missing description", t, func() {
+		userId := "test" + uuid.NewV7().String()
+		notebookId := "test" + uuid.NewV7().String()
+
+		got, err := testSandboxCache.Get(t.Context(), userId, notebookId)
+		So(err, ShouldBeNil)
+		So(got, ShouldBeNil)
+	})
 }

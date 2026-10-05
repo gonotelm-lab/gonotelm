@@ -95,6 +95,18 @@ make run-worker        # async artifact jobs (studio generation)
 make run-sourcejob     # source ingestion jobs
 ```
 
+The web UI lives in its own repository, [gonotelm-lab/gonotelm-web](https://github.com/gonotelm-lab/gonotelm-web):
+
+```bash
+# 5. run the web UI (requires Node.js 20.19+ or 22.12+ and pnpm)
+git clone https://github.com/gonotelm-lab/gonotelm-web.git
+cd gonotelm-web
+pnpm install
+pnpm dev               # Vite dev server on :5173, proxying /api to http://127.0.0.1:7099
+```
+
+Point it at another backend with `VITE_BACKEND_PROXY_TARGET=http://host:port pnpm dev`.
+
 The `run-*` targets load `.env` automatically, so values exported in your shell win over the file.
 Middleware ports are published on the host and must match the `GONOTELM_*` addresses in `.env`;
 see [deploy/dev/README.md](deploy/dev/README.md) for the full port table, data-volume reuse, and how to

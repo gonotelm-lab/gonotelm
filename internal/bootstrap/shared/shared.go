@@ -43,6 +43,9 @@ type Infra struct {
 	Cache                  *infracache.Cache
 	MessageQueue           *mq.MessageQueue
 	Storage                storage.Storage
+	PublicStorage          storage.PublicReadStorage
+	ObjectStore            adapter.ObjectStore
+	KeyFactory             adapter.StoreKeyFactory
 	LLMGateway             *llmchat.Gateway
 	LLMBillingMeter        llmchatbilling.Meter
 	EmbeddingGateway       *embedding.EmbeddingGateway
@@ -141,11 +144,20 @@ func initMessageQueue(_ context.Context, cfg *confshared.InfraConfig, infra *Inf
 }
 
 func initStorage(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
-	oss, err := newStorage(&cfg.Storage)
+	privateStorage, err := newStorage(&cfg.Storage)
 	if err != nil {
 		return fmt.Errorf("storage: %w", err)
 	}
-	infra.Storage = oss
+	infra.Storage = privateStorage
+
+	publicStorage, err := newPublicReadStorage(&cfg.Storage)
+	if err != nil {
+		return fmt.Errorf("public read storage: %w", err)
+	}
+	infra.PublicStorage = publicStorage
+
+	infra.ObjectStore = infraadapter.NewObjectStore(privateStorage, publicStorage)
+	infra.KeyFactory = infraadapter.NewStoreKeyFactory(privateStorage, publicStorage)
 
 	return nil
 }
@@ -382,6 +394,23 @@ func newStorage(cfg *storage.StorageTypeConfig) (storage.Storage, error) {
 		})
 	default:
 		return nil, fmt.Errorf("unknown storage type: %s", cfg.Type)
+	}
+}
+
+func newPublicReadStorage(cfg *storage.StorageTypeConfig) (storage.PublicReadStorage, error) {
+	publicCfg, err := cfg.PublicObjectStorageConfig()
+	if err != nil {
+		return nil, err
+	}
+	if publicCfg == nil {
+		return nil, nil
+	}
+
+	switch cfg.Type {
+	case storage.Minio:
+		return minio.New(publicCfg)
+	default:
+		return nil, fmt.Errorf("public read storage is not supported for type %s", cfg.Type)
 	}
 }
 

@@ -62,7 +62,6 @@ func NewWorker(ctx context.Context, cfg *conf.WorkerConfig) (*Worker, error) {
 	}
 
 	sourceRepo := repository.NewSourceRepository(shared.Database.SourceStore)
-	storageRepo := repository.NewSourceStorageRepository(shared.Storage)
 	sourceDocRepo := repository.NewSourceDocRepository(
 		shared.Embedder,
 		shared.VectorDatabase.SourceDocStore,
@@ -71,7 +70,7 @@ func NewWorker(ctx context.Context, cfg *conf.WorkerConfig) (*Worker, error) {
 			EmbedMaxConcurrency: cfg.Embedding.MaxConcurrency,
 		},
 	)
-	agentizeService := agentize.NewService(agentize.Config{}, sourceRepo, storageRepo, sourceDocRepo)
+	agentizeService := agentize.NewService(agentize.Config{}, sourceRepo, shared.ObjectStore, sourceDocRepo)
 
 	deps := &workertypes.WorkerDeps{
 		Agentize:             agentizeService,
@@ -81,7 +80,8 @@ func NewWorker(ctx context.Context, cfg *conf.WorkerConfig) (*Worker, error) {
 		Sandbox:              shared.SandboxGateway,
 		SandboxRepository:    repository.NewSandboxRepository(shared.Cache.SandboxCache),
 		DistLock:             shared.DistLock,
-		ObjectStorage:        shared.Storage,
+		ObjectStorage:        shared.ObjectStore,
+		KeyFactory:           shared.KeyFactory,
 		CheckpointRepository: repository.NewCheckpointRepository(shared.Database.WorkerCheckpointStore),
 	}
 

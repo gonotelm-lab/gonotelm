@@ -1,6 +1,7 @@
 package testsuite
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -39,5 +40,18 @@ func TestNewRandomTestDBName_StartsWithTestPrefix(t *testing.T) {
 	name, err := newRandomTestDBName()
 	require.NoError(t, err)
 	assert.True(t, strings.HasPrefix(name, "test_"), "got %q", name)
-	assert.True(t, pgIdentifierPattern.MatchString(name), "got %q", name)
+	assert.True(t, sql.IsValidPgIdentifier(name), "got %q", name)
+}
+
+func TestSetup_RejectsNilMigrator(t *testing.T) {
+	db, err := NewTestGormDB("pgsql", &sql.Config{
+		Host:     "127.0.0.1",
+		Port:     5432,
+		User:     "postgres",
+		Password: "postgres",
+	})
+	require.NoError(t, err)
+
+	err = db.Setup(context.Background(), nil)
+	require.Error(t, err)
 }

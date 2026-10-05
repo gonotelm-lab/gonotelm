@@ -4,6 +4,12 @@ deployEnv = "dev"
 port = 7099
 exitWaitTimeout = "${GONOTELM_API_EXIT_WAIT_TIMEOUT:-30s}"
 
+[cors]
+allowOrigins = ["${GONOTELM_CORS_ALLOW_ORIGINS:-http://127.0.0.1:5173,http://localhost:5173}"]
+
+[auth]
+returnToAllowOrigins = ["${GONOTELM_AUTH_RETURN_TO_ALLOW_ORIGINS:-http://127.0.0.1:5173,http://localhost:5173}"]
+
 [database]
 type = "postgres"
 host = "${GONOTELM_DB_HOST:-127.0.0.1}"
@@ -46,6 +52,10 @@ bucket = "gonotelm"
 region = "${GONOTELM_MINIO_REGION:-us-east-1}"
 secure = ${GONOTELM_MINIO_SECURE:-false}
 presignExpiry = "${GONOTELM_MINIO_PRESIGN_EXPIRY:-15m}"
+publicBucket = "${GONOTELM_PUBLIC_MINIO_BUCKET:-gonotelm-public}"
+publicAccessKey = "${GONOTELM_PUBLIC_MINIO_ACCESS_KEY:-}"
+publicSecretKey = "${GONOTELM_PUBLIC_MINIO_SECRET_KEY:-}"
+publicBaseURL = "${GONOTELM_PUBLIC_MINIO_BASE_URL:-http://127.0.0.1:9000}"
 
 [messageQueue]
 type = "kafka"
@@ -258,3 +268,19 @@ globalBatchSize  = ${GONOTELM_SYNCER_GLOBAL_BATCH_SIZE:-100}
 name = "notelm"
 endpoint = "${OTEL_TRACE_ENDPOINT:-127.0.0.1:4317}"
 exporter = "grpc"
+
+[idp.github]
+clientId = "${GONOTELM_OAUTH_GITHUB_CLIENT_ID}"
+clientSecret = "${GONOTELM_OAUTH_GITHUB_CLIENT_SECRET}"
+redirectUri = "${GONOTELM_OAUTH_REDIRECT_URI:-http://127.0.0.1:7099/api/v1/auth/callback/github}"
+scopes = ["read:user", "user:email"]
+authEndpoint = ""
+tokenEndpoint = ""
+
+[idp.google]
+clientId = "${GONOTELM_OAUTH_GOOGLE_CLIENT_ID}"
+clientSecret = "${GONOTELM_OAUTH_GOOGLE_CLIENT_SECRET}"
+redirectUri = "${GONOTELM_OAUTH_GOOGLE_REDIRECT_URI:-http://127.0.0.1:7099/api/v1/auth/callback/google}"
+scopes = ["openid", "email", "profile"]
+authEndpoint = ""
+tokenEndpoint = ""

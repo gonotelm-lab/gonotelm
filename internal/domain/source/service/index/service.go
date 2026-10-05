@@ -23,7 +23,7 @@ const (
 
 type Service struct {
 	sourceConverters map[vo.SourceKind]convertdoc.Handler
-	objectStorage    repository.FileObjectGetter
+	objectStorage    adapter.ObjectGetter
 	sourceDocRepo    repository.SourceDocRepository
 }
 
@@ -35,7 +35,7 @@ type ServiceConfig struct {
 
 func New(
 	c ServiceConfig,
-	objectStorage repository.FileObjectGetter,
+	objectStorage adapter.ObjectGetter,
 	sourceDocRepo repository.SourceDocRepository,
 	imageInterpreter adapter.ImageInterpreter,
 ) *Service {

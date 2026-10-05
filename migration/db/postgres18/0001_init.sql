@@ -1,7 +1,5 @@
-CREATE DATABASE gonotelm;
-
-\c gonotelm;
-
+-- +goose Up
+-- 数据库本身由调用方创建：单测用随机 test_ 库，dev/prod 由 cmd/migrate 建。
 CREATE TABLE notebooks (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
   name VARCHAR(128) NOT NULL DEFAULT '',
@@ -146,3 +144,11 @@ COMMENT ON COLUMN worker_artifact_checkpoints.field7 IS 'worker artifact checkpo
 COMMENT ON COLUMN worker_artifact_checkpoints.field8 IS 'worker artifact checkpoint field8';
 COMMENT ON COLUMN worker_artifact_checkpoints.created_at IS 'worker artifact checkpoint created time (unix ms)';
 COMMENT ON COLUMN worker_artifact_checkpoints.updated_at IS 'worker artifact checkpoint updated time (unix ms)';
+
+-- +goose Down
+DROP TABLE IF EXISTS worker_artifact_checkpoints;
+DROP TABLE IF EXISTS artifacts;
+DROP TABLE IF EXISTS chat_messages;
+DROP TABLE IF EXISTS chats;
+DROP TABLE IF EXISTS sources;
+DROP TABLE IF EXISTS notebooks;

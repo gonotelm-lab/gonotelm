@@ -1,12 +1,13 @@
 package testsuite
 
 import (
+	"context"
 	"crypto/rand"
-	stderrors "errors"
+	stdsql "database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -16,14 +17,18 @@ import (
 	gormlogger "gorm.io/gorm/logger"
 )
 
-var pgIdentifierPattern = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]{0,62}$`)
-
 const (
 	EnvGonotelmTestDBHost = "TEST_GONOTELM_DB_HOST"
 	EnvGonotelmTestDBPort = "TEST_GONOTELM_DB_PORT"
 	EnvGonotelmTestDBUser = "TEST_GONOTELM_DB_USER"
 	EnvGonotelmTestDBPass = "TEST_GONOTELM_DB_PASS"
+
+	// 避免迁移卡死时整个测试包一直挂住。
+	migrationTimeout = 2 * time.Minute
 )
+
+// Migrator 在随机 test_ 库建好后、交给测试之前执行，用于把表结构迁移到最新版本。
+type Migrator func(ctx context.Context, db *stdsql.DB) error
 
 type TestDb struct {
 	db         *gorm.DB
@@ -67,7 +72,7 @@ func NewTestGormDBFromEnv(driver string) (*TestDb, error) {
 
 	switch normalizedDriver {
 	case "pgsql":
-		missing := make([]string, 0, 5)
+		missing := make([]string, 0, 4)
 
 		host := strings.TrimSpace(os.Getenv(EnvGonotelmTestDBHost))
 		if host == "" {
@@ -113,13 +118,18 @@ func (t *TestDb) GetDB() *gorm.DB {
 	return t.db
 }
 
-func (t *TestDb) Setup(migrationFilePath string) error {
+// Setup 创建随机 test_ 库并用 migrate 迁移表结构，任何一步失败都会把已建的库清理掉。
+func (t *TestDb) Setup(ctx context.Context, migrate Migrator) error {
 	if t == nil {
-		return fmt.Errorf("test db is nil")
+		return errors.New("test db is nil")
 	}
+	if migrate == nil {
+		return errors.New("migrator is nil")
+	}
+
 	switch t.driver {
 	case "pgsql":
-		return t.setupPgsql(migrationFilePath)
+		return t.setupPgsql(ctx, migrate)
 	default:
 		return fmt.Errorf("driver %s setup is not implemented yet", t.driver)
 	}
@@ -137,43 +147,41 @@ func (t *TestDb) Cleanup() error {
 	}
 }
 
-func (t *TestDb) setupPgsql(migrationFilePath string) error {
-	if strings.TrimSpace(migrationFilePath) == "" {
-		return fmt.Errorf("migration file path is empty")
-	}
+func (t *TestDb) setupPgsql(ctx context.Context, migrate Migrator) error {
 	if t.db != nil {
-		return fmt.Errorf("test db already setup")
+		return errors.New("test db already setup")
 	}
 
 	testDBName, err := newRandomTestDBName()
 	if err != nil {
 		return err
 	}
-	if err := createPgDatabase(&t.config, testDBName, t.logger); err != nil {
-		return err
-	}
 
 	testConfig := t.config
 	testConfig.DBName = testDBName
-	testDB, err := sql.OpenPgSqlWithLogger(&testConfig, t.logger)
-	if err != nil {
-		_ = dropPgDatabase(&t.config, testDBName, t.logger)
-		return fmt.Errorf("open test db failed: %w", err)
-	}
-
-	statements, err := readMigrationStatements(migrationFilePath)
-	if err != nil {
-		_ = closeGormDB(testDB)
-		_ = dropPgDatabase(&t.config, testDBName, t.logger)
+	if err := sql.EnsurePgDatabase(&testConfig, t.logger); err != nil {
 		return err
 	}
 
-	for _, statement := range statements {
-		if err := testDB.Exec(statement).Error; err != nil {
-			_ = closeGormDB(testDB)
-			_ = dropPgDatabase(&t.config, testDBName, t.logger)
-			return fmt.Errorf("execute migration statement failed: %w", err)
-		}
+	testDB, err := sql.OpenPgSqlWithLogger(&testConfig, t.logger)
+	if err != nil {
+		_ = sql.DropPgDatabase(&testConfig, t.logger)
+		return fmt.Errorf("open test db failed: %w", err)
+	}
+
+	stdDB, err := testDB.DB()
+	if err != nil {
+		_ = sql.CloseGormDB(testDB)
+		_ = sql.DropPgDatabase(&testConfig, t.logger)
+		return fmt.Errorf("get sql db failed: %w", err)
+	}
+
+	migrateCtx, cancel := context.WithTimeout(ctx, migrationTimeout)
+	defer cancel()
+	if err := migrate(migrateCtx, stdDB); err != nil {
+		_ = sql.CloseGormDB(testDB)
+		_ = sql.DropPgDatabase(&testConfig, t.logger)
+		return fmt.Errorf("migrate test db failed: %w", err)
 	}
 
 	t.testDBName = testDBName
@@ -183,98 +191,18 @@ func (t *TestDb) setupPgsql(migrationFilePath string) error {
 
 func (t *TestDb) cleanupPgsql() error {
 	var errs []error
-	errs = append(errs, closeGormDB(t.db))
+	errs = append(errs, sql.CloseGormDB(t.db))
 	t.db = nil
 
 	if t.testDBName != "" {
-		// Ephemeral test_* databases are dropped entirely; no need to drop tables first.
-		errs = append(errs, dropPgDatabase(&t.config, t.testDBName, t.logger))
+		dropConfig := t.config
+		dropConfig.DBName = t.testDBName
+		// 临时 test_ 库整体删除，不需要先 drop 表。
+		errs = append(errs, sql.DropPgDatabase(&dropConfig, t.logger))
 	}
 	t.testDBName = ""
 
-	return joinErrors(errs...)
-}
-
-func createPgDatabase(config *sql.Config, dbName string, gormLogger gormlogger.Interface) error {
-	quotedName, err := quotePGIdentifier(dbName)
-	if err != nil {
-		return err
-	}
-
-	adminDB, err := openPgAdminDB(config, gormLogger)
-	if err != nil {
-		return fmt.Errorf("open admin db failed: %w", err)
-	}
-	defer func() {
-		_ = closeGormDB(adminDB)
-	}()
-
-	createDBSQL := fmt.Sprintf(`CREATE DATABASE %s`, quotedName)
-	if err := adminDB.Exec(createDBSQL).Error; err != nil {
-		return fmt.Errorf("create test db failed: %w", err)
-	}
-	return nil
-}
-
-func dropPgDatabase(config *sql.Config, dbName string, gormLogger gormlogger.Interface) error {
-	quotedName, err := quotePGIdentifier(dbName)
-	if err != nil {
-		return err
-	}
-
-	adminDB, err := openPgAdminDB(config, gormLogger)
-	if err != nil {
-		return fmt.Errorf("open admin db failed: %w", err)
-	}
-	defer func() {
-		_ = closeGormDB(adminDB)
-	}()
-
-	dropWithForceSQL := fmt.Sprintf(`DROP DATABASE IF EXISTS %s WITH (FORCE)`, quotedName)
-	if err := adminDB.Exec(dropWithForceSQL).Error; err != nil {
-		dropSQL := fmt.Sprintf(`DROP DATABASE IF EXISTS %s`, quotedName)
-		if fallbackErr := adminDB.Exec(dropSQL).Error; fallbackErr != nil {
-			return fmt.Errorf("drop test db failed, force=%v fallback=%v", err, fallbackErr)
-		}
-	}
-	return nil
-}
-
-func readMigrationStatements(path string) ([]string, error) {
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("read migration file failed: %w", err)
-	}
-
-	lines := strings.Split(string(content), "\n")
-	filteredLines := make([]string, 0, len(lines))
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		lower := strings.ToLower(trimmed)
-		if trimmed == "" || strings.HasPrefix(lower, "--") {
-			continue
-		}
-		// Skip DB-level commands from migration file, keep schema DDL only.
-		if strings.HasPrefix(lower, "create database ") || strings.HasPrefix(lower, "\\c ") {
-			continue
-		}
-		filteredLines = append(filteredLines, line)
-	}
-
-	rawStatements := strings.Split(strings.Join(filteredLines, "\n"), ";")
-	statements := make([]string, 0, len(rawStatements))
-	for _, raw := range rawStatements {
-		statement := strings.TrimSpace(raw)
-		if statement == "" {
-			continue
-		}
-		statements = append(statements, statement)
-	}
-	if len(statements) == 0 {
-		return nil, fmt.Errorf("no executable statements in migration file: %s", path)
-	}
-
-	return statements, nil
+	return errors.Join(errs...)
 }
 
 func normalizeDriver(driver string) (string, error) {
@@ -320,24 +248,6 @@ func validateConfig(driver string, config *sql.Config) error {
 	}
 }
 
-func closeGormDB(db *gorm.DB) error {
-	if db == nil {
-		return nil
-	}
-	sqlDB, err := db.DB()
-	if err != nil {
-		return fmt.Errorf("get sql db failed: %w", err)
-	}
-	return sqlDB.Close()
-}
-
-func quotePGIdentifier(identifier string) (string, error) {
-	if !pgIdentifierPattern.MatchString(identifier) {
-		return "", fmt.Errorf("invalid postgres identifier: %s", identifier)
-	}
-	return fmt.Sprintf(`"%s"`, identifier), nil
-}
-
 func newRandomTestDBName() (string, error) {
 	randBytes := make([]byte, 4)
 	if _, err := rand.Read(randBytes); err != nil {
@@ -348,46 +258,11 @@ func newRandomTestDBName() (string, error) {
 	if len(name) > 63 {
 		name = name[:63]
 	}
-	if !pgIdentifierPattern.MatchString(name) {
+	if !sql.IsValidPgIdentifier(name) {
 		return "", fmt.Errorf("generated invalid db name: %s", name)
 	}
 
 	return name, nil
-}
-
-func openPgAdminDB(config *sql.Config, gormLogger gormlogger.Interface) (*gorm.DB, error) {
-	if config == nil {
-		return nil, fmt.Errorf("db config is nil")
-	}
-
-	candidates := []string{"postgres", "template1"}
-
-	var errs []error
-	for _, dbName := range candidates {
-		adminConfig := *config
-		adminConfig.DBName = dbName
-
-		db, err := sql.OpenPgSqlWithLogger(&adminConfig, gormLogger)
-		if err == nil {
-			return db, nil
-		}
-		errs = append(errs, fmt.Errorf("connect %s failed: %w", dbName, err))
-	}
-
-	return nil, joinErrors(errs...)
-}
-
-func joinErrors(errs ...error) error {
-	filtered := make([]error, 0, len(errs))
-	for _, err := range errs {
-		if err != nil {
-			filtered = append(filtered, err)
-		}
-	}
-	if len(filtered) == 0 {
-		return nil
-	}
-	return stderrors.Join(filtered...)
 }
 
 func newTestLogger() gormlogger.Interface {

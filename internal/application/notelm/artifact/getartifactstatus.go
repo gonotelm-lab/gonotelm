@@ -24,10 +24,10 @@ type StatusResponse struct {
 
 type GetArtifactStatusHandler struct {
 	*baseHandler
-	storage adapter.StorageAdapter
+	storage adapter.ObjectStore
 }
 
-func NewGetArtifactStatusHandler(repo artifactrepo.Repository, storage adapter.StorageAdapter) *GetArtifactStatusHandler {
+func NewGetArtifactStatusHandler(repo artifactrepo.Repository, storage adapter.ObjectStore) *GetArtifactStatusHandler {
 	return &GetArtifactStatusHandler{baseHandler: newBaseHandler(repo), storage: storage}
 }
 

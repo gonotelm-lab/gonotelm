@@ -13,5 +13,7 @@ func NewCache(
 		ChatMessageStreamCache:  NewChatMessageStreamCacheImpl(rdb),
 		ChatSuggestionCache:     NewChatSuggestionCacheImpl(rdb),
 		SandboxCache:            NewSandboxCacheImpl(rdb),
+		LoginInfoCache:          NewTransientProviderLoginInfoCacheImpl(rdb),
+		UserSessionCache:        NewUserSessionCacheImpl(rdb),
 	}
 }

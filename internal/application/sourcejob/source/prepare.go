@@ -29,7 +29,8 @@ const PreparationConsumerGroup = "gonotelm.source.preparation.group"
 type PrepareSourceHandler struct {
 	sourceRepo         sourcerepo.Repository
 	sourceIndexService *index.Service
-	sourceStorageRepo  sourcerepo.StorageRepository
+	objectStore        adapter.ObjectStore
+	keyFactory         adapter.StoreKeyFactory
 	sourceDocRepo      sourcerepo.SourceDocRepository
 	summarizer         adapter.Summarizer
 	eventBus           eventbus.Publisher
@@ -37,7 +38,8 @@ type PrepareSourceHandler struct {
 
 func NewPrepareSourceHandler(
 	sourceRepo sourcerepo.Repository,
-	sourceStorageRepo sourcerepo.StorageRepository,
+	objectStore adapter.ObjectStore,
+	keyFactory adapter.StoreKeyFactory,
 	sourceDocRepo sourcerepo.SourceDocRepository,
 	summarizer adapter.Summarizer,
 	eventBus eventbus.Publisher,
@@ -47,11 +49,12 @@ func NewPrepareSourceHandler(
 		sourceRepo: sourceRepo,
 		sourceIndexService: index.New(index.ServiceConfig{
 			DefaultMaxSourceFileSizeBytes: entity.MaxUploadFileSizeBytes,
-		}, sourceStorageRepo, sourceDocRepo, imageInterpreter),
-		sourceStorageRepo: sourceStorageRepo,
-		sourceDocRepo:     sourceDocRepo,
-		summarizer:        summarizer,
-		eventBus:          eventBus,
+		}, objectStore, sourceDocRepo, imageInterpreter),
+		objectStore:   objectStore,
+		keyFactory:    keyFactory,
+		sourceDocRepo: sourceDocRepo,
+		summarizer:    summarizer,
+		eventBus:      eventBus,
 	}
 }
 
@@ -109,8 +112,8 @@ func (h *PrepareSourceHandler) Handle(
 			)
 		}
 
-		if targetSource.ParsedContentKey != "" {
-			if err := h.sourceStorageRepo.DeleteObject(ctx, targetSource.ParsedContentKey); err != nil {
+		if targetSource.ParsedContentKey.Valid() {
+			if err := h.objectStore.DeleteObject(ctx, targetSource.ParsedContentKey); err != nil {
 				slog.ErrorContext(ctx, "delete parsed content failed",
 					slog.String("source_id", sourceId.String()),
 					slog.Any("err", err),
@@ -199,9 +202,11 @@ func (h *PrepareSourceHandler) uploadParsedContent(
 	source *entity.Source,
 	result *index.IndexSourceResult,
 ) error {
-	source.UploadParsedContent()
+	if err := source.UploadParsedContent(h.keyFactory); err != nil {
+		return errors.WithMessagef(err, "create parsed content store key failed, source_id=%s", source.Id.String())
+	}
 	source.MarkReady()
-	if err := h.sourceStorageRepo.UploadObject(
+	if err := h.objectStore.Upload(
 		ctx,
 		source.ParsedContentKey,
 		result.ParsedContent,

@@ -13,7 +13,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image"
 	infrasandbox "github.com/gonotelm-lab/gonotelm/internal/infrastructure/sandbox"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	"github.com/gonotelm-lab/gonotelm/pkg/pipeline"
 )
 
@@ -55,7 +54,8 @@ type WorkerDeps struct {
 	Sandbox              *infrasandbox.Gateway
 	SandboxRepository    sandboxrepo.Repository
 	DistLock             adapter.DistributedLock
-	ObjectStorage        storage.Storage
+	ObjectStorage        adapter.ObjectStore
+	KeyFactory           adapter.StoreKeyFactory
 	CheckpointRepository workerrepo.CheckpointRepository
 }
 

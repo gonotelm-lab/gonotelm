@@ -25,8 +25,7 @@ func OkRespNoContent(c *app.RequestContext) {
 
 func ErrResp(c *app.RequestContext, err error) {
 	cause := xerror.Cause(err)
-	var ie *xerror.InnerError
-	if errors.As(cause, &ie) {
+	if ie, ok := errors.AsType[*xerror.InnerError](cause); ok {
 		c.Set(RequestContextInnerErrKey, ie) // already is caused error
 		c.Set(RequestContextRawErrKey, err)
 		c.AbortWithStatusJSON(ie.Status, resultFrom(ie))

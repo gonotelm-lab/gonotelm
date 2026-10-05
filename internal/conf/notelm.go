@@ -2,8 +2,8 @@ package conf
 
 import (
 	"fmt"
-	"os"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -11,10 +11,8 @@ import (
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	rerank "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/rerank"
 	mqimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
+	"github.com/gonotelm-lab/gonotelm/pkg/idp"
 	"github.com/gonotelm-lab/gonotelm/pkg/trace"
-
-	"github.com/BurntSushi/toml"
-	"github.com/a8m/envsubst"
 )
 
 var notelmGlobal *NotelmConfig
@@ -25,6 +23,8 @@ type NotelmConfig struct {
 	DeployEnv string `toml:"deployEnv"`
 
 	Api       ApiConfig            `toml:"api"`
+	Cors      CorsConfig           `toml:"cors"`
+	Auth      AuthConfig           `toml:"auth"`
 	Chat      ChatConfig           `toml:"chat"`
 	Source    SourceConfig         `toml:"source"`
 	Rerank    rerank.RerankConfig  `toml:"rerank"`
@@ -33,6 +33,7 @@ type NotelmConfig struct {
 	Flow      shared.FlowConfig    `toml:"flow"`
 	Syncer    SyncerConfig         `toml:"syncer"`
 	OtelTrace trace.Config         `toml:"otelTrace"`
+	IDP       map[string]IDPConfig `toml:"idp"`
 }
 
 var sourceUrlBlacklistRegex *regexp.Regexp
@@ -107,8 +108,19 @@ func (c *NotelmConfig) IsDev() bool {
 	return shared.IsDevEnv(c.DeployEnv)
 }
 
-func (c *WorkerConfig) IsDev() bool {
-	return shared.IsDevEnv(c.DeployEnv)
+func (c *NotelmConfig) ToIDPConfig() map[string]idp.Config {
+	configs := make(map[string]idp.Config)
+	for k, v := range c.IDP {
+		configs[k] = idp.Config{
+			ClientID:     v.ClientId,
+			ClientSecret: v.ClientSecret,
+			RedirectURL:  v.RedirectUri,
+			Scopes:       v.Scopes,
+			AuthURL:      v.AuthEndpoint,
+			TokenURL:     v.TokenEndpoint,
+		}
+	}
+	return configs
 }
 
 type ApiConfig struct {
@@ -120,27 +132,51 @@ func (c *ApiConfig) HostPort() string {
 	return fmt.Sprintf(":%d", c.Port)
 }
 
-func LoadTOML(path string, cfg interface{}) error {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("read config file %q failed: %w", path, err)
-	}
+type CorsConfig struct {
+	AllowOrigins []string `toml:"allowOrigins"`
+}
 
-	expanded, err := envsubst.String(string(raw))
-	if err != nil {
-		return fmt.Errorf("expand env in config file %q failed: %w", path, err)
+func (c *CorsConfig) Init() {
+	origins := make([]string, 0, len(c.AllowOrigins))
+	for _, raw := range c.AllowOrigins {
+		for origin := range strings.SplitSeq(raw, ",") {
+			if origin = strings.TrimSpace(origin); origin != "" {
+				origins = append(origins, origin)
+			}
+		}
 	}
+	c.AllowOrigins = origins
+}
 
-	if _, err := toml.Decode(expanded, cfg); err != nil {
-		return fmt.Errorf("decode config file %q failed: %w", path, err)
+type AuthConfig struct {
+	// ReturnToAllowOrigins 登录后 return_to 允许跳转的站外来源白名单
+	ReturnToAllowOrigins []string `toml:"returnToAllowOrigins"`
+}
+
+func (c *AuthConfig) Init() {
+	origins := make([]string, 0, len(c.ReturnToAllowOrigins))
+	for _, raw := range c.ReturnToAllowOrigins {
+		for origin := range strings.SplitSeq(raw, ",") {
+			if origin = strings.TrimSpace(origin); origin != "" {
+				origins = append(origins, origin)
+			}
+		}
 	}
+	c.ReturnToAllowOrigins = origins
+}
 
-	return nil
+type IDPConfig struct {
+	ClientId      string   `toml:"clientId"`
+	ClientSecret  string   `toml:"clientSecret"`
+	RedirectUri   string   `toml:"redirectUri"`
+	Scopes        []string `toml:"scopes"`
+	AuthEndpoint  string   `toml:"authEndpoint"`
+	TokenEndpoint string   `toml:"tokenEndpoint"`
 }
 
 func LoadNotelmConfig(path string) (*NotelmConfig, error) {
 	cfg := &NotelmConfig{}
-	if err := LoadTOML(path, cfg); err != nil {
+	if err := shared.LoadTOML(path, cfg); err != nil {
 		return nil, err
 	}
 
@@ -156,6 +192,8 @@ func (c *NotelmConfig) init() {
 	c.InitInfra()
 	c.Logging.Init()
 	c.Flow.Init()
+	c.Cors.Init()
+	c.Auth.Init()
 
 	if c.MessageQueue.Type == "" {
 		c.MessageQueue.Type = mqimpl.Kafka

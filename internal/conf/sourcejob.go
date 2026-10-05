@@ -41,7 +41,7 @@ type ChunkingConfig struct {
 
 func LoadSourceJobConfig(path string) (*SourceJobConfig, error) {
 	cfg := &SourceJobConfig{}
-	if err := LoadTOML(path, cfg); err != nil {
+	if err := shared.LoadTOML(path, cfg); err != nil {
 		return nil, err
 	}
 

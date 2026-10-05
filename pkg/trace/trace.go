@@ -60,7 +60,9 @@ func Init(ctx context.Context, c Config) error {
 
 		otel.SetTracerProvider(traceProvider)
 		otel.SetErrorHandler(otel.ErrorHandlerFunc(func(cause error) {
-			slog.Error(fmt.Sprintf("[otel] error: %v", err))
+			// 必须用回调参数 cause：外层 Init 的 err 到这里已经是 nil，
+			// 用它只会打印 "[otel] error: <nil>"，真正的导出错误会被吞掉
+			slog.ErrorContext(ctx, "[otel] error", slog.Any("err", cause))
 		}))
 
 		slog.InfoContext(ctx, "[otel] init success")

@@ -98,9 +98,12 @@ func (s *imageStep) generate(
 
 	ext := mimeType.Extension()
 	contentType := mimeType.String()
-	storeKey := formatArtifactStoreKey(payload.NotebookId, artifactId, ext)
+	storeKey, err := s.deps.KeyFactory.New(artifactImagePath(payload.NotebookId, artifactId, ext), false)
+	if err != nil {
+		return nil, errors.WithMessage(err, "create infographic image store key failed")
+	}
 
-	if err := types.UploadReader(ctx, s.deps.ObjectStorage, storeKey, contentType, stream); err != nil {
+	if err := s.deps.ObjectStorage.UploadReader(ctx, storeKey, contentType, stream); err != nil {
 		return nil, errors.WithMessagef(err, "upload infographic image failed")
 	}
 
@@ -116,7 +119,7 @@ func (s *imageStep) generate(
 	}, nil
 }
 
-func formatArtifactStoreKey(notebookId, artifactId valobj.Id, ext string) string {
+func artifactImagePath(notebookId, artifactId valobj.Id, ext string) string {
 	if !strings.HasPrefix(ext, ".") {
 		ext = "." + ext
 	}

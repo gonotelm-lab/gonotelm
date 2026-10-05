@@ -85,6 +85,13 @@ type WorkerCheckpointStore interface {
 	DeleteByArtifactId(ctx context.Context, artifactId Id) error
 }
 
+type UserStore interface {
+	Create(ctx context.Context, user *schema.User) error
+	Upsert(ctx context.Context, user *schema.User) error
+	GetById(ctx context.Context, id valobj.Uid) (*schema.User, error)
+	GetByProviderAndSub(ctx context.Context, provider, sub string) (*schema.User, error)
+}
+
 type Dao struct {
 	Closer misc.Closer
 
@@ -94,6 +101,7 @@ type Dao struct {
 	ChatMessageStore      ChatMessageStore
 	ArtifactStore         ArtifactStore
 	WorkerCheckpointStore WorkerCheckpointStore
+	UserStore             UserStore
 }
 
 func NewDao(
@@ -104,6 +112,7 @@ func NewDao(
 	chatMessageStore ChatMessageStore,
 	artifactStore ArtifactStore,
 	workerCheckpointStore WorkerCheckpointStore,
+	userStore UserStore,
 ) *Dao {
 	return &Dao{
 		Closer:                closer,
@@ -113,6 +122,7 @@ func NewDao(
 		ChatMessageStore:      chatMessageStore,
 		ArtifactStore:         artifactStore,
 		WorkerCheckpointStore: workerCheckpointStore,
+		UserStore:             userStore,
 	}
 }
 

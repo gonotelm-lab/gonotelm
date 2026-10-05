@@ -17,11 +17,11 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	workerentity "github.com/gonotelm-lab/gonotelm/internal/domain/worker/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	pkgaudio "github.com/gonotelm-lab/gonotelm/pkg/audio/wav"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -31,7 +31,7 @@ import (
 )
 
 type AudioStorageResult struct {
-	StoreKey    string                  `json:"store_key"`
+	StoreKey    valobj.StoreKey         `json:"store_key"`
 	ContentType string                  `json:"content_type"`
 	Audio       *AudioStorageResultMeta `json:"audio,omitempty"`
 }
@@ -52,7 +52,7 @@ type synthesizedTurn struct {
 }
 
 // audioCheckpointVersion 音频产物缓存版本；朗读规则变化时递增，使旧音频失效并重新合成。
-const audioCheckpointVersion = 2
+const audioCheckpointVersion = 3
 
 // audioCheckpointMeta 持久化到 checkpoint.Field3，记录已成功合成并上传的逐段音频元信息，
 // 用于跨进程断点重试。
@@ -65,14 +65,15 @@ type audioCheckpointMeta struct {
 }
 
 type audioTurnPart struct {
-	Index    int    `json:"index"`
-	StoreKey string `json:"store_key"`
+	Index    int             `json:"index"`
+	StoreKey valobj.StoreKey `json:"store_key"`
 }
 
 // audioStep 负责播客音频合成：逐轮 TTS、上传 OSS、拼接成完整 WAV、断点续跑与陈旧音频清理。
 type audioStep struct {
 	text2audio     *text2audio.Text2AudioGateway
-	storage        storage.Storage
+	objectStore    adapter.ObjectStore
+	keyFactory     adapter.StoreKeyFactory
 	checkpoints    *types.CheckpointStore
 	downloadClient *http.Client
 
@@ -89,7 +90,8 @@ func newAudioStep(deps *types.WorkerDeps, checkpoints *types.CheckpointStore) *a
 	}
 	return &audioStep{
 		text2audio:     deps.Text2Audio,
-		storage:        deps.ObjectStorage,
+		objectStore:    deps.ObjectStorage,
+		keyFactory:     deps.KeyFactory,
 		checkpoints:    checkpoints,
 		downloadClient: httpclient.NewBuilder(nil).WithTimeout(5 * time.Minute).Build(),
 		provider:       cfg.AudioModelProvider,
@@ -294,18 +296,17 @@ func (s *audioStep) generate(
 		slog.Int("channels", int(merged.NumChannels)),
 	)
 
-	storeKey := formatAudioStoreKey(payload.NotebookId, req.ArtifactId)
-	if err = s.storage.UploadObject(ctx, &storage.UploadObjectRequest{
-		Key:         storeKey,
-		Body:        wavBytes,
-		ContentType: "audio/wav",
-	}); err != nil {
+	storeKey, err := s.keyFactory.New(finalAudioObjectPath(payload.NotebookId, req.ArtifactId), false)
+	if err != nil {
+		return nil, errors.WithMessage(err, "create podcast audio store key failed")
+	}
+	if err = s.objectStore.Upload(ctx, storeKey, wavBytes, "audio/wav"); err != nil {
 		return nil, errors.WithMessagef(err, "upload podcast audio failed")
 	}
 
 	slog.InfoContext(ctx, "podcast audio synthesized and uploaded",
 		slog.String("artifact_id", req.ArtifactId.String()),
-		slog.String("store_key", storeKey),
+		slog.String("store_key", storeKey.String()),
 		slog.Int("turns", len(turns)),
 		slog.Int("size", len(wavBytes)),
 	)
@@ -330,7 +331,7 @@ func (s *audioStep) generate(
 // turnSynthResult 并发生成侧产出的单段结果，经 channel 交给顺序落库侧。
 type turnSynthResult struct {
 	index   int
-	partKey string
+	partKey valobj.StoreKey
 	pcm     *pkgaudio.PCM
 }
 
@@ -500,15 +501,14 @@ func (s *audioStep) synthesizeOneTurn(
 		return errors.Wrapf(errors.ErrInner, "parse wav for turn %d failed, err=%v", index, err)
 	}
 
-	partKey := formatIntermediateAudioStoreKey(job.payload.NotebookId, job.artifactId, index)
-	if err = s.storage.UploadObject(ctx, &storage.UploadObjectRequest{
-		Key:         partKey,
-		Body:        raw,
-		ContentType: "audio/wav",
-	}); err != nil {
+	partKey, err := s.keyFactory.New(intermediateAudioObjectPath(job.payload.NotebookId, job.artifactId, index), false)
+	if err != nil {
+		return errors.Wrapf(errors.ErrInner, "create intermediate audio store key for turn %d failed, err=%v", index, err)
+	}
+	if err = s.objectStore.Upload(ctx, partKey, raw, "audio/wav"); err != nil {
 		slog.ErrorContext(ctx, "[audio] turn upload intermediate audio failed",
 			slog.Int("turn_index", index),
-			slog.String("part_key", partKey),
+			slog.String("part_key", partKey.String()),
 			slog.Any("err", err),
 		)
 		return errors.Wrapf(errors.ErrInner, "upload intermediate audio for turn %d failed, err=%v", index, err)
@@ -584,7 +584,7 @@ func (s *audioStep) assembleOrderedPCMs(
 		)
 	}
 
-	partsByIndex := make(map[int]string, len(meta.Parts))
+	partsByIndex := make(map[int]valobj.StoreKey, len(meta.Parts))
 	for _, p := range meta.Parts {
 		partsByIndex[p.Index] = p.StoreKey
 	}
@@ -605,13 +605,13 @@ func (s *audioStep) assembleOrderedPCMs(
 }
 
 // downloadTurnPCM 从 OSS 下载逐段 WAV 并解析为 PCM。
-func (s *audioStep) downloadTurnPCM(ctx context.Context, key string) (*pkgaudio.PCM, error) {
-	resp, err := s.storage.GetObject(ctx, &storage.GetObjectRequest{Key: key})
+func (s *audioStep) downloadTurnPCM(ctx context.Context, key valobj.StoreKey) (*pkgaudio.PCM, error) {
+	body, _, err := s.objectStore.GetObject(ctx, key)
 	if err != nil {
 		return nil, err
 	}
 
-	return pkgaudio.Parse(resp.Body)
+	return pkgaudio.Parse(body)
 }
 
 // cleanupIntermediateAudio 在最终 WAV 合并上传成功后批量删除中间音频，失败仅记日志。
@@ -619,13 +619,11 @@ func (s *audioStep) cleanupIntermediateAudio(ctx context.Context, meta *audioChe
 	if meta == nil || len(meta.Parts) == 0 {
 		return
 	}
-	keys := make([]string, 0, len(meta.Parts))
+	keys := make([]valobj.StoreKey, 0, len(meta.Parts))
 	for _, p := range meta.Parts {
 		keys = append(keys, p.StoreKey)
 	}
-	if err := s.storage.BatchDeleteObject(ctx, &storage.BatchDeleteObjectRequest{
-		Keys: keys,
-	}); err != nil {
+	if err := s.objectStore.BatchDeleteObject(ctx, keys); err != nil {
 		slog.ErrorContext(ctx, "cleanup intermediate audio failed",
 			slog.Int("count", len(keys)),
 			slog.Any("err", err),
@@ -739,11 +737,11 @@ func assertOrInitFormat(meta *audioCheckpointMeta, pcm *pkgaudio.PCM) error {
 	return nil
 }
 
-func formatAudioStoreKey(notebookId, artifactId valobj.Id) string {
+func finalAudioObjectPath(notebookId, artifactId valobj.Id) string {
 	return fmt.Sprintf("artifact/%s/%s.wav", notebookId.String(), artifactId.String())
 }
 
-func formatIntermediateAudioStoreKey(notebookId, artifactId valobj.Id, index int) string {
+func intermediateAudioObjectPath(notebookId, artifactId valobj.Id, index int) string {
 	return fmt.Sprintf("tmp/artifact/%s/%s/audio/turn_%06d.wav",
 		notebookId.String(), artifactId.String(), index)
 }

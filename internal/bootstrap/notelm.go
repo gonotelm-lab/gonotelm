@@ -11,6 +11,7 @@ import (
 	chatsuggest "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/suggestion"
 	bootshared "github.com/gonotelm-lab/gonotelm/internal/bootstrap/shared"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
+	identityservice "github.com/gonotelm-lab/gonotelm/internal/domain/identity/service"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	flowcli "github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
@@ -72,7 +73,6 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 	// ── 2. Repositories ──
 	notebookRepo := repository.NewNotebookRepository(infra.Database.NotebookStore, infra.Database.SourceStore)
 	sourceRepo := repository.NewSourceRepository(infra.Database.SourceStore)
-	sourceStorageRepo := repository.NewSourceStorageRepository(infra.Storage)
 	sourceDocRepo := repository.NewSourceDocRepository(
 		infra.Embedder,
 		infra.VectorDatabase.SourceDocStore,
@@ -87,6 +87,18 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 	artifactRepo := repository.NewArtifactRepository(infra.Database.ArtifactStore)
 	streamTaskRepo := repository.NewStreamTaskRepository(infra.Cache.ChatMessageStreamCache)
 	suggestionRepo := repository.NewSuggestionRepository(infra.Cache.ChatSuggestionCache)
+	loginInfoRepo, err := repository.NewLoginInfoRepository(rootCtx, infra.Cache.LoginInfoCache, cfg.ToIDPConfig())
+	if err != nil {
+		return nil, err
+	}
+	userRepo := repository.NewUserRepository(infra.Database.UserStore)
+	userService := identityservice.NewUserService(
+		userRepo,
+		infra.DistLock,
+		infra.KeyFactory,
+		infra.ObjectStore,
+	)
+	userSessionRepo := repository.NewUserSessionRepository(infra.Cache.UserSessionCache)
 
 	// ── 3. Event Bus ──
 	inprocessBus := eventbus.NewInProcessEventBus()
@@ -129,9 +141,6 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 	}
 	addCloser(flowClient)
 
-	// ── 6. Storage gateway adapter ──
-	storageGateway := adapter.NewStorageAdapter(infra.Storage)
-
 	// ── 7. Syncer ──
 	syncerCfg := syncerpkg.Config{
 		PerTaskInterval: cfg.Syncer.PerTaskInterval,
@@ -148,9 +157,9 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 
 		NotebookRepo: notebookRepo,
 
-		SourceRepo:        sourceRepo,
-		SourceStorageRepo: sourceStorageRepo,
-		SourceDocRepo:     sourceDocRepo,
+		SourceRepo:    sourceRepo,
+		ObjectStore:   infra.ObjectStore,
+		SourceDocRepo: sourceDocRepo,
 
 		ChatRepo:               chatRepo,
 		ChatMessageRepo:        messageRepo,
@@ -171,7 +180,8 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 			RootCtx:                rootCtx,
 			NotebookRepo:           notebookRepo,
 			SourceRepo:             sourceRepo,
-			SourceStorageRepo:      sourceStorageRepo,
+			ObjectStore:            infra.ObjectStore,
+			KeyFactory:             infra.KeyFactory,
 			SourceDocRepo:          sourceDocRepo,
 			ChatRepo:               chatRepo,
 			ChatMessageRepo:        messageRepo,
@@ -180,6 +190,10 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 			ChatSuggestionRepo:     suggestionRepo,
 			ChatSuggestService:     suggestionService,
 			ArtifactRepo:           artifactRepo,
+			LoginInfoRepo:          loginInfoRepo,
+			UserRepo:               userRepo,
+			UserService:            userService,
+			UserSessionRepo:        userSessionRepo,
 
 			EventBus:   eventBus,
 			WaitGroup:  wg,
@@ -187,10 +201,9 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 			DistLock:   infra.DistLock,
 			Summarizer: summarizer,
 
-			FlowClient:     flowClient,
-			Poller:         syncerInst,
-			StorageGateway: storageGateway,
-			TitleMaker:     titleMaker,
+			FlowClient: flowClient,
+			Poller:     syncerInst,
+			TitleMaker: titleMaker,
 		},
 	)
 

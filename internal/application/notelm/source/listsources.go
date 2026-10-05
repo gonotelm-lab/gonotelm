@@ -3,6 +3,7 @@ package source
 import (
 	"context"
 
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
@@ -21,12 +22,12 @@ type ListSourcesHandler struct {
 func NewListSourcesHandler(
 	notebookRepo notebookrepo.Repository,
 	sourceRepo sourcerepo.Repository,
-	storageRepo sourcerepo.StorageRepository,
+	objectStore adapter.ObjectStore,
 ) *ListSourcesHandler {
 	return &ListSourcesHandler{
 		notebookRepo:  notebookRepo,
 		sourceRepo:    sourceRepo,
-		sourceService: sourceservice.New(storageRepo),
+		sourceService: sourceservice.New(objectStore),
 	}
 }
 

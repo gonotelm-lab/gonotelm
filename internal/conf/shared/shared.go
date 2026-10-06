@@ -8,12 +8,12 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache"
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
-	embedding "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/embedding"
-	text2audio "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio"
-	text2image "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image"
-	mqimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
-	sandboximpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/sandbox"
-	storageimpl "github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/embedding"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2audio"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/text2image"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/mq"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/sandbox"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/storage"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/vectordb"
 	"github.com/gonotelm-lab/gonotelm/pkg/sql"
 
@@ -112,24 +112,24 @@ func (c *ProviderBillingConfig) Init() {
 
 // InfraConfig 共用的基础设施配置。
 type InfraConfig struct {
-	Database        DatabaseConfig                `toml:"database"`
-	VectorDB        vectordb.Config               `toml:"vectorDb"`
-	Storage         storageimpl.StorageTypeConfig `toml:"storage"`
-	Provider        llmchat.ProviderConfig        `toml:"provider"`
-	ProviderBilling ProviderBillingConfig         `toml:"providerBilling"`
-	LLMRecord       llmchat.RecordConfig          `toml:"llmRecord"`
-	Embedding       embedding.EmbeddingConfig     `toml:"embedding"`
-	Text2Image      text2image.Text2ImageConfig   `toml:"text2image"`
-	Text2Audio      text2audio.Text2AudioConfig   `toml:"text2audio"`
-	Sandbox         sandboximpl.ProviderConfig    `toml:"sandbox"`
-	DatabaseOlap    DatabaseConfig                `toml:"databaseOlap"`
-	Redis           cache.RedisCacheConfig        `toml:"redis"`
-	MessageQueue    mqimpl.Config                 `toml:"messageQueue"`
+	Database        DatabaseConfig              `toml:"database"`
+	VectorDB        vectordb.Config             `toml:"vectorDb"`
+	Storage         storage.StorageTypeConfig   `toml:"storage"`
+	Provider        llmchat.ProviderConfig      `toml:"provider"`
+	ProviderBilling ProviderBillingConfig       `toml:"providerBilling"`
+	LLMRecord       llmchat.RecordConfig        `toml:"llmRecord"`
+	Embedding       embedding.EmbeddingConfig   `toml:"embedding"`
+	Text2Image      text2image.Text2ImageConfig `toml:"text2image"`
+	Text2Audio      text2audio.Text2AudioConfig `toml:"text2audio"`
+	Sandbox         sandbox.ProviderConfig      `toml:"sandbox"`
+	DatabaseOlap    DatabaseConfig              `toml:"databaseOlap"`
+	Redis           cache.RedisCacheConfig      `toml:"redis"`
+	MessageQueue    mq.Config                   `toml:"messageQueue"`
 }
 
 func (c *InfraConfig) InitInfra() {
 	if c.Storage.Type == "" {
-		c.Storage.Type = storageimpl.Minio
+		c.Storage.Type = storage.Minio
 	}
 	if c.Embedding.Type == "" {
 		c.Embedding.Type = embedding.EmbeddingQwen

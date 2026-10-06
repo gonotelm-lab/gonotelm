@@ -53,13 +53,16 @@ func TestMigrate_AppliesAndIsIdempotent(t *testing.T) {
 
 	require.NoError(t, Migrate(ctx, stdDB))
 
-	// 迁移应当真正建出 users 表（0002_init.sql），而不是只写入版本记录。
-	var tableName string
-	err = stdDB.QueryRowContext(ctx,
-		`SELECT table_name FROM information_schema.tables WHERE table_name = 'users'`,
-	).Scan(&tableName)
-	require.NoError(t, err)
-	assert.Equal(t, "users", tableName)
+	// 0002_init.sql and 0003_init.sql must really create their tables,
+	// not just record a version.
+	for _, name := range []string{"users", "initjob_runs", "initjob_tasks"} {
+		var tableName string
+		err = stdDB.QueryRowContext(ctx,
+			`SELECT table_name FROM information_schema.tables WHERE table_name = $1`, name,
+		).Scan(&tableName)
+		require.NoError(t, err, "table %s was not created", name)
+		assert.Equal(t, name, tableName)
+	}
 
 	// 二次调用不报错：goose 已应用的迁移会被跳过。
 	require.NoError(t, Migrate(ctx, stdDB))

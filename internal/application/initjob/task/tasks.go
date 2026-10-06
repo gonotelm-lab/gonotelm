@@ -5,6 +5,7 @@ package task
 import (
 	"github.com/gonotelm-lab/gonotelm/internal/application/initjob/dep"
 	"github.com/gonotelm-lab/gonotelm/internal/application/initjob/task/artifact/stylepreview"
+	"github.com/gonotelm-lab/gonotelm/internal/application/initjob/task/idregistry"
 	pkginitjob "github.com/gonotelm-lab/gonotelm/pkg/initjob"
 )
 
@@ -19,11 +20,15 @@ type Option struct {
 // so registration order never decides execution order.
 func New(opt *Option) []pkginitjob.Task {
 	return []pkginitjob.Task{
-		stylepreview.NewSlidesInitTask(
-			opt.Dependency.StylePreviewRepo,
-			opt.Infra.ObjectStore,
-			opt.Infra.KeyFactory,
-			opt.AssetsDir,
-		),
+		stylepreview.NewTask(stylepreview.Option{
+			ID:          idregistry.IdStylePreviewInit,
+			Description: "Initialize artifact slides style preview assets",
+			Provider:    stylepreview.SlidesProvider(),
+
+			Repo:        opt.Dependency.StylePreviewRepo,
+			ObjectStore: opt.Infra.ObjectStore,
+			KeyFactory:  opt.Infra.KeyFactory,
+			AssetsDir:   opt.AssetsDir,
+		}),
 	}
 }

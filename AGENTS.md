@@ -73,6 +73,16 @@ tests/deptest/            cross-dependency integration smoke tests
 assets/                   slides templates, opensandbox Dockerfile, node build scripts
 ```
 
+## HTTP API layer (`internal/interfaces/api/notelm`)
+
+- **Routing**: `server.go` is the only place that builds the server and its groups. `registerRoutes` mounts `/api/v1` (CSRF) → `v1AuthedGroup` (`authMiddleware`) → one `register<Domain>Routes(g *route.RouterGroup)` per file. Public routes are registered against `v1Group` instead (only `/api/v1/auth` today). Adding an endpoint = a handler method on `*Server` + one line in a `register*Routes`. A static sibling wins over a `:param` (`/artifacts/style-previews` vs `/artifacts/:id`), so both can coexist.
+- **Middleware**: global chain is `Tracing → Recovery → CORS → Logging`; CSRF is double-submit and exempts GET/HEAD/OPTIONS; auth reads the `gnlm_user_sid` cookie, puts the user in ctx (`pkgcontext.GetUserId`), and returns 401 `ErrNotLogin` when the session is missing.
+- **Envelope**: `http.OkResp(c, data)` → 200 `{"code":0,"msg":"ok","data":…}`; `http.ErrResp(c, err)` writes `{code,msg}` at `InnerError.Status`. **Business errors are HTTP 200** — `ErrParams`(1000), `ErrNoRecord`(1001) and every domain error derived from them; only the 2000–2003 builtins produce 401/403; a non-`InnerError` becomes 500 `code:-999`.
+- **Request binding**: `c.BindAndValidate(&req)` runs the custom binder in `pkg/http/binder.go` — `path:`/`query:`/`json:` tags, then `validator/v10` tags, then the DTO's own `Validate() error`. A plain validator failure surfaces as 200 `code:1000`.
+- **Object URLs are never persisted**: only the encoded `StoreKey` is stored (mapper); every URL is resolved per request. Public-read assets (avatars, style previews) use `adapter.ObjectPublicURLer.PublicURL`; private ones (source content, artifact results) use `PresignGet`. A resolve failure normally degrades to an empty URL plus a WARN, not an API error.
+- **Error codes**: 100xxx notebook, 101xxx chat, 102xxx artifact, 103xxx source, 104xxx worker, 105xxx sandbox, 106xxx identity. Each is declared as `errors.ErrXxx.ErrCode(n).Msg(…)`, so its HTTP status is inherited from the builtin it derives from.
+- **Wiring**: `ServerDeps` in `server.go` is the only injection surface — add the repo field there, build it in `bootstrap/notelm.go`, construct the application handler in the `NewServer` literal. There is no route manifest to update.
+
 ## Cross-process flows
 
 - **Artifact generation**: notelm's `GenerateArtifactHandler` builds `contract.WorkerInput` via `buildWorkerInput` and submits a long task with `flow.Submit` → worker's `entrypoint/worker` decodes it and dispatches on `kind` into `application/worker/artifact/<kind>`; results come back as `WorkerOutput`, and notelm's `artifact/syncer` polls flow task state and persists it.

@@ -13,6 +13,9 @@ import (
 )
 
 func (s *Server) registerStudioRoutes(g *route.RouterGroup) {
+	// GET /api/v1/artifacts/style-previews?kind=slides
+	g.GET("/artifacts/style-previews", s.ListStylePreviews)
+
 	artifactGroup := g.Group("/artifacts/:id")
 	{
 		// GET /api/v1/artifacts/:id
@@ -256,4 +259,35 @@ func (s *Server) toArtifactItems(ctx context.Context, artifacts []*artifactentit
 		results = append(results, s.toArtifactItem(ctx, a))
 	}
 	return results
+}
+
+func (s *Server) ListStylePreviews(ctx context.Context, c *app.RequestContext) {
+	var req schema.ListStylePreviewsRequest
+	if err := c.BindAndValidate(&req); err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	resp, err := s.listStylePreviewsHandler.Handle(ctx,
+		&artifactapp.ListStylePreviewsQuery{
+			Kind: artifactentity.Kind(req.Kind),
+		})
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	previews := make([]*schema.StylePreviewItem, 0, len(resp.Previews))
+	for _, item := range resp.Previews {
+		previews = append(previews, &schema.StylePreviewItem{
+			VisualStyle: item.VisualStyle,
+			PreviewUrl:  item.PreviewUrl,
+		})
+	}
+
+	http.OkResp(c, schema.ListStylePreviewsResponse{
+		Kind:               resp.Kind.String(),
+		DefaultVisualStyle: resp.DefaultVisualStyle,
+		Previews:           previews,
+	})
 }

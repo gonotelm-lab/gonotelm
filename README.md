@@ -89,16 +89,23 @@ make dev-up            # make dev-up-notrace to skip jaeger; make dev-down to st
 # 3. initialize the database schema (first run only)
 make dev-migrate
 
-# 4. run the services, each in its own terminal
+# 4. seed business data — style preview assets (one-shot, run from the repo root)
+make run-initjob
+
+# 5. run the services, each in its own terminal
 make run-notelm        # HTTP API, listens on :7099 by default
 make run-worker        # async artifact jobs (studio generation)
 make run-sourcejob     # source ingestion jobs
 ```
 
+`make run-initjob` is one-shot: it exits when done, a non-zero exit code means a task failed or the
+run was interrupted, and re-running it executes only the tasks that have not succeeded yet. It uploads
+the assets shipped under `./assets` (override with `-assets-dir`), so run it from the repository root.
+
 The web UI lives in its own repository, [gonotelm-lab/gonotelm-web](https://github.com/gonotelm-lab/gonotelm-web):
 
 ```bash
-# 5. run the web UI (requires Node.js 20.19+ or 22.12+ and pnpm)
+# 6. run the web UI (requires Node.js 20.19+ or 22.12+ and pnpm)
 git clone https://github.com/gonotelm-lab/gonotelm-web.git
 cd gonotelm-web
 pnpm install

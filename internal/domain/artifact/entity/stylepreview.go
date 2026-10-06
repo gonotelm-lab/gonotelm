@@ -1,6 +1,10 @@
 package entity
 
-import "github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+import (
+	"slices"
+
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+)
 
 type StylePreviewIdentifier string
 
@@ -9,10 +13,42 @@ func (i StylePreviewIdentifier) String() string {
 }
 
 const (
-	StylePreviewSlidesDefault     StylePreviewIdentifier = "slidesstyle.default"
-	StylePreviewSlidesCute        StylePreviewIdentifier = "slidesstyle.cute"
-	StylePreviewSlidesEducational StylePreviewIdentifier = "slidesstyle.educational"
+	StylePreviewSlidesDefault     StylePreviewIdentifier = "slides.style.default"
+	StylePreviewSlidesCute        StylePreviewIdentifier = "slides.style.cute"
+	StylePreviewSlidesEducational StylePreviewIdentifier = "slides.style.educational"
 )
+
+type StylePreviewRef struct {
+	// VisualStyle 为 visual_style 接受的值
+	VisualStyle string
+	Identifier  StylePreviewIdentifier
+}
+
+var slidesStylePreviews = []StylePreviewRef{
+	{VisualStyle: SlidesVisualStyleDefault.String(), Identifier: StylePreviewSlidesDefault},
+	{VisualStyle: SlidesVisualStyleCute.String(), Identifier: StylePreviewSlidesCute},
+	{VisualStyle: SlidesVisualStyleEducational.String(), Identifier: StylePreviewSlidesEducational},
+}
+
+// StylePreviewsForKind 返回该 kind 的风格列表
+func StylePreviewsForKind(kind Kind) []StylePreviewRef {
+	switch kind {
+	case KindSlides:
+		return slices.Clone(slidesStylePreviews)
+	default:
+		return nil
+	}
+}
+
+// DefaultVisualStyleForKind 返回该 kind 的默认风格
+func DefaultVisualStyleForKind(kind Kind) string {
+	switch kind {
+	case KindSlides:
+		return SlidesVisualStyleDefaultValue().String()
+	default:
+		return ""
+	}
+}
 
 type StylePreview struct {
 	StoreKey         valobj.StoreKey

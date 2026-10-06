@@ -84,6 +84,9 @@ func (s *pptxStep) generate(
 	if err := ensureSlidesWorkspace(ctx, sandbox, workspaceDir); err != nil {
 		return nil, err
 	}
+	if err := syncSkillsToSandbox(ctx, sandbox, workspaceDir); err != nil {
+		return nil, errors.WithMessage(err, "sync skills to sandbox failed")
+	}
 	outputLocation := path.Join(workspaceDir, "slides", "output", "presentation.pptx")
 	payload := artifactentity.PayloadAs[*artifactentity.SlidesPayload](req.Payload)
 	msgs, err := RenderSlides(ctx,
@@ -99,7 +102,7 @@ func (s *pptxStep) generate(
 		return nil, errors.Wrap(err, "gen pptx render prompts failed")
 	}
 
-	_, err = agent.React(ctx, msgs)
+	_, err = agent.ReactStream(ctx, msgs)
 	if err != nil {
 		return nil, errors.Wrap(err, "generate pptx output failed")
 	}

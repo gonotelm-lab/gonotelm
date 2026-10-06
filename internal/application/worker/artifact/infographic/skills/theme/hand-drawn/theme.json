@@ -1,0 +1,23 @@
+{
+  "id": "hand-drawn",
+  "name": "Watercolor Sketch",
+  "nameZh": "手绘水彩",
+  "description": "Soft watercolor washes on grainy sketchbook paper, irregular pigment edges and visible brush strokes. Warm, translucent and handmade.",
+  "descriptionZh": "水彩晕染、速写本纸张颗粒、手作感，温暖通透。",
+  "mood": ["light", "watercolor", "organic", "soft", "warm", "sketchbook"],
+  "bestFor": ["人文 / 生活方式内容", "儿童与通识科普", "情绪 / 故事类主题", "需要手作温度的内容"],
+  "palette": {
+    "primary": "3f5b6b",
+    "secondary": "7d8f7b",
+    "accent": "e08d5a",
+    "light": "a8c6c0",
+    "bg": "fdfaf3"
+  },
+  "guidance": {
+    "style": "手绘水彩插画风：柔和的水彩笔触，色彩自然晕染、边缘不规则并带轻微水痕，像在速写本上随性画成；纸张略带颗粒纹理（#fdfaf3），主色水彩蓝（#3f5b6b）与鼠尾草绿（#7d8f7b），点缀暖赭橙（#e08d5a），整体色调温暖通透，保留手作感。",
+    "palette": "底色 #fdfaf3；分区用低饱和水彩 wash（#a8c6c0 / #f2d7b6）淡染；主色 #3f5b6b；次色 #7d8f7b；点缀 #e08d5a；所有色都允许同色系深浅不匀。",
+    "composition": "手绘感分区，边界允许轻微溢出与不规则；留白充足；区块边界用淡 wash 或手绘细线，不用硬边矩形与直线栅格。",
+    "expression": "水彩斑点、晕染、笔触痕、手绘箭头与圈注、纸胶带；元素保留手作误差感；一张图只允许一个 accent 电压。",
+    "avoid": "不要矢量硬边、3D 渲染、写实照片、荧光高饱和色、干净的数码渐变、机械式对称栅格。"
+  }
+}

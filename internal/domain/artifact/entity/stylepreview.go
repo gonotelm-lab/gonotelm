@@ -16,6 +16,13 @@ const (
 	StylePreviewSlidesDefault     StylePreviewIdentifier = "slides.style.default"
 	StylePreviewSlidesCute        StylePreviewIdentifier = "slides.style.cute"
 	StylePreviewSlidesEducational StylePreviewIdentifier = "slides.style.educational"
+
+	StylePreviewInfoGraphicDefault     StylePreviewIdentifier = "info_graphic.style.default"
+	StylePreviewInfoGraphicHandDrawn   StylePreviewIdentifier = "info_graphic.style.hand-drawn"
+	StylePreviewInfoGraphicAnime       StylePreviewIdentifier = "info_graphic.style.anime"
+	StylePreviewInfoGraphicCute        StylePreviewIdentifier = "info_graphic.style.cute"
+	StylePreviewInfoGraphicEducational StylePreviewIdentifier = "info_graphic.style.educational"
+	StylePreviewInfoGraphicMinimal25D  StylePreviewIdentifier = "info_graphic.style.minimal-2.5d"
 )
 
 type StylePreviewRef struct {
@@ -30,11 +37,22 @@ var slidesStylePreviews = []StylePreviewRef{
 	{VisualStyle: SlidesVisualStyleEducational.String(), Identifier: StylePreviewSlidesEducational},
 }
 
+var infoGraphicStylePreviews = []StylePreviewRef{
+	{VisualStyle: InfoGraphicVisualStyleDefault.String(), Identifier: StylePreviewInfoGraphicDefault},
+	{VisualStyle: InfoGraphicVisualStyleHandDrawn.String(), Identifier: StylePreviewInfoGraphicHandDrawn},
+	{VisualStyle: InfoGraphicVisualStyleAnime.String(), Identifier: StylePreviewInfoGraphicAnime},
+	{VisualStyle: InfoGraphicVisualStyleCute.String(), Identifier: StylePreviewInfoGraphicCute},
+	{VisualStyle: InfoGraphicVisualStyleEducational.String(), Identifier: StylePreviewInfoGraphicEducational},
+	{VisualStyle: InfoGraphicVisualStyleMinimal25D.String(), Identifier: StylePreviewInfoGraphicMinimal25D},
+}
+
 // StylePreviewsForKind 返回该 kind 的风格列表
 func StylePreviewsForKind(kind Kind) []StylePreviewRef {
 	switch kind {
 	case KindSlides:
 		return slices.Clone(slidesStylePreviews)
+	case KindInfoGraphic:
+		return slices.Clone(infoGraphicStylePreviews)
 	default:
 		return nil
 	}
@@ -45,6 +63,8 @@ func DefaultVisualStyleForKind(kind Kind) string {
 	switch kind {
 	case KindSlides:
 		return SlidesVisualStyleDefaultValue().String()
+	case KindInfoGraphic:
+		return InfoGraphicVisualStyleDefault.String()
 	default:
 		return ""
 	}

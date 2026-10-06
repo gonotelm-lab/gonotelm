@@ -21,10 +21,18 @@ type Option struct {
 func New(opt *Option) []pkginitjob.Task {
 	return []pkginitjob.Task{
 		stylepreview.NewTask(stylepreview.Option{
-			ID:          idregistry.IdStylePreviewInit,
+			ID:          idregistry.IdSlidesStylePreviewInit,
 			Description: "Initialize artifact slides style preview assets",
 			Provider:    stylepreview.SlidesProvider(),
-
+			Repo:        opt.Dependency.StylePreviewRepo,
+			ObjectStore: opt.Infra.ObjectStore,
+			KeyFactory:  opt.Infra.KeyFactory,
+			AssetsDir:   opt.AssetsDir,
+		}),
+		stylepreview.NewTask(stylepreview.Option{
+			ID:          idregistry.IdInfoGraphicStylePreviewInit,
+			Description: "Initialize artifact infographic style preview assets",
+			Provider:    stylepreview.InfoGraphicProvider(),
 			Repo:        opt.Dependency.StylePreviewRepo,
 			ObjectStore: opt.Infra.ObjectStore,
 			KeyFactory:  opt.Infra.KeyFactory,

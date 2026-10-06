@@ -1,0 +1,23 @@
+{
+  "id": "anime",
+  "name": "Anime Illustration",
+  "nameZh": "动漫插画",
+  "description": "Clean cel-shaded anime illustration: crisp outlines, bright saturated fills, clear light and shadow, dynamic and youthful storytelling.",
+  "descriptionZh": "动漫插画：干净描边、明快饱满色彩、清晰光影、轻快叙事感。",
+  "mood": ["bright", "clean", "dynamic", "illustrative", "youthful", "saturated"],
+  "bestFor": ["面向大众的科普", "故事 / 情节类主题", "年轻向内容", "需要情绪与代入感的内容"],
+  "palette": {
+    "primary": "2b2d5c",
+    "secondary": "5b8def",
+    "accent": "ff6b8a",
+    "light": "ffd166",
+    "bg": "fdfcff"
+  },
+  "guidance": {
+    "style": "动漫插画风：干净利落的线条勾边（#2b2d5c），色彩明快饱满（亮蓝 #5b8def、暖黄 #ffd166、玫红 #ff6b8a），光影对比清晰、有明确的明暗分层，带轻快叙事感与略数码化的光滑质感；背景干净（#fdfcff）或用浅蓝天光渐变（#eaf1ff）。",
+    "palette": "底色 #fdfcff 或天光 #eaf1ff；主体色 #5b8def；描边 / 文字 #2b2d5c；高光与能量色 #ffd166；点缀 #ff6b8a 只做小面积强调。",
+    "composition": "斜向 / 对角线动势构图，用速度线、集中线、气泡与光效引导视线；分区靠动势而不是横平竖直的栅格；主体突出，留白与动态平衡。",
+    "expression": "拟人化角色或吉祥物、夸张表情符号、星星与闪光、漫画气泡与效果线；图标带描边与高光；一张图只允许一个 accent 电压。",
+    "avoid": "不要写实照片、3D 渲染、暗黑恐怖元素、真实人物肖像、品牌标识、脏灰低饱和配色。"
+  }
+}

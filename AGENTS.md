@@ -70,7 +70,7 @@ etc/                      per-binary config templates (.toml.tpl); values come f
 deploy/dev/               local middleware docker-compose and Makefile
 docs/superpowers/         design docs: specs/ for designs, plans/ for implementation plans
 tests/deptest/            cross-dependency integration smoke tests
-assets/                   slides templates, opensandbox Dockerfile, node build scripts
+assets/                   slides templates, artifact preview images, opensandbox Dockerfile, node build scripts
 ```
 
 ## HTTP API layer (`internal/interfaces/api/notelm`)

@@ -1,0 +1,23 @@
+{
+  "id": "default",
+  "name": "Warm Hand-drawn",
+  "nameZh": "温暖手绘",
+  "description": "Warm cream paper with a flat hand-drawn feel, slightly rough dark outlines, a single terracotta accent and generous whitespace. Warm and educational.",
+  "descriptionZh": "扁平手绘感、米色 / 奶油纸张底、温暖教育向。",
+  "mood": ["light", "warm", "paper", "hand-drawn", "editorial", "balanced"],
+  "bestFor": ["通用知识讲解", "产品 / 概念介绍", "人文 / 生活方式内容", "需要温暖质感的内容"],
+  "palette": {
+    "primary": "3d405b",
+    "secondary": "6d6a5f",
+    "accent": "e07a5f",
+    "light": "f2cc8f",
+    "bg": "faf6ec"
+  },
+  "guidance": {
+    "style": "扁平手绘插画风：手绘感深色描边（#3d405b）略带粗糙与不均匀，色块平涂无渐变，米色 / 奶油色纸张底（#faf6ec），暖色调，点缀色只用赤陶橙（#e07a5f），整体温暖、朴素、教育向。",
+    "palette": "底色 #faf6ec；卡片用更浅的米白（#fdf8ef）或浅砂色 #f2cc8f 淡染；文字与主色 #3d405b；次色 #6d6a5f；点缀 #e07a5f 只做小面积（关键数字、箭头、图标、短色条）。",
+    "composition": "均衡留白，横向单栏或 2–3 栏并列；卡片浅底 + 手绘描边；对齐靠留白而不是通栏线；标题区固定在图顶部。",
+    "expression": "手绘图标、箭头、虚线与纸张 / 胶带小装饰；一张图只允许一个 accent 电压；不要通栏色条、侧边条、标题下划线。",
+    "avoid": "不要写实照片、3D 渲染、霓虹 / 赛博配色、大面积高饱和色块、浓重投影的拟物效果。"
+  }
+}

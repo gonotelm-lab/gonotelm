@@ -34,3 +34,24 @@ func (slidesProvider) Assets() []Asset {
 		{FileName: "educational-v1.webp", Identifier: entity.StylePreviewSlidesEducational},
 	}
 }
+
+type infoGraphicProvider struct{}
+
+func InfoGraphicProvider() Provider { return infoGraphicProvider{} }
+
+func (infoGraphicProvider) Kind() entity.Kind { return entity.KindInfoGraphic }
+
+func (infoGraphicProvider) LocalDir() string { return "artifact-preview/infographic" }
+
+func (infoGraphicProvider) KeyPrefix() string { return "artifact-preview/infographic/v1" }
+
+func (infoGraphicProvider) Assets() []Asset {
+	return []Asset{
+		{FileName: "anime-v1.webp", Identifier: entity.StylePreviewInfoGraphicAnime},
+		{FileName: "cute-v1.webp", Identifier: entity.StylePreviewInfoGraphicCute},
+		{FileName: "default-v1.webp", Identifier: entity.StylePreviewInfoGraphicDefault},
+		{FileName: "educational-v1.webp", Identifier: entity.StylePreviewInfoGraphicEducational},
+		{FileName: "hand-drawn-v1.webp", Identifier: entity.StylePreviewInfoGraphicHandDrawn},
+		{FileName: "minimal-2.5d-v1.webp", Identifier: entity.StylePreviewInfoGraphicMinimal25D},
+	}
+}

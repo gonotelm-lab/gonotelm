@@ -1,0 +1,23 @@
+{
+  "id": "educational",
+  "name": "Sharp & Educational",
+  "nameZh": "锐利科普",
+  "description": "Textbook science illustration on a clean stage: high contrast, geometric partitioning, simple expressive icons and dense but readable layout. Cool and precise.",
+  "descriptionZh": "教科书科普：高对比、几何分区清晰、冷静易读、信息偏密。",
+  "mood": ["light", "sharp", "geometric", "data-first", "calm", "precise"],
+  "bestFor": ["知识科普 / 概念讲解", "教程 / 操作步骤", "数据 / 指标解读", "开发者向技术分享"],
+  "palette": {
+    "primary": "1e293b",
+    "secondary": "475569",
+    "accent": "0d9488",
+    "light": "e2e8f0",
+    "bg": "f8fafc"
+  },
+  "guidance": {
+    "style": "教学科普风格：干净利落的教科书插画，清晰几何分区与明确的信息层级；高对比配色（深板岩 #1e293b、石板灰 #475569、青绿点缀 #0d9488、浅灰底 #f8fafc），图标简洁表意，类似高质量科普百科的信息图美学。",
+    "palette": "底色 #f8fafc；卡片极浅底 #e2e8f0 + 细边框；标题 #1e293b、正文 #475569；accent #0d9488 只给 eyebrow、关键数字、图表与页码。",
+    "composition": "几何栅格分区、直角或极小圆角；信息可偏密但必须有清晰栅格；分隔用独立短矩形或细线，不要通栏色条与侧边条。",
+    "expression": "细边框卡片、简洁线性图标、图表与坐标轴、步骤圆点用透明度阶梯（1.0 → 0.85 → 0.7）；一张图只允许一个 accent 电压。",
+    "avoid": "不要手绘涂鸦、水彩晕染、卡通角色、写实照片、3D 渲染、装饰性花纹与浓重投影。"
+  }
+}

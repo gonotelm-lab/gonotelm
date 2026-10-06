@@ -19,7 +19,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 
-type Option struct {
+type option struct {
 	ID          string
 	Description string
 	Provider    Provider
@@ -33,10 +33,10 @@ type Option struct {
 type stylePreviewTask struct {
 	pkginitjob.Base
 
-	opt Option
+	opt option
 }
 
-func NewTask(opt Option) pkginitjob.Task {
+func newTask(opt option) pkginitjob.Task {
 	return &stylePreviewTask{opt: opt}
 }
 

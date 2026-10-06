@@ -23,6 +23,10 @@ const (
 	StylePreviewInfoGraphicCute        StylePreviewIdentifier = "info_graphic.style.cute"
 	StylePreviewInfoGraphicEducational StylePreviewIdentifier = "info_graphic.style.educational"
 	StylePreviewInfoGraphicMinimal25D  StylePreviewIdentifier = "info_graphic.style.minimal-2.5d"
+
+	StylePreviewVideoOverviewDefault     StylePreviewIdentifier = "video_overview.style.default"
+	StylePreviewVideoOverviewCute        StylePreviewIdentifier = "video_overview.style.cute"
+	StylePreviewVideoOverviewEducational StylePreviewIdentifier = "video_overview.style.educational"
 )
 
 type StylePreviewRef struct {
@@ -46,6 +50,12 @@ var infoGraphicStylePreviews = []StylePreviewRef{
 	{VisualStyle: InfoGraphicVisualStyleMinimal25D.String(), Identifier: StylePreviewInfoGraphicMinimal25D},
 }
 
+var videoOverviewStylePreviews = []StylePreviewRef{
+	{VisualStyle: VideoOverviewStyleDefault.String(), Identifier: StylePreviewVideoOverviewDefault},
+	{VisualStyle: VideoOverviewStyleCute.String(), Identifier: StylePreviewVideoOverviewCute},
+	{VisualStyle: VideoOverviewStyleEducational.String(), Identifier: StylePreviewVideoOverviewEducational},
+}
+
 // StylePreviewsForKind 返回该 kind 的风格列表
 func StylePreviewsForKind(kind Kind) []StylePreviewRef {
 	switch kind {
@@ -53,6 +63,8 @@ func StylePreviewsForKind(kind Kind) []StylePreviewRef {
 		return slices.Clone(slidesStylePreviews)
 	case KindInfoGraphic:
 		return slices.Clone(infoGraphicStylePreviews)
+	case KindVideoOverview:
+		return slices.Clone(videoOverviewStylePreviews)
 	default:
 		return nil
 	}
@@ -65,6 +77,8 @@ func DefaultVisualStyleForKind(kind Kind) string {
 		return SlidesVisualStyleDefaultValue().String()
 	case KindInfoGraphic:
 		return InfoGraphicVisualStyleDefault.String()
+	case KindVideoOverview:
+		return VideoOverviewStyleDefaultValue().String()
 	default:
 		return ""
 	}

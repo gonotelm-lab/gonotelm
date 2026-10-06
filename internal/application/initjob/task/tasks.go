@@ -5,7 +5,6 @@ package task
 import (
 	"github.com/gonotelm-lab/gonotelm/internal/application/initjob/dep"
 	"github.com/gonotelm-lab/gonotelm/internal/application/initjob/task/artifact/stylepreview"
-	"github.com/gonotelm-lab/gonotelm/internal/application/initjob/task/idregistry"
 	pkginitjob "github.com/gonotelm-lab/gonotelm/pkg/initjob"
 )
 
@@ -20,23 +19,23 @@ type Option struct {
 // so registration order never decides execution order.
 func New(opt *Option) []pkginitjob.Task {
 	return []pkginitjob.Task{
-		stylepreview.NewTask(stylepreview.Option{
-			ID:          idregistry.IdSlidesStylePreviewInit,
-			Description: "Initialize artifact slides style preview assets",
-			Provider:    stylepreview.SlidesProvider(),
-			Repo:        opt.Dependency.StylePreviewRepo,
-			ObjectStore: opt.Infra.ObjectStore,
-			KeyFactory:  opt.Infra.KeyFactory,
-			AssetsDir:   opt.AssetsDir,
-		}),
-		stylepreview.NewTask(stylepreview.Option{
-			ID:          idregistry.IdInfoGraphicStylePreviewInit,
-			Description: "Initialize artifact infographic style preview assets",
-			Provider:    stylepreview.InfoGraphicProvider(),
-			Repo:        opt.Dependency.StylePreviewRepo,
-			ObjectStore: opt.Infra.ObjectStore,
-			KeyFactory:  opt.Infra.KeyFactory,
-			AssetsDir:   opt.AssetsDir,
-		}),
+		stylepreview.NewSlidesStylePreviewInitTask(
+			opt.Dependency.StylePreviewRepo,
+			opt.Infra.ObjectStore,
+			opt.Infra.KeyFactory,
+			opt.AssetsDir,
+		),
+		stylepreview.NewInfoGraphicStylePreviewInitTask(
+			opt.Dependency.StylePreviewRepo,
+			opt.Infra.ObjectStore,
+			opt.Infra.KeyFactory,
+			opt.AssetsDir,
+		),
+		stylepreview.NewVideoOverviewStylePreviewInitTask(
+			opt.Dependency.StylePreviewRepo,
+			opt.Infra.ObjectStore,
+			opt.Infra.KeyFactory,
+			opt.AssetsDir,
+		),
 	}
 }

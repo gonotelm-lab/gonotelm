@@ -55,3 +55,21 @@ func (infoGraphicProvider) Assets() []Asset {
 		{FileName: "minimal-2.5d-v1.webp", Identifier: entity.StylePreviewInfoGraphicMinimal25D},
 	}
 }
+
+type videoOverviewProvider struct{}
+
+func VideoOverviewProvider() Provider { return videoOverviewProvider{} }
+
+func (videoOverviewProvider) Kind() entity.Kind { return entity.KindVideoOverview }
+
+func (videoOverviewProvider) LocalDir() string { return "artifact-preview/video-overview" }
+
+func (videoOverviewProvider) KeyPrefix() string { return "artifact-preview/video-overview/v1" }
+
+func (videoOverviewProvider) Assets() []Asset {
+	return []Asset{
+		{FileName: "cute-v1.webp", Identifier: entity.StylePreviewVideoOverviewCute},
+		{FileName: "default-v1.webp", Identifier: entity.StylePreviewVideoOverviewDefault},
+		{FileName: "educational-v1.webp", Identifier: entity.StylePreviewVideoOverviewEducational},
+	}
+}

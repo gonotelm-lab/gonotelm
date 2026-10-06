@@ -13,14 +13,15 @@ import (
 )
 
 var (
-	testDB                    *gorm.DB
-	testNotebookStore         *NotebookStoreImpl
-	testSourceStore           *SourceStoreImpl
-	testChatMessageStore      *ChatMessageStoreImpl
-	testArtifactStore         *ArtifactStoreImpl
-	testWorkerCheckpointStore *WorkerCheckpointStoreImpl
-	testInitJobStore          *InitJobStoreImpl
-	testUserStore             *UserStoreImpl
+	testDB                        *gorm.DB
+	testNotebookStore             *NotebookStoreImpl
+	testSourceStore               *SourceStoreImpl
+	testChatMessageStore          *ChatMessageStoreImpl
+	testArtifactStore             *ArtifactStoreImpl
+	testArtifactStylePreviewStore *ArtifactStylePreviewStoreImpl
+	testWorkerCheckpointStore     *WorkerCheckpointStoreImpl
+	testInitJobStore              *InitJobStoreImpl
+	testUserStore                 *UserStoreImpl
 )
 
 func TestMain(m *testing.M) {
@@ -37,6 +38,7 @@ func TestMain(m *testing.M) {
 	testSourceStore = NewSourceStoreImpl(testDB)
 	testChatMessageStore = NewChatMessageStoreImpl(testDB)
 	testArtifactStore = NewArtifactStoreImpl(testDB)
+	testArtifactStylePreviewStore = NewArtifactStylePreviewStoreImpl(testDB)
 	testWorkerCheckpointStore = NewWorkerCheckpointStoreImpl(testDB)
 	testInitJobStore = NewInitJobStoreImpl(testDB)
 	testUserStore = NewUserStoreImpl(testDB)

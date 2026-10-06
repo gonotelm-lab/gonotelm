@@ -28,6 +28,7 @@ func main() {
 
 func run() error {
 	configPath := flag.String("config", "./etc/initjob.toml.tpl", "config file path")
+	assetsDir := flag.String("assets-dir", "./assets", "assets directory path")
 	flag.Parse()
 
 	if _, err := conf.LoadInitJobConfig(*configPath); err != nil {
@@ -42,7 +43,7 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	app, err := bootstrap.NewInitJob(ctx, conf.InitJobGlobal())
+	app, err := bootstrap.NewInitJob(ctx, conf.InitJobGlobal(), *assetsDir)
 	if err != nil {
 		return err
 	}

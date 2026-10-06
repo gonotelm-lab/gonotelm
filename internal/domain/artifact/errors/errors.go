@@ -16,6 +16,7 @@ const (
 	CodeInvalidKind              = 102011
 	CodeInvalidPayload           = 102012
 	CodePayloadKindMismatch      = 102013
+	CodeStylePreviewNotFound     = 102014
 )
 
 var (
@@ -33,4 +34,6 @@ var (
 	ErrInvalidKind              = errors.ErrParams.ErrCode(CodeInvalidKind).Msg("invalid artifact kind")
 	ErrInvalidPayload           = errors.ErrParams.ErrCode(CodeInvalidPayload).Msg("invalid artifact payload")
 	ErrPayloadKindMismatch      = errors.ErrParams.ErrCode(CodePayloadKindMismatch).Msg("artifact payload kind does not match artifact kind")
+
+	ErrStylePreviewNotFound = errors.ErrNoRecord.ErrCode(CodeStylePreviewNotFound).Msg("style preview not found")
 )

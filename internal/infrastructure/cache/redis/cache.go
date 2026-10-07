@@ -16,5 +16,6 @@ func NewCache(
 		LoginInfoCache:          NewTransientProviderLoginInfoCacheImpl(rdb),
 		UserSessionCache:        NewUserSessionCacheImpl(rdb),
 		StylePreviewCache:       NewStylePreviewCacheImpl(rdb),
+		UserCache:               NewUserCacheImpl(rdb),
 	}
 }

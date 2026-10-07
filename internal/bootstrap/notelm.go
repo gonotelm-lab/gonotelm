@@ -95,7 +95,10 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 	if err != nil {
 		return nil, err
 	}
-	userRepo := repository.NewUserRepository(infra.Database.UserStore)
+	userRepo := repository.NewUserRepository(
+		infra.Database.UserStore,
+		infra.Cache.UserCache,
+	)
 	userService := identityservice.NewUserService(
 		userRepo,
 		infra.DistLock,

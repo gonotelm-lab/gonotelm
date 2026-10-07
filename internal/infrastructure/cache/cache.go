@@ -79,6 +79,11 @@ type StylePreviewCache interface {
 	Delete(ctx context.Context, identifier string) error
 }
 
+type UserCache interface {
+	Set(ctx context.Context, user *schema.User) error
+	GetById(ctx context.Context, id string) (*schema.User, error)
+}
+
 type Cache struct {
 	ChatMessageContextCache ChatContextMessageCache
 	ChatMessageStreamCache  ChatMessageStreamCache
@@ -87,6 +92,7 @@ type Cache struct {
 	LoginInfoCache          TransientProviderLoginInfoCache
 	UserSessionCache        UserSessionCache
 	StylePreviewCache       StylePreviewCache
+	UserCache               UserCache
 }
 
 var (

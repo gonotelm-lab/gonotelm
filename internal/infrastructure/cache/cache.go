@@ -82,6 +82,7 @@ type StylePreviewCache interface {
 type UserCache interface {
 	Set(ctx context.Context, user *schema.User) error
 	GetById(ctx context.Context, id string) (*schema.User, error)
+	Delete(ctx context.Context, id string) error
 }
 
 type Cache struct {

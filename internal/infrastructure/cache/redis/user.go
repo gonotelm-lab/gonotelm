@@ -59,3 +59,11 @@ func (c *UserCacheImpl) GetById(ctx context.Context, id string) (*schema.User, e
 
 	return user, nil
 }
+
+func (c *UserCacheImpl) Delete(ctx context.Context, id string) error {
+	if err := c.rd.Del(ctx, c.cacheKey(id)).Err(); err != nil {
+		return errors.Wrapf(errors.ErrCache, "delete user failed, err=%s", err.Error())
+	}
+
+	return nil
+}

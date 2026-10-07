@@ -32,7 +32,7 @@ func (r *StylePreviewRepositoryImpl) Save(ctx context.Context, p *entity.StylePr
 		return err
 	}
 
-	r.setCache(ctx, p)
+	r.deleteCache(ctx, p.Identifier.String())
 
 	return nil
 }
@@ -121,14 +121,7 @@ func (r *StylePreviewRepositoryImpl) DeleteByIdentifier(ctx context.Context, ide
 		return err
 	}
 
-	if r.cache != nil {
-		if err := r.cache.Delete(ctx, identifier.String()); err != nil {
-			slog.WarnContext(ctx, "delete style preview cache failed",
-				slog.String("identifier", identifier.String()),
-				slog.Any("err", err),
-			)
-		}
-	}
+	r.deleteCache(ctx, identifier.String())
 
 	return nil
 }
@@ -219,6 +212,19 @@ func (r *StylePreviewRepositoryImpl) setCacheMulti(ctx context.Context, previews
 	if err := r.cache.SetMulti(ctx, mapper.StylePreviewsToCacheSchema(previews)); err != nil {
 		slog.WarnContext(ctx, "cache style previews failed",
 			slog.Int("count", len(previews)),
+			slog.Any("err", err),
+		)
+	}
+}
+
+func (r *StylePreviewRepositoryImpl) deleteCache(ctx context.Context, identifier string) {
+	if r.cache == nil {
+		return
+	}
+
+	if err := r.cache.Delete(ctx, identifier); err != nil {
+		slog.WarnContext(ctx, "delete style preview cache failed",
+			slog.String("identifier", identifier),
 			slog.Any("err", err),
 		)
 	}

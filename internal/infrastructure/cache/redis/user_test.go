@@ -69,3 +69,22 @@ func TestUserCacheImplSetOverwrites(t *testing.T) {
 		So(got.Status, ShouldEqual, "banned")
 	})
 }
+
+func TestUserCacheImplDelete(t *testing.T) {
+	Convey("UserCache Delete removes the cached user", t, func() {
+		user, id := newTestUser()
+		So(testUserCache.Set(t.Context(), user), ShouldBeNil)
+
+		So(testUserCache.Delete(t.Context(), id), ShouldBeNil)
+
+		got, err := testUserCache.GetById(t.Context(), id)
+		So(err, ShouldBeNil)
+		So(got, ShouldBeNil)
+	})
+}
+
+func TestUserCacheImplDeleteMissing(t *testing.T) {
+	Convey("UserCache Delete on a missing userId is a no-op", t, func() {
+		So(testUserCache.Delete(t.Context(), ulid.New().String()), ShouldBeNil)
+	})
+}

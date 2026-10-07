@@ -31,7 +31,7 @@ func (r *UserRepositoryImpl) Save(ctx context.Context, user *identityentity.User
 		return errors.WithMessage(err, "failed to save user")
 	}
 
-	r.setCache(ctx, user)
+	r.deleteCache(ctx, user.Id.String())
 
 	return nil
 }
@@ -119,6 +119,19 @@ func (r *UserRepositoryImpl) setCache(ctx context.Context, user *identityentity.
 	if err := r.cache.Set(ctx, mapper.UserToCacheSchema(user)); err != nil {
 		slog.WarnContext(ctx, "cache user failed",
 			slog.String("user_id", user.Id.String()),
+			slog.Any("err", err),
+		)
+	}
+}
+
+func (r *UserRepositoryImpl) deleteCache(ctx context.Context, id string) {
+	if r.cache == nil {
+		return
+	}
+
+	if err := r.cache.Delete(ctx, id); err != nil {
+		slog.WarnContext(ctx, "delete user cache failed",
+			slog.String("user_id", id),
 			slog.Any("err", err),
 		)
 	}

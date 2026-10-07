@@ -66,6 +66,19 @@ type UserSessionCache interface {
 	DeleteByUserId(ctx context.Context, userId string) error
 }
 
+// StylePreviewCache 缓存风格预览图记录，键为 StylePreviewIdentifier。
+// 预览图由 initjob 播种，量少读多，写路径负责刷新/失效，TTL 仅作兜底。
+type StylePreviewCache interface {
+	Set(ctx context.Context, identifier string, preview *schema.StylePreview) error
+	SetMulti(ctx context.Context, previews []*schema.StylePreview) error
+	// Get 不存在时返回 nil，非错误。
+	Get(ctx context.Context, identifier string) (*schema.StylePreview, error)
+	// GetMulti 只返回命中的条目，miss 不出现在结果里。
+	// 注意：实现不能直接用 MGET，否则 redis 集群下多 key 跨 slot 会被 CROSSSLOT 拒绝。
+	GetMulti(ctx context.Context, identifiers []string) (map[string]*schema.StylePreview, error)
+	Delete(ctx context.Context, identifier string) error
+}
+
 type Cache struct {
 	ChatMessageContextCache ChatContextMessageCache
 	ChatMessageStreamCache  ChatMessageStreamCache
@@ -73,6 +86,7 @@ type Cache struct {
 	SandboxCache            SandboxCache
 	LoginInfoCache          TransientProviderLoginInfoCache
 	UserSessionCache        UserSessionCache
+	StylePreviewCache       StylePreviewCache
 }
 
 var (

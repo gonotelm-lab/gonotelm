@@ -43,7 +43,10 @@ func NewInitJob(ctx context.Context, cfg *conf.InitJobConfig, assetsDir string) 
 		Cfg:         cfg,
 	}
 	dependencies := &dep.Dependency{
-		StylePreviewRepo: repository.NewStylePreviewRepository(infra.Database.ArtifactStylePreviewStore),
+		StylePreviewRepo: repository.NewStylePreviewRepository(
+			infra.Database.ArtifactStylePreviewStore,
+			nil,
+		),
 	}
 
 	recorder := repository.NewInitJobRecorder(infra.Database.InitJobStore)

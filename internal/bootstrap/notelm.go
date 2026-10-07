@@ -85,7 +85,10 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 	messageRepo := repository.NewMessageRepository(infra.Database.ChatMessageStore)
 	contextMsgRepo := repository.NewContextMessageRepository(infra.Cache.ChatMessageContextCache)
 	artifactRepo := repository.NewArtifactRepository(infra.Database.ArtifactStore)
-	stylePreviewRepo := repository.NewStylePreviewRepository(infra.Database.ArtifactStylePreviewStore)
+	stylePreviewRepo := repository.NewStylePreviewRepository(
+		infra.Database.ArtifactStylePreviewStore,
+		infra.Cache.StylePreviewCache,
+	)
 	streamTaskRepo := repository.NewStreamTaskRepository(infra.Cache.ChatMessageStreamCache)
 	suggestionRepo := repository.NewSuggestionRepository(infra.Cache.ChatSuggestionCache)
 	loginInfoRepo, err := repository.NewLoginInfoRepository(rootCtx, infra.Cache.LoginInfoCache, cfg.ToIDPConfig())

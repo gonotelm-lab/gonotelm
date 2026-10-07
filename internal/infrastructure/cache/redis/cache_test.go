@@ -19,6 +19,7 @@ var (
 	testSandboxCache            cache.SandboxCache
 	testLoginInfoCache          cache.TransientProviderLoginInfoCache
 	testUserSessionCache        cache.UserSessionCache
+	testStylePreviewCache       cache.StylePreviewCache
 )
 
 func TestMain(m *testing.M) {
@@ -39,6 +40,7 @@ func TestMain(m *testing.M) {
 	testSandboxCache = NewSandboxCacheImpl(testRedis)
 	testLoginInfoCache = NewTransientProviderLoginInfoCacheImpl(testRedis)
 	testUserSessionCache = NewUserSessionCacheImpl(testRedis)
+	testStylePreviewCache = NewStylePreviewCacheImpl(testRedis)
 
 	code := m.Run()
 
@@ -59,5 +61,6 @@ func TestNewCache_WiresAllCaches(t *testing.T) {
 		So(c.SandboxCache, ShouldNotBeNil)
 		So(c.LoginInfoCache, ShouldNotBeNil)
 		So(c.UserSessionCache, ShouldNotBeNil)
+		So(c.StylePreviewCache, ShouldNotBeNil)
 	})
 }

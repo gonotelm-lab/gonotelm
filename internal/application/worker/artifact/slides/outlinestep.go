@@ -34,7 +34,12 @@ type outlineStep struct {
 func (s *outlineStep) Name() string { return "outline" }
 
 func (s *outlineStep) Execute(ctx context.Context, data *pipeline.Data) error {
-	outline, ckpt, err := s.ensure(ctx, types.RequestFrom(data), sourcesFrom(data), checkpointFrom(data))
+	outline, ckpt, err := s.ensure(
+		ctx,
+		types.RequestFrom(data),
+		sourcesFrom(data),
+		checkpointFrom(data),
+	)
 	if err != nil {
 		return errors.WithMessage(err, "ensure outline failed")
 	}

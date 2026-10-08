@@ -29,12 +29,16 @@ type TemplateVars struct {
 }
 
 func (v TemplateVars) promptVars() map[string]any {
+	themeJSON, styleClause := visualTheme(v.VisualStyle)
+
 	return map[string]any{
 		"SourceIds":    types.NormalizeStrings(v.SourceIds),
 		"TextLanguage": strings.TrimSpace(v.TextLanguage),
 		"Orientation":  v.Orientation.String(),
 		"DetailLevel":  v.DetailLevel.String(),
 		"VisualStyle":  v.VisualStyle.String(),
+		"Theme":        themeJSON,
+		"ThemeStyle":   styleClause,
 		"Tip":          strings.TrimSpace(v.ExtraPrompt),
 	}
 }

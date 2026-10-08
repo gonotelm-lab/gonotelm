@@ -1,0 +1,60 @@
+{
+  "id": "default",
+  "name": "Soft & Balanced",
+  "nameZh": "柔和平衡",
+  "description": "Warm cream paper deck with a flat hand-drawn feel, moderate whitespace and a single terracotta accent. Warm and educational.",
+  "descriptionZh": "扁平手绘感、米色 / 奶油纸张底、温暖教育向。",
+  "mood": ["light", "warm", "paper", "editorial", "soft", "balanced"],
+  "bestFor": ["通用知识讲解", "产品 / 概念介绍", "人文 / 生活方式内容", "需要温暖质感的内容"],
+  "units": {
+    "color": "6 位 hex，不带 #（带 # 或 8 位 hex 都会损坏文件）",
+    "type": "pt（字号）",
+    "space": "相对画布的比例：marginX/gapX 相对 PAGE_W；marginY/gapY/footerH 相对 PAGE_H；pad 相对卡片短边",
+    "radius": "相对卡片短边 / 元素高度的比例（0 = 用 RECTANGLE，不做圆角）"
+  },
+  "palette": {
+    "primary": "3d405b",
+    "secondary": "6d6a5f",
+    "accent": "e07a5f",
+    "light": "f2cc8f",
+    "bg": "faf6ec"
+  },
+  "fonts": {
+    "cjk": "Microsoft YaHei",
+    "latin": "Arial",
+    "latinAlt": ["Georgia", "Calibri", "Cambria", "Trebuchet MS"]
+  },
+  "type": {
+    "coverTitle": 40,
+    "sectionTitle": 34,
+    "pageTitle": 30,
+    "subtitle": 20,
+    "body": 16,
+    "caption": 11,
+    "statNumber": 44,
+    "pageNumber": 12
+  },
+  "space": {
+    "marginX": 0.05,
+    "marginY": 0.08,
+    "footerH": 0.1,
+    "gapX": 0.03,
+    "gapY": 0.045,
+    "pad": 0.03
+  },
+  "radius": {
+    "card": 0.06,
+    "pill": 0.5
+  },
+  "chart": {
+    "colors": ["e07a5f", "6d6a5f", "f2cc8f"],
+    "grid": "e8e0d0",
+    "axis": "6d6a5f"
+  },
+  "guidance": {
+    "fonts": "中文 `Microsoft YaHei`，英文 `Arial`（备选 Georgia / Calibri / Cambria / Trebuchet MS）；正文与注释不加粗",
+    "composition": "均衡留白、圆角适中（外容器 ≥ 内层）；卡片用浅底 + 极轻阴影；对齐靠留白，不靠通栏线",
+    "typography": "标题粗体、正文常规；正文 16pt / 页标题 30pt；正文左对齐，短标签可居中；数据大字可大于页标题",
+    "expression": "暖米底 + 浅色卡片；一页只用一个 accent 电压（短条 / 页码 / 关键数字，不同时两个）；关键数字用大字 + 小标签；不要通栏色条、侧边条、标题下划线"
+  }
+}

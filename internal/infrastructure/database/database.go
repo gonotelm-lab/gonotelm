@@ -78,6 +78,13 @@ type ArtifactStore interface {
 	DeleteByNotebookId(ctx context.Context, notebookId Id) error
 }
 
+type ArtifactStylePreviewStore interface {
+	Upsert(ctx context.Context, preview *schema.ArtifactStylePreview) error
+	GetByIdentifier(ctx context.Context, identifier string) (*schema.ArtifactStylePreview, error)
+	ListByIdentifiers(ctx context.Context, identifiers []string) ([]*schema.ArtifactStylePreview, error)
+	DeleteByIdentifier(ctx context.Context, identifier string) error
+}
+
 type WorkerCheckpointStore interface {
 	Create(ctx context.Context, cp *schema.WorkerCheckpoint) error
 	GetByArtifactId(ctx context.Context, artifactId Id) (*schema.WorkerCheckpoint, error)
@@ -108,14 +115,15 @@ type InitJobStore interface {
 type Dao struct {
 	Closer misc.Closer
 
-	NotebookStore         NotebookStore
-	SourceStore           SourceStore
-	ChatStore             ChatStore
-	ChatMessageStore      ChatMessageStore
-	ArtifactStore         ArtifactStore
-	WorkerCheckpointStore WorkerCheckpointStore
-	InitJobStore          InitJobStore
-	UserStore             UserStore
+	NotebookStore             NotebookStore
+	SourceStore               SourceStore
+	ChatStore                 ChatStore
+	ChatMessageStore          ChatMessageStore
+	ArtifactStore             ArtifactStore
+	ArtifactStylePreviewStore ArtifactStylePreviewStore
+	WorkerCheckpointStore     WorkerCheckpointStore
+	InitJobStore              InitJobStore
+	UserStore                 UserStore
 }
 
 func NewDao(
@@ -125,20 +133,22 @@ func NewDao(
 	chatStore ChatStore,
 	chatMessageStore ChatMessageStore,
 	artifactStore ArtifactStore,
+	artifactStylePreviewStore ArtifactStylePreviewStore,
 	workerCheckpointStore WorkerCheckpointStore,
 	initJobStore InitJobStore,
 	userStore UserStore,
 ) *Dao {
 	return &Dao{
-		Closer:                closer,
-		NotebookStore:         notebookStore,
-		SourceStore:           sourceStore,
-		ChatStore:             chatStore,
-		ChatMessageStore:      chatMessageStore,
-		ArtifactStore:         artifactStore,
-		WorkerCheckpointStore: workerCheckpointStore,
-		InitJobStore:          initJobStore,
-		UserStore:             userStore,
+		Closer:                    closer,
+		NotebookStore:             notebookStore,
+		SourceStore:               sourceStore,
+		ChatStore:                 chatStore,
+		ChatMessageStore:          chatMessageStore,
+		ArtifactStore:             artifactStore,
+		ArtifactStylePreviewStore: artifactStylePreviewStore,
+		WorkerCheckpointStore:     workerCheckpointStore,
+		InitJobStore:              initJobStore,
+		UserStore:                 userStore,
 	}
 }
 

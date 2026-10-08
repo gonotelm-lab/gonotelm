@@ -1,0 +1,60 @@
+{
+  "id": "cute",
+  "name": "Rounded & Cute",
+  "nameZh": "圆润可爱",
+  "description": "Soft pastel deck: pink / mint / cream, rounded pills and generous whitespace, playful and healing. Friendly for beginner introductions.",
+  "descriptionZh": "粉嫩柔和（粉 / 薄荷绿 / 奶油底），圆润治愈、留白充足，适合入门介绍。",
+  "mood": ["light", "pastel", "soft", "rounded", "playful", "healing"],
+  "bestFor": ["入门介绍 / 科普", "轻松知识分享", "面向大众的内容", "友好向产品讲解"],
+  "units": {
+    "color": "6 位 hex，不带 #（带 # 或 8 位 hex 都会损坏文件）",
+    "type": "pt（字号）",
+    "space": "相对画布的比例：marginX/gapX 相对 PAGE_W；marginY/gapY/footerH 相对 PAGE_H；pad 相对卡片短边",
+    "radius": "相对卡片短边 / 元素高度的比例（0 = 用 RECTANGLE，不做圆角）"
+  },
+  "palette": {
+    "primary": "5b4b6e",
+    "secondary": "8b7aa0",
+    "accent": "f4a4b8",
+    "light": "b8e0d2",
+    "bg": "fff8f5"
+  },
+  "fonts": {
+    "cjk": "Microsoft YaHei",
+    "latin": "Arial",
+    "latinAlt": ["Trebuchet MS", "Calibri", "Georgia", "Cambria"]
+  },
+  "type": {
+    "coverTitle": 42,
+    "sectionTitle": 34,
+    "pageTitle": 30,
+    "subtitle": 20,
+    "body": 16,
+    "caption": 11,
+    "statNumber": 44,
+    "pageNumber": 12
+  },
+  "space": {
+    "marginX": 0.06,
+    "marginY": 0.09,
+    "footerH": 0.11,
+    "gapX": 0.035,
+    "gapY": 0.05,
+    "pad": 0.035
+  },
+  "radius": {
+    "card": 0.12,
+    "pill": 0.5
+  },
+  "chart": {
+    "colors": ["f4a4b8", "b8e0d2", "8b7aa0", "5b4b6e"],
+    "grid": "f2e6ea",
+    "axis": "8b7aa0"
+  },
+  "guidance": {
+    "fonts": "中文 `Microsoft YaHei`，英文 `Arial`（备选 Trebuchet MS / Calibri / Georgia / Cambria）；正文与注释不加粗",
+    "composition": "圆润卡片、留白充足、轻装饰；圆角明显偏大（外容器 ≥ 内层）；胶囊页码可用 rectRadius = 高度/2；不要做成尖锐报表风",
+    "typography": "标题粗体、圆润；正文 16pt / 页标题 30pt；短标签可居中，多行说明仍左对齐",
+    "expression": "强调用小面积药丸高亮（替代加粗/斜体）；点状 bullet 用描边圆点；accent 只做小标记，不做大面积底；不要通栏色条、侧边条、标题下划线"
+  }
+}

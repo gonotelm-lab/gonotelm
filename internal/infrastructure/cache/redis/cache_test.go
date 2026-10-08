@@ -19,6 +19,8 @@ var (
 	testSandboxCache            cache.SandboxCache
 	testLoginInfoCache          cache.TransientProviderLoginInfoCache
 	testUserSessionCache        cache.UserSessionCache
+	testStylePreviewCache       cache.StylePreviewCache
+	testUserCache               cache.UserCache
 )
 
 func TestMain(m *testing.M) {
@@ -39,6 +41,8 @@ func TestMain(m *testing.M) {
 	testSandboxCache = NewSandboxCacheImpl(testRedis)
 	testLoginInfoCache = NewTransientProviderLoginInfoCacheImpl(testRedis)
 	testUserSessionCache = NewUserSessionCacheImpl(testRedis)
+	testStylePreviewCache = NewStylePreviewCacheImpl(testRedis)
+	testUserCache = NewUserCacheImpl(testRedis)
 
 	code := m.Run()
 
@@ -48,7 +52,6 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// NewCache 是 redis 缓存的装配入口，漏挂字段只会在运行期 panic，这里逐个断言非 nil。
 func TestNewCache_WiresAllCaches(t *testing.T) {
 	Convey("NewCache wires all caches", t, func() {
 		c := NewCache(testRedis)
@@ -59,5 +62,7 @@ func TestNewCache_WiresAllCaches(t *testing.T) {
 		So(c.SandboxCache, ShouldNotBeNil)
 		So(c.LoginInfoCache, ShouldNotBeNil)
 		So(c.UserSessionCache, ShouldNotBeNil)
+		So(c.StylePreviewCache, ShouldNotBeNil)
+		So(c.UserCache, ShouldNotBeNil)
 	})
 }

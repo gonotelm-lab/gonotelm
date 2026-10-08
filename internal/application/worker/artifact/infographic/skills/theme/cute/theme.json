@@ -1,0 +1,23 @@
+{
+  "id": "cute",
+  "name": "Rounded & Cute",
+  "nameZh": "圆润可爱",
+  "description": "Soft pastel infographic: pink / mint / cream, rounded pills and cards, mascots and tiny decorations. Playful and healing.",
+  "descriptionZh": "粉嫩柔和（粉 / 薄荷绿 / 奶油底），圆润治愈、留白充足。",
+  "mood": ["light", "pastel", "soft", "rounded", "playful", "healing"],
+  "bestFor": ["入门介绍 / 科普", "轻松知识分享", "面向大众的内容", "友好向产品讲解"],
+  "palette": {
+    "primary": "5b4b6e",
+    "secondary": "8b7aa0",
+    "accent": "f4a4b8",
+    "light": "b8e0d2",
+    "bg": "fff8f5"
+  },
+  "guidance": {
+    "style": "可爱卡通风格：圆润饱满的形状，大头小身的萌系角色与吉祥物；粉嫩柔和配色（粉红 #f4a4b8、薄荷绿 #b8e0d2、淡紫 #8b7aa0、奶油底 #fff8f5），点缀星星、泡泡、爱心等小装饰，整体温柔治愈。",
+    "palette": "底色 #fff8f5；卡片用更浅的奶油白或薄荷 / 淡粉淡染；主色与文字 #5b4b6e；次色 #8b7aa0；点缀 #f4a4b8 与 #b8e0d2 只做小标记。",
+    "composition": "圆润卡片、留白充足、轻装饰；圆角明显偏大（外容器 ≥ 内层）；对称或均衡排布，避免任何尖锐形状与硬直角。",
+    "expression": "描边圆点 bullet、药丸高亮、漂浮小装饰 3–7 个（花 / 星 / 云 / 爱心，可出血到画框外）；一张图只允许一个 accent 电压。",
+    "avoid": "不要尖锐直角、暗色厚重描边、写实照片、3D 渲染、大面积高饱和色、恐怖或攻击性元素。"
+  }
+}

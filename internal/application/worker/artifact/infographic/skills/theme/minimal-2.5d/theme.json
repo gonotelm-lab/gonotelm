@@ -1,0 +1,23 @@
+{
+  "id": "minimal-2.5d",
+  "name": "Minimal 2.5D",
+  "nameZh": "极简 2.5D",
+  "description": "Minimal isometric composition with soft gradients, subtle long shadows and plenty of whitespace. Modern digital-product polish.",
+  "descriptionZh": "等距视角、柔和渐变、微妙投影、留白充足，现代数字产品质感。",
+  "mood": ["isometric", "clean", "modern", "soft-gradient", "spacious", "digital"],
+  "bestFor": ["产品 / 功能讲解", "技术架构与流程", "数据 / 系统类主题", "需要现代感的内容"],
+  "palette": {
+    "primary": "2f3e5c",
+    "secondary": "7c8db5",
+    "accent": "4c8dff",
+    "light": "d9e4f5",
+    "bg": "f7f9fd"
+  },
+  "guidance": {
+    "style": "极简 2.5D 风格：等距视角（isometric）几何构图，柔和渐变色彩（主色 #2f3e5c、蓝 #4c8dff、浅蓝 #d9e4f5），微妙投影增加层次与深度感；造型干净克制、留白充足，呈现现代数字产品般的精致质感，浅冷灰底（#f7f9fd）。",
+    "palette": "底色 #f7f9fd；模块面用 #d9e4f5 到白色的柔和渐变；结构与文字 #2f3e5c；次色 #7c8db5；accent #4c8dff 用于高亮模块与路径。",
+    "composition": "等距网格对齐、模块悬浮于浅色底之上、元素间用等距连线或路径串联；留白充足，避免拥挤与重叠遮挡。",
+    "expression": "等距卡片 / 立方体 / 图层 / 箭头 / 数据方块；柔和长投影（同色系加深，不用黑色）；一张图只允许一个 accent 电压。",
+    "avoid": "不要正投影平面堆叠、手绘笔触、卡通角色、写实照片、高饱和大色块、浓黑描边。"
+  }
+}

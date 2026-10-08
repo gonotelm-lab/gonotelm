@@ -139,6 +139,21 @@ type ConvertNoteToSourceResponse struct {
 	SourceId string `json:"source_id"`
 }
 
+type ListStylePreviewsRequest struct {
+	Kind string `query:"kind"`
+}
+
+type StylePreviewItem struct {
+	VisualStyle string `json:"visual_style"`
+	PreviewUrl  string `json:"preview_url"`
+}
+
+type ListStylePreviewsResponse struct {
+	Kind               string              `json:"kind"`
+	DefaultVisualStyle string              `json:"default_visual_style"`
+	Previews           []*StylePreviewItem `json:"previews"`
+}
+
 type ListNotebookArtifactsRequest struct {
 	Id     uuid.UUID `path:"id,required"`
 	Limit  int       `query:"limit"`

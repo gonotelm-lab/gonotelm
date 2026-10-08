@@ -1,0 +1,60 @@
+{
+  "id": "educational",
+  "name": "Sharp & Educational",
+  "nameZh": "锐利科普",
+  "description": "Textbook science on a clean stage: high contrast, geometric partitioning, tight margins and dense but readable pages. Cool and precise.",
+  "descriptionZh": "教科书科普：高对比、几何分区清晰、冷静易读、页面偏密。",
+  "mood": ["light", "sharp", "geometric", "data-first", "calm"],
+  "bestFor": ["知识科普 / 概念讲解", "教程 / 操作步骤", "数据 / 指标解读", "开发者向技术分享"],
+  "units": {
+    "color": "6 位 hex，不带 #（带 # 或 8 位 hex 都会损坏文件）",
+    "type": "pt（字号）",
+    "space": "相对画布的比例：marginX/gapX 相对 PAGE_W；marginY/gapY/footerH 相对 PAGE_H；pad 相对卡片短边",
+    "radius": "相对卡片短边 / 元素高度的比例（0 = 用 RECTANGLE，不做圆角）"
+  },
+  "palette": {
+    "primary": "1e293b",
+    "secondary": "475569",
+    "accent": "0d9488",
+    "light": "e2e8f0",
+    "bg": "f8fafc"
+  },
+  "fonts": {
+    "cjk": "Microsoft YaHei",
+    "latin": "Arial",
+    "latinAlt": ["Calibri", "Cambria", "Georgia", "Trebuchet MS"]
+  },
+  "type": {
+    "coverTitle": 38,
+    "sectionTitle": 32,
+    "pageTitle": 28,
+    "subtitle": 19,
+    "body": 15,
+    "caption": 10,
+    "statNumber": 42,
+    "pageNumber": 11
+  },
+  "space": {
+    "marginX": 0.04,
+    "marginY": 0.06,
+    "footerH": 0.09,
+    "gapX": 0.025,
+    "gapY": 0.035,
+    "pad": 0.025
+  },
+  "radius": {
+    "card": 0.02,
+    "pill": 0.5
+  },
+  "chart": {
+    "colors": ["0d9488", "475569", "94a3b8"],
+    "grid": "e2e8f0",
+    "axis": "475569"
+  },
+  "guidance": {
+    "fonts": "中文 `Microsoft YaHei`，英文 `Arial`（备选 Calibri / Cambria / Georgia / Trebuchet MS）；正文与注释不加粗",
+    "composition": "几何分区、直角或极小圆角（外容器 ≥ 内层）；信息可偏密但必须有清晰栅格；少用装饰圆与气泡；分隔用独立短矩形，不要通栏线",
+    "typography": "高对比：primary 标题 / secondary 正文；正文 15pt / 页标题 28pt；数字与单位排版紧凑；正文左对齐",
+    "expression": "卡片：极浅底（light）+ 细边框；accent 只给 eyebrow、关键数字、图表与页码；步骤圆点用透明度阶梯 1.0 → 0.85 → 0.7；不要通栏色条、侧边条、标题下划线"
+  }
+}

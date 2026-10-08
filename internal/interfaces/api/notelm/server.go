@@ -38,6 +38,7 @@ type ServerDeps struct {
 	KeyFactory             adapter.StoreKeyFactory
 	SourceDocRepo          sourcerepo.SourceDocRepository
 	ArtifactRepo           artifactrepo.Repository
+	StylePreviewRepo       artifactrepo.StylePreviewRepository
 	ChatRepo               chatrepo.ChatRepository
 	ChatMessageRepo        chatrepo.MessageRepository
 	ChatContextMessageRepo chatrepo.ContextMessageRepository
@@ -101,6 +102,7 @@ type Server struct {
 	retryArtifactHandler         *artifactapp.RetryArtifactHandler
 	updateArtifactHandler        *artifactapp.UpdateArtifactHandler
 	convertNoteToSourceHandler   *artifactapp.ConvertNoteToSourceHandler
+	listStylePreviewsHandler     *artifactapp.ListStylePreviewsHandler
 
 	authLoginHandler     *authapp.LoginHandler
 	authCallbackHandler  *authapp.CallbackHandler
@@ -219,6 +221,7 @@ func NewServer(
 			deps.KeyFactory,
 			deps.EventBus,
 		),
+		listStylePreviewsHandler: artifactapp.NewListStylePreviewsHandler(deps.StylePreviewRepo, deps.ObjectStore),
 
 		authLoginHandler:     authapp.NewLoginHandler(deps.LoginInfoRepo, deps.UserRepo, deps.UserSessionRepo),
 		authCallbackHandler:  authapp.NewCallbackHandler(deps.LoginInfoRepo, deps.UserService, deps.UserRepo, deps.UserSessionRepo),

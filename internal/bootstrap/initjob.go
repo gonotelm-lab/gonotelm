@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/gonotelm-lab/gonotelm/internal/application/initjob/deps"
-	"github.com/gonotelm-lab/gonotelm/internal/application/initjob/tasks"
+	"github.com/gonotelm-lab/gonotelm/internal/application/initjob/dep"
+	"github.com/gonotelm-lab/gonotelm/internal/application/initjob/task"
 	bootshared "github.com/gonotelm-lab/gonotelm/internal/bootstrap/shared"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository"
@@ -21,7 +21,7 @@ type InitJob struct {
 	runner *initjob.Runner
 }
 
-func NewInitJob(ctx context.Context, cfg *conf.InitJobConfig) (*InitJob, error) {
+func NewInitJob(ctx context.Context, cfg *conf.InitJobConfig, assetsDir string) (*InitJob, error) {
 	if err := trace.Init(ctx, cfg.OtelTrace); err != nil {
 		slog.ErrorContext(ctx, "can not init trace", "err", err)
 	}
@@ -35,23 +35,34 @@ func NewInitJob(ctx context.Context, cfg *conf.InitJobConfig) (*InitJob, error) 
 		return nil, err
 	}
 
-	d := &deps.Instance{
+	infras := &dep.Infra{
 		Database:    infra.Database,
 		Redis:       infra.Redis,
 		ObjectStore: infra.ObjectStore,
 		KeyFactory:  infra.KeyFactory,
 		Cfg:         cfg,
 	}
+	dependencies := &dep.Dependency{
+		StylePreviewRepo: repository.NewStylePreviewRepository(
+			infra.Database.ArtifactStylePreviewStore,
+			nil,
+		),
+	}
 
 	recorder := repository.NewInitJobRecorder(infra.Database.InitJobStore)
 	runner, err := initjob.NewRunner(
-		tasks.All(d),
+		task.New(&task.Option{
+			AssetsDir:  assetsDir,
+			Infra:      infras,
+			Dependency: dependencies,
+		}),
 		recorder,
 		initjob.Options{
 			Mode:         cfg.Mode(),
 			ForceTaskIDs: cfg.ForceTaskIDs(),
 			Pod:          podName(),
-		})
+		},
+	)
 	if err != nil {
 		_ = infra.Close(ctx)
 		return nil, err

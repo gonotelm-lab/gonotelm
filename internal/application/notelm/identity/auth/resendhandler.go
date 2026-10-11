@@ -67,7 +67,7 @@ func (h *ResendHandler) Handle(ctx context.Context, cmd *ResendCommand) (*Resend
 
 	link := buildVerifyLink(h.verifyURLBase, linkToken)
 	if err := h.mailer.SendEmailVerification(ctx, email, link, code); err != nil {
-		return nil, errors.WithMessage(err, "send verification mail failed")
+		return nil, errors.Wrapf(identerr.ErrMailSendFailed, "send verification mail: %s", err.Error())
 	}
 
 	return &ResendResult{}, nil

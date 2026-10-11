@@ -51,6 +51,7 @@ require (
 	github.com/pressly/goose/v3 v3.26.0
 	github.com/redis/go-redis/extra/redisotel/v9 v9.21.0
 	github.com/redis/go-redis/v9 v9.21.0
+	github.com/resend/resend-go/v4 v4.8.2
 	github.com/segmentio/kafka-go v0.4.50
 	github.com/shopspring/decimal v1.4.0
 	github.com/smartystreets/goconvey v1.8.1

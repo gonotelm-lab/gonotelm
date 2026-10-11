@@ -11,6 +11,7 @@ import (
 	chatsuggest "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/suggestion"
 	bootshared "github.com/gonotelm-lab/gonotelm/internal/bootstrap/shared"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
+	coreadapter "github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	identityservice "github.com/gonotelm-lab/gonotelm/internal/domain/identity/service"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
@@ -18,6 +19,10 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository"
 	notelmapi "github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm"
 	eventnotelm "github.com/gonotelm-lab/gonotelm/internal/interfaces/event/notelm"
+	"github.com/gonotelm-lab/gonotelm/pkg/httpclient"
+	"github.com/gonotelm-lab/gonotelm/pkg/mail"
+	maillog "github.com/gonotelm-lab/gonotelm/pkg/mail/log"
+	mailresend "github.com/gonotelm-lab/gonotelm/pkg/mail/resend"
 	"github.com/gonotelm-lab/gonotelm/pkg/trace"
 )
 
@@ -131,6 +136,7 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 		cfg.Source.ModelProvider,
 		cfg.Source.Model,
 	)
+	mailer := newMailer(rootCtx, cfg.Mailer)
 
 	// ── 4.1 Suggestion service (单例) ──
 	suggestionService := chatsuggest.NewService(
@@ -214,7 +220,7 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 			UserService:            userService,
 			UserSessionRepo:        userSessionRepo,
 			PasswordHasher:         passwordHasher,
-			Mailer:                 infra.Mailer,
+			Mailer:                 mailer,
 			AuthVerifyURLBase:      cfg.Auth.EmailVerifyURLBase,
 
 			EventBus:   eventBus,
@@ -244,4 +250,40 @@ type syncerCloser struct {
 func (s *syncerCloser) Close() error {
 	s.syncer.Shutdown(context.Background())
 	return nil
+}
+
+// newMailer builds the transactional email sender. Anything that cannot be built falls back to the log sender rather than
+// blocking startup.
+func newMailer(ctx context.Context, cfg conf.MailerConfig) coreadapter.Mailer {
+	return adapter.NewMailer(newMailSender(ctx, cfg))
+}
+
+func newMailSender(ctx context.Context, cfg conf.MailerConfig) mail.Sender {
+	switch mail.ParseType(cfg.Type) {
+	case mail.TypeResend:
+		sender, err := newResendSender(cfg)
+		if err == nil {
+			return sender
+		}
+
+		slog.ErrorContext(ctx, "init resend mailer failed, falling back to log mailer", slog.Any("err", err))
+	case mail.TypeLog:
+	default:
+		slog.ErrorContext(ctx, "unknown mailer type, falling back to log mailer", slog.String("type", cfg.Type))
+	}
+
+	return maillog.New(cfg.Log.Level())
+}
+
+func newResendSender(cfg conf.MailerConfig) (mail.Sender, error) {
+	httpClient := httpclient.NewBuilder(nil).WithTimeout(cfg.Timeout).Build()
+
+	return mailresend.New(
+		mail.Config{
+			From:     cfg.Resend.From,
+			FromName: cfg.FromName,
+		},
+		cfg.Resend.APIKey,
+		mailresend.WithHTTPClient(httpClient),
+	)
 }

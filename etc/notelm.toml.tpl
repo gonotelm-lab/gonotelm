@@ -14,13 +14,16 @@ loginErrorUrl = "${GONOTELM_AUTH_LOGIN_ERROR_URL:-http://127.0.0.1:5173/login}"
 bindErrorUrl  = "${GONOTELM_AUTH_BIND_ERROR_URL:-http://127.0.0.1:5173/?settings=account}"
 
 [mailer]
-# log = 只打日志（开发/测试）；smtp 待 P1 选型后实现
 type     = "${GONOTELM_MAILER_TYPE:-log}"
-addr     = "${GONOTELM_MAILER_ADDR:-127.0.0.1:1025}"
-username = "${GONOTELM_MAILER_USERNAME:-}"
-password = "${GONOTELM_MAILER_PASSWORD:-}"
-from     = "${GONOTELM_MAILER_FROM:-no-reply@mail.gonotelm.com}"
 fromName = "${GONOTELM_MAILER_FROM_NAME:-GoNoteLM}"
+timeout  = "${GONOTELM_MAILER_TIMEOUT:-10s}"
+
+[mailer.log]
+logLevel = "${GONOTELM_MAILER_LOG_LEVEL:-info}"
+
+[mailer.resend]
+apiKey = "${GONOTELM_MAILER_RESEND_API_KEY:-}"
+from   = "${GONOTELM_MAILER_RESEND_FROM:-onboarding@resend.dev}"
 
 [database]
 type = "postgres"

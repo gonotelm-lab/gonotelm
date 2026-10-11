@@ -2,6 +2,7 @@ package conf
 
 import (
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 	"sync"
@@ -25,6 +26,7 @@ type NotelmConfig struct {
 	Api       ApiConfig            `toml:"api"`
 	Cors      CorsConfig           `toml:"cors"`
 	Auth      AuthConfig           `toml:"auth"`
+	Mailer    MailerConfig         `toml:"mailer"`
 	Chat      ChatConfig           `toml:"chat"`
 	Source    SourceConfig         `toml:"source"`
 	Rerank    rerank.RerankConfig  `toml:"rerank"`
@@ -174,6 +176,52 @@ func (c *AuthConfig) Init() {
 	c.ReturnToAllowOrigins = origins
 }
 
+// MailerConfig configures transactional email sending. Type-specific settings live
+// in the matching sub-config; everything shared by all senders stays here. Type
+// picks one of them, and log is the fallback when the picked one cannot be built.
+type MailerConfig struct {
+	Type     string        `toml:"type"`     // resend | log
+	FromName string        `toml:"fromName"` // display name, shared by every sender
+	Timeout  time.Duration `toml:"timeout"`
+
+	Resend ResendMailerConfig `toml:"resend"`
+	Log    LogMailerConfig    `toml:"log"`
+}
+
+// ResendMailerConfig holds the Resend credentials and the From address: which
+// addresses may be used as From is decided by the provider.
+type ResendMailerConfig struct {
+	APIKey string `toml:"apiKey"`
+	From   string `toml:"from"`
+}
+
+type LogMailerConfig struct {
+	LogLevel string `toml:"logLevel"`
+}
+
+func (c *MailerConfig) Init() {
+	if c.Type == "" {
+		c.Type = "log"
+	}
+	if c.Timeout <= 0 {
+		c.Timeout = 10 * time.Second
+	}
+}
+
+// Level is the slog level the log mailer writes at; defaults to info.
+func (c *LogMailerConfig) Level() slog.Level {
+	if strings.TrimSpace(c.LogLevel) == "" {
+		return slog.LevelInfo
+	}
+
+	var level slog.Level
+	if err := level.UnmarshalText([]byte(c.LogLevel)); err != nil {
+		return slog.LevelInfo
+	}
+
+	return level
+}
+
 type IDPConfig struct {
 	ClientId      string   `toml:"clientId"`
 	ClientSecret  string   `toml:"clientSecret"`
@@ -203,6 +251,7 @@ func (c *NotelmConfig) init() {
 	c.Flow.Init()
 	c.Cors.Init()
 	c.Auth.Init()
+	c.Mailer.Init()
 
 	if c.Auth.EmailVerifyURLBase == "" {
 		c.Auth.EmailVerifyURLBase = "http://127.0.0.1:5173/verify-email"

@@ -29,6 +29,7 @@ const (
 	CodeProviderAlreadyBound         = 106023
 	CodeLastLoginMethod              = 106024
 	CodePasswordUnchanged            = 106025
+	CodeMailSendFailed               = 106026
 )
 
 var (
@@ -59,4 +60,5 @@ var (
 	ErrProviderAlreadyBound         = errors.ErrParams.ErrCode(CodeProviderAlreadyBound).Msg("this account already bound another identity of the same provider")
 	ErrLastLoginMethod              = errors.ErrParams.ErrCode(CodeLastLoginMethod).Msg("cannot unbind the last sign-in method, set a password first")
 	ErrPasswordUnchanged            = errors.ErrParams.ErrCode(CodePasswordUnchanged).Msg("new password must differ from the current one")
+	ErrMailSendFailed               = errors.ErrParams.ErrCode(CodeMailSendFailed).Msg("failed to send email, please retry later")
 )

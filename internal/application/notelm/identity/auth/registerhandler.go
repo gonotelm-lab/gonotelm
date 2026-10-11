@@ -86,7 +86,7 @@ func (h *RegisterHandler) Handle(ctx context.Context, cmd *RegisterCommand) (*Re
 
 	link := buildVerifyLink(h.verifyURLBase, linkToken)
 	if err := h.mailer.SendEmailVerification(ctx, email, link, code); err != nil {
-		return nil, errors.WithMessage(err, "send verification mail failed")
+		return nil, errors.Wrapf(identerr.ErrMailSendFailed, "send verification mail: %s", err.Error())
 	}
 
 	return &RegisterResult{Ticket: ticket}, nil

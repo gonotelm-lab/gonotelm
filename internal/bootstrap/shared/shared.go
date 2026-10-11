@@ -58,7 +58,6 @@ type Infra struct {
 	SandboxGateway         *sandbox.Gateway
 	DistLock               adapter.DistributedLock
 	Redis                  redisv9.UniversalClient
-	Mailer                 adapter.Mailer
 
 	closers []io.Closer
 }
@@ -299,20 +298,6 @@ func initSandbox(ctx context.Context, cfg *confshared.InfraConfig, infra *Infra)
 	return nil
 }
 
-// initMailer 只支持 log（开发/测试）；smtp 实现留到 P1 选型后补。
-func initMailer(_ context.Context, cfg *confshared.InfraConfig, infra *Infra) error {
-	switch cfg.Mailer.Type {
-	case "", "log":
-		infra.Mailer = infraadapter.NewLogMailer()
-	case "smtp":
-		return fmt.Errorf("mailer: smtp implementation is not available yet, use type=log")
-	default:
-		return fmt.Errorf("mailer: unknown type %q", cfg.Mailer.Type)
-	}
-
-	return nil
-}
-
 // Component names one infra component that NewInfraWith can build.
 type Component string
 
@@ -332,7 +317,6 @@ const (
 	ComponentText2Image        Component = "text2image"
 	ComponentText2Audio        Component = "text2audio"
 	ComponentSandbox           Component = "sandbox"
-	ComponentMailer            Component = "mailer"
 )
 
 type infraInit struct {
@@ -359,7 +343,6 @@ func infraInits() []infraInit {
 		{ComponentText2Image, initText2Image},
 		{ComponentText2Audio, initText2Audio},
 		{ComponentSandbox, initSandbox},
-		{ComponentMailer, initMailer},
 	}
 }
 

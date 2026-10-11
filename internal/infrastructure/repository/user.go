@@ -6,32 +6,75 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	identityentity "github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
-	identityerrors "github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
+	identerr "github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
 	identityrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache"
 	cacheschema "github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache/schema"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/schema"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository/mapper"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type UserRepositoryImpl struct {
-	userStore database.UserStore
-	cache     cache.UserCache
+	userStore     database.UserStore
+	identityStore database.UserIdentityStore
+	transactor    database.Transactor
+	cache         cache.UserCache
 }
 
 var _ identityrepo.UserRepository = &UserRepositoryImpl{}
 
-func NewUserRepository(userStore database.UserStore, userCache cache.UserCache) identityrepo.UserRepository {
-	return &UserRepositoryImpl{userStore: userStore, cache: userCache}
+func NewUserRepository(
+	userStore database.UserStore,
+	identityStore database.UserIdentityStore,
+	transactor database.Transactor,
+	userCache cache.UserCache,
+) identityrepo.UserRepository {
+	return &UserRepositoryImpl{
+		userStore:     userStore,
+		identityStore: identityStore,
+		transactor:    transactor,
+		cache:         userCache,
+	}
 }
 
-func (r *UserRepositoryImpl) Save(ctx context.Context, user *identityentity.User) error {
-	if err := r.userStore.Upsert(ctx, mapper.UserToSchema(user)); err != nil {
-		return errors.WithMessage(err, "failed to save user")
+func (r *UserRepositoryImpl) Create(ctx context.Context, user *identityentity.User) error {
+	return r.create(ctx, mapper.UserToSchema(user))
+}
+
+func (r *UserRepositoryImpl) CreateWithPassword(
+	ctx context.Context,
+	user *identityentity.User,
+	passwordHash string,
+) error {
+	return r.create(ctx, mapper.UserToSchemaWithPassword(user, passwordHash))
+}
+
+// CreateWithFirstIdentity 建号与挂第一个身份必须原子，否则会留下没有登录方式的孤儿账号。
+func (r *UserRepositoryImpl) CreateWithFirstIdentity(
+	ctx context.Context,
+	user *identityentity.User,
+	identity *identityentity.UserIdentity,
+) error {
+	err := r.transactor.Transaction(ctx, func(txCtx context.Context) error {
+		if err := r.userStore.Create(txCtx, mapper.UserToSchema(user)); err != nil {
+			return err
+		}
+
+		return r.identityStore.Create(txCtx, mapper.UserIdentityToSchema(identity))
+	})
+	if err != nil {
+		return errors.WithMessage(err, "failed to create user with first identity")
 	}
 
-	r.deleteCache(ctx, user.Id.String())
+	return nil
+}
+
+func (r *UserRepositoryImpl) create(ctx context.Context, row *schema.User) error {
+	if err := r.userStore.Create(ctx, row); err != nil {
+		return errors.WithMessage(err, "failed to create user")
+	}
 
 	return nil
 }
@@ -45,7 +88,7 @@ func (r *UserRepositoryImpl) GetById(ctx context.Context, id valobj.Uid) (*ident
 	sch, err := r.userStore.GetById(ctx, id)
 	if err != nil {
 		if errors.Is(err, errors.ErrNoRecord) {
-			return nil, identityerrors.ErrUserNotFound
+			return nil, identerr.ErrUserNotFound
 		}
 
 		return nil, errors.WithMessage(err, "failed to get user by id")
@@ -61,21 +104,75 @@ func (r *UserRepositoryImpl) GetById(ctx context.Context, id valobj.Uid) (*ident
 	return user, nil
 }
 
-func (r *UserRepositoryImpl) GetByProviderSub(
-	ctx context.Context,
-	issuer identityentity.ProviderType,
-	sub string,
-) (*identityentity.User, error) {
-	sch, err := r.userStore.GetByProviderAndSub(ctx, string(issuer), sub)
+func (r *UserRepositoryImpl) GetByEmail(ctx context.Context, email string) (*identityentity.User, error) {
+	sch, err := r.userStore.GetByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, errors.ErrNoRecord) {
-			return nil, identityerrors.ErrUserNotFound
+			return nil, identerr.ErrUserNotFound
 		}
 
-		return nil, errors.WithMessage(err, "failed to get user by issuer and sub")
+		return nil, errors.WithMessage(err, "failed to get user by email")
 	}
 
 	return mapper.UserFromSchema(sch)
+}
+
+func (r *UserRepositoryImpl) GetPasswordHash(ctx context.Context, id valobj.Uid) (string, error) {
+	hash, err := r.userStore.GetPasswordHash(ctx, id)
+	if err != nil {
+		if errors.Is(err, errors.ErrNoRecord) {
+			return "", identerr.ErrUserNotFound
+		}
+
+		return "", errors.WithMessage(err, "failed to get password hash")
+	}
+
+	return hash, nil
+}
+
+func (r *UserRepositoryImpl) UpdateProfile(ctx context.Context, user *identityentity.User) error {
+	err := r.userStore.UpdateProfile(ctx, &schema.UserUpdateProfileParams{
+		Id:        user.Id,
+		Nickname:  user.Nickname,
+		UpdatedAt: user.UpdatedAt.Value(),
+	})
+	if err != nil {
+		return errors.WithMessage(err, "failed to update user profile")
+	}
+
+	r.deleteCache(ctx, user.Id.String())
+
+	return nil
+}
+
+func (r *UserRepositoryImpl) UpdateAvatar(ctx context.Context, user *identityentity.User) error {
+	err := r.userStore.UpdateAvatar(ctx, &schema.UserUpdateAvatarParams{
+		Id:        user.Id,
+		Avatar:    user.Avatar.Encode(),
+		UpdatedAt: user.UpdatedAt.Value(),
+	})
+	if err != nil {
+		return errors.WithMessage(err, "failed to update user avatar")
+	}
+
+	r.deleteCache(ctx, user.Id.String())
+
+	return nil
+}
+
+func (r *UserRepositoryImpl) UpdatePasswordHash(ctx context.Context, id valobj.Uid, hash string) error {
+	err := r.userStore.UpdatePasswordHash(ctx, &schema.UserUpdatePasswordParams{
+		Id:           id,
+		PasswordHash: hash,
+		UpdatedAt:    valobj.NewTime().Value(),
+	})
+	if err != nil {
+		return errors.WithMessage(err, "failed to update password hash")
+	}
+
+	// UpdatePasswordHash 不需要清缓存
+
+	return nil
 }
 
 func (r *UserRepositoryImpl) cacheGetById(ctx context.Context, id string) (*cacheschema.User, error) {

@@ -39,7 +39,7 @@ func (h *UpdateProfileHandler) Handle(ctx context.Context, cmd *UpdateProfileCom
 		return false, nil
 	}
 
-	if err := h.userRepo.Save(ctx, user); err != nil {
+	if err := h.userRepo.UpdateProfile(ctx, user); err != nil {
 		return false, errors.WithMessage(err, "update user profile failed")
 	}
 

@@ -6,7 +6,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	identityentity "github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
-	identityerrors "github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
+	identerr "github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
 	identityrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository/mapper"
@@ -42,7 +42,7 @@ func (r *UserSessionRepositoryImpl) Get(ctx context.Context, id string) (*identi
 	sch, err := r.cache.Get(ctx, id)
 	if err != nil {
 		if errors.Is(err, errors.ErrNoRecord) {
-			return nil, identityerrors.ErrUserSessionNotFound
+			return nil, identerr.ErrUserSessionNotFound
 		}
 
 		return nil, errors.WithMessage(err, "failed to get user session")

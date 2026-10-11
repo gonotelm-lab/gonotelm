@@ -42,6 +42,7 @@ func (s *Server) authMiddleware() app.HandlerFunc {
 		}
 
 		ctx = pkgcontext.WithUserId(ctx, authn.UserId)
+		ctx = pkgcontext.WithLoginSource(ctx, authn.LoginSource)
 		c.Next(ctx)
 	}
 }

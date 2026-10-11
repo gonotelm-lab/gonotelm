@@ -5,8 +5,8 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache/schema"
 )
 
-func LoginInfoToSchema(l *entity.TransientProviderLoginInfo) *schema.TransientProviderLoginInfo {
-	return &schema.TransientProviderLoginInfo{
+func OAuthStateToSchema(l *entity.OAuthState) *schema.OAuthState {
+	return &schema.OAuthState{
 		State:               l.State,
 		Nonce:               l.Nonce,
 		CodeVerifier:        l.CodeVerifier,
@@ -15,11 +15,13 @@ func LoginInfoToSchema(l *entity.TransientProviderLoginInfo) *schema.TransientPr
 		ReturnTo:            l.ReturnTo,
 		ProviderType:        string(l.ProviderType),
 		Device:              string(l.Device),
+		Mode:                string(l.Mode),
+		SessionId:           l.SessionId,
 	}
 }
 
-func LoginInfoFromSchema(s *schema.TransientProviderLoginInfo) *entity.TransientProviderLoginInfo {
-	return &entity.TransientProviderLoginInfo{
+func OAuthStateFromSchema(s *schema.OAuthState) *entity.OAuthState {
+	return &entity.OAuthState{
 		State:               s.State,
 		Nonce:               s.Nonce,
 		CodeVerifier:        s.CodeVerifier,
@@ -28,5 +30,7 @@ func LoginInfoFromSchema(s *schema.TransientProviderLoginInfo) *entity.Transient
 		ReturnTo:            s.ReturnTo,
 		ProviderType:        entity.ProviderType(s.ProviderType),
 		Device:              entity.DeviceType(s.Device),
+		Mode:                entity.ProviderLoginMode(s.Mode),
+		SessionId:           s.SessionId,
 	}
 }

@@ -53,15 +53,28 @@ func TestMigrate_AppliesAndIsIdempotent(t *testing.T) {
 
 	require.NoError(t, Migrate(ctx, stdDB))
 
-	// 0002_init.sql and 0003_init.sql must really create their tables,
 	// not just record a version.
-	for _, name := range []string{"users", "initjob_runs", "initjob_tasks"} {
+	for _, name := range []string{
+		"users", "initjob_runs", "initjob_tasks", "users_v2", "user_identities_v2",
+	} {
 		var tableName string
 		err = stdDB.QueryRowContext(ctx,
 			`SELECT table_name FROM information_schema.tables WHERE table_name = $1`, name,
 		).Scan(&tableName)
 		require.NoError(t, err, "table %s was not created", name)
 		assert.Equal(t, name, tableName)
+	}
+
+	// 身份唯一性只靠索引表达，漏了不会报错、只会静默放行重复数据，所以显式断言。
+	for _, name := range []string{
+		"uq_user_identities_v2_provider_subject", "uk_user_identities_v2_user_provider",
+	} {
+		var indexName string
+		err = stdDB.QueryRowContext(ctx,
+			`SELECT indexname FROM pg_indexes WHERE schemaname = current_schema() AND indexname = $1`, name,
+		).Scan(&indexName)
+		require.NoError(t, err, "unique index %s was not created", name)
+		assert.Equal(t, name, indexName)
 	}
 
 	// 二次调用不报错：goose 已应用的迁移会被跳过。

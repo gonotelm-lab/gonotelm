@@ -16,11 +16,13 @@ const (
 )
 
 type UserInfo struct {
-	Issuer    string
-	Subject   string
-	Name      string
-	AvatarURL string
-	Raw       map[string]any
+	Issuer        string
+	Subject       string
+	Name          string
+	Email         string
+	EmailVerified bool
+	AvatarURL     string
+	Raw           map[string]any
 }
 
 type Provider interface {

@@ -22,6 +22,8 @@ var (
 	testWorkerCheckpointStore     *WorkerCheckpointStoreImpl
 	testInitJobStore              *InitJobStoreImpl
 	testUserStore                 *UserStoreImpl
+	testUserIdentityStore         *UserIdentityStoreImpl
+	testTransactor                *TransactorImpl
 )
 
 func TestMain(m *testing.M) {
@@ -42,6 +44,8 @@ func TestMain(m *testing.M) {
 	testWorkerCheckpointStore = NewWorkerCheckpointStoreImpl(testDB)
 	testInitJobStore = NewInitJobStoreImpl(testDB)
 	testUserStore = NewUserStoreImpl(testDB)
+	testUserIdentityStore = NewUserIdentityStoreImpl(testDB)
+	testTransactor = NewTransactorImpl(testDB)
 
 	m.Run()
 

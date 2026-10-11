@@ -18,16 +18,24 @@ const (
 	sessionIdLength = 32
 )
 
+// 会话里记录的登录方式。
+const (
+	LoginSourcePassword = "password"
+	LoginSourceEmail    = "email"
+)
+
 type UserSession struct {
-	Id        string
-	UserId    valobj.Uid
-	CreatedAt valobj.Time
+	Id     string
+	UserId valobj.Uid
+	// LoginSource 本次登录方式：provider 名（github/google）或 password
+	LoginSource string
+	CreatedAt   valobj.Time
 	// ExpireAt 当前闲置过期时间点;活跃时滑动前移,但不越过绝对上限。
 	ExpireAt valobj.Time
 	Device   DeviceType
 }
 
-func NewUserSession(user *User, device DeviceType) (*UserSession, error) {
+func NewUserSession(user *User, device DeviceType, loginSource string) (*UserSession, error) {
 	id, err := idp.RandomString(sessionIdLength)
 	if err != nil {
 		return nil, err
@@ -35,11 +43,12 @@ func NewUserSession(user *User, device DeviceType) (*UserSession, error) {
 
 	createdAt := valobj.NewTime()
 	s := &UserSession{
-		Id:        id,
-		UserId:    user.Id,
-		CreatedAt: createdAt,
-		ExpireAt:  valobj.NewTimeFrom(createdAt.Time().Add(UserSessionIdleTimeout).UnixMilli()),
-		Device:    device,
+		Id:          id,
+		UserId:      user.Id,
+		LoginSource: loginSource,
+		CreatedAt:   createdAt,
+		ExpireAt:    valobj.NewTimeFrom(createdAt.Time().Add(UserSessionIdleTimeout).UnixMilli()),
+		Device:      device,
 	}
 	return s, nil
 }

@@ -53,9 +53,10 @@ type SandboxCache interface {
 	Delete(ctx context.Context, userId, notebookId string) error
 }
 
-type TransientProviderLoginInfoCache interface {
-	Set(ctx context.Context, state string, loginInfo *schema.TransientProviderLoginInfo) error
-	Get(ctx context.Context, state string) (*schema.TransientProviderLoginInfo, error)
+// OAuthStateCache OAuth 握手的一次性状态，state 明文不入 key。
+type OAuthStateCache interface {
+	Set(ctx context.Context, state string, oauthState *schema.OAuthState) error
+	Get(ctx context.Context, state string) (*schema.OAuthState, error)
 	Delete(ctx context.Context, state string) error
 }
 
@@ -85,15 +86,28 @@ type UserCache interface {
 	Delete(ctx context.Context, id string) error
 }
 
+// SignupCache 邮箱注册的待验证记录：主记录 + 链接索引 + 验证码错误计数。
+type SignupCache interface {
+	// Set 写入 pending 与链接索引；previousLinkTokenHash 非空时顺带删掉旧链接索引。
+	Set(ctx context.Context, pending *schema.SignupPending, previousLinkTokenHash string, ttl time.Duration) error
+	// GetByEmail 不存在时返回 errors.ErrNoRecord。
+	GetByEmail(ctx context.Context, email string) (*schema.SignupPending, error)
+	GetByLinkToken(ctx context.Context, linkToken string) (*schema.SignupPending, error)
+	DeleteByEmail(ctx context.Context, email string) error
+	// IncrAttempts 原子自增并返回新值。
+	IncrAttempts(ctx context.Context, email string, ttl time.Duration) (int64, error)
+}
+
 type Cache struct {
 	ChatMessageContextCache ChatContextMessageCache
 	ChatMessageStreamCache  ChatMessageStreamCache
 	ChatSuggestionCache     ChatSuggestionCache
 	SandboxCache            SandboxCache
-	LoginInfoCache          TransientProviderLoginInfoCache
+	OAuthStateCache         OAuthStateCache
 	UserSessionCache        UserSessionCache
 	StylePreviewCache       StylePreviewCache
 	UserCache               UserCache
+	SignupCache             SignupCache
 }
 
 var (

@@ -44,10 +44,16 @@ type ServerDeps struct {
 	ChatContextMessageRepo chatrepo.ContextMessageRepository
 	ChatStreamTaskRepo     chatrepo.StreamTaskRepository
 	ChatSuggestionRepo     chatrepo.SuggestionRepository
-	LoginInfoRepo          identrepo.LoginInfoRepository
+	ProviderRegistry       identrepo.ProviderRegistry
+	OAuthStateRepo         identrepo.OAuthStateRepository
 	UserRepo               identrepo.UserRepository
+	UserIdentityRepo       identrepo.UserIdentityRepository
 	UserSessionRepo        identrepo.UserSessionRepository
+	SignupRepo             identrepo.SignupRepository
 	UserService            *identityservice.UserService
+	PasswordHasher         adapter.PasswordHasher
+	Mailer                 adapter.Mailer
+	AuthVerifyURLBase      string
 
 	ChatSuggestService *chatsuggest.Service
 	EventBus           eventbus.Publisher
@@ -108,9 +114,19 @@ type Server struct {
 	authCallbackHandler  *authapp.CallbackHandler
 	authProvidersHandler *authapp.ProvidersHandler
 	authHandler          *authapp.AuthHandler
-	getMeHandler         *userapp.GetMeHandler
-	updateProfileHandler *userapp.UpdateProfileHandler
-	updateAvatarHandler  *userapp.UpdateAvatarHandler
+
+	authRegisterHandler                *authapp.RegisterHandler
+	authVerifyHandler                  *authapp.VerifyHandler
+	authResendHandler                  *authapp.ResendHandler
+	authPasswordLoginHandler           *authapp.PasswordLoginHandler
+	authSetPasswordHandler             *authapp.SetPasswordHandler
+	authBindHandler                    *authapp.BindHandler
+	authUnbindHandler                  *authapp.UnbindHandler
+	authListIdentitiesHandler          *authapp.ListIdentitiesHandler
+	authListSupportedIdentitiesHandler *authapp.ListSupportedIdentitiesHandler
+	getMeHandler                       *userapp.GetMeHandler
+	updateProfileHandler               *userapp.UpdateProfileHandler
+	updateAvatarHandler                *userapp.UpdateAvatarHandler
 }
 
 func NewServer(
@@ -223,13 +239,25 @@ func NewServer(
 		),
 		listStylePreviewsHandler: artifactapp.NewListStylePreviewsHandler(deps.StylePreviewRepo, deps.ObjectStore),
 
-		authLoginHandler:     authapp.NewLoginHandler(deps.LoginInfoRepo, deps.UserRepo, deps.UserSessionRepo),
-		authCallbackHandler:  authapp.NewCallbackHandler(deps.LoginInfoRepo, deps.UserService, deps.UserRepo, deps.UserSessionRepo),
-		authProvidersHandler: authapp.NewProvidersHandler(deps.LoginInfoRepo),
+		authLoginHandler:     authapp.NewLoginHandler(deps.ProviderRegistry, deps.OAuthStateRepo, deps.UserRepo, deps.UserSessionRepo),
+		authCallbackHandler:  authapp.NewCallbackHandler(deps.ProviderRegistry, deps.OAuthStateRepo, deps.UserService, deps.UserRepo, deps.UserSessionRepo),
+		authProvidersHandler: authapp.NewProvidersHandler(deps.ProviderRegistry),
 		authHandler:          authapp.NewAuthHandler(deps.UserRepo, deps.UserSessionRepo),
-		getMeHandler:         userapp.NewGetMeHandler(deps.UserRepo, deps.ObjectStore),
-		updateProfileHandler: userapp.NewUpdateProfileHandler(deps.UserRepo),
-		updateAvatarHandler:  userapp.NewUpdateAvatarHandler(deps.UserRepo, deps.ObjectStore, deps.KeyFactory),
+
+		authRegisterHandler: authapp.NewRegisterHandler(
+			deps.SignupRepo, deps.UserRepo, deps.PasswordHasher, deps.Mailer, deps.AuthVerifyURLBase,
+		),
+		authVerifyHandler:                  authapp.NewVerifyHandler(deps.SignupRepo, deps.UserService, deps.UserRepo, deps.UserSessionRepo),
+		authResendHandler:                  authapp.NewResendHandler(deps.SignupRepo, deps.UserRepo, deps.Mailer, deps.AuthVerifyURLBase),
+		authPasswordLoginHandler:           authapp.NewPasswordLoginHandler(deps.PasswordHasher, deps.UserRepo, deps.UserSessionRepo),
+		authSetPasswordHandler:             authapp.NewSetPasswordHandler(deps.UserService, deps.UserSessionRepo),
+		authBindHandler:                    authapp.NewBindHandler(deps.ProviderRegistry, deps.OAuthStateRepo, deps.UserRepo, deps.UserIdentityRepo),
+		authUnbindHandler:                  authapp.NewUnbindHandler(deps.UserService, deps.UserIdentityRepo),
+		authListIdentitiesHandler:          authapp.NewListIdentitiesHandler(deps.UserIdentityRepo),
+		authListSupportedIdentitiesHandler: authapp.NewListSupportedIdentitiesHandler(),
+		getMeHandler:                       userapp.NewGetMeHandler(deps.UserRepo, deps.UserIdentityRepo, deps.ObjectStore),
+		updateProfileHandler:               userapp.NewUpdateProfileHandler(deps.UserRepo),
+		updateAvatarHandler:                userapp.NewUpdateAvatarHandler(deps.UserRepo, deps.ObjectStore, deps.KeyFactory),
 	}
 
 	s.registerRoutes()
@@ -247,6 +275,7 @@ func (s *Server) registerRoutes() {
 			s.registerChatRoutes(v1AuthedGroup)
 			s.registerStudioRoutes(v1AuthedGroup)
 			s.registerUserRoutes(v1AuthedGroup)
+			s.registerAuthBindRoutes(v1AuthedGroup)
 		}
 
 		s.registerAuthRoutes(v1Group)

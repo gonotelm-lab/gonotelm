@@ -1,6 +1,43 @@
 package schema
 
-import "testing"
+import (
+	"testing"
+
+	identerr "github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
+	pkgerrors "github.com/gonotelm-lab/gonotelm/pkg/errors"
+)
+
+func TestEmailRegisterRequestRejectsBadEmail(t *testing.T) {
+	bad := []string{"", "user", "user@localhost", "user@example", "user @example.com", "user@example.c"}
+	for _, email := range bad {
+		req := &EmailRegisterRequest{Email: email, Password: "s3cret-pass"}
+		if err := req.Validate(); !pkgerrors.Is(err, identerr.ErrEmailInvalid) {
+			t.Fatalf("Validate(%q) = %v, want ErrEmailInvalid", email, err)
+		}
+	}
+
+	req := &EmailRegisterRequest{Email: "user@example.com", Password: ""}
+	if err := req.Validate(); pkgerrors.Is(err, identerr.ErrEmailInvalid) {
+		t.Fatal("missing password must not be reported as an email error")
+	}
+
+	req = &EmailRegisterRequest{Email: "E2E.User@Example.com", Password: "s3cret-pass"}
+	if err := req.Validate(); err != nil {
+		t.Fatalf("Validate() = %v, want nil", err)
+	}
+}
+
+func TestEmailRequestsValidateEmail(t *testing.T) {
+	if err := (&EmailResendRequest{Email: "nope"}).Validate(); !pkgerrors.Is(err, identerr.ErrEmailInvalid) {
+		t.Fatalf("resend should reject a bad email, got %v", err)
+	}
+	if err := (&EmailVerifyCodeRequest{Email: "nope", Code: "123456"}).Validate(); !pkgerrors.Is(err, identerr.ErrEmailInvalid) {
+		t.Fatalf("verify code should reject a bad email, got %v", err)
+	}
+	if err := (&EmailVerifyCodeRequest{Email: "user@example.com", Code: ""}).Validate(); err == nil {
+		t.Fatal("verify code should require the code")
+	}
+}
 
 func TestIsSafeReturnTo(t *testing.T) {
 	allowed := []string{"https://app.example.com", "http://localhost:5173"}

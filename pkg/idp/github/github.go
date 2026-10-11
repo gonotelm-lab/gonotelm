@@ -68,12 +68,24 @@ func (g *GitHub) GetUserInfo(ctx context.Context, code, verifier, _ string) (*id
 		return nil, fmt.Errorf("get github user: %w", err)
 	}
 
+	// /user only carries the email when the user made it public, so a non-empty
+	// value is verified. Otherwise ask the emails API, which needs `user:email`.
+	email, emailVerified := user.Email, user.Email != ""
+	if email == "" {
+		email, emailVerified, err = g.getUserEmails(ctx, token.AccessToken)
+		if err != nil {
+			return nil, fmt.Errorf("get github user emails: %w", err)
+		}
+	}
+
 	return &idp.UserInfo{
-		Issuer:    issuer,
-		Subject:   strconv.FormatInt(user.ID, 10),
-		Name:      user.Login,
-		AvatarURL: user.AvatarURL,
-		Raw:       user.raw(),
+		Issuer:        issuer,
+		Subject:       strconv.FormatInt(user.ID, 10),
+		Name:          user.Login,
+		Email:         email,
+		EmailVerified: emailVerified,
+		AvatarURL:     user.AvatarURL,
+		Raw:           user.raw(),
 	}, nil
 }
 
@@ -122,4 +134,52 @@ func (g *GitHub) getUser(ctx context.Context, accessToken string) (*user, error)
 	}
 
 	return &u, nil
+}
+
+// email is one entry of the "List email addresses for the authenticated user" API.
+type email struct {
+	Email    string `json:"email"`
+	Primary  bool   `json:"primary"`
+	Verified bool   `json:"verified"`
+}
+
+// getUserEmails calls the GitHub "List email addresses for the authenticated
+// user" API and picks the primary verified address, falling back to any
+// verified one.
+// Docs: https://docs.github.com/en/rest/users/emails#list-email-addresses-for-the-authenticated-user
+func (g *GitHub) getUserEmails(ctx context.Context, accessToken string) (string, bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, g.apiBaseURL+"/user/emails", nil)
+	if err != nil {
+		return "", false, err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Accept", "application/vnd.github+json")
+
+	resp, err := g.httpClient.Do(req)
+	if err != nil {
+		return "", false, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return "", false, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var emails []email
+	if err := json.NewDecoder(resp.Body).Decode(&emails); err != nil {
+		return "", false, err
+	}
+
+	var verified string
+	for _, e := range emails {
+		if e.Primary && e.Verified {
+			return e.Email, true, nil
+		}
+		if e.Verified && verified == "" {
+			verified = e.Email
+		}
+	}
+
+	return verified, verified != "", nil
 }

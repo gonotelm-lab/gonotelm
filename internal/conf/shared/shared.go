@@ -125,6 +125,17 @@ type InfraConfig struct {
 	DatabaseOlap    DatabaseConfig              `toml:"databaseOlap"`
 	Redis           cache.RedisCacheConfig      `toml:"redis"`
 	MessageQueue    mq.Config                   `toml:"messageQueue"`
+	Mailer          MailerConfig                `toml:"mailer"`
+}
+
+// MailerConfig 事务性邮件发送配置。
+type MailerConfig struct {
+	Type     string `toml:"type"` // log | smtp
+	Addr     string `toml:"addr"`
+	Username string `toml:"username"`
+	Password string `toml:"password"`
+	From     string `toml:"from"`
+	FromName string `toml:"fromName"`
 }
 
 func (c *InfraConfig) InitInfra() {

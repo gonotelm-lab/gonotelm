@@ -7,7 +7,9 @@ import (
 	authapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/identity/auth"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
+	domainerr "github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
 	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/schema"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 
@@ -19,12 +21,26 @@ import (
 func (s *Server) registerAuthRoutes(g *route.RouterGroup) {
 	authGroup := g.Group("/auth")
 	{
-		// POST /api/v1/auth/login
+		// GET /api/v1/auth/login 发起三方登录（302 跳 IdP）
 		authGroup.GET("/login", s.AuthLogin)
 		// POST /api/v1/auth/logout
 		authGroup.POST("/logout", s.AuthLogout)
 		// GET /api/v1/auth/providers
 		authGroup.GET("/providers", s.AuthProviders)
+
+		emailGroup := authGroup.Group("/email")
+		{
+			// POST /api/v1/auth/email/register
+			emailGroup.POST("/register", s.AuthEmailRegister)
+			// POST /api/v1/auth/email/login 邮箱密码登录
+			emailGroup.POST("/login", s.AuthEmailLogin)
+			// POST /api/v1/auth/email/verify 验证链接
+			emailGroup.POST("/verify", s.AuthEmailVerify)
+			// POST /api/v1/auth/email/verify/code 验证码
+			emailGroup.POST("/verify/code", s.AuthEmailVerifyCode)
+			// POST /api/v1/auth/email/resend
+			emailGroup.POST("/resend", s.AuthEmailResend)
+		}
 
 		// we use different callback endpoints for different providers
 		callbackGroup := authGroup.Group("/callback")
@@ -34,6 +50,23 @@ func (s *Server) registerAuthRoutes(g *route.RouterGroup) {
 			// GET /api/v1/auth/callback/google
 			callbackGroup.GET("/google", s.AuthCallback(entity.ProviderTypeGoogle))
 		}
+	}
+}
+
+// registerAuthBindRoutes 挂在鉴权组下：身份相关（已绑列表、支持的类型目录、绑定）与设置口令都要求已登录。
+func (s *Server) registerAuthBindRoutes(g *route.RouterGroup) {
+	authGroup := g.Group("/auth")
+	{
+		// GET /api/v1/auth/identities 当前账号已绑定的三方身份
+		authGroup.GET("/identities", s.AuthIdentities)
+		// GET /api/v1/auth/supported-identities 代码支持的身份类型目录
+		authGroup.GET("/supported-identities", s.AuthSupportedIdentities)
+		// PUT /api/v1/auth/password
+		authGroup.PUT("/password", s.AuthSetPassword)
+		// POST /api/v1/auth/identities/bind
+		authGroup.POST("/identities/bind", s.AuthBind)
+		// POST /api/v1/auth/identities/unbind
+		authGroup.POST("/identities/unbind", s.AuthUnbind)
 	}
 }
 
@@ -76,9 +109,9 @@ func (s *Server) AuthLogin(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	c.SetCookie(schema.AuthLoginStateCookieName,
+	c.SetCookie(schema.AuthOAuthStateCookieName,
 		resp.LoginInfo.State,
-		schema.AuthLoginStateCookieTTL,
+		schema.AuthOAuthStateCookieTTL,
 		"/",
 		"",
 		protocol.CookieSameSiteLaxMode,
@@ -111,20 +144,287 @@ func (s *Server) AuthProviders(ctx context.Context, c *app.RequestContext) {
 		providers = append(providers, schema.AuthProvider{Name: name})
 	}
 
-	http.OkResp(c, schema.AuthProvidersResponse{Providers: providers})
+	http.OkResp(c, schema.AuthProvidersResponse{
+		Providers:       providers,
+		PasswordEnabled: true,
+	})
+}
+
+func (s *Server) AuthEmailRegister(ctx context.Context, c *app.RequestContext) {
+	var req schema.EmailRegisterRequest
+	if err := c.BindAndValidate(&req); err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	resp, err := s.authRegisterHandler.Handle(ctx, &authapp.RegisterCommand{
+		Email:    req.Email,
+		Password: req.Password,
+	})
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	// 只有首次注册才下发票据；重复注册保留首次票据，不重置 cookie
+	if resp.Ticket != "" {
+		c.SetCookie(schema.SignupTicketCookieName,
+			resp.Ticket,
+			schema.SignupTicketCookieTTL,
+			"/",
+			"",
+			protocol.CookieSameSiteLaxMode,
+			true,
+			true,
+		)
+	}
+
+	http.OkRespNoContent(c)
+}
+
+func (s *Server) AuthEmailVerify(ctx context.Context, c *app.RequestContext) {
+	var req schema.EmailVerifyLinkRequest
+	if err := c.BindAndValidate(&req); err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	resp, err := s.authVerifyHandler.VerifyLink(ctx, &authapp.VerifyCommand{
+		Token:  req.Token,
+		Device: schema.DeviceOrWeb(req.LoginFrom),
+		Ticket: s.signupTicket(c),
+	})
+
+	s.finishSession(c, resp, err)
+}
+
+func (s *Server) AuthEmailVerifyCode(ctx context.Context, c *app.RequestContext) {
+	var req schema.EmailVerifyCodeRequest
+	if err := c.BindAndValidate(&req); err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	resp, err := s.authVerifyHandler.VerifyCode(ctx, &authapp.VerifyCommand{
+		Email:  req.Email,
+		Code:   req.Code,
+		Device: schema.DeviceOrWeb(req.LoginFrom),
+		Ticket: s.signupTicket(c),
+	})
+
+	s.finishSession(c, resp, err)
+}
+
+func (s *Server) AuthEmailResend(ctx context.Context, c *app.RequestContext) {
+	var req schema.EmailResendRequest
+	if err := c.BindAndValidate(&req); err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	if _, err := s.authResendHandler.Handle(ctx, &authapp.ResendCommand{Email: req.Email}); err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	http.OkRespNoContent(c)
+}
+
+func (s *Server) AuthEmailLogin(ctx context.Context, c *app.RequestContext) {
+	var req schema.PasswordLoginRequest
+	if err := c.BindAndValidate(&req); err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	resp, err := s.authPasswordLoginHandler.Handle(ctx, &authapp.PasswordLoginCommand{
+		Email:            req.Email,
+		Password:         req.Password,
+		Device:           schema.DeviceOrWeb(req.LoginFrom),
+		CurrentSessionId: string(c.Cookie(schema.AuthSessionCookieName)),
+	})
+
+	s.finishSession(c, resp, err)
+}
+
+func (s *Server) AuthSetPassword(ctx context.Context, c *app.RequestContext) {
+	var req schema.SetPasswordRequest
+	if err := c.BindAndValidate(&req); err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	resp, err := s.authSetPasswordHandler.Handle(ctx, &authapp.SetPasswordCommand{
+		UserId:      pkgcontext.GetUserId(ctx),
+		OldPassword: req.OldPassword,
+		NewPassword: req.NewPassword,
+	})
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	// 全部会话已作废：清掉当前浏览器的 cookie，让前端引导重新登录
+	c.SetCookie(schema.AuthSessionCookieName, "", -1, "/", "", protocol.CookieSameSiteLaxMode, true, true)
+	c.SetCookie(schema.AuthUserIdCookieName, "", -1, "/", "", protocol.CookieSameSiteLaxMode, true, false)
+
+	http.OkResp(c, schema.SetPasswordResponse{ReloginRequired: resp.ReloginRequired})
+}
+
+func (s *Server) AuthIdentities(ctx context.Context, c *app.RequestContext) {
+	resp, err := s.authListIdentitiesHandler.Handle(ctx)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	identities := make([]schema.AuthIdentity, 0, len(resp.Identities))
+	for _, identity := range resp.Identities {
+		identities = append(identities, schema.AuthIdentity{
+			BindId:                identity.Id.String(),
+			Provider:              identity.Provider.String(),
+			ProviderEmail:         identity.ProviderEmail,
+			ProviderEmailVerified: identity.ProviderEmailVerified,
+			BoundAt:               identity.BoundAt.Value(),
+			LastLoginAt:           identity.LastLoginAt.Value(),
+		})
+	}
+
+	http.OkResp(c, schema.AuthIdentitiesResponse{Identities: identities})
+}
+
+func (s *Server) AuthSupportedIdentities(ctx context.Context, c *app.RequestContext) {
+	resp, err := s.authListSupportedIdentitiesHandler.Handle(ctx)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	identities := make([]schema.AuthSupportedIdentity, 0, len(resp.Identities))
+	for _, identity := range resp.Identities {
+		identities = append(identities, schema.AuthSupportedIdentity{Provider: identity.Provider.String()})
+	}
+
+	http.OkResp(c, schema.AuthSupportedIdentitiesResponse{Identities: identities})
+}
+
+func (s *Server) AuthBind(ctx context.Context, c *app.RequestContext) {
+	var req schema.BindProviderRequest
+	if err := c.BindAndValidate(&req); err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	allowedOrigins := conf.NotelmGlobal().Auth.ReturnToAllowOrigins
+	if !schema.IsSafeReturnTo(req.ReturnTo, allowedOrigins) {
+		http.ErrResp(c, errors.ErrParams.Msgf("invalid return_to: %s", req.ReturnTo))
+		return
+	}
+
+	resp, err := s.authBindHandler.Handle(ctx, &authapp.BindCommand{
+		ProviderType: entity.ProviderType(req.Provider),
+		UserId:       pkgcontext.GetUserId(ctx),
+		SessionId:    string(c.Cookie(schema.AuthSessionCookieName)),
+		ReturnTo:     req.ReturnTo,
+	})
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	// 已绑在当前账号上：不发 state、不返回授权地址
+	if resp.AlreadyBound {
+		http.OkResp(c, schema.BindProviderResponse{AlreadyBound: true})
+		return
+	}
+
+	// state cookie 仍由后端下发，回调时校验；跳转交给前端
+	c.SetCookie(schema.AuthOAuthStateCookieName,
+		resp.LoginInfo.State,
+		schema.AuthOAuthStateCookieTTL,
+		"/",
+		"",
+		protocol.CookieSameSiteLaxMode,
+		true,
+		true,
+	)
+
+	http.OkResp(c, schema.BindProviderResponse{AuthorizeUrl: resp.LoginInfo.URL})
+}
+
+func (s *Server) AuthUnbind(ctx context.Context, c *app.RequestContext) {
+	var req schema.UnbindIdentityRequest
+	if err := c.BindAndValidate(&req); err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	if err := s.authUnbindHandler.Handle(ctx, &authapp.UnbindCommand{
+		BindId:       req.BindId,
+		ProviderType: entity.ProviderType(req.Provider),
+		UserId:       pkgcontext.GetUserId(ctx),
+	}); err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	http.OkRespNoContent(c)
+}
+
+// finishSession 登录/验证成功的收口：写会话 cookie、清注册票据、返回账号标识。
+func (s *Server) finishSession(c *app.RequestContext, resp *authapp.SessionResult, err error) {
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	s.setSessionCookies(c, resp.SessionId, resp.UserId)
+	c.SetCookie(schema.SignupTicketCookieName, "", -1, "/", "", protocol.CookieSameSiteLaxMode, true, true)
+
+	http.OkResp(c, schema.AuthSessionResponse{UserId: resp.UserId})
+}
+
+func (s *Server) setSessionCookies(c *app.RequestContext, sessionId, userId string) {
+	c.SetCookie(schema.AuthSessionCookieName,
+		sessionId,
+		schema.AuthSessionCookieTTL,
+		"/",
+		"",
+		protocol.CookieSameSiteLaxMode,
+		true,
+		true,
+	)
+
+	// set user id cookie (readable by frontend, do not trust for authz)
+	c.SetCookie(schema.AuthUserIdCookieName,
+		userId,
+		schema.AuthSessionCookieTTL,
+		"/",
+		"",
+		protocol.CookieSameSiteLaxMode,
+		true,
+		false,
+	)
+}
+
+func (s *Server) signupTicket(c *app.RequestContext) string {
+	return string(c.Cookie(schema.SignupTicketCookieName))
 }
 
 func (s *Server) AuthCallback(providerType entity.ProviderType) func(ctx context.Context, c *app.RequestContext) {
 	return func(ctx context.Context, c *app.RequestContext) {
 		var req schema.AuthCallbackRequest
 		if err := c.BindAndValidate(&req); err != nil {
-			http.ErrResp(c, err)
+			// 浏览器整页导航到回调地址，任何失败都必须 302 回前端而不是回 JSON
+			s.redirectCallbackError(ctx, c, providerType, nil, err)
 			return
 		}
 
 		// check if is error
 		if req.IsError() {
-			http.ErrResp(c, errors.ErrUnauthorized.Msgf("%s %s", req.Error, req.ErrorDescription))
+			// provider 侧报错（如用户拒绝授权）：state 还在，只读它决定落登录页还是账号设置页
+			s.redirectCallbackError(ctx, c, providerType,
+				s.authCallbackHandler.PeekState(ctx, req.State), domainerr.ErrIDPError)
 			return
 		}
 
@@ -141,34 +441,17 @@ func (s *Server) AuthCallback(providerType entity.ProviderType) func(ctx context
 			CurrentSessionId: currentSessionId,
 		})
 		if err != nil {
-			http.ErrResp(c, err)
+			s.redirectCallbackError(ctx, c, providerType, resp, err)
 			return
 		}
 
-		// set user session cookie
-		c.SetCookie(schema.AuthSessionCookieName,
-			resp.SessionId,
-			schema.AuthSessionCookieTTL,
-			"/",
-			"",
-			protocol.CookieSameSiteLaxMode,
-			true,
-			true,
-		)
-
-		// set user id cookie (readable by frontend, do not trust for authz)
-		c.SetCookie(schema.AuthUserIdCookieName,
-			resp.UserId,
-			schema.AuthSessionCookieTTL,
-			"/",
-			"",
-			protocol.CookieSameSiteLaxMode,
-			true,
-			false,
-		)
+		// 只有登录流程签发新会话；绑定流程复用当前会话
+		if !resp.Mode.IsBindMode() {
+			s.setSessionCookies(c, resp.SessionId, resp.UserId)
+		}
 
 		// clear state cookie
-		c.SetCookie(schema.AuthLoginStateCookieName, "", -1, "/", "", protocol.CookieSameSiteLaxMode, true, true)
+		c.SetCookie(schema.AuthOAuthStateCookieName, "", -1, "/", "", protocol.CookieSameSiteLaxMode, true, true)
 
 		returnTo := resp.ReturnTo
 		if returnTo == "" || !schema.IsSafeReturnTo(returnTo, conf.NotelmGlobal().Auth.ReturnToAllowOrigins) {

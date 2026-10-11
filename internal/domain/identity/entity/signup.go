@@ -1,0 +1,126 @@
+package entity
+
+import (
+	"crypto/rand"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/hex"
+	"fmt"
+	"math/big"
+	"regexp"
+	"time"
+
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	identerr "github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/idp"
+)
+
+const (
+	SignupPendingTTL      = 24 * time.Hour
+	SignupLinkTokenLength = 32
+	SignupCodeTTL         = 15 * time.Minute
+	SignupMaxCodeAttempts = 5
+
+	MinPasswordBytes = 8
+	// bcrypt 只使用前 72 字节，超长必须直接拒绝而不是静默截断
+	MaxPasswordBytes = 72
+)
+
+// SignupPending 待验证的邮箱注册。账号在验证通过后才建立
+type SignupPending struct {
+	Email         string
+	PasswordHash  string
+	TicketHash    string
+	LinkTokenHash string
+	CodeHash      string
+	CodeExpireAt  valobj.Time
+	CreatedAt     valobj.Time
+}
+
+func NewSignupPending(email, passwordHash, ticket string) *SignupPending {
+	return &SignupPending{
+		Email:        NormalizeEmail(email),
+		PasswordHash: passwordHash,
+		TicketHash:   HashSecret(ticket),
+		CreatedAt:    valobj.NewTime(),
+	}
+}
+
+// IssueCredentials 生成链接 token 与 6 位验证码，只把哈希写回记录；明文仅出现在邮件里。
+func (p *SignupPending) IssueCredentials() (linkToken, code string, err error) {
+	linkToken, err = idp.RandomString(SignupLinkTokenLength)
+	if err != nil {
+		return "", "", err
+	}
+
+	code, err = randomSignupCode()
+	if err != nil {
+		return "", "", err
+	}
+
+	p.LinkTokenHash = HashSecret(linkToken)
+	p.CodeHash = HashSecret(code)
+	p.CodeExpireAt = valobj.NewTimeFrom(time.Now().Add(SignupCodeTTL).UnixMilli())
+
+	return linkToken, code, nil
+}
+
+// MatchesTicket 注册票据只属于发起注册的那个浏览器，命中才允许激活口令（方案 F）。
+func (p *SignupPending) MatchesTicket(ticket string) bool {
+	return p.TicketHash != "" && constantTimeEqual(p.TicketHash, HashSecret(ticket))
+}
+
+func (p *SignupPending) MatchesCode(code string) bool {
+	if p.IsCodeExpired(time.Now()) {
+		return false
+	}
+
+	return constantTimeEqual(p.CodeHash, HashSecret(code))
+}
+
+func (p *SignupPending) IsCodeExpired(now time.Time) bool {
+	return now.After(p.CodeExpireAt.Time())
+}
+
+func HashSecret(raw string) string {
+	sum := sha256.Sum256([]byte(raw))
+
+	return hex.EncodeToString(sum[:])
+}
+
+func constantTimeEqual(a, b string) bool {
+	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
+}
+
+// 邮箱形状：允许的 local part 按 HTML5 规范去掉反引号；域名必须带点且 TLD 为字母。
+// 有意不接受 IP 字面量与 Unicode（IDN）地址——归一化按 ASCII 小写处理。
+var emailRegexp = regexp.MustCompile(
+	`^[A-Za-z0-9.!#$%&'*+/=?^_{|}~-]+@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$`,
+)
+
+// ValidateEmail 只做格式粗筛，邮箱是否真实由验证链接/验证码证明。
+func ValidateEmail(email string) error {
+	if email == "" || len(email) > 255 || !emailRegexp.MatchString(email) {
+		return identerr.ErrEmailInvalid
+	}
+
+	return nil
+}
+
+// ValidatePassword 口令长度按字节计：下限防弱口令，上限对齐 bcrypt。
+func ValidatePassword(plain string) error {
+	if len(plain) < MinPasswordBytes || len(plain) > MaxPasswordBytes {
+		return identerr.ErrWeakPassword
+	}
+
+	return nil
+}
+
+func randomSignupCode() (string, error) {
+	n, err := rand.Int(rand.Reader, big.NewInt(1_000_000))
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%06d", n.Int64()), nil
+}

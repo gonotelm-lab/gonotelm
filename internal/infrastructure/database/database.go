@@ -94,9 +94,24 @@ type WorkerCheckpointStore interface {
 
 type UserStore interface {
 	Create(ctx context.Context, user *schema.User) error
-	Upsert(ctx context.Context, user *schema.User) error
 	GetById(ctx context.Context, id valobj.Uid) (*schema.User, error)
-	GetByProviderAndSub(ctx context.Context, provider, sub string) (*schema.User, error)
+	GetByEmail(ctx context.Context, email string) (*schema.User, error)
+	// GetPasswordHash 只读口令列，避免它混进用户实体/缓存/日志
+	GetPasswordHash(ctx context.Context, id valobj.Uid) (string, error)
+	UpdateProfile(ctx context.Context, params *schema.UserUpdateProfileParams) error
+	UpdateAvatar(ctx context.Context, params *schema.UserUpdateAvatarParams) error
+	UpdatePasswordHash(ctx context.Context, params *schema.UserUpdatePasswordParams) error
+}
+
+type UserIdentityStore interface {
+	Create(ctx context.Context, identity *schema.UserIdentity) error
+	GetByProviderAndSubject(ctx context.Context, provider, subject string) (*schema.UserIdentity, error)
+	// GetByUserIdAndId 按 (账号, 身份 id) 取；归属由查询本身保证，不靠调用方再比对 user_id
+	GetByUserIdAndId(ctx context.Context, userId valobj.Uid, id valobj.Id) (*schema.UserIdentity, error)
+	ListByUserId(ctx context.Context, userId valobj.Uid) ([]*schema.UserIdentity, error)
+	UpdateLastLoginAt(ctx context.Context, id valobj.Id, lastLoginAt int64) error
+	Delete(ctx context.Context, id valobj.Id) error
+	DeleteByUserId(ctx context.Context, userId valobj.Uid) error
 }
 
 // InitJobStore persists initjob run and task records. It speaks rows only; the
@@ -124,6 +139,8 @@ type Dao struct {
 	WorkerCheckpointStore     WorkerCheckpointStore
 	InitJobStore              InitJobStore
 	UserStore                 UserStore
+	UserIdentityStore         UserIdentityStore
+	Transactor                Transactor
 }
 
 func NewDao(
@@ -137,6 +154,8 @@ func NewDao(
 	workerCheckpointStore WorkerCheckpointStore,
 	initJobStore InitJobStore,
 	userStore UserStore,
+	userIdentityStore UserIdentityStore,
+	transactor Transactor,
 ) *Dao {
 	return &Dao{
 		Closer:                    closer,
@@ -149,6 +168,8 @@ func NewDao(
 		WorkerCheckpointStore:     workerCheckpointStore,
 		InitJobStore:              initJobStore,
 		UserStore:                 userStore,
+		UserIdentityStore:         userIdentityStore,
+		Transactor:                transactor,
 	}
 }
 

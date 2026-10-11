@@ -8,10 +8,11 @@ import (
 
 func UserSessionToSchema(s *identityentity.UserSession) *schema.UserSession {
 	return &schema.UserSession{
-		UserId:    s.UserId.String(),
-		CreatedAt: s.CreatedAt.Value(),
-		ExpireAt:  s.ExpireAt.Value(),
-		Device:    string(s.Device),
+		UserId:      s.UserId.String(),
+		LoginSource: s.LoginSource,
+		CreatedAt:   s.CreatedAt.Value(),
+		ExpireAt:    s.ExpireAt.Value(),
+		Device:      string(s.Device),
 	}
 }
 
@@ -22,10 +23,11 @@ func UserSessionFromSchema(id string, s *schema.UserSession) (*identityentity.Us
 	}
 
 	return &identityentity.UserSession{
-		Id:        id,
-		UserId:    userId,
-		CreatedAt: valobj.NewTimeFrom(s.CreatedAt),
-		ExpireAt:  valobj.NewTimeFrom(s.ExpireAt),
-		Device:    identityentity.DeviceType(s.Device),
+		Id:          id,
+		UserId:      userId,
+		LoginSource: s.LoginSource,
+		CreatedAt:   valobj.NewTimeFrom(s.CreatedAt),
+		ExpireAt:    valobj.NewTimeFrom(s.ExpireAt),
+		Device:      identityentity.DeviceType(s.Device),
 	}, nil
 }

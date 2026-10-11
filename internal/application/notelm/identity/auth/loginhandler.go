@@ -4,24 +4,28 @@ import (
 	"context"
 
 	"github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
-	identityerrors "github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
-	"github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
+	identerr "github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
+	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
+// LoginHandler 发起三方登录：取 provider 的 authorize URL，并把本次握手的 state 存起来。
 type LoginHandler struct {
 	*baseHandler
-	loginRepo repository.LoginInfoRepository
+	registry  identrepo.ProviderRegistry
+	stateRepo identrepo.OAuthStateRepository
 }
 
 func NewLoginHandler(
-	loginProviderRepo repository.LoginInfoRepository,
-	userRepo repository.UserRepository,
-	userSessionRepo repository.UserSessionRepository,
+	registry identrepo.ProviderRegistry,
+	stateRepo identrepo.OAuthStateRepository,
+	userRepo identrepo.UserRepository,
+	userSessionRepo identrepo.UserSessionRepository,
 ) *LoginHandler {
 	return &LoginHandler{
 		baseHandler: newBaseHandler(userRepo, userSessionRepo),
-		loginRepo:   loginProviderRepo,
+		registry:    registry,
+		stateRepo:   stateRepo,
 	}
 }
 
@@ -50,30 +54,27 @@ func (h *LoginHandler) Handle(ctx context.Context, cmd *LoginHandleCommand) (*Lo
 				ReturnTo:      cmd.ReturnTo,
 			}, nil
 		}
-		if !errors.Is(err, identityerrors.ErrUserSessionNotFound) {
+		if !errors.Is(err, identerr.ErrUserSessionNotFound) {
 			return nil, errors.WithMessage(err, "check current session failed")
 		}
 	}
 
-	provider, err := h.loginRepo.GetProvider(ctx, cmd.LoginProvider)
+	provider, err := h.registry.GetProvider(ctx, cmd.LoginProvider)
 	if err != nil {
 		return nil, errors.WithMessage(err, "provide login provider failed")
 	}
 
-	request := &entity.LoginInfoRequest{
+	loginInfo, err := provider.LoginInfo(ctx, &entity.LoginInfoRequest{
 		ReturnTo: cmd.ReturnTo,
 		Device:   cmd.LoginFrom,
-	}
-
-	loginInfo, err := provider.LoginInfo(ctx, request)
+		Mode:     entity.ProviderLoginModeLogin,
+	})
 	if err != nil {
 		return nil, errors.WithMessage(err, "get login info failed")
 	}
 
-	// store short lived login info
-	err = h.loginRepo.SaveTransientLoginInfo(ctx, loginInfo.ToTransient())
-	if err != nil {
-		return nil, errors.WithMessage(err, "save transient login info failed")
+	if err := h.stateRepo.Save(ctx, loginInfo.ToOAuthState()); err != nil {
+		return nil, errors.WithMessage(err, "save login state failed")
 	}
 
 	return &LoginHandleResult{

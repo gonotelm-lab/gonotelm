@@ -34,7 +34,8 @@ func TestOpen(t *testing.T) {
 
 	if dao.NotebookStore == nil || dao.SourceStore == nil || dao.ChatStore == nil ||
 		dao.ChatMessageStore == nil || dao.ArtifactStore == nil ||
-		dao.ArtifactStylePreviewStore == nil || dao.WorkerCheckpointStore == nil {
+		dao.ArtifactStylePreviewStore == nil || dao.WorkerCheckpointStore == nil ||
+		dao.UserStore == nil || dao.UserIdentityStore == nil || dao.Transactor == nil {
 		t.Errorf("Open() returned dao with missing stores: %+v", dao)
 	}
 }

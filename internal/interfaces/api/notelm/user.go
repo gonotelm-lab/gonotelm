@@ -35,10 +35,12 @@ func (s *Server) GetMe(ctx context.Context, c *app.RequestContext) {
 	http.OkResp(c, schema.MeResponse{
 		UserId:      resp.UserId,
 		Nickname:    resp.Nickname,
+		Email:       resp.Email,
 		AvatarUrl:   resp.AvatarUrl,
 		CreatedAt:   resp.CreatedAt.Value(),
 		UpdatedAt:   resp.UpdatedAt.Value(),
-		LoginSource: resp.LoginSource.String(),
+		LoginSource: resp.LoginSource,
+		HasPassword: resp.HasPassword,
 	})
 }
 

@@ -215,6 +215,12 @@ func TestGetUserInfo(t *testing.T) {
 	if userInfo.Name != "Ada Lovelace" {
 		t.Fatalf("unexpected name: %q", userInfo.Name)
 	}
+	if userInfo.Email != "ada@example.com" {
+		t.Fatalf("unexpected email: %q", userInfo.Email)
+	}
+	if !userInfo.EmailVerified {
+		t.Fatal("email must be reported as verified")
+	}
 	if userInfo.AvatarURL != "https://example.com/avatar.png" {
 		t.Fatalf("unexpected avatar url: %q", userInfo.AvatarURL)
 	}
@@ -226,6 +232,42 @@ func TestGetUserInfo(t *testing.T) {
 	}
 	if got := userInfo.Raw["hd"]; got != "example.com" {
 		t.Fatalf("unexpected raw hd: %v", got)
+	}
+}
+
+func TestGetUserInfoUnverifiedEmail(t *testing.T) {
+	key := newTestKey(t)
+	idToken := signIDToken(t, key, testNonce, nil)
+
+	srv := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/token":
+			writeToken(w, idToken)
+		case "/jwks":
+			writeJWKS(w, key)
+		case "/userinfo":
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"sub":            testSubject,
+				"email":          "unverified@example.com",
+				"email_verified": false,
+			})
+		default:
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+
+	g := newProvider(t, srv.URL)
+	userInfo, err := g.GetUserInfo(context.Background(), "auth-code", "verifier", testNonce)
+	if err != nil {
+		t.Fatalf("get user info failed: %v", err)
+	}
+
+	if userInfo.Email != "unverified@example.com" {
+		t.Fatalf("unexpected email: %q", userInfo.Email)
+	}
+	if userInfo.EmailVerified {
+		t.Fatal("email must not be reported as verified")
 	}
 }
 

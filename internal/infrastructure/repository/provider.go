@@ -9,8 +9,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
 	domainerr "github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository/mapper"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/httpclient"
 	"github.com/gonotelm-lab/gonotelm/pkg/idp"
@@ -18,23 +16,19 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/idp/google"
 )
 
-type LoginInfoRepositoryImpl struct {
+// ProviderRegistryImpl 按配置构造三方 provider；未配置凭据的直接跳过。
+type ProviderRegistryImpl struct {
 	mu        sync.RWMutex
 	providers map[entity.ProviderType]entity.Provider
-	cache     cache.TransientProviderLoginInfoCache
 }
 
-var _ repository.LoginInfoRepository = &LoginInfoRepositoryImpl{}
+var _ repository.ProviderRegistry = &ProviderRegistryImpl{}
 
-func NewLoginInfoRepository(ctx context.Context,
-	cache cache.TransientProviderLoginInfoCache,
+func NewProviderRegistry(
+	ctx context.Context,
 	providersConfig map[string]idp.Config,
-) (repository.LoginInfoRepository, error) {
-	impl := &LoginInfoRepositoryImpl{
-		cache:     cache,
-		providers: make(map[entity.ProviderType]entity.Provider),
-	}
-
+) (repository.ProviderRegistry, error) {
+	impl := &ProviderRegistryImpl{providers: make(map[entity.ProviderType]entity.Provider)}
 	if err := impl.initProviders(ctx, providersConfig); err != nil {
 		return nil, errors.WithMessage(err, "failed to init login providers")
 	}
@@ -42,7 +36,7 @@ func NewLoginInfoRepository(ctx context.Context,
 	return impl, nil
 }
 
-func (r *LoginInfoRepositoryImpl) initProviders(ctx context.Context, providersConfig map[string]idp.Config) error {
+func (r *ProviderRegistryImpl) initProviders(ctx context.Context, providersConfig map[string]idp.Config) error {
 	client := httpclient.NewBuilder(nil).Build()
 
 	for k, v := range providersConfig {
@@ -78,38 +72,13 @@ func (r *LoginInfoRepositoryImpl) initProviders(ctx context.Context, providersCo
 	return nil
 }
 
-// 保存临时登录信息 一般保存的内容为 state code_verifier
-func (r *LoginInfoRepositoryImpl) SaveTransientLoginInfo(ctx context.Context, loginInfo *entity.TransientProviderLoginInfo) error {
-	err := r.cache.Set(ctx, loginInfo.State, mapper.LoginInfoToSchema(loginInfo))
-	if err != nil {
-		return errors.WithMessage(err, "failed to save transient login info")
-	}
-
-	return nil
-}
-
-func (r *LoginInfoRepositoryImpl) GetTransientLoginInfo(ctx context.Context, state string) (*entity.TransientProviderLoginInfo, error) {
-	sch, err := r.cache.Get(ctx, state)
-	if err != nil {
-		return nil, errors.WithMessage(err, "failed to get transient login info")
-	}
-	loginInfo := mapper.LoginInfoFromSchema(sch)
-
-	return loginInfo, nil
-}
-
-func (r *LoginInfoRepositoryImpl) DeleteTransientLoginInfo(ctx context.Context, state string) error {
-	err := r.cache.Delete(ctx, state)
-	if err != nil {
-		return errors.WithMessage(err, "failed to delete transient login info")
-	}
-
-	return nil
-}
-
-func (r *LoginInfoRepositoryImpl) GetProvider(ctx context.Context, providerType entity.ProviderType) (entity.Provider, error) {
+func (r *ProviderRegistryImpl) GetProvider(
+	ctx context.Context,
+	providerType entity.ProviderType,
+) (entity.Provider, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
+
 	provider, ok := r.providers[providerType]
 	if ok {
 		return provider, nil
@@ -118,7 +87,7 @@ func (r *LoginInfoRepositoryImpl) GetProvider(ctx context.Context, providerType 
 	return nil, domainerr.ErrProviderNotFound
 }
 
-func (r *LoginInfoRepositoryImpl) AvailableProviders() []entity.Provider {
+func (r *ProviderRegistryImpl) AvailableProviders() []entity.Provider {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -152,7 +121,10 @@ func (p *oauthLoginProvider) Type() entity.ProviderType {
 	return p.providerType
 }
 
-func (p *oauthLoginProvider) LoginInfo(ctx context.Context, request *entity.LoginInfoRequest) (*entity.ProviderLoginInfo, error) {
+func (p *oauthLoginProvider) LoginInfo(
+	ctx context.Context,
+	request *entity.LoginInfoRequest,
+) (*entity.ProviderLoginInfo, error) {
 	url, state, err := p.impl.AuthURL()
 	if err != nil {
 		return nil, errors.Wrapf(domainerr.ErrIDPError, "failed to get auth url, err=%s", err.Error())
@@ -169,20 +141,28 @@ func (p *oauthLoginProvider) LoginInfo(ctx context.Context, request *entity.Logi
 		ProviderType:        p.providerType,
 		ReturnTo:            request.ReturnTo,
 		Device:              request.Device,
+		Mode:                request.Mode,
+		SessionId:           request.SessionId,
 	}, nil
 }
 
-func (p *oauthLoginProvider) GetUserInfo(ctx context.Context, code string, state *entity.TransientProviderLoginInfo) (*entity.ProviderUserInfo, error) {
+func (p *oauthLoginProvider) GetUserInfo(
+	ctx context.Context,
+	code string,
+	state *entity.OAuthState,
+) (*entity.ProviderUserInfo, error) {
 	userInfo, err := p.impl.GetUserInfo(ctx, code, state.CodeVerifier, state.Nonce)
 	if err != nil {
 		return nil, errors.Wrapf(domainerr.ErrIDPExchangeError, "get user info: %s", err.Error())
 	}
 
 	return &entity.ProviderUserInfo{
-		Issuer:    userInfo.Issuer,
-		Subject:   userInfo.Subject,
-		Name:      userInfo.Name,
-		Raw:       userInfo.Raw,
-		AvatarURL: userInfo.AvatarURL,
+		Issuer:        userInfo.Issuer,
+		Subject:       userInfo.Subject,
+		Name:          userInfo.Name,
+		Raw:           userInfo.Raw,
+		AvatarURL:     userInfo.AvatarURL,
+		Email:         userInfo.Email,
+		EmailVerified: userInfo.EmailVerified,
 	}, nil
 }

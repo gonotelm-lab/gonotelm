@@ -151,6 +151,15 @@ func (c *CorsConfig) Init() {
 type AuthConfig struct {
 	// ReturnToAllowOrigins 登录后 return_to 允许跳转的站外来源白名单
 	ReturnToAllowOrigins []string `toml:"returnToAllowOrigins"`
+
+	// EmailVerifyURLBase 邮件里验证链接的前端落地页，最终链接为 base#token=xxx
+	EmailVerifyURLBase string `toml:"emailVerifyUrlBase"`
+
+	// LoginErrorURL 三方登录回调失败时的落地页
+	LoginErrorURL string `toml:"loginErrorUrl"`
+
+	// BindErrorURL 三方绑定回调失败时的落地页
+	BindErrorURL string `toml:"bindErrorUrl"`
 }
 
 func (c *AuthConfig) Init() {
@@ -194,6 +203,18 @@ func (c *NotelmConfig) init() {
 	c.Flow.Init()
 	c.Cors.Init()
 	c.Auth.Init()
+
+	if c.Auth.EmailVerifyURLBase == "" {
+		c.Auth.EmailVerifyURLBase = "http://127.0.0.1:5173/verify-email"
+	}
+
+	if c.Auth.LoginErrorURL == "" {
+		c.Auth.LoginErrorURL = "http://127.0.0.1:5173/login"
+	}
+
+	if c.Auth.BindErrorURL == "" {
+		c.Auth.BindErrorURL = "http://127.0.0.1:5173/?settings=account"
+	}
 
 	if c.MessageQueue.Type == "" {
 		c.MessageQueue.Type = mqimpl.Kafka

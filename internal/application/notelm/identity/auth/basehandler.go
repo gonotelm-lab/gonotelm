@@ -7,7 +7,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	identityentity "github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
-	identityerrors "github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
+	identerr "github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
 	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
@@ -30,13 +30,14 @@ func newBaseHandler(
 }
 
 type AuthenticateResult struct {
-	UserId valobj.Uid
+	UserId      valobj.Uid
+	LoginSource string
 }
 
-// authenticate 校验会话凭证。凭证为空、会话不存在或已失效统一返回 identityerrors.ErrUserSessionNotFound。
+// authenticate 校验会话凭证。凭证为空、会话不存在或已失效统一返回 identerr.ErrUserSessionNotFound。
 func (h *baseHandler) authenticate(ctx context.Context, sessionId string) (*AuthenticateResult, error) {
 	if sessionId == "" {
-		return nil, identityerrors.ErrUserSessionNotFound
+		return nil, identerr.ErrUserSessionNotFound
 	}
 
 	session, err := h.userSessionRepo.Get(ctx, sessionId)
@@ -46,20 +47,20 @@ func (h *baseHandler) authenticate(ctx context.Context, sessionId string) (*Auth
 
 	now := time.Now()
 	if session.IsExpired(now) {
-		return nil, identityerrors.ErrUserSessionNotFound
+		return nil, identerr.ErrUserSessionNotFound
 	}
 
 	// 会话有效不代表用户可用：封禁可能发生在会话签发之后，
 	user, err := h.userRepo.GetById(ctx, session.UserId)
 	if err != nil {
 		// 用户已被删除，会话一并视为失效，走 401 重新登录
-		if errors.Is(err, identityerrors.ErrUserNotFound) {
-			return nil, identityerrors.ErrUserSessionNotFound
+		if errors.Is(err, identerr.ErrUserNotFound) {
+			return nil, identerr.ErrUserSessionNotFound
 		}
 		return nil, errors.WithMessage(err, "failed to get user")
 	}
 	if user.IsBanned() {
-		return nil, identityerrors.ErrUserBanned
+		return nil, identerr.ErrUserBanned
 	}
 
 	// 会话有效时按需滑动续期(闲置 UserSessionIdleTimeout,自登录起最长 UserSessionMaxAge);
@@ -72,7 +73,7 @@ func (h *baseHandler) authenticate(ctx context.Context, sessionId string) (*Auth
 		}
 	}
 
-	return &AuthenticateResult{UserId: session.UserId}, nil
+	return &AuthenticateResult{UserId: session.UserId, LoginSource: session.LoginSource}, nil
 }
 
 // issueSession 为用户签发新会话并持久化。
@@ -80,8 +81,9 @@ func (h *baseHandler) issueSession(
 	ctx context.Context,
 	user *identityentity.User,
 	device identityentity.DeviceType,
+	loginSource string,
 ) (*identityentity.UserSession, error) {
-	session, err := identityentity.NewUserSession(user, device)
+	session, err := identityentity.NewUserSession(user, device, loginSource)
 	if err != nil {
 		return nil, errors.WithMessage(err, "failed to new user session")
 	}

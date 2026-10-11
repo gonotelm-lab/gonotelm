@@ -91,19 +91,27 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 	)
 	streamTaskRepo := repository.NewStreamTaskRepository(infra.Cache.ChatMessageStreamCache)
 	suggestionRepo := repository.NewSuggestionRepository(infra.Cache.ChatSuggestionCache)
-	loginInfoRepo, err := repository.NewLoginInfoRepository(rootCtx, infra.Cache.LoginInfoCache, cfg.ToIDPConfig())
+	providerRegistry, err := repository.NewProviderRegistry(rootCtx, cfg.ToIDPConfig())
 	if err != nil {
 		return nil, err
 	}
+	oauthStateRepo := repository.NewOAuthStateRepository(infra.Cache.OAuthStateCache)
 	userRepo := repository.NewUserRepository(
 		infra.Database.UserStore,
+		infra.Database.UserIdentityStore,
+		infra.Database.Transactor,
 		infra.Cache.UserCache,
 	)
+	userIdentityRepo := repository.NewUserIdentityRepository(infra.Database.UserIdentityStore)
+	signupRepo := repository.NewSignupRepository(infra.Cache.SignupCache)
+	passwordHasher := adapter.NewBcryptHasher()
 	userService := identityservice.NewUserService(
 		userRepo,
+		userIdentityRepo,
 		infra.DistLock,
 		infra.KeyFactory,
 		infra.ObjectStore,
+		passwordHasher,
 	)
 	userSessionRepo := repository.NewUserSessionRepository(infra.Cache.UserSessionCache)
 
@@ -198,10 +206,16 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 			ChatSuggestService:     suggestionService,
 			ArtifactRepo:           artifactRepo,
 			StylePreviewRepo:       stylePreviewRepo,
-			LoginInfoRepo:          loginInfoRepo,
+			ProviderRegistry:       providerRegistry,
+			OAuthStateRepo:         oauthStateRepo,
 			UserRepo:               userRepo,
+			UserIdentityRepo:       userIdentityRepo,
+			SignupRepo:             signupRepo,
 			UserService:            userService,
 			UserSessionRepo:        userSessionRepo,
+			PasswordHasher:         passwordHasher,
+			Mailer:                 infra.Mailer,
+			AuthVerifyURLBase:      cfg.Auth.EmailVerifyURLBase,
 
 			EventBus:   eventBus,
 			WaitGroup:  wg,

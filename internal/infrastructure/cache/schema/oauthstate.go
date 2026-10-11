@@ -1,6 +1,7 @@
 package schema
 
-type TransientProviderLoginInfo struct {
+// OAuthState OAuth 握手状态在 Redis 里的载荷。
+type OAuthState struct {
 	State               string `msgpack:"state"`
 	Nonce               string `msgpack:"nonce"`
 	CodeVerifier        string `msgpack:"code_verifier"`
@@ -9,4 +10,6 @@ type TransientProviderLoginInfo struct {
 	ReturnTo            string `msgpack:"return_to"`
 	ProviderType        string `msgpack:"provider_type"`
 	Device              string `msgpack:"device"`
+	Mode                string `msgpack:"mode"`
+	SessionId           string `msgpack:"session_id"`
 }

@@ -9,6 +9,18 @@ allowOrigins = ["${GONOTELM_CORS_ALLOW_ORIGINS:-http://127.0.0.1:5173,http://loc
 
 [auth]
 returnToAllowOrigins = ["${GONOTELM_AUTH_RETURN_TO_ALLOW_ORIGINS:-http://127.0.0.1:5173,http://localhost:5173}"]
+emailVerifyUrlBase = "${GONOTELM_AUTH_EMAIL_VERIFY_URL_BASE:-http://127.0.0.1:5173/verify-email}"
+loginErrorUrl = "${GONOTELM_AUTH_LOGIN_ERROR_URL:-http://127.0.0.1:5173/login}"
+bindErrorUrl  = "${GONOTELM_AUTH_BIND_ERROR_URL:-http://127.0.0.1:5173/?settings=account}"
+
+[mailer]
+# log = 只打日志（开发/测试）；smtp 待 P1 选型后实现
+type     = "${GONOTELM_MAILER_TYPE:-log}"
+addr     = "${GONOTELM_MAILER_ADDR:-127.0.0.1:1025}"
+username = "${GONOTELM_MAILER_USERNAME:-}"
+password = "${GONOTELM_MAILER_PASSWORD:-}"
+from     = "${GONOTELM_MAILER_FROM:-no-reply@mail.gonotelm.com}"
+fromName = "${GONOTELM_MAILER_FROM_NAME:-GoNoteLM}"
 
 [database]
 type = "postgres"

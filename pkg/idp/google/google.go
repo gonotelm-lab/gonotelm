@@ -153,11 +153,13 @@ func (g *Google) GetUserInfo(ctx context.Context, code, verifier, nonce string) 
 	}
 
 	return &idp.UserInfo{
-		Issuer:    issuer,
-		Subject:   user.Sub,
-		Name:      name,
-		AvatarURL: user.Picture,
-		Raw:       user.raw(),
+		Issuer:        issuer,
+		Subject:       user.Sub,
+		Name:          name,
+		Email:         user.Email,
+		EmailVerified: user.EmailVerified,
+		AvatarURL:     user.Picture,
+		Raw:           user.raw(),
 	}, nil
 }
 

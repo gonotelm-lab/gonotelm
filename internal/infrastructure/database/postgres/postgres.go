@@ -44,5 +44,7 @@ func Open(cfg *sql.Config) (*database.Dao, error) {
 		NewWorkerCheckpointStoreImpl(db),
 		NewInitJobStoreImpl(db),
 		NewUserStoreImpl(db),
+		NewUserIdentityStoreImpl(db),
+		NewTransactorImpl(db),
 	), nil
 }

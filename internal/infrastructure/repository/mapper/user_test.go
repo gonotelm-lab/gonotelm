@@ -46,7 +46,7 @@ func TestUserToSchemaWithPassword(t *testing.T) {
 	assert.Equal(t, "bcrypt-hash", sch.PasswordHash)
 	assert.Equal(t, "users_v2", sch.TableName())
 
-	// 口令不会从 schema 回读进实体
+	// 密码不会从 schema 回读进实体
 	back, err := UserFromSchema(sch)
 	require.NoError(t, err)
 	assert.Equal(t, user.Id, back.Id)

@@ -26,7 +26,7 @@ func UserToSchemaWithPassword(u *identityentity.User, passwordHash string) *sche
 	}
 }
 
-// UserFromSchema 有意丢弃 password_hash：口令只经 UserRepository 的口令方法读写。
+// UserFromSchema 有意丢弃 password_hash：密码只经 UserRepository 的密码方法读写。
 func UserFromSchema(u *schema.User) (*identityentity.User, error) {
 	avatar, err := valobj.DecodeStoreKey(u.Avatar)
 	if err != nil {

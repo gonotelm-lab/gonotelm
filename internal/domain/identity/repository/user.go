@@ -10,7 +10,7 @@ import (
 type UserRepository interface {
 	// 建号
 	Create(ctx context.Context, user *entity.User) error
-	// CreateWithPassword 建号并同时写入口令
+	// CreateWithPassword 建号并同时写入密码
 	CreateWithPassword(ctx context.Context, user *entity.User, passwordHash string) error
 	// CreateWithFirstIdentity 建号与挂第一个身份必须原子
 	CreateWithFirstIdentity(ctx context.Context, user *entity.User, identity *entity.UserIdentity) error

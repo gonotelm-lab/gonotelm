@@ -154,6 +154,12 @@ type AuthConfig struct {
 	// ReturnToAllowOrigins 登录后 return_to 允许跳转的站外来源白名单
 	ReturnToAllowOrigins []string `toml:"returnToAllowOrigins"`
 
+	// EmailVerificationRequired 注册是否必须完成邮箱验证；false 时邮箱视为已验证
+	EmailVerificationRequired bool `toml:"emailVerificationRequired"`
+
+	// RequireComplexPassword 密码是否必须同时含大写字母、小写字母与数字
+	RequireComplexPassword bool `toml:"requireComplexPassword"`
+
 	// EmailVerifyURLBase 邮件里验证链接的前端落地页，最终链接为 base#token=xxx
 	EmailVerifyURLBase string `toml:"emailVerifyUrlBase"`
 

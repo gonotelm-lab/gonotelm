@@ -9,6 +9,8 @@ allowOrigins = ["${GONOTELM_CORS_ALLOW_ORIGINS:-http://127.0.0.1:5173,http://loc
 
 [auth]
 returnToAllowOrigins = ["${GONOTELM_AUTH_RETURN_TO_ALLOW_ORIGINS:-http://127.0.0.1:5173,http://localhost:5173}"]
+emailVerificationRequired = ${GONOTELM_AUTH_EMAIL_VERIFICATION_REQUIRED:-false}
+requireComplexPassword = ${GONOTELM_AUTH_REQUIRE_COMPLEX_PASSWORD:-true}
 emailVerifyUrlBase = "${GONOTELM_AUTH_EMAIL_VERIFY_URL_BASE:-http://127.0.0.1:5173/verify-email}"
 loginErrorUrl = "${GONOTELM_AUTH_LOGIN_ERROR_URL:-http://127.0.0.1:5173/login}"
 bindErrorUrl  = "${GONOTELM_AUTH_BIND_ERROR_URL:-http://127.0.0.1:5173/?settings=account}"

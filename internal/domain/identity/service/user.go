@@ -350,7 +350,7 @@ func (s *UserService) BindIdentity(
 	return agg, nil
 }
 
-// VerifyPassword 校验账号口令；无口令与口令错误一样返回 ErrInvalidCredentials。
+// VerifyPassword 校验账号密码；无密码与密码错误一样返回 ErrInvalidCredentials。
 func (s *UserService) VerifyPassword(ctx context.Context, userId valobj.Uid, plain string) error {
 	hash, err := s.userRepo.GetPasswordHash(ctx, userId)
 	if err != nil {
@@ -366,7 +366,7 @@ func (s *UserService) VerifyPassword(ctx context.Context, userId valobj.Uid, pla
 	return nil
 }
 
-// SetPassword 设置或修改口令：无口令时直接设置；已有口令必须给出正确的旧口令，
+// SetPassword 设置或修改密码：无密码时直接设置；已有密码必须给出正确的旧密码，
 func (s *UserService) SetPassword(
 	ctx context.Context,
 	userId valobj.Uid,
@@ -388,7 +388,7 @@ func (s *UserService) SetPassword(
 		if err := s.hasher.Verify(ctx, current, oldPassword); err != nil {
 			return domainerr.ErrInvalidCredentials
 		}
-		// 与库那份哈希比，而不是比客户端传来的两个明文：这才是"当前口令"的权威来源
+		// 与库那份哈希比，而不是比客户端传来的两个明文：这才是"当前密码"的权威来源
 		if err := s.hasher.Verify(ctx, current, newPassword); err == nil {
 			return domainerr.ErrPasswordUnchanged
 		}

@@ -37,7 +37,7 @@ type VerifyCommand struct {
 	Email  string
 	Code   string
 	Device entity.DeviceType
-	// Ticket 发起注册那个浏览器的票据；不匹配则不写口令
+	// Ticket 发起注册那个浏览器的票据；不匹配则不写密码
 	Ticket string
 }
 

@@ -51,7 +51,6 @@ type ServerDeps struct {
 	UserService            *identityservice.UserService
 	SignupService          *identityservice.SignupService
 	Mailer                 adapter.Mailer
-	AuthVerifyURLBase      string
 
 	ChatSuggestService *chatsuggest.Service
 	EventBus           eventbus.Publisher
@@ -114,6 +113,7 @@ type Server struct {
 	authHandler          *authapp.AuthHandler
 
 	authRegisterHandler                *authapp.RegisterHandler
+	authRegisterPrefetchHandler        *authapp.RegisterPrefetchHandler
 	authVerifyHandler                  *authapp.VerifyHandler
 	authResendHandler                  *authapp.ResendHandler
 	authPasswordLoginHandler           *authapp.PasswordLoginHandler
@@ -242,9 +242,15 @@ func NewServer(
 		authProvidersHandler: authapp.NewProvidersHandler(deps.ProviderRegistry),
 		authHandler:          authapp.NewAuthHandler(deps.UserService, deps.UserSessionRepo),
 
-		authRegisterHandler:                authapp.NewRegisterHandler(deps.SignupService, deps.Mailer, deps.AuthVerifyURLBase),
+		authRegisterHandler: authapp.NewRegisterHandler(
+			deps.SignupService,
+			deps.UserService,
+			deps.UserSessionRepo,
+			deps.Mailer,
+		),
+		authRegisterPrefetchHandler:        authapp.NewRegisterPrefetchHandler(),
 		authVerifyHandler:                  authapp.NewVerifyHandler(deps.SignupService, deps.UserService, deps.UserSessionRepo),
-		authResendHandler:                  authapp.NewResendHandler(deps.SignupService, deps.Mailer, deps.AuthVerifyURLBase),
+		authResendHandler:                  authapp.NewResendHandler(deps.SignupService, deps.Mailer),
 		authPasswordLoginHandler:           authapp.NewPasswordLoginHandler(deps.UserService, deps.UserSessionRepo),
 		authSetPasswordHandler:             authapp.NewSetPasswordHandler(deps.UserService, deps.UserSessionRepo),
 		authBindHandler:                    authapp.NewBindHandler(deps.ProviderRegistry, deps.OAuthStateRepo, deps.UserService),

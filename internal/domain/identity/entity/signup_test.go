@@ -60,6 +60,20 @@ func TestValidatePassword(t *testing.T) {
 	}
 }
 
+func TestValidateComplexPassword(t *testing.T) {
+	for _, weak := range []string{"12345678", "abcdefgh", "Abcdefgh", "abcd1234", "Ab1"} {
+		if err := ValidateComplexPassword(weak); !pkgerrors.Is(err, identerr.ErrWeakPassword) {
+			t.Fatalf("ValidateComplexPassword(%q) = %v, want ErrWeakPassword", weak, err)
+		}
+	}
+
+	for _, strong := range []string{"Abcd1234", "aaaaAAAA1", "P@ssw0rd"} {
+		if err := ValidateComplexPassword(strong); err != nil {
+			t.Fatalf("ValidateComplexPassword(%q) = %v, want nil", strong, err)
+		}
+	}
+}
+
 func TestSignupPendingCredentials(t *testing.T) {
 	pending := NewSignupPending("User@Example.COM", "bcrypt-hash", "raw-ticket")
 

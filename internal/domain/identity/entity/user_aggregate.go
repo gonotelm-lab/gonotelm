@@ -34,7 +34,7 @@ func (a *UserAggregate) Identities() []*UserIdentity {
 	return append([]*UserIdentity(nil), a.identities...)
 }
 
-// LoginMethodCount 口令算一种登录方式，每条三方身份算一种。
+// LoginMethodCount 密码算一种登录方式，每条三方身份算一种。
 func (a *UserAggregate) LoginMethodCount() int {
 	n := len(a.identities)
 	if a.hasPassword {

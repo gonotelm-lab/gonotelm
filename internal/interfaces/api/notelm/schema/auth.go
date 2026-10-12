@@ -17,7 +17,7 @@ const (
 	AuthOAuthStateCookieName = "_gnlm_oauth_state"
 	AuthOAuthStateCookieTTL  = 600 // 10 minutes
 
-	// SignupTicketCookieName 注册票据：只有发起注册的浏览器完成验证才激活口令
+	// SignupTicketCookieName 注册票据：只有发起注册的浏览器完成验证才激活密码
 	SignupTicketCookieName = "_gnlm_signup_ticket"
 	SignupTicketCookieTTL  = 24 * 60 * 60
 
@@ -45,9 +45,22 @@ func DeviceOrWeb(raw string) entity.DeviceType {
 	return entity.DeviceType(raw)
 }
 
+// EmailRegisterResponse 注册结果。EmailVerified 为 true 时账号已建好并已签发会话，
+// 客户端可直接进已登录态；false 时账号尚未建立，等待验证信里的链接或验证码。
+type EmailRegisterResponse struct {
+	EmailVerified bool   `json:"email_verified"`
+	UserId        string `json:"user_id,omitempty"`
+}
+
+// EmailRegisterPrefetchResponse 注册前的元数据，客户端据此即时校验表单。
+type EmailRegisterPrefetchResponse struct {
+	RequireComplexPassword bool `json:"require_complex_password"`
+}
+
 type EmailRegisterRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email     string `json:"email"`
+	Password  string `json:"password"`
+	LoginFrom string `json:"login_from,omitempty"`
 }
 
 func (req *EmailRegisterRequest) Validate() error {
@@ -56,6 +69,9 @@ func (req *EmailRegisterRequest) Validate() error {
 	}
 	if req.Password == "" {
 		return errors.ErrParams.Msg("password is required")
+	}
+	if req.LoginFrom != "" && !entity.CheckDeviceType(req.LoginFrom) {
+		return errors.ErrParams.Msgf("invalid login from: %s", req.LoginFrom)
 	}
 
 	return nil
@@ -142,7 +158,7 @@ func (req *SetPasswordRequest) Validate() error {
 	return nil
 }
 
-// SetPasswordResponse 改口令会作废该账号全部会话（含当前），前端据此引导重新登录。
+// SetPasswordResponse 改密码会作废该账号全部会话（含当前），前端据此引导重新登录。
 type SetPasswordResponse struct {
 	ReloginRequired bool `json:"relogin_required"`
 }
@@ -278,7 +294,7 @@ type AuthProvider struct {
 
 type AuthProvidersResponse struct {
 	Providers []AuthProvider `json:"providers"`
-	// PasswordEnabled 前端据此决定是否渲染邮箱+口令表单
+	// PasswordEnabled 前端据此决定是否渲染邮箱+密码表单
 	PasswordEnabled bool `json:"password_enabled"`
 }
 

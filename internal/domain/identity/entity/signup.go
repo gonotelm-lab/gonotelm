@@ -67,7 +67,7 @@ func (p *SignupPending) IssueCredentials() (linkToken, code string, err error) {
 	return linkToken, code, nil
 }
 
-// MatchesTicket 注册票据只属于发起注册的那个浏览器，命中才允许激活口令（方案 F）。
+// MatchesTicket 注册票据只属于发起注册的那个浏览器，命中才允许激活密码
 func (p *SignupPending) MatchesTicket(ticket string) bool {
 	return p.TicketHash != "" && constantTimeEqual(p.TicketHash, HashSecret(ticket))
 }
@@ -109,13 +109,39 @@ func ValidateEmail(email string) error {
 	return nil
 }
 
-// ValidatePassword 口令长度按字节计：下限防弱口令，上限对齐 bcrypt。
+// ValidatePassword 密码长度按字节计：下限防弱密码，上限对齐 bcrypt。
 func ValidatePassword(plain string) error {
 	if len(plain) < MinPasswordBytes || len(plain) > MaxPasswordBytes {
 		return identerr.ErrWeakPassword
 	}
 
 	return nil
+}
+
+// ValidateComplexPassword 复杂密码：长度照旧要过，另需同时含大写字母、小写字母与数字。
+// 是否启用由部署配置决定。
+func ValidateComplexPassword(plain string) error {
+	if err := ValidatePassword(plain); err != nil {
+		return err
+	}
+
+	if !hasUpperLowerDigit(plain) {
+		return identerr.ErrWeakPassword
+	}
+
+	return nil
+}
+
+var (
+	upperLetterRegexp = regexp.MustCompile(`[A-Z]`)
+	lowerLetterRegexp = regexp.MustCompile(`[a-z]`)
+	digitRegexp       = regexp.MustCompile(`[0-9]`)
+)
+
+func hasUpperLowerDigit(plain string) bool {
+	return upperLetterRegexp.MatchString(plain) &&
+		lowerLetterRegexp.MatchString(plain) &&
+		digitRegexp.MatchString(plain)
 }
 
 func randomSignupCode() (string, error) {

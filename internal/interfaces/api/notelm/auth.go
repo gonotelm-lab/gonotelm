@@ -30,6 +30,8 @@ func (s *Server) registerAuthRoutes(g *route.RouterGroup) {
 
 		emailGroup := authGroup.Group("/email")
 		{
+			// GET /api/v1/auth/email/register/prefetch 注册前元数据（密码策略）
+			emailGroup.GET("/register/prefetch", s.AuthEmailRegisterPrefetch)
 			// POST /api/v1/auth/email/register
 			emailGroup.POST("/register", s.AuthEmailRegister)
 			// POST /api/v1/auth/email/login 邮箱密码登录
@@ -53,7 +55,7 @@ func (s *Server) registerAuthRoutes(g *route.RouterGroup) {
 	}
 }
 
-// registerAuthBindRoutes 挂在鉴权组下：身份相关（已绑列表、支持的类型目录、绑定）与设置口令都要求已登录。
+// registerAuthBindRoutes 挂在鉴权组下：身份相关（已绑列表、支持的类型目录、绑定）与设置密码都要求已登录。
 func (s *Server) registerAuthBindRoutes(g *route.RouterGroup) {
 	authGroup := g.Group("/auth")
 	{
@@ -150,6 +152,15 @@ func (s *Server) AuthProviders(ctx context.Context, c *app.RequestContext) {
 	})
 }
 
+// AuthEmailRegisterPrefetch 注册前元数据：让前端先知道密码策略再决定怎么校验。
+func (s *Server) AuthEmailRegisterPrefetch(ctx context.Context, c *app.RequestContext) {
+	resp := s.authRegisterPrefetchHandler.Handle()
+
+	http.OkResp(c, schema.EmailRegisterPrefetchResponse{
+		RequireComplexPassword: resp.RequireComplexPassword,
+	})
+}
+
 func (s *Server) AuthEmailRegister(ctx context.Context, c *app.RequestContext) {
 	var req schema.EmailRegisterRequest
 	if err := c.BindAndValidate(&req); err != nil {
@@ -160,9 +171,22 @@ func (s *Server) AuthEmailRegister(ctx context.Context, c *app.RequestContext) {
 	resp, err := s.authRegisterHandler.Handle(ctx, &authapp.RegisterCommand{
 		Email:    req.Email,
 		Password: req.Password,
+		Device:   schema.DeviceOrWeb(req.LoginFrom),
 	})
 	if err != nil {
 		http.ErrResp(c, err)
+		return
+	}
+
+	// 免验证：账号与会话已就绪，不下发注册票据
+	if resp.Session != nil {
+		c.SetCookie(schema.SignupTicketCookieName, "", -1, "/", "", protocol.CookieSameSiteLaxMode, true, true)
+		s.setSessionCookies(c, resp.Session.SessionId, resp.Session.UserId)
+		http.OkResp(c, schema.EmailRegisterResponse{
+			EmailVerified: true,
+			UserId:        resp.Session.UserId,
+		})
+
 		return
 	}
 
@@ -179,7 +203,7 @@ func (s *Server) AuthEmailRegister(ctx context.Context, c *app.RequestContext) {
 		)
 	}
 
-	http.OkRespNoContent(c)
+	http.OkResp(c, schema.EmailRegisterResponse{EmailVerified: false})
 }
 
 func (s *Server) AuthEmailVerify(ctx context.Context, c *app.RequestContext) {

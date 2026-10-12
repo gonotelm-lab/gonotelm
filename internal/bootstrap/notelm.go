@@ -121,6 +121,13 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 	signupService := identityservice.NewSignupService(signupRepo, userRepo, userService, passwordHasher)
 	userSessionRepo := repository.NewUserSessionRepository(infra.Cache.UserSessionCache)
 
+	if !cfg.Auth.EmailVerificationRequired {
+		slog.WarnContext(rootCtx,
+			"email verification is disabled: signup will treat any address as verified and log the user in",
+			slog.Bool("email_verification_required", cfg.Auth.EmailVerificationRequired),
+		)
+	}
+
 	// ── 3. Event Bus ──
 	inprocessBus := eventbus.NewInProcessEventBus()
 	interprocessBus := eventbus.NewInterProcessEventBus(infra.MessageQueue)
@@ -220,7 +227,6 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 			SignupService:          signupService,
 			UserSessionRepo:        userSessionRepo,
 			Mailer:                 mailer,
-			AuthVerifyURLBase:      cfg.Auth.EmailVerifyURLBase,
 
 			EventBus:   eventBus,
 			WaitGroup:  wg,

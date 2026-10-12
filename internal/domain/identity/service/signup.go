@@ -48,23 +48,11 @@ type SignupDispatch struct {
 	Rollback  func(ctx context.Context)
 }
 
-// Start 邮箱注册第一步：校验 → 邮箱未占用 → 哈希口令 → 复用或新建 pending → 下发凭证。
+// Start 邮箱注册第一步：校验 → 邮箱未占用 → 哈希密码 → 复用或新建 pending → 下发凭证。
 func (s *SignupService) Start(ctx context.Context, email, password string) (*SignupDispatch, error) {
-	email = entity.NormalizeEmail(email)
-	if err := entity.ValidateEmail(email); err != nil {
-		return nil, err
-	}
-	if err := entity.ValidatePassword(password); err != nil {
-		return nil, err
-	}
-
-	if err := s.ensureEmailAvailable(ctx, email); err != nil {
-		return nil, err
-	}
-
-	passwordHash, err := s.hasher.Hash(ctx, password)
+	email, passwordHash, err := s.prepareCredentials(ctx, email, password)
 	if err != nil {
-		return nil, errors.WithMessage(err, "hash password failed")
+		return nil, err
 	}
 
 	pending, previousLinkTokenHash, ticket, err := s.preparePending(ctx, email, passwordHash)
@@ -79,6 +67,44 @@ func (s *SignupService) Start(ctx context.Context, email, password string) (*Sig
 	dispatch.Ticket = ticket
 
 	return dispatch, nil
+}
+
+// DirectSignup 免验证注册：邮箱视为已验证
+func (s *SignupService) DirectSignup(
+	ctx context.Context,
+	email, password string,
+) (*entity.UserAggregate, error) {
+	email, passwordHash, err := s.prepareCredentials(ctx, email, password)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.userService.createVerifiedAccount(ctx, email, passwordHash)
+}
+
+// prepareCredentials 两条注册入口共用的前置校验，返回归一化邮箱与密码哈希。
+func (s *SignupService) prepareCredentials(
+	ctx context.Context,
+	email, password string,
+) (normalizedEmail, passwordHash string, err error) {
+	normalizedEmail = entity.NormalizeEmail(email)
+	if err := entity.ValidateEmail(normalizedEmail); err != nil {
+		return "", "", err
+	}
+	if err := entity.ValidatePassword(password); err != nil {
+		return "", "", err
+	}
+
+	if err := s.ensureEmailAvailable(ctx, normalizedEmail); err != nil {
+		return "", "", err
+	}
+
+	passwordHash, err = s.hasher.Hash(ctx, password)
+	if err != nil {
+		return "", "", errors.WithMessage(err, "hash password failed")
+	}
+
+	return normalizedEmail, passwordHash, nil
 }
 
 // Resend 重发验证信
@@ -157,7 +183,7 @@ func (s *SignupService) ensureEmailAvailable(ctx context.Context, email string) 
 	return nil
 }
 
-// preparePending 重复注册时保留首次的口令与票据，只轮换两条验证凭证。
+// preparePending 重复注册时保留首次的密码与票据，只轮换两条验证凭证。
 func (s *SignupService) preparePending(
 	ctx context.Context,
 	email, passwordHash string,
@@ -208,7 +234,7 @@ func (s *SignupService) dispatch(
 	}, nil
 }
 
-// activate 邮箱被证明后建号：只有发起注册的那个浏览器完成验证，才把惰性口令激活。
+// activate 邮箱被证明后建号：只有发起注册的那个浏览器完成验证，才把惰性密码激活。
 func (s *SignupService) activate(
 	ctx context.Context,
 	pending *entity.SignupPending,

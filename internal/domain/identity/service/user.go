@@ -55,6 +55,62 @@ func NewUserService(
 	}
 }
 
+func (s *UserService) GetUser(ctx context.Context, userId valobj.Uid) (*entity.User, error) {
+	return s.userRepo.GetById(ctx, userId)
+}
+
+// GetAccount 装载账号聚合：User + 全部身份
+func (s *UserService) GetAccount(ctx context.Context, userId valobj.Uid) (*entity.UserAggregate, error) {
+	user, err := s.userRepo.GetById(ctx, userId)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.assembleAccount(ctx, user)
+}
+
+func (s *UserService) GetAccountByEmail(ctx context.Context, email string) (*entity.UserAggregate, error) {
+	user, err := s.userRepo.GetByEmail(ctx, entity.NormalizeEmail(email))
+	if err != nil {
+		return nil, err
+	}
+
+	return s.assembleAccount(ctx, user)
+}
+
+func (s *UserService) assembleAccount(ctx context.Context, user *entity.User) (*entity.UserAggregate, error) {
+	identities, err := s.identityRepo.ListByUserId(ctx, user.Id)
+	if err != nil {
+		return nil, errors.WithMessage(err, "list user identities failed")
+	}
+
+	hash, err := s.userRepo.GetPasswordHash(ctx, user.Id)
+	if err != nil {
+		return nil, errors.WithMessage(err, "get password hash failed")
+	}
+
+	return entity.NewUserAggregate(user, identities, hash != ""), nil
+}
+
+// UnbindIdentity 摘除账号下的一条身份并落库。
+func (s *UserService) UnbindIdentity(
+	ctx context.Context,
+	agg *entity.UserAggregate,
+	bindId valobj.Id,
+	provider entity.ProviderType,
+) error {
+	removed, err := agg.UnbindIdentity(bindId, provider)
+	if err != nil {
+		return err
+	}
+
+	if err := s.identityRepo.Delete(ctx, removed.Id); err != nil {
+		return errors.WithMessage(err, "delete identity failed")
+	}
+
+	return nil
+}
+
 type ResolveProviderParams struct {
 	Provider       entity.ProviderType
 	Subject        string
@@ -74,7 +130,7 @@ func registerLockKey(provider entity.ProviderType, subject string) string {
 func (s *UserService) ResolveOrCreateByProvider(
 	ctx context.Context,
 	params ResolveProviderParams,
-) (*entity.User, error) {
+) (*entity.UserAggregate, error) {
 	identity, err := s.identityRepo.GetByProviderAndSubject(ctx, params.Provider, params.Subject)
 	if err == nil {
 		return s.loginWithIdentity(ctx, identity)
@@ -106,9 +162,9 @@ func (s *UserService) ResolveOrCreateByProvider(
 		return s.loginWithIdentity(ctx, identity)
 	}
 
-	user, err := s.userRepo.GetByEmail(ctx, email)
+	agg, err := s.GetAccountByEmail(ctx, email)
 	if err == nil {
-		return s.linkIdentity(ctx, user, params, email)
+		return s.linkIdentity(ctx, agg, params, email)
 	}
 	if !errors.Is(err, domainerr.ErrUserNotFound) {
 		return nil, errors.WithMessage(err, "get user by email failed")
@@ -120,43 +176,44 @@ func (s *UserService) ResolveOrCreateByProvider(
 func (s *UserService) loginWithIdentity(
 	ctx context.Context,
 	identity *entity.UserIdentity,
-) (*entity.User, error) {
-	user, err := s.userRepo.GetById(ctx, identity.UserId)
+) (*entity.UserAggregate, error) {
+	agg, err := s.GetAccount(ctx, identity.UserId)
 	if err != nil {
 		return nil, errors.WithMessage(err, "get user of identity failed")
 	}
 
-	identity.TouchLogin(valobj.NewTime())
-	if err := s.identityRepo.TouchLogin(ctx, identity); err != nil {
-		slog.WarnContext(ctx, "touch identity login time failed", slog.Any("err", err))
+	if updated := agg.TouchIdentityLogin(identity.Id, valobj.NewTime()); updated != nil {
+		if err := s.identityRepo.TouchLogin(ctx, updated); err != nil {
+			slog.WarnContext(ctx, "touch identity login time failed", slog.Any("err", err))
+		}
 	}
 
-	return user, nil
+	return agg, nil
 }
 
 // linkIdentity 邮箱验证过的账号已存在 → 直接把身份挂上去。
 func (s *UserService) linkIdentity(
 	ctx context.Context,
-	user *entity.User,
+	agg *entity.UserAggregate,
 	params ResolveProviderParams,
 	email string,
-) (*entity.User, error) {
-	taken, err := s.providerBoundByOtherSubject(ctx, user.Id, params.Provider, params.Subject)
-	if err != nil {
-		return nil, err
-	}
-	if taken {
+) (*entity.UserAggregate, error) {
+	if agg.HasIdentityOfAnotherSubject(params.Provider, params.Subject) {
 		// 邮箱已验证说明就是本人，登录放行；只是不再挂第二个同 provider 身份
 		slog.WarnContext(ctx, "skip linking second identity of same provider",
-			slog.String("user_id", user.Id.String()),
+			slog.String("user_id", agg.Id().String()),
 			slog.String("provider", params.Provider.String()),
 			slog.String("subject", params.Subject),
 		)
 
-		return user, nil
+		return agg, nil
 	}
 
-	identity := entity.NewUserIdentity(user.Id, params.Provider, params.Subject, email, true)
+	identity := entity.NewUserIdentity(agg.Id(), params.Provider, params.Subject, email, true)
+	if err := agg.BindIdentity(identity); err != nil {
+		return nil, errors.WithMessage(err, "bind identity failed")
+	}
+
 	if err := s.identityRepo.Create(ctx, identity); err != nil {
 		// 并发兜底：唯一索引冲突说明身份已被建好，重查即可
 		if existing, lookupErr := s.identityRepo.GetByProviderAndSubject(
@@ -166,23 +223,22 @@ func (s *UserService) linkIdentity(
 		}
 
 		// 另一个并发请求刚给同一账号挂了同 provider 的别的身份
-		if taken, checkErr := s.providerBoundByOtherSubject(
-			ctx, user.Id, params.Provider, params.Subject,
-		); checkErr == nil && taken {
-			return user, nil
+		if reloaded, checkErr := s.GetAccount(ctx, agg.Id()); checkErr == nil &&
+			reloaded.HasIdentityOfAnotherSubject(params.Provider, params.Subject) {
+			return reloaded, nil
 		}
 
 		return nil, errors.WithMessage(err, "link identity failed")
 	}
 
-	return user, nil
+	return agg, nil
 }
 
 func (s *UserService) createAccount(
 	ctx context.Context,
 	params ResolveProviderParams,
 	email string,
-) (*entity.User, error) {
+) (*entity.UserAggregate, error) {
 	user := entity.NewUser(email, params.Nickname, valobj.NewTime())
 	avatarKey, hasAvatar := s.attachAvatar(ctx, user, params.OuterAvatarURL)
 
@@ -202,14 +258,14 @@ func (s *UserService) createAccount(
 		return nil, errors.WithMessage(err, "create user failed")
 	}
 
-	return user, nil
+	return entity.NewUserAggregate(user, []*entity.UserIdentity{identity}, false), nil
 }
 
-// CreateVerifiedAccount 邮箱被证明后建号；passwordHash 非空时一并写入
-func (s *UserService) CreateVerifiedAccount(
+// createVerifiedAccount 邮箱被证明后建号；passwordHash 非空时一并写入
+func (s *UserService) createVerifiedAccount(
 	ctx context.Context,
 	email, passwordHash string,
-) (*entity.User, error) {
+) (*entity.UserAggregate, error) {
 	normalized := entity.NormalizeEmail(email)
 	user := entity.NewUser(normalized, nicknameFromEmail(normalized), valobj.NewTime())
 
@@ -228,34 +284,34 @@ func (s *UserService) CreateVerifiedAccount(
 		return nil, errors.WithMessage(err, "create verified account failed")
 	}
 
-	return user, nil
+	return entity.NewUserAggregate(user, nil, passwordHash != ""), nil
 }
 
-// LinkProviderIdentity 已登录态下的显式绑定：同一个身份不会挂到两个账号，
+// BindIdentity 已登录态下的显式绑定：同一个身份不会挂到两个账号，
 // 同一账号在每个 provider 上也只允许一个身份（(user_id, provider) 唯一）。
-func (s *UserService) LinkProviderIdentity(
+func (s *UserService) BindIdentity(
 	ctx context.Context,
 	userId valobj.Uid,
 	params ResolveProviderParams,
-) (*entity.User, error) {
+) (*entity.UserAggregate, error) {
 	existing, err := s.identityRepo.GetByProviderAndSubject(ctx, params.Provider, params.Subject)
 	if err == nil {
 		if !existing.BelongsTo(userId) {
 			return nil, domainerr.ErrIdentityAlreadyLinked
 		}
 
-		return s.userRepo.GetById(ctx, userId)
+		return s.GetAccount(ctx, userId)
 	}
 	if !errors.Is(err, domainerr.ErrIdentityNotFound) {
 		return nil, errors.WithMessage(err, "lookup identity failed")
 	}
 
-	// (provider, subject) 未占用，此时同 provider 已存在的行必然是另一个三方账号
-	taken, err := s.providerBoundByOtherSubject(ctx, userId, params.Provider, params.Subject)
+	agg, err := s.GetAccount(ctx, userId)
 	if err != nil {
 		return nil, err
 	}
-	if taken {
+	// (provider, subject) 未占用，此时同 provider 已存在的行必然是另一个三方账号
+	if agg.HasIdentityOfAnotherSubject(params.Provider, params.Subject) {
 		return nil, domainerr.ErrProviderAlreadyBound
 	}
 
@@ -266,6 +322,10 @@ func (s *UserService) LinkProviderIdentity(
 		params.Email,
 		params.EmailVerified,
 	)
+	if err := agg.BindIdentity(identity); err != nil {
+		return nil, errors.WithMessage(err, "bind identity failed")
+	}
+
 	if err := s.identityRepo.Create(ctx, identity); err != nil {
 		// 并发兜底：唯一索引冲突说明已被建好
 		if again, lookupErr := s.identityRepo.GetByProviderAndSubject(
@@ -275,20 +335,35 @@ func (s *UserService) LinkProviderIdentity(
 				return nil, domainerr.ErrIdentityAlreadyLinked
 			}
 
-			return s.userRepo.GetById(ctx, userId)
+			return s.GetAccount(ctx, userId)
 		}
 
 		// 并发兜底：同 provider 的另一个身份刚被挂到这个账号上
-		if taken, checkErr := s.providerBoundByOtherSubject(
-			ctx, userId, params.Provider, params.Subject,
-		); checkErr == nil && taken {
+		if reloaded, checkErr := s.GetAccount(ctx, userId); checkErr == nil &&
+			reloaded.HasIdentityOfAnotherSubject(params.Provider, params.Subject) {
 			return nil, domainerr.ErrProviderAlreadyBound
 		}
 
 		return nil, errors.WithMessage(err, "link identity failed")
 	}
 
-	return s.userRepo.GetById(ctx, userId)
+	return agg, nil
+}
+
+// VerifyPassword 校验账号口令；无口令与口令错误一样返回 ErrInvalidCredentials。
+func (s *UserService) VerifyPassword(ctx context.Context, userId valobj.Uid, plain string) error {
+	hash, err := s.userRepo.GetPasswordHash(ctx, userId)
+	if err != nil {
+		return errors.WithMessage(err, "get password hash failed")
+	}
+	if hash == "" {
+		return domainerr.ErrInvalidCredentials
+	}
+	if err := s.hasher.Verify(ctx, hash, plain); err != nil {
+		return domainerr.ErrInvalidCredentials
+	}
+
+	return nil
 }
 
 // SetPassword 设置或修改口令：无口令时直接设置；已有口令必须给出正确的旧口令，
@@ -329,50 +404,6 @@ func (s *UserService) SetPassword(
 	}
 
 	return nil
-}
-
-// EnsureNotLastLoginMethod 无口令且只剩一条身份时不允许解绑：解完账号就再也登不进来了。
-func (s *UserService) EnsureNotLastLoginMethod(ctx context.Context, userId valobj.Uid) error {
-	passwordHash, err := s.userRepo.GetPasswordHash(ctx, userId)
-	if err != nil {
-		return errors.WithMessage(err, "get password hash failed")
-	}
-	if passwordHash != "" {
-		return nil
-	}
-
-	identities, err := s.identityRepo.ListByUserId(ctx, userId)
-	if err != nil {
-		return errors.WithMessage(err, "list identities failed")
-	}
-	if len(identities) <= 1 {
-		return domainerr.ErrLastLoginMethod
-	}
-
-	return nil
-}
-
-// providerBoundByOtherSubject 账号在该 provider 上是否已挂了 subject 不同的身份。
-// 唯一约束要求每个 provider 每账号最多一个身份，所以这类写入必须先拦在应用层，
-// 否则唯一索引冲突会以 500 而不是业务错误码返回。
-func (s *UserService) providerBoundByOtherSubject(
-	ctx context.Context,
-	userId valobj.Uid,
-	provider entity.ProviderType,
-	subject string,
-) (bool, error) {
-	identities, err := s.identityRepo.ListByUserId(ctx, userId)
-	if err != nil {
-		return false, errors.WithMessage(err, "list identities failed")
-	}
-
-	for _, identity := range identities {
-		if identity.Provider == provider && identity.Subject != subject {
-			return true, nil
-		}
-	}
-
-	return false, nil
 }
 
 func nicknameFromEmail(email string) string {

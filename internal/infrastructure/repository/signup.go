@@ -25,6 +25,7 @@ var _ identityrepo.SignupRepository = &SignupRepositoryImpl{}
 //	gonotelm:identity:signup:link:{sha256(link_token)} -> sha256(email)，TTL 24h
 //	    链接索引：明文 token 只出现在邮件里，库里存它的哈希，指向 pending
 //	gonotelm:identity:signup:attempts:{sha256(email)}  -> 验证码错误次数（INCR），TTL 24h
+//	gonotelm:identity:signup:cooldown:{sha256(email)}  -> 发信冷却位（SET NX），TTL 60s
 //
 // 验证通过、验证码超限或重发时：前两个 key 会被覆盖，重发还会删掉旧的 link 索引让旧链接立即失效；
 // 建号成功后整组删除。
@@ -93,6 +94,26 @@ func (r *SignupRepositoryImpl) IncrAttempts(ctx context.Context, email string) (
 	}
 
 	return attempts, nil
+}
+
+func (r *SignupRepositoryImpl) StartSendCooldown(ctx context.Context, email string) error {
+	ok, err := r.cache.SetCooldown(ctx, email, identityentity.SignupSendCooldown)
+	if err != nil {
+		return errors.WithMessage(err, "failed to start signup send cooldown")
+	}
+	if !ok {
+		return identerr.ErrTooManyRequests
+	}
+
+	return nil
+}
+
+func (r *SignupRepositoryImpl) ClearSendCooldown(ctx context.Context, email string) error {
+	if err := r.cache.DeleteCooldown(ctx, email); err != nil {
+		return errors.WithMessage(err, "failed to clear signup send cooldown")
+	}
+
+	return nil
 }
 
 func (r *SignupRepositoryImpl) get(

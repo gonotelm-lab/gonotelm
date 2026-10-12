@@ -96,6 +96,9 @@ type SignupCache interface {
 	DeleteByEmail(ctx context.Context, email string) error
 	// IncrAttempts 原子自增并返回新值。
 	IncrAttempts(ctx context.Context, email string, ttl time.Duration) (int64, error)
+	// SetCooldown 原子写入冷却标记（SET NX）；已存在时不覆盖并返回 false。
+	SetCooldown(ctx context.Context, email string, ttl time.Duration) (bool, error)
+	DeleteCooldown(ctx context.Context, email string) error
 }
 
 type Cache struct {

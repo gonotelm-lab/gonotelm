@@ -121,16 +121,16 @@ func (p *oauthLoginProvider) Type() entity.ProviderType {
 	return p.providerType
 }
 
-func (p *oauthLoginProvider) LoginInfo(
+func (p *oauthLoginProvider) OAuthInfo(
 	ctx context.Context,
-	request *entity.LoginInfoRequest,
-) (*entity.ProviderLoginInfo, error) {
+	request *entity.OAuthInfoRequest,
+) (*entity.ProviderOAuthInfo, error) {
 	url, state, err := p.impl.AuthURL()
 	if err != nil {
 		return nil, errors.Wrapf(domainerr.ErrIDPError, "failed to get auth url, err=%s", err.Error())
 	}
 
-	return &entity.ProviderLoginInfo{
+	return &entity.ProviderOAuthInfo{
 		URL:                 url.String(),
 		ClientId:            p.config.ClientID,
 		State:               state.State,

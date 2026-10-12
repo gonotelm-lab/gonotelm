@@ -116,3 +116,26 @@ func TestSignupCacheDeleteRemovesAttempts(t *testing.T) {
 		So(attempts, ShouldEqual, 1)
 	})
 }
+
+func TestSignupCacheCooldown(t *testing.T) {
+	Convey("SignupCache sets the cooldown marker only once", t, func() {
+		ctx := t.Context()
+		email := uuid.NewV7().String() + "@example.com"
+		t.Cleanup(func() { _ = testSignupCache.DeleteCooldown(ctx, email) })
+
+		ok, err := testSignupCache.SetCooldown(ctx, email, time.Minute)
+		So(err, ShouldBeNil)
+		So(ok, ShouldBeTrue)
+
+		// 已存在时不覆盖
+		ok, err = testSignupCache.SetCooldown(ctx, email, time.Minute)
+		So(err, ShouldBeNil)
+		So(ok, ShouldBeFalse)
+
+		// 删除后可再次写入
+		So(testSignupCache.DeleteCooldown(ctx, email), ShouldBeNil)
+		ok, err = testSignupCache.SetCooldown(ctx, email, time.Minute)
+		So(err, ShouldBeNil)
+		So(ok, ShouldBeTrue)
+	})
+}

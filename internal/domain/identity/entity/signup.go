@@ -20,6 +20,8 @@ const (
 	SignupLinkTokenLength = 32
 	SignupCodeTTL         = 15 * time.Minute
 	SignupMaxCodeAttempts = 5
+	// SignupSendCooldown 同一邮箱两次发送验证信的最小间隔。
+	SignupSendCooldown = 60 * time.Second
 
 	MinPasswordBytes = 8
 	// bcrypt 只使用前 72 字节，超长必须直接拒绝而不是静默截断

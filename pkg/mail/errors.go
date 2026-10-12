@@ -70,8 +70,7 @@ func IsTransient(err error) bool {
 		return true
 	}
 
-	var netErr net.Error
-	if stderr.As(err, &netErr) {
+	if _, ok := stderr.AsType[net.Error](err); ok {
 		return true
 	}
 

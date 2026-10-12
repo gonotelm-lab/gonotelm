@@ -6,6 +6,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
 	identerr "github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
 	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
+	identityservice "github.com/gonotelm-lab/gonotelm/internal/domain/identity/service"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
@@ -19,11 +20,11 @@ type LoginHandler struct {
 func NewLoginHandler(
 	registry identrepo.ProviderRegistry,
 	stateRepo identrepo.OAuthStateRepository,
-	userRepo identrepo.UserRepository,
+	userService *identityservice.UserService,
 	userSessionRepo identrepo.UserSessionRepository,
 ) *LoginHandler {
 	return &LoginHandler{
-		baseHandler: newBaseHandler(userRepo, userSessionRepo),
+		baseHandler: newBaseHandler(userService, userSessionRepo),
 		registry:    registry,
 		stateRepo:   stateRepo,
 	}
@@ -39,7 +40,7 @@ type LoginHandleCommand struct {
 type LoginHandleResult struct {
 	Authenticated bool
 	ReturnTo      string
-	LoginInfo     *entity.ProviderLoginInfo
+	LoginInfo     *entity.ProviderOAuthInfo
 }
 
 func (h *LoginHandler) Handle(ctx context.Context, cmd *LoginHandleCommand) (*LoginHandleResult, error) {
@@ -64,7 +65,7 @@ func (h *LoginHandler) Handle(ctx context.Context, cmd *LoginHandleCommand) (*Lo
 		return nil, errors.WithMessage(err, "provide login provider failed")
 	}
 
-	loginInfo, err := provider.LoginInfo(ctx, &entity.LoginInfoRequest{
+	loginInfo, err := provider.OAuthInfo(ctx, &entity.OAuthInfoRequest{
 		ReturnTo: cmd.ReturnTo,
 		Device:   cmd.LoginFrom,
 		Mode:     entity.ProviderLoginModeLogin,

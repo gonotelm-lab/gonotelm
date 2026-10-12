@@ -6,22 +6,21 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	"github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
+	"github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
+	identityservice "github.com/gonotelm-lab/gonotelm/internal/domain/identity/service"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 )
 
 type GetMeHandler struct {
-	userRepo     repository.UserRepository
-	identityRepo repository.UserIdentityRepository
-	objectStore  adapter.ObjectPublicURLer
+	userService *identityservice.UserService
+	objectStore adapter.ObjectPublicURLer
 }
 
 func NewGetMeHandler(
-	userRepo repository.UserRepository,
-	identityRepo repository.UserIdentityRepository,
+	userService *identityservice.UserService,
 	objectStore adapter.ObjectPublicURLer,
 ) *GetMeHandler {
-	return &GetMeHandler{userRepo: userRepo, identityRepo: identityRepo, objectStore: objectStore}
+	return &GetMeHandler{userService: userService, objectStore: objectStore}
 }
 
 type MeResult struct {
@@ -36,10 +35,12 @@ type MeResult struct {
 }
 
 func (h *GetMeHandler) Handle(ctx context.Context) (*MeResult, error) {
-	user, err := h.userRepo.GetById(ctx, pkgcontext.GetUserId(ctx))
+	agg, err := h.userService.GetAccount(ctx, pkgcontext.GetUserId(ctx))
 	if err != nil {
 		return nil, err
 	}
+
+	user := agg.User()
 
 	return &MeResult{
 		UserId:      user.Id.String(),
@@ -48,37 +49,23 @@ func (h *GetMeHandler) Handle(ctx context.Context) (*MeResult, error) {
 		AvatarUrl:   h.avatarURL(ctx, user.Avatar),
 		CreatedAt:   user.CreatedAt,
 		UpdatedAt:   user.UpdatedAt,
-		LoginSource: h.loginSource(ctx, user.Id),
-		HasPassword: h.hasPassword(ctx, user.Id),
+		LoginSource: h.loginSource(ctx, agg),
+		HasPassword: agg.HasPassword(),
 	}, nil
 }
 
 // loginSource 优先取会话携带的登录方式；旧会话缺该字段时退回最早绑定的身份。
-func (h *GetMeHandler) loginSource(ctx context.Context, userId valobj.Uid) string {
+func (h *GetMeHandler) loginSource(ctx context.Context, agg *entity.UserAggregate) string {
 	if source := pkgcontext.GetLoginSource(ctx); source != "" {
 		return source
 	}
 
-	identities, err := h.identityRepo.ListByUserId(ctx, userId)
-	if err != nil {
-		slog.WarnContext(ctx, "list user identities failed", slog.Any("err", err))
-		return ""
-	}
+	identities := agg.Identities()
 	if len(identities) == 0 {
 		return ""
 	}
 
 	return identities[0].Provider.String()
-}
-
-func (h *GetMeHandler) hasPassword(ctx context.Context, userId valobj.Uid) bool {
-	hash, err := h.userRepo.GetPasswordHash(ctx, userId)
-	if err != nil {
-		slog.WarnContext(ctx, "read password hash failed", slog.Any("err", err))
-		return false
-	}
-
-	return hash != ""
 }
 
 func (h *GetMeHandler) avatarURL(ctx context.Context, avatar valobj.StoreKey) string {

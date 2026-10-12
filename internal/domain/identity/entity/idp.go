@@ -59,7 +59,7 @@ func (m ProviderLoginMode) IsBindMode() bool {
 	return m == ProviderLoginModeBind
 }
 
-type ProviderLoginInfo struct {
+type ProviderOAuthInfo struct {
 	URL                 string       // full login url with query params to redirect to with http status code 302
 	ClientId            string       // client_id
 	State               string       // random state
@@ -75,7 +75,7 @@ type ProviderLoginInfo struct {
 	SessionId string
 }
 
-func (info *ProviderLoginInfo) ToOAuthState() *OAuthState {
+func (info *ProviderOAuthInfo) ToOAuthState() *OAuthState {
 	return &OAuthState{
 		State:               info.State,
 		Nonce:               info.Nonce,
@@ -104,7 +104,7 @@ type OAuthState struct {
 	SessionId           string
 }
 
-type LoginInfoRequest struct {
+type OAuthInfoRequest struct {
 	ReturnTo string // return to url to redirect after login
 	Device   DeviceType
 	Mode     ProviderLoginMode
@@ -127,7 +127,7 @@ type ProviderUserInfo struct {
 type Provider interface {
 	Type() ProviderType
 	// get basic login url
-	LoginInfo(ctx context.Context, request *LoginInfoRequest) (*ProviderLoginInfo, error)
+	OAuthInfo(ctx context.Context, request *OAuthInfoRequest) (*ProviderOAuthInfo, error)
 	// GetUserInfo gets third-party user info out of code and verifier
 	GetUserInfo(ctx context.Context, code string, state *OAuthState) (*ProviderUserInfo, error)
 }

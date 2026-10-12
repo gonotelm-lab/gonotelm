@@ -19,6 +19,7 @@ import (
 // gonotelm:identity:signup:{sha256(email)}          -> SignupPending(msgpack)
 // gonotelm:identity:signup:link:{sha256(token)}     -> sha256(email)
 // gonotelm:identity:signup:attempts:{sha256(email)} -> 验证码错误次数(INCR)
+// gonotelm:identity:signup:cooldown:{sha256(email)} -> 发信冷却位(SET NX EX)
 type SignupCacheImpl struct {
 	rd goredis.UniversalClient
 }
@@ -50,6 +51,10 @@ func (c *SignupCacheImpl) linkKeyByToken(linkToken string) string {
 
 func (c *SignupCacheImpl) attemptsKey(email string) string {
 	return fmt.Sprintf("gonotelm:identity:signup:attempts:%s", hashKey(email))
+}
+
+func (c *SignupCacheImpl) cooldownKey(email string) string {
+	return fmt.Sprintf("gonotelm:identity:signup:cooldown:%s", hashKey(email))
 }
 
 func (c *SignupCacheImpl) Set(
@@ -115,6 +120,24 @@ func (c *SignupCacheImpl) IncrAttempts(ctx context.Context, email string, ttl ti
 	}
 
 	return incr.Val(), nil
+}
+
+// SetCooldown 用 SET NX EX 原子写入冷却标记，返回是否写入成功（已存在则为 false）。
+func (c *SignupCacheImpl) SetCooldown(ctx context.Context, email string, ttl time.Duration) (bool, error) {
+	ok, err := c.rd.SetNX(ctx, c.cooldownKey(email), "1", ttl).Result()
+	if err != nil {
+		return false, errors.Wrapf(errors.ErrCache, "set signup cooldown failed, err=%s", err.Error())
+	}
+
+	return ok, nil
+}
+
+func (c *SignupCacheImpl) DeleteCooldown(ctx context.Context, email string) error {
+	if err := c.rd.Del(ctx, c.cooldownKey(email)).Err(); err != nil {
+		return errors.Wrapf(errors.ErrCache, "delete signup cooldown failed, err=%s", err.Error())
+	}
+
+	return nil
 }
 
 func (c *SignupCacheImpl) get(ctx context.Context, key string) (*schema.SignupPending, error) {

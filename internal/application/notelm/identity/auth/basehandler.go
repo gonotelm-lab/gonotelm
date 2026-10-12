@@ -9,22 +9,23 @@ import (
 	identityentity "github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
 	identerr "github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
 	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
+	identityservice "github.com/gonotelm-lab/gonotelm/internal/domain/identity/service"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 // baseHandler 收敛 auth 包内各 handler 共用的会话能力。
 // 各 handler 通过嵌入 *baseHandler 复用，而不是互相依赖。
 type baseHandler struct {
-	userRepo        identrepo.UserRepository
+	userService     *identityservice.UserService
 	userSessionRepo identrepo.UserSessionRepository
 }
 
 func newBaseHandler(
-	userRepo identrepo.UserRepository,
+	userService *identityservice.UserService,
 	userSessionRepo identrepo.UserSessionRepository,
 ) *baseHandler {
 	return &baseHandler{
-		userRepo:        userRepo,
+		userService:     userService,
 		userSessionRepo: userSessionRepo,
 	}
 }
@@ -51,7 +52,7 @@ func (h *baseHandler) authenticate(ctx context.Context, sessionId string) (*Auth
 	}
 
 	// 会话有效不代表用户可用：封禁可能发生在会话签发之后，
-	user, err := h.userRepo.GetById(ctx, session.UserId)
+	user, err := h.userService.GetUser(ctx, session.UserId)
 	if err != nil {
 		// 用户已被删除，会话一并视为失效，走 401 重新登录
 		if errors.Is(err, identerr.ErrUserNotFound) {

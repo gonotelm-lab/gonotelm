@@ -14,4 +14,8 @@ type SignupRepository interface {
 	GetByLinkToken(ctx context.Context, linkToken string) (*entity.SignupPending, error)
 	DeleteByEmail(ctx context.Context, email string) error
 	IncrAttempts(ctx context.Context, email string) (int64, error)
+	// StartSendCooldown 启动发信冷却窗口；冷却期内返回 ErrTooManyRequests。
+	StartSendCooldown(ctx context.Context, email string) error
+	// ClearSendCooldown 清除发信冷却，用于发送失败后允许立即重试。
+	ClearSendCooldown(ctx context.Context, email string) error
 }

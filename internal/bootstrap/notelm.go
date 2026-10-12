@@ -118,6 +118,7 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 		infra.ObjectStore,
 		passwordHasher,
 	)
+	signupService := identityservice.NewSignupService(signupRepo, userRepo, userService, passwordHasher)
 	userSessionRepo := repository.NewUserSessionRepository(infra.Cache.UserSessionCache)
 
 	// ── 3. Event Bus ──
@@ -215,11 +216,9 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 			ProviderRegistry:       providerRegistry,
 			OAuthStateRepo:         oauthStateRepo,
 			UserRepo:               userRepo,
-			UserIdentityRepo:       userIdentityRepo,
-			SignupRepo:             signupRepo,
 			UserService:            userService,
+			SignupService:          signupService,
 			UserSessionRepo:        userSessionRepo,
-			PasswordHasher:         passwordHasher,
 			Mailer:                 mailer,
 			AuthVerifyURLBase:      cfg.Auth.EmailVerifyURLBase,
 

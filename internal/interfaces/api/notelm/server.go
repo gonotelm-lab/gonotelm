@@ -47,11 +47,9 @@ type ServerDeps struct {
 	ProviderRegistry       identrepo.ProviderRegistry
 	OAuthStateRepo         identrepo.OAuthStateRepository
 	UserRepo               identrepo.UserRepository
-	UserIdentityRepo       identrepo.UserIdentityRepository
 	UserSessionRepo        identrepo.UserSessionRepository
-	SignupRepo             identrepo.SignupRepository
 	UserService            *identityservice.UserService
-	PasswordHasher         adapter.PasswordHasher
+	SignupService          *identityservice.SignupService
 	Mailer                 adapter.Mailer
 	AuthVerifyURLBase      string
 
@@ -239,23 +237,21 @@ func NewServer(
 		),
 		listStylePreviewsHandler: artifactapp.NewListStylePreviewsHandler(deps.StylePreviewRepo, deps.ObjectStore),
 
-		authLoginHandler:     authapp.NewLoginHandler(deps.ProviderRegistry, deps.OAuthStateRepo, deps.UserRepo, deps.UserSessionRepo),
-		authCallbackHandler:  authapp.NewCallbackHandler(deps.ProviderRegistry, deps.OAuthStateRepo, deps.UserService, deps.UserRepo, deps.UserSessionRepo),
+		authLoginHandler:     authapp.NewLoginHandler(deps.ProviderRegistry, deps.OAuthStateRepo, deps.UserService, deps.UserSessionRepo),
+		authCallbackHandler:  authapp.NewCallbackHandler(deps.ProviderRegistry, deps.OAuthStateRepo, deps.UserService, deps.UserSessionRepo),
 		authProvidersHandler: authapp.NewProvidersHandler(deps.ProviderRegistry),
-		authHandler:          authapp.NewAuthHandler(deps.UserRepo, deps.UserSessionRepo),
+		authHandler:          authapp.NewAuthHandler(deps.UserService, deps.UserSessionRepo),
 
-		authRegisterHandler: authapp.NewRegisterHandler(
-			deps.SignupRepo, deps.UserRepo, deps.PasswordHasher, deps.Mailer, deps.AuthVerifyURLBase,
-		),
-		authVerifyHandler:                  authapp.NewVerifyHandler(deps.SignupRepo, deps.UserService, deps.UserRepo, deps.UserSessionRepo),
-		authResendHandler:                  authapp.NewResendHandler(deps.SignupRepo, deps.UserRepo, deps.Mailer, deps.AuthVerifyURLBase),
-		authPasswordLoginHandler:           authapp.NewPasswordLoginHandler(deps.PasswordHasher, deps.UserRepo, deps.UserSessionRepo),
+		authRegisterHandler:                authapp.NewRegisterHandler(deps.SignupService, deps.Mailer, deps.AuthVerifyURLBase),
+		authVerifyHandler:                  authapp.NewVerifyHandler(deps.SignupService, deps.UserService, deps.UserSessionRepo),
+		authResendHandler:                  authapp.NewResendHandler(deps.SignupService, deps.Mailer, deps.AuthVerifyURLBase),
+		authPasswordLoginHandler:           authapp.NewPasswordLoginHandler(deps.UserService, deps.UserSessionRepo),
 		authSetPasswordHandler:             authapp.NewSetPasswordHandler(deps.UserService, deps.UserSessionRepo),
-		authBindHandler:                    authapp.NewBindHandler(deps.ProviderRegistry, deps.OAuthStateRepo, deps.UserRepo, deps.UserIdentityRepo),
-		authUnbindHandler:                  authapp.NewUnbindHandler(deps.UserService, deps.UserIdentityRepo),
-		authListIdentitiesHandler:          authapp.NewListIdentitiesHandler(deps.UserIdentityRepo),
+		authBindHandler:                    authapp.NewBindHandler(deps.ProviderRegistry, deps.OAuthStateRepo, deps.UserService),
+		authUnbindHandler:                  authapp.NewUnbindHandler(deps.UserService),
+		authListIdentitiesHandler:          authapp.NewListIdentitiesHandler(deps.UserService),
 		authListSupportedIdentitiesHandler: authapp.NewListSupportedIdentitiesHandler(),
-		getMeHandler:                       userapp.NewGetMeHandler(deps.UserRepo, deps.UserIdentityRepo, deps.ObjectStore),
+		getMeHandler:                       userapp.NewGetMeHandler(deps.UserService, deps.ObjectStore),
 		updateProfileHandler:               userapp.NewUpdateProfileHandler(deps.UserRepo),
 		updateAvatarHandler:                userapp.NewUpdateAvatarHandler(deps.UserRepo, deps.ObjectStore, deps.KeyFactory),
 	}

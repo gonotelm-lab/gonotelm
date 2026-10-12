@@ -5,18 +5,17 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
-	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
+	identityservice "github.com/gonotelm-lab/gonotelm/internal/domain/identity/service"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
-	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 // ListIdentitiesHandler 列出当前账号已绑定的三方身份
 type ListIdentitiesHandler struct {
-	identityRepo identrepo.UserIdentityRepository
+	userService *identityservice.UserService
 }
 
-func NewListIdentitiesHandler(identityRepo identrepo.UserIdentityRepository) *ListIdentitiesHandler {
-	return &ListIdentitiesHandler{identityRepo: identityRepo}
+func NewListIdentitiesHandler(userService *identityservice.UserService) *ListIdentitiesHandler {
+	return &ListIdentitiesHandler{userService: userService}
 }
 
 type IdentityItem struct {
@@ -33,11 +32,12 @@ type ListIdentitiesResult struct {
 }
 
 func (h *ListIdentitiesHandler) Handle(ctx context.Context) (*ListIdentitiesResult, error) {
-	identities, err := h.identityRepo.ListByUserId(ctx, pkgcontext.GetUserId(ctx))
+	agg, err := h.userService.GetAccount(ctx, pkgcontext.GetUserId(ctx))
 	if err != nil {
-		return nil, errors.WithMessage(err, "list user identities failed")
+		return nil, err
 	}
 
+	identities := agg.Identities()
 	items := make([]*IdentityItem, 0, len(identities))
 	for _, identity := range identities {
 		items = append(items, &IdentityItem{

@@ -22,11 +22,10 @@ func NewCallbackHandler(
 	registry identrepo.ProviderRegistry,
 	stateRepo identrepo.OAuthStateRepository,
 	userService *identityservice.UserService,
-	userRepo identrepo.UserRepository,
 	userSessionRepo identrepo.UserSessionRepository,
 ) *CallbackHandler {
 	return &CallbackHandler{
-		baseHandler: newBaseHandler(userRepo, userSessionRepo),
+		baseHandler: newBaseHandler(userService, userSessionRepo),
 		registry:    registry,
 		stateRepo:   stateRepo,
 		userService: userService,
@@ -104,7 +103,7 @@ func (h *CallbackHandler) Handle(ctx context.Context, cmd *CallbackHandleCommand
 		return result, errors.WithMessage(err, "failed to get user info")
 	}
 
-	if oauthState.Mode == entity.ProviderLoginModeBind {
+	if oauthState.Mode.IsBindMode() {
 		if err := h.handleBind(ctx, cmd, oauthState, userInfo, result); err != nil {
 			return result, err
 		}
@@ -113,7 +112,7 @@ func (h *CallbackHandler) Handle(ctx context.Context, cmd *CallbackHandleCommand
 	}
 
 	// 身份优先，邮箱只在建新身份时用来决定挂到哪个账号
-	user, err := h.userService.ResolveOrCreateByProvider(ctx,
+	agg, err := h.userService.ResolveOrCreateByProvider(ctx,
 		identityservice.ResolveProviderParams{
 			Provider:       cmd.ProviderType,
 			Subject:        userInfo.Subject,
@@ -127,7 +126,7 @@ func (h *CallbackHandler) Handle(ctx context.Context, cmd *CallbackHandleCommand
 	}
 
 	// 封禁用户不允许重新登录，否则封禁只需等到下一次登录就被绕过。
-	if user.IsBanned() {
+	if agg.IsBanned() {
 		return result, domainerr.ErrUserBanned
 	}
 
@@ -136,7 +135,7 @@ func (h *CallbackHandler) Handle(ctx context.Context, cmd *CallbackHandleCommand
 		return result, err
 	}
 
-	session, err := h.issueSession(ctx, user, oauthState.Device, cmd.ProviderType.String())
+	session, err := h.issueSession(ctx, agg.User(), oauthState.Device, cmd.ProviderType.String())
 	if err != nil {
 		return result, err
 	}
@@ -145,14 +144,14 @@ func (h *CallbackHandler) Handle(ctx context.Context, cmd *CallbackHandleCommand
 		slog.String("provider_type", string(cmd.ProviderType)),
 		slog.String("issuer", userInfo.Issuer),
 		slog.String("subject", userInfo.Subject),
-		slog.String("user_id", user.Id.String()),
+		slog.String("user_id", agg.Id().String()),
 		slog.String("session_id", session.Id),
-		slog.String("avatar", user.Avatar.String()),
+		slog.String("avatar", agg.User().Avatar.String()),
 		slog.Any("raw", userInfo.Raw),
 	)
 
 	result.SessionId = session.Id
-	result.UserId = user.Id.String()
+	result.UserId = agg.Id().String()
 
 	return result, nil
 }
@@ -190,7 +189,7 @@ func (h *CallbackHandler) handleBind(
 		return err
 	}
 
-	user, err := h.userService.LinkProviderIdentity(ctx, authn.UserId,
+	agg, err := h.userService.BindIdentity(ctx, authn.UserId,
 		identityservice.ResolveProviderParams{
 			Provider:       cmd.ProviderType,
 			Subject:        userInfo.Subject,
@@ -206,11 +205,11 @@ func (h *CallbackHandler) handleBind(
 	slog.InfoContext(ctx, "callback handler bind ok",
 		slog.String("provider_type", string(cmd.ProviderType)),
 		slog.String("subject", userInfo.Subject),
-		slog.String("user_id", user.Id.String()),
+		slog.String("user_id", agg.Id().String()),
 	)
 
 	result.Mode = entity.ProviderLoginModeBind
-	result.UserId = user.Id.String()
+	result.UserId = agg.Id().String()
 
 	return nil
 }

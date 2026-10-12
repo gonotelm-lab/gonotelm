@@ -7,28 +7,26 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
 	identerr "github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
 	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
+	identityservice "github.com/gonotelm-lab/gonotelm/internal/domain/identity/service"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 // BindHandler 发起三方绑定：state 记录里带上发起会话，回调必须是同一个会话。
 type BindHandler struct {
-	registry     identrepo.ProviderRegistry
-	stateRepo    identrepo.OAuthStateRepository
-	userRepo     identrepo.UserRepository
-	identityRepo identrepo.UserIdentityRepository
+	registry       identrepo.ProviderRegistry
+	oauthStateRepo identrepo.OAuthStateRepository
+	userService    *identityservice.UserService
 }
 
 func NewBindHandler(
 	registry identrepo.ProviderRegistry,
-	stateRepo identrepo.OAuthStateRepository,
-	userRepo identrepo.UserRepository,
-	identityRepo identrepo.UserIdentityRepository,
+	oauthStateRepo identrepo.OAuthStateRepository,
+	userService *identityservice.UserService,
 ) *BindHandler {
 	return &BindHandler{
-		registry:     registry,
-		stateRepo:    stateRepo,
-		userRepo:     userRepo,
-		identityRepo: identityRepo,
+		registry:       registry,
+		oauthStateRepo: oauthStateRepo,
+		userService:    userService,
 	}
 }
 
@@ -40,28 +38,21 @@ type BindCommand struct {
 }
 
 type BindResult struct {
-	LoginInfo *entity.ProviderLoginInfo
+	LoginInfo *entity.ProviderOAuthInfo
 	// AlreadyBound 该 provider 已经绑在当前账号上，不必再走一遍 OAuth
 	AlreadyBound bool
 }
 
 func (h *BindHandler) Handle(ctx context.Context, cmd *BindCommand) (*BindResult, error) {
-	user, err := h.userRepo.GetById(ctx, cmd.UserId)
+	agg, err := h.userService.GetAccount(ctx, cmd.UserId)
 	if err != nil {
 		return nil, err
 	}
-	if !user.IsEmailVerified() {
+	if !agg.IsEmailVerified() {
 		return nil, identerr.ErrEmailNotVerified
 	}
-
-	identities, err := h.identityRepo.ListByUserId(ctx, cmd.UserId)
-	if err != nil {
-		return nil, errors.WithMessage(err, "list user identities failed")
-	}
-	for _, identity := range identities {
-		if identity.Provider == cmd.ProviderType {
-			return &BindResult{AlreadyBound: true}, nil
-		}
+	if agg.HasIdentity(cmd.ProviderType) {
+		return &BindResult{AlreadyBound: true}, nil
 	}
 
 	provider, err := h.registry.GetProvider(ctx, cmd.ProviderType)
@@ -69,7 +60,7 @@ func (h *BindHandler) Handle(ctx context.Context, cmd *BindCommand) (*BindResult
 		return nil, errors.WithMessage(err, "get login provider failed")
 	}
 
-	loginInfo, err := provider.LoginInfo(ctx, &entity.LoginInfoRequest{
+	oauthInfo, err := provider.OAuthInfo(ctx, &entity.OAuthInfoRequest{
 		ReturnTo:  cmd.ReturnTo,
 		Device:    entity.DeviceTypeWeb,
 		Mode:      entity.ProviderLoginModeBind, // 绑定三方账户模式
@@ -79,9 +70,9 @@ func (h *BindHandler) Handle(ctx context.Context, cmd *BindCommand) (*BindResult
 		return nil, errors.WithMessage(err, "get login info failed")
 	}
 
-	if err := h.stateRepo.Save(ctx, loginInfo.ToOAuthState()); err != nil {
+	if err := h.oauthStateRepo.Save(ctx, oauthInfo.ToOAuthState()); err != nil {
 		return nil, errors.WithMessage(err, "save login state failed")
 	}
 
-	return &BindResult{LoginInfo: loginInfo}, nil
+	return &BindResult{LoginInfo: oauthInfo}, nil
 }

@@ -13,7 +13,7 @@ type ArtifactTask struct {
 	Result     []byte     `gorm:"column:result"`      // 任务结果
 	ResultKind string     `gorm:"column:result_kind"` // 任务结果类型
 	Title      string     `gorm:"column:title"`       // 生成的任务标题
-	UserId     valobj.Uid `gorm:"column:user_id"`     // 用户id
+	UserId     valobj.Uid `gorm:"column:user_id"`     // 账号id
 	RunId      string     `gorm:"column:run_id"`      // 消费者id
 	LockNo     int32      `gorm:"column:lock_no"`     // 乐观锁版本号
 	Payload    []byte     `gorm:"column:payload"`     // 任务输入

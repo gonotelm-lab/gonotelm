@@ -12,12 +12,10 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	identerr "github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
-	"github.com/gonotelm-lab/gonotelm/pkg/idp"
 )
 
 const (
 	SignupPendingTTL      = 24 * time.Hour
-	SignupLinkTokenLength = 32
 	SignupCodeTTL         = 15 * time.Minute
 	SignupMaxCodeAttempts = 5
 	// SignupSendCooldown 同一邮箱两次发验证邮件的最小间隔
@@ -30,13 +28,12 @@ const (
 
 // SignupPending 待验证的邮箱注册，验证通过后才建号
 type SignupPending struct {
-	Email         string
-	PasswordHash  string
-	TicketHash    string
-	LinkTokenHash string
-	CodeHash      string
-	CodeExpireAt  valobj.Time
-	CreatedAt     valobj.Time
+	Email        string
+	PasswordHash string
+	TicketHash   string
+	CodeHash     string
+	CodeExpireAt valobj.Time
+	CreatedAt    valobj.Time
 }
 
 func NewSignupPending(email, passwordHash, ticket string) *SignupPending {
@@ -48,23 +45,17 @@ func NewSignupPending(email, passwordHash, ticket string) *SignupPending {
 	}
 }
 
-// IssueCredentials 生成链接 token 与 6 位验证码，只把哈希写回记录，token 本身只出现在邮件里
-func (p *SignupPending) IssueCredentials() (linkToken, code string, err error) {
-	linkToken, err = idp.RandomString(SignupLinkTokenLength)
+// IssueCredentials 生成 6 位验证码，只把哈希写回记录，明文只出现在邮件里
+func (p *SignupPending) IssueCredentials() (code string, err error) {
+	code, err = randomVerificationCode()
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
 
-	code, err = randomSignupCode()
-	if err != nil {
-		return "", "", err
-	}
-
-	p.LinkTokenHash = HashSecret(linkToken)
 	p.CodeHash = HashSecret(code)
 	p.CodeExpireAt = valobj.NewTimeFrom(time.Now().Add(SignupCodeTTL).UnixMilli())
 
-	return linkToken, code, nil
+	return code, nil
 }
 
 // MatchesTicket 注册 ticket 只属于发起注册的那个浏览器，匹配才写入密码
@@ -144,7 +135,8 @@ func hasUpperLowerDigit(plain string) bool {
 		digitRegexp.MatchString(plain)
 }
 
-func randomSignupCode() (string, error) {
+// randomVerificationCode 6 位数字验证码，注册与找回密码共用
+func randomVerificationCode() (string, error) {
 	n, err := rand.Int(rand.Reader, big.NewInt(1_000_000))
 	if err != nil {
 		return "", err

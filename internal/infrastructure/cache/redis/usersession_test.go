@@ -102,7 +102,7 @@ func TestUserSessionCacheImplNotFound(t *testing.T) {
 	})
 }
 
-// 一个用户多个会话，Delete 只删自己那份
+// 一个账号多个会话，Delete 只删自己那份
 func TestUserSessionCacheImplMultipleSessionsPerUser(t *testing.T) {
 	Convey("UserSessionCache keeps multiple sessions per user", t, func() {
 		ctx := t.Context()
@@ -137,7 +137,7 @@ func TestUserSessionCacheImplMultipleSessionsPerUser(t *testing.T) {
 		_, err = testUserSessionCache.Get(ctx, idB)
 		So(err, ShouldBeNil)
 
-		// DeleteByUserId 清掉该用户剩余的会话
+		// DeleteByUserId 清掉该账号剩余的会话
 		err = testUserSessionCache.DeleteByUserId(ctx, userId)
 		So(err, ShouldBeNil)
 
@@ -210,7 +210,7 @@ func TestUserSessionCacheImplSetTTL(t *testing.T) {
 	})
 }
 
-// DeleteByUserId 只清理目标用户，其他用户的会话不能误删
+// DeleteByUserId 只清理目标账号，其他账号的会话不能误删
 func TestUserSessionCacheImplDeleteByUserIdScopedToUser(t *testing.T) {
 	Convey("UserSessionCache DeleteByUserId only targets one user", t, func() {
 		ctx := t.Context()

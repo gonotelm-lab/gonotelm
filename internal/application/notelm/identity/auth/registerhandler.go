@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"strings"
 
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
@@ -91,22 +90,16 @@ func (h *RegisterHandler) registerVerified(
 	}}, nil
 }
 
-// sendVerification 拼验证链接并发送验证邮件，失败撤销本次占用的发送间隔，统一返回 ErrMailSendFailed
+// sendVerification 发送验证码邮件，失败撤销本次占用的发送间隔，统一返回 ErrMailSendFailed
 func sendVerification(
 	ctx context.Context,
 	mailer adapter.Mailer,
 	dispatch *identityservice.SignupDispatch,
 ) error {
-	link := buildVerifyLink(conf.NotelmGlobal().Auth.EmailVerifyURLBase, dispatch.LinkToken)
-	if err := mailer.SendEmailVerification(ctx, dispatch.Email, link, dispatch.Code); err != nil {
+	if err := mailer.SendEmailVerification(ctx, dispatch.Email, dispatch.Code); err != nil {
 		dispatch.Rollback(ctx)
 		return errors.Wrapf(identerr.ErrMailSendFailed, "send verification mail: %s", err.Error())
 	}
 
 	return nil
-}
-
-// buildVerifyLink 验证链接指向前端页面，token 放 URL 片段，不进服务端日志与 Referer
-func buildVerifyLink(base, linkToken string) string {
-	return strings.TrimRight(base, "/") + "#token=" + linkToken
 }

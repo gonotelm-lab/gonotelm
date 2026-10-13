@@ -92,7 +92,7 @@ func (s *UserService) assembleAccount(ctx context.Context, user *entity.User) (*
 	return entity.NewUserAggregate(user, identities, hash != ""), nil
 }
 
-// UnbindIdentity 解绑账号下的一条身份并写库
+// UnbindIdentity 解绑账号下的一条身份并落库
 func (s *UserService) UnbindIdentity(
 	ctx context.Context,
 	agg *entity.UserAggregate,
@@ -392,6 +392,30 @@ func (s *UserService) SetPassword(
 		if err := s.hasher.Verify(ctx, current, newPassword); err == nil {
 			return domainerr.ErrPasswordUnchanged
 		}
+	}
+
+	newHash, err := s.hasher.Hash(ctx, newPassword)
+	if err != nil {
+		return errors.WithMessage(err, "hash password failed")
+	}
+
+	if err := s.userRepo.UpdatePasswordHash(ctx, userId, newHash); err != nil {
+		return errors.WithMessage(err, "update password failed")
+	}
+
+	return nil
+}
+
+// ResetPassword 找回密码确认后写入新密码，不校验旧密码
+// 调用方必须先用一次性凭证确认过邮箱归属，否则这个方法等于无条件改号
+// 跟 SetPassword 的区别：不比旧密码，也不判新旧是否相同
+func (s *UserService) ResetPassword(
+	ctx context.Context,
+	userId valobj.Uid,
+	newPassword string,
+) error {
+	if err := entity.ValidatePassword(newPassword); err != nil {
+		return err
 	}
 
 	newHash, err := s.hasher.Hash(ctx, newPassword)

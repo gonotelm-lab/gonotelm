@@ -23,6 +23,7 @@ var (
 	testStylePreviewCache       cache.StylePreviewCache
 	testUserCache               cache.UserCache
 	testSignupCache             cache.SignupCache
+	testPasswordResetCache      cache.PasswordResetCache
 )
 
 func TestMain(m *testing.M) {
@@ -46,6 +47,7 @@ func TestMain(m *testing.M) {
 	testStylePreviewCache = NewStylePreviewCacheImpl(testRedis)
 	testUserCache = NewUserCacheImpl(testRedis)
 	testSignupCache = NewSignupCacheImpl(testRedis)
+	testPasswordResetCache = NewPasswordResetCacheImpl(testRedis)
 
 	code := m.Run()
 
@@ -67,6 +69,8 @@ func TestNewCache_WiresAllCaches(t *testing.T) {
 		So(c.UserSessionCache, ShouldNotBeNil)
 		So(c.StylePreviewCache, ShouldNotBeNil)
 		So(c.UserCache, ShouldNotBeNil)
+		So(c.SignupCache, ShouldNotBeNil)
+		So(c.PasswordResetCache, ShouldNotBeNil)
 	})
 }
 

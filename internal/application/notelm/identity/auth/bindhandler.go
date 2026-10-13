@@ -63,7 +63,7 @@ func (h *BindHandler) Handle(ctx context.Context, cmd *BindCommand) (*BindResult
 	oauthInfo, err := provider.OAuthInfo(ctx, &entity.OAuthInfoRequest{
 		ReturnTo:  cmd.ReturnTo,
 		Device:    entity.DeviceTypeWeb,
-		Mode:      entity.ProviderLoginModeBind, // 绑定三方账户模式
+		Mode:      entity.ProviderLoginModeBind, // 绑定三方账号模式
 		SessionId: cmd.SessionId,
 	})
 	if err != nil {

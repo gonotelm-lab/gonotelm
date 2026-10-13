@@ -12,6 +12,7 @@ import (
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
+	"github.com/gonotelm-lab/gonotelm/pkg/http/middleware"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol"
@@ -19,7 +20,8 @@ import (
 )
 
 func (s *Server) registerAuthRoutes(g *route.RouterGroup) {
-	authGroup := g.Group("/auth")
+	// 认证响应带会话标识与账号邮箱，且登录/注册/验证都是可变更状态的操作，一律禁止缓存
+	authGroup := g.Group("/auth", middleware.NoStore())
 	{
 		// GET /api/v1/auth/login 发起三方登录，302 跳 IdP
 		authGroup.GET("/login", s.AuthLogin)
@@ -36,12 +38,20 @@ func (s *Server) registerAuthRoutes(g *route.RouterGroup) {
 			emailGroup.POST("/register", s.AuthEmailRegister)
 			// POST /api/v1/auth/email/login 邮箱密码登录
 			emailGroup.POST("/login", s.AuthEmailLogin)
-			// POST /api/v1/auth/email/verify 验证链接
-			emailGroup.POST("/verify", s.AuthEmailVerify)
 			// POST /api/v1/auth/email/verify/code 验证码
 			emailGroup.POST("/verify/code", s.AuthEmailVerifyCode)
 			// POST /api/v1/auth/email/resend
 			emailGroup.POST("/resend", s.AuthEmailResend)
+		}
+
+		passwordGroup := authGroup.Group("/password")
+		{
+			// GET /api/v1/auth/password/reset/prefetch 重置页元数据，含密码复杂度要求
+			passwordGroup.GET("/reset/prefetch", s.AuthPasswordResetPrefetch)
+			// POST /api/v1/auth/password/reset 发起找回密码，账号不存在也返回 204
+			passwordGroup.POST("/reset", s.AuthPasswordReset)
+			// POST /api/v1/auth/password/reset/verify 邮件链接确认
+			passwordGroup.POST("/reset/verify", s.AuthPasswordResetConfirmLink)
 		}
 
 		// we use different callback endpoints for different providers
@@ -57,7 +67,8 @@ func (s *Server) registerAuthRoutes(g *route.RouterGroup) {
 
 // registerAuthBindRoutes 挂在鉴权组下，身份与设置密码相关接口都要求已登录
 func (s *Server) registerAuthBindRoutes(g *route.RouterGroup) {
-	authGroup := g.Group("/auth")
+	// 同上：响应里带账号身份列表，不能进任何缓存
+	authGroup := g.Group("/auth", middleware.NoStore())
 	{
 		// GET /api/v1/auth/identities 当前账号已绑定的三方身份
 		authGroup.GET("/identities", s.AuthIdentities)
@@ -206,22 +217,6 @@ func (s *Server) AuthEmailRegister(ctx context.Context, c *app.RequestContext) {
 	http.OkResp(c, schema.EmailRegisterResponse{EmailVerified: false})
 }
 
-func (s *Server) AuthEmailVerify(ctx context.Context, c *app.RequestContext) {
-	var req schema.EmailVerifyLinkRequest
-	if err := c.BindAndValidate(&req); err != nil {
-		http.ErrResp(c, err)
-		return
-	}
-
-	resp, err := s.authVerifyHandler.VerifyLink(ctx, &authapp.VerifyCommand{
-		Token:  req.Token,
-		Device: schema.DeviceOrWeb(req.LoginFrom),
-		Ticket: s.signupTicket(c),
-	})
-
-	s.finishSession(c, resp, err)
-}
-
 func (s *Server) AuthEmailVerifyCode(ctx context.Context, c *app.RequestContext) {
 	var req schema.EmailVerifyCodeRequest
 	if err := c.BindAndValidate(&req); err != nil {
@@ -293,6 +288,54 @@ func (s *Server) AuthSetPassword(ctx context.Context, c *app.RequestContext) {
 	c.SetCookie(schema.AuthUserIdCookieName, "", -1, "/", "", protocol.CookieSameSiteLaxMode, true, false)
 
 	http.OkResp(c, schema.SetPasswordResponse{ReloginRequired: resp.ReloginRequired})
+}
+
+// AuthPasswordResetPrefetch 重置页元数据：密码复杂度要求
+// 复用注册页那份策略，两处校验的是同一份配置
+func (s *Server) AuthPasswordResetPrefetch(ctx context.Context, c *app.RequestContext) {
+	resp := s.authRegisterPrefetchHandler.Handle()
+
+	http.OkResp(c, schema.PasswordResetPrefetchResponse{
+		RequireComplexPassword: resp.RequireComplexPassword,
+	})
+}
+
+// AuthPasswordReset 发起找回密码：账号存在才发信，响应跟账号存不存在无关
+func (s *Server) AuthPasswordReset(ctx context.Context, c *app.RequestContext) {
+	var req schema.PasswordResetRequest
+	if err := c.BindAndValidate(&req); err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	if _, err := s.authPasswordResetHandler.Handle(ctx, &authapp.PasswordResetCommand{
+		Email: req.Email,
+	}); err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	http.OkRespNoContent(c)
+}
+
+// AuthPasswordResetConfirmLink 邮件链接确认：token 由前端从 URL 片段读出后提交
+// 成功返回 204，新密码要用户回登录页自己登一次
+func (s *Server) AuthPasswordResetConfirmLink(ctx context.Context, c *app.RequestContext) {
+	var req schema.PasswordResetConfirmRequest
+	if err := c.BindAndValidate(&req); err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	if err := s.authPasswordResetHandler.ConfirmLink(ctx, &authapp.PasswordResetConfirmCommand{
+		Token:       req.Token,
+		NewPassword: req.NewPassword,
+	}); err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	http.OkRespNoContent(c)
 }
 
 func (s *Server) AuthIdentities(ctx context.Context, c *app.RequestContext) {

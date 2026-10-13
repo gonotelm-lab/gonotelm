@@ -17,18 +17,15 @@ type SignupRepositoryImpl struct {
 
 var _ identityrepo.SignupRepository = &SignupRepositoryImpl{}
 
-// NewSignupRepository 创建待验证注册的读写实现，写库形态（Redis，key 推导见
+// NewSignupRepository 创建待验证注册的读写实现，落库形态（Redis，key 推导见
 // internal/infrastructure/cache/redis/signup.go）：
 //
 //	gonotelm:identity:signup:{sha256(email)}           -> SignupPending(msgpack)，TTL 24h
-//	    值里是 email、验证通过后才写入的 password_hash、ticket_hash、link_token_hash、code_hash、code_expire_at、created_at
-//	gonotelm:identity:signup:link:{sha256(link_token)} -> sha256(email)，TTL 24h
-//	    链接索引：原始 token 只在邮件里，库里存哈希，指向 pending
+//	    值里是 email、验证通过后才写入的 password_hash、ticket_hash、code_hash、code_expire_at、created_at
 //	gonotelm:identity:signup:attempts:{sha256(email)}  -> 验证码错误次数（INCR），TTL 24h
 //	gonotelm:identity:signup:cooldown:{sha256(email)}  -> 发邮件间隔标记（SET NX），TTL 60s
 //
-// 验证通过、验证码超限或重发时前两个 key 会被覆盖，重发会删掉旧的 link 索引让旧链接立即失效
-// 建号成功后整组删除
+// 重发会覆盖 pending 并重置验证码；建号成功后或验证码超限时整组删除
 func NewSignupRepository(signupCache cache.SignupCache) identityrepo.SignupRepository {
 	return &SignupRepositoryImpl{cache: signupCache}
 }
@@ -36,14 +33,8 @@ func NewSignupRepository(signupCache cache.SignupCache) identityrepo.SignupRepos
 func (r *SignupRepositoryImpl) Save(
 	ctx context.Context,
 	pending *identityentity.SignupPending,
-	previousLinkTokenHash string,
 ) error {
-	err := r.cache.Set(
-		ctx,
-		mapper.SignupToSchema(pending),
-		previousLinkTokenHash,
-		identityentity.SignupPendingTTL,
-	)
+	err := r.cache.Set(ctx, mapper.SignupToSchema(pending), identityentity.SignupPendingTTL)
 	if err != nil {
 		return errors.WithMessage(err, "failed to save signup pending")
 	}
@@ -57,20 +48,6 @@ func (r *SignupRepositoryImpl) GetByEmail(
 ) (*identityentity.SignupPending, error) {
 	return r.get(func() (*identityentity.SignupPending, error) {
 		sch, err := r.cache.GetByEmail(ctx, email)
-		if err != nil {
-			return nil, err
-		}
-
-		return mapper.SignupFromSchema(sch), nil
-	})
-}
-
-func (r *SignupRepositoryImpl) GetByLinkToken(
-	ctx context.Context,
-	linkToken string,
-) (*identityentity.SignupPending, error) {
-	return r.get(func() (*identityentity.SignupPending, error) {
-		sch, err := r.cache.GetByLinkToken(ctx, linkToken)
 		if err != nil {
 			return nil, err
 		}

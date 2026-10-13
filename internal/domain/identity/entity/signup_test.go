@@ -87,18 +87,15 @@ func TestSignupPendingCredentials(t *testing.T) {
 		t.Fatal("ticket match is wrong")
 	}
 
-	linkToken, code, err := pending.IssueCredentials()
+	code, err := pending.IssueCredentials()
 	if err != nil {
 		t.Fatalf("IssueCredentials failed: %v", err)
-	}
-	if pending.LinkTokenHash != HashSecret(linkToken) {
-		t.Fatal("link token must be stored hashed")
 	}
 	if pending.CodeHash != HashSecret(code) {
 		t.Fatal("code must be stored hashed")
 	}
-	if strings.Contains(pending.LinkTokenHash, linkToken) || pending.CodeHash == code {
-		t.Fatal("record must not keep the plaintext credentials")
+	if pending.CodeHash == code {
+		t.Fatal("record must not keep the plaintext code")
 	}
 	if len(code) != 6 {
 		t.Fatalf("code = %q, want 6 digits", code)

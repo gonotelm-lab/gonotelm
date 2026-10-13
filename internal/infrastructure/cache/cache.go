@@ -86,16 +86,29 @@ type UserCache interface {
 	Delete(ctx context.Context, id string) error
 }
 
-// SignupCache 邮箱注册的待验证记录：主记录 + 链接索引 + 验证码错误计数
+// SignupCache 邮箱注册的待验证记录：主记录 + 验证码错误计数 + 发信冷却
 type SignupCache interface {
-	// Set 写入 pending 与链接索引，previousLinkTokenHash 非空时顺带删掉旧链接索引
-	Set(ctx context.Context, pending *schema.SignupPending, previousLinkTokenHash string, ttl time.Duration) error
+	// Set 写入 pending，ttl 同时是重发验证码的窗口
+	Set(ctx context.Context, pending *schema.SignupPending, ttl time.Duration) error
 	// GetByEmail 不存在时返回 errors.ErrNoRecord
 	GetByEmail(ctx context.Context, email string) (*schema.SignupPending, error)
-	GetByLinkToken(ctx context.Context, linkToken string) (*schema.SignupPending, error)
 	DeleteByEmail(ctx context.Context, email string) error
 	// IncrAttempts 原子自增并返回新值
 	IncrAttempts(ctx context.Context, email string, ttl time.Duration) (int64, error)
+	// SetCooldown 用 SET NX 原子写入发邮件间隔标记，已存在则不覆盖并返回 false
+	SetCooldown(ctx context.Context, email string, ttl time.Duration) (bool, error)
+	DeleteCooldown(ctx context.Context, email string) error
+}
+
+// PasswordResetCache 找回密码的待确认记录：主记录 + 链接索引 + 发信冷却
+// 走链接而不是验证码，所以没有「验证码错误次数」这一项：token 是 32 字节随机串
+type PasswordResetCache interface {
+	// Set 写入 pending 与链接索引，previousLinkTokenHash 非空时顺带删掉旧链接索引
+	Set(ctx context.Context, pending *schema.PasswordResetPending, previousLinkTokenHash string, ttl time.Duration) error
+	// GetByEmail 不存在时返回 errors.ErrNoRecord
+	GetByEmail(ctx context.Context, email string) (*schema.PasswordResetPending, error)
+	GetByLinkToken(ctx context.Context, linkToken string) (*schema.PasswordResetPending, error)
+	DeleteByEmail(ctx context.Context, email string) error
 	// SetCooldown 用 SET NX 原子写入发邮件间隔标记，已存在则不覆盖并返回 false
 	SetCooldown(ctx context.Context, email string, ttl time.Duration) (bool, error)
 	DeleteCooldown(ctx context.Context, email string) error
@@ -111,6 +124,7 @@ type Cache struct {
 	StylePreviewCache       StylePreviewCache
 	UserCache               UserCache
 	SignupCache             SignupCache
+	PasswordResetCache      PasswordResetCache
 }
 
 var (

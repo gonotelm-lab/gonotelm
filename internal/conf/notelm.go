@@ -160,8 +160,8 @@ type AuthConfig struct {
 	// RequireComplexPassword 密码是否必须同时含大写字母、小写字母与数字
 	RequireComplexPassword bool `toml:"requireComplexPassword"`
 
-	// EmailVerifyURLBase 邮件里验证链接的前端页面，最终链接为 base#token=xxx
-	EmailVerifyURLBase string `toml:"emailVerifyUrlBase"`
+	// PasswordResetURLBase 找回密码邮件里重置链接的前端页面，最终链接为 base#token=xxx
+	PasswordResetURLBase string `toml:"passwordResetUrlBase"`
 
 	// LoginErrorURL 三方登录回调失败时的前端页面
 	LoginErrorURL string `toml:"loginErrorUrl"`
@@ -256,8 +256,8 @@ func (c *NotelmConfig) init() {
 	c.Auth.Init()
 	c.Mailer.Init()
 
-	if c.Auth.EmailVerifyURLBase == "" {
-		c.Auth.EmailVerifyURLBase = "http://127.0.0.1:5173/verify-email"
+	if c.Auth.PasswordResetURLBase == "" {
+		c.Auth.PasswordResetURLBase = "http://127.0.0.1:5173/reset-password"
 	}
 
 	if c.Auth.LoginErrorURL == "" {

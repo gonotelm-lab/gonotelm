@@ -50,10 +50,10 @@ func (h *baseHandler) authenticate(ctx context.Context, sessionId string) (*Auth
 		return nil, identerr.ErrUserSessionNotFound
 	}
 
-	// 会话有效不代表用户可用，封禁可能在会话创建之后发生
+	// 会话有效不代表账号可用，封禁可能在会话创建之后发生
 	user, err := h.userService.GetUser(ctx, session.UserId)
 	if err != nil {
-		// 用户已被删除，会话一并视为失效，走 401 重新登录
+		// 账号已被删除，会话一并视为失效，走 401 重新登录
 		if errors.Is(err, identerr.ErrUserNotFound) {
 			return nil, identerr.ErrUserSessionNotFound
 		}
@@ -76,7 +76,7 @@ func (h *baseHandler) authenticate(ctx context.Context, sessionId string) (*Auth
 	return &AuthenticateResult{UserId: session.UserId, LoginSource: session.LoginSource}, nil
 }
 
-// issueSession 为用户创建新会话并保存
+// issueSession 为账号创建新会话并保存
 func (h *baseHandler) issueSession(
 	ctx context.Context,
 	user *identityentity.User,

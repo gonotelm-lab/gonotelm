@@ -37,15 +37,14 @@ func NewSignupService(
 	}
 }
 
-// SignupDispatch 给 app 层返回凭证时的结果，token 与验证码只用于发邮件，不进库
+// SignupDispatch 给 app 层返回凭证时的结果，验证码只用于发邮件，不进库
 // Ticket 仅首次注册返回，重复注册为空，前端保留旧 ticket
 // Rollback 在 app 层发邮件失败时调用，撤销本次写入的发送间隔，允许立即重试
 type SignupDispatch struct {
-	Email     string
-	Ticket    string
-	LinkToken string
-	Code      string
-	Rollback  func(ctx context.Context)
+	Email    string
+	Ticket   string
+	Code     string
+	Rollback func(ctx context.Context)
 }
 
 // Start 邮箱注册第一步：校验 → 邮箱未占用 → 哈希密码 → 沿用或新建 pending → 返回凭证
@@ -55,12 +54,12 @@ func (s *SignupService) Start(ctx context.Context, email, password string) (*Sig
 		return nil, err
 	}
 
-	pending, previousLinkTokenHash, ticket, err := s.preparePending(ctx, email, passwordHash)
+	pending, ticket, err := s.preparePending(ctx, email, passwordHash)
 	if err != nil {
 		return nil, err
 	}
 
-	dispatch, err := s.dispatch(ctx, pending, previousLinkTokenHash)
+	dispatch, err := s.dispatch(ctx, pending)
 	if err != nil {
 		return nil, err
 	}
@@ -123,20 +122,7 @@ func (s *SignupService) Resend(ctx context.Context, email string) (*SignupDispat
 		return nil, err
 	}
 
-	return s.dispatch(ctx, pending, pending.LinkTokenHash)
-}
-
-// VerifyLink 链接验证：用邮件里的 token 取出 pending 再建号
-func (s *SignupService) VerifyLink(
-	ctx context.Context,
-	linkToken, ticket string,
-) (*entity.UserAggregate, error) {
-	pending, err := s.signupRepo.GetByLinkToken(ctx, linkToken)
-	if err != nil {
-		return nil, err
-	}
-
-	return s.activate(ctx, pending, ticket)
+	return s.dispatch(ctx, pending)
 }
 
 // VerifyCode 验证码验证：先按 email 取 pending，码不匹配只累加 attempts
@@ -183,35 +169,34 @@ func (s *SignupService) ensureEmailAvailable(ctx context.Context, email string) 
 	return nil
 }
 
-// preparePending 重复注册时保留首次的密码与 ticket，只轮换链接 token 和验证码
+// preparePending 重复注册时保留首次的密码与 ticket，只轮换验证码
 func (s *SignupService) preparePending(
 	ctx context.Context,
 	email, passwordHash string,
-) (pending *entity.SignupPending, previousLinkTokenHash, ticket string, err error) {
+) (pending *entity.SignupPending, ticket string, err error) {
 	existing, err := s.signupRepo.GetByEmail(ctx, email)
 	if err == nil {
-		return existing, existing.LinkTokenHash, "", nil
+		return existing, "", nil
 	}
 	if !errors.Is(err, identerr.ErrVerificationExpired) {
-		return nil, "", "", err
+		return nil, "", err
 	}
 
 	ticket, err = idp.RandomString(signupTicketLength)
 	if err != nil {
-		return nil, "", "", errors.WithMessage(err, "generate signup ticket failed")
+		return nil, "", errors.WithMessage(err, "generate signup ticket failed")
 	}
 
-	return entity.NewSignupPending(email, passwordHash, ticket), "", ticket, nil
+	return entity.NewSignupPending(email, passwordHash, ticket), ticket, nil
 }
 
-// dispatch 生成凭证 → 写发送间隔 → 写库
-// 先写发送间隔再写库，否则限流请求会换掉链接却没发邮件，写库失败立即撤销间隔
+// dispatch 生成验证码 → 写发送间隔 → 落库
+// 先写发送间隔再落库，否则限流请求会换掉验证码却没发邮件，落库失败立即撤销间隔
 func (s *SignupService) dispatch(
 	ctx context.Context,
 	pending *entity.SignupPending,
-	previousLinkTokenHash string,
 ) (*SignupDispatch, error) {
-	linkToken, code, err := pending.IssueCredentials()
+	code, err := pending.IssueCredentials()
 	if err != nil {
 		return nil, errors.WithMessage(err, "issue signup credentials failed")
 	}
@@ -221,16 +206,15 @@ func (s *SignupService) dispatch(
 	}
 	rollback := func(ctx context.Context) { s.clearCooldown(ctx, pending.Email) }
 
-	if err := s.signupRepo.Save(ctx, pending, previousLinkTokenHash); err != nil {
+	if err := s.signupRepo.Save(ctx, pending); err != nil {
 		rollback(ctx)
 		return nil, errors.WithMessage(err, "save signup pending failed")
 	}
 
 	return &SignupDispatch{
-		Email:     pending.Email,
-		LinkToken: linkToken,
-		Code:      code,
-		Rollback:  rollback,
+		Email:    pending.Email,
+		Code:     code,
+		Rollback: rollback,
 	}, nil
 }
 

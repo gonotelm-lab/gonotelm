@@ -89,6 +89,31 @@ assets/                   slides templates, artifact preview images, opensandbox
 - **Source ingestion**: notelm publishes the inter-process `source.preparation` event → sourcejob's `PrepareSourceHandler` parses, chunks, and embeds it into Milvus, then emits domain events back.
 - **Event publishing**: entities call `AddEvent` inside their mutation methods; handlers call `PullEvents()` after a successful `Save` and hand the events to the eventbus. A publish failure is logged only — it never rolls back saved data.
 
+## Terminology (中文用词)
+
+Comments, docs, and copy are Chinese; pick one word per concept and keep it. A term that changes every PR reads like a machine translation and slows review down.
+
+| Term | Meaning |
+|---|---|
+| 密码 | What the UI and the code already say — `ErrWeakPassword`, 改密码, 旧密码. |
+| 账号 | The `users_v2` row / `entity.User`. |
+| 用户 | The person using the product — 给用户推送, 用户无感. |
+| 登录 | Signing in. |
+| 凭证 | Any credential — 会话凭证, 验证凭证, provider 凭证. |
+| 三方 | 三方登录, 三方身份. |
+| 封禁 | Matches `UserStatusBanned` / `ErrUserBanned`. |
+| 建号 | Concretely: insert one row into `users_v2`. |
+| 落库 | Persisting to a store — Postgres, Redis and MinIO all take the same word. |
+| 注销账号 | The user ending their own account. |
+
+Three verbs with distinct jobs:
+
+- **验证** proves ownership or truth — 邮箱验证, 验证码, 验证链接.
+- **校验** checks that a value is acceptable — 参数校验, 密码策略校验, 校验旧密码.
+- **检查** checks state or permission — 检查锁是否被持有, 检查登录态, 检查账号是否存在.
+
+Type and field names stay English (`Password`); this section governs the Chinese prose around them.
+
 ## Conventions when changing code
 
 - **New persistence capability**: define the interface in `domain/<domain>/repository` → implement in `infrastructure/repository` → convert models in `mapper` → add the GORM model in `infrastructure/database/schema` → wire it up in `bootstrap`.
@@ -96,7 +121,7 @@ assets/                   slides templates, artifact preview images, opensandbox
 - **New external component**: register a `Component` constructor in `bootstrap/shared`, then have each `bootstrap/<binary>.go` request only what it needs. Wiring belongs in code, not in config.
 - **New config field**: add it to `internal/conf/<binary>.go` and `etc/<binary>.toml.tpl`, with defaults in the `Init()` method; use a goose migration under `migration/db/postgres18` for schema changes.
 - **New artifact kind**: add the Kind and payload in `domain/artifact/entity` → add the pipeline in `application/worker/artifact/<kind>` → register it in `interfaces/entrypoint/worker` → list it in `buildinTaskTypes` in `bootstrap/worker.go`.
-- Match the surrounding file's comment language (many files carry Chinese comments).
+- Match the surrounding file's comment language (many files carry Chinese comments); for which Chinese word to use, see the Terminology section above.
 
 ## Verification
 

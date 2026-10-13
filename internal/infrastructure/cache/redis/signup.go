@@ -17,7 +17,6 @@ import (
 )
 
 // gonotelm:identity:signup:{sha256(email)}          -> SignupPending(msgpack)
-// gonotelm:identity:signup:link:{sha256(token)}     -> sha256(email)
 // gonotelm:identity:signup:attempts:{sha256(email)} -> 验证码错误次数(INCR)
 // gonotelm:identity:signup:cooldown:{sha256(email)} -> 发信冷却位(SET NX EX)
 type SignupCacheImpl struct {
@@ -30,6 +29,7 @@ func NewSignupCacheImpl(rdb goredis.UniversalClient) *SignupCacheImpl {
 	return &SignupCacheImpl{rd: rdb}
 }
 
+// hashKey 邮箱等敏感值不进 key，统一 sha256 后拼进去
 func hashKey(raw string) string {
 	sum := sha256.Sum256(pkgstring.AsBytes(raw))
 
@@ -38,15 +38,6 @@ func hashKey(raw string) string {
 
 func (c *SignupCacheImpl) pendingKey(email string) string {
 	return fmt.Sprintf("gonotelm:identity:signup:%s", hashKey(email))
-}
-
-// linkKeyByHash 直接用算好的 token 哈希组 key
-func (c *SignupCacheImpl) linkKeyByHash(tokenHash string) string {
-	return fmt.Sprintf("gonotelm:identity:signup:link:%s", tokenHash)
-}
-
-func (c *SignupCacheImpl) linkKeyByToken(linkToken string) string {
-	return c.linkKeyByHash(hashKey(linkToken))
 }
 
 func (c *SignupCacheImpl) attemptsKey(email string) string {
@@ -60,7 +51,6 @@ func (c *SignupCacheImpl) cooldownKey(email string) string {
 func (c *SignupCacheImpl) Set(
 	ctx context.Context,
 	pending *schema.SignupPending,
-	previousLinkTokenHash string,
 	ttl time.Duration,
 ) error {
 	data, err := msgpack.Marshal(pending)
@@ -68,14 +58,7 @@ func (c *SignupCacheImpl) Set(
 		return errors.Wrapf(errors.ErrSerde, "marshal signup pending failed, err=%s", err.Error())
 	}
 
-	pipe := c.rd.TxPipeline()
-	pipe.Set(ctx, c.pendingKey(pending.Email), data, ttl)
-	pipe.Set(ctx, c.linkKeyByHash(pending.LinkTokenHash), hashKey(pending.Email), ttl)
-	if previousLinkTokenHash != "" && previousLinkTokenHash != pending.LinkTokenHash {
-		// 重发后旧链接立即失效
-		pipe.Del(ctx, c.linkKeyByHash(previousLinkTokenHash))
-	}
-	if _, err := pipe.Exec(ctx); err != nil {
+	if err := c.rd.Set(ctx, c.pendingKey(pending.Email), data, ttl).Err(); err != nil {
 		return errors.Wrapf(errors.ErrCache, "set signup pending failed, err=%s", err.Error())
 	}
 
@@ -84,19 +67,6 @@ func (c *SignupCacheImpl) Set(
 
 func (c *SignupCacheImpl) GetByEmail(ctx context.Context, email string) (*schema.SignupPending, error) {
 	return c.get(ctx, c.pendingKey(email))
-}
-
-func (c *SignupCacheImpl) GetByLinkToken(ctx context.Context, linkToken string) (*schema.SignupPending, error) {
-	emailHash, err := c.rd.Get(ctx, c.linkKeyByToken(linkToken)).Result()
-	if err != nil {
-		if errors.Is(err, goredis.Nil) {
-			return nil, errors.ErrNoRecord
-		}
-
-		return nil, errors.Wrapf(errors.ErrCache, "get signup link failed, err=%s", err.Error())
-	}
-
-	return c.get(ctx, fmt.Sprintf("gonotelm:identity:signup:%s", emailHash))
 }
 
 func (c *SignupCacheImpl) DeleteByEmail(ctx context.Context, email string) error {

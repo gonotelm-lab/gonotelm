@@ -6,7 +6,7 @@ import (
 	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 )
 
-// ProvidersHandler 只列当前部署配好凭据、能真正完成登录的 provider
+// ProvidersHandler 只列当前部署配好凭证、能真正完成登录的 provider
 type ProvidersHandler struct {
 	registry identrepo.ProviderRegistry
 }

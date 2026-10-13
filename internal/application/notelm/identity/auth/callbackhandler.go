@@ -123,7 +123,7 @@ func (h *CallbackHandler) Handle(ctx context.Context, cmd *CallbackHandleCommand
 		return result, errors.WithMessage(err, "resolve user failed")
 	}
 
-	// 封禁用户不允许重新登录，否则下一次登录就能绕过封禁
+	// 封禁账号不允许重新登录，否则下一次登录就能绕过封禁
 	if agg.IsBanned() {
 		return result, domainerr.ErrUserBanned
 	}
@@ -168,7 +168,7 @@ func (h *CallbackHandler) PeekState(ctx context.Context, state string) *Callback
 	return &CallbackHandleResult{Mode: oauthState.Mode, ReturnTo: oauthState.ReturnTo}
 }
 
-// handleBind 绑定分支：回调必须来自发起绑定的那个会话，否则就是账户关联 CSRF
+// handleBind 绑定分支：回调必须来自发起绑定的那个会话，否则就是账号关联 CSRF
 // 结果写进调用方的 result，失败时由它带 Mode/ReturnTo 跳转
 func (h *CallbackHandler) handleBind(
 	ctx context.Context,

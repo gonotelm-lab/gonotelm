@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"fmt"
 	"net/url"
 	"strings"
 	"time"
@@ -57,6 +58,10 @@ type EmailRegisterPrefetchResponse struct {
 	RequireComplexPassword bool `json:"require_complex_password"`
 }
 
+// PasswordResetPrefetchResponse 重置页与注册页共用同一份密码策略，字段一致
+// 单独起名是为了让路由与 DTO 对得上，线上契约不变
+type PasswordResetPrefetchResponse = EmailRegisterPrefetchResponse
+
 type EmailRegisterRequest struct {
 	Email     string `json:"email"`
 	Password  string `json:"password"`
@@ -69,22 +74,6 @@ func (req *EmailRegisterRequest) Validate() error {
 	}
 	if req.Password == "" {
 		return errors.ErrParams.Msg("password is required")
-	}
-	if req.LoginFrom != "" && !entity.CheckDeviceType(req.LoginFrom) {
-		return errors.ErrParams.Msgf("invalid login from: %s", req.LoginFrom)
-	}
-
-	return nil
-}
-
-type EmailVerifyLinkRequest struct {
-	Token     string `json:"token"`
-	LoginFrom string `json:"login_from,omitempty"`
-}
-
-func (req *EmailVerifyLinkRequest) Validate() error {
-	if req.Token == "" {
-		return errors.ErrParams.Msg("token is required")
 	}
 	if req.LoginFrom != "" && !entity.CheckDeviceType(req.LoginFrom) {
 		return errors.ErrParams.Msgf("invalid login from: %s", req.LoginFrom)
@@ -163,6 +152,37 @@ type SetPasswordResponse struct {
 	ReloginRequired bool `json:"relogin_required"`
 }
 
+// PasswordResetRequest 发起找回密码
+// 账号不存在时接口也返回成功，前端没法据此判断邮箱是否注册
+type PasswordResetRequest struct {
+	Email string `json:"email"`
+}
+
+func (req *PasswordResetRequest) Validate() error {
+	if err := entity.ValidateEmail(entity.NormalizeEmail(req.Email)); err != nil {
+		return identerr.ErrEmailInvalid
+	}
+
+	return nil
+}
+
+// PasswordResetConfirmRequest 链接确认：token 取自邮件里重置链接的 URL 片段
+type PasswordResetConfirmRequest struct {
+	Token       string `json:"token"`
+	NewPassword string `json:"new_password"`
+}
+
+func (req *PasswordResetConfirmRequest) Validate() error {
+	if req.Token == "" {
+		return errors.ErrParams.Msg("token is required")
+	}
+	if req.NewPassword == "" {
+		return errors.ErrParams.Msg("new_password is required")
+	}
+
+	return nil
+}
+
 type BindProviderRequest struct {
 	Provider string `json:"provider"`
 	ReturnTo string `json:"return_to,omitempty"`
@@ -221,7 +241,7 @@ type AuthIdentitiesResponse struct {
 	Identities []AuthIdentity `json:"identities"`
 }
 
-// AuthSupportedIdentity 代码支持的身份类型，不含是否配置凭据（见 /auth/providers）
+// AuthSupportedIdentity 代码支持的身份类型，不含是否配置凭证（见 /auth/providers）
 type AuthSupportedIdentity struct {
 	Provider string `json:"provider"`
 }
@@ -329,4 +349,44 @@ func (r *AuthCallbackRequest) Validate(req *protocol.Request) error {
 	}
 
 	return nil
+}
+
+// ── 打印脱敏 ──────────────────────────────────────────────────────────────
+//
+// 下面这些 DTO 带密码或一次性凭证，实现 fmt.Stringer 是为了万一有人 %+v
+// 打整个请求体（handler、中间件、错误日志都可能），不至于把密码和能直接换
+// 会话的凭证写进日志。
+//
+// String 都用值接收者：handler 传的是指针，但 %+v 打在值上也得命中。
+// 不带凭证的 DTO 不实现 String，它们的默认输出本来就安全。
+
+// redactedValue 密码与一次性凭证的打印占位符
+const redactedValue = "[REDACTED]"
+
+func (req EmailRegisterRequest) String() string {
+	return fmt.Sprintf("EmailRegisterRequest{Email:%q, Password:%s, LoginFrom:%q}",
+		req.Email, redactedValue, req.LoginFrom)
+}
+
+func (req EmailVerifyCodeRequest) String() string {
+	return fmt.Sprintf("EmailVerifyCodeRequest{Email:%q, Code:%s, LoginFrom:%q}",
+		req.Email, redactedValue, req.LoginFrom)
+}
+
+func (req PasswordLoginRequest) String() string {
+	return fmt.Sprintf("PasswordLoginRequest{Email:%q, Password:%s, LoginFrom:%q}",
+		req.Email, redactedValue, req.LoginFrom)
+}
+
+func (req SetPasswordRequest) String() string {
+	return fmt.Sprintf("SetPasswordRequest{OldPassword:%s, NewPassword:%s}", redactedValue, redactedValue)
+}
+
+func (req PasswordResetConfirmRequest) String() string {
+	return fmt.Sprintf("PasswordResetConfirmRequest{Token:%s, NewPassword:%s}", redactedValue, redactedValue)
+}
+
+func (r AuthCallbackRequest) String() string {
+	return fmt.Sprintf("AuthCallbackRequest{State:%s, Code:%s, Error:%q, ErrorDescription:%q, ErrorUri:%q, Iss:%q}",
+		redactedValue, redactedValue, r.Error, r.ErrorDescription, r.ErrorUri, r.Iss)
 }

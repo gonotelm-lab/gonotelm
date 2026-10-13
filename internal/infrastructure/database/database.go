@@ -96,7 +96,7 @@ type UserStore interface {
 	Create(ctx context.Context, user *schema.User) error
 	GetById(ctx context.Context, id valobj.Uid) (*schema.User, error)
 	GetByEmail(ctx context.Context, email string) (*schema.User, error)
-	// GetPasswordHash 单独读取密码列，避免它混进用户实体/缓存/日志
+	// GetPasswordHash 单独读取密码列，避免它混进账号实体/缓存/日志
 	GetPasswordHash(ctx context.Context, id valobj.Uid) (string, error)
 	UpdateProfile(ctx context.Context, params *schema.UserUpdateProfileParams) error
 	UpdateAvatar(ctx context.Context, params *schema.UserUpdateAvatarParams) error

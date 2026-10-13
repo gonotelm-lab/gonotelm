@@ -119,6 +119,8 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 		passwordHasher,
 	)
 	signupService := identityservice.NewSignupService(signupRepo, userRepo, userService, passwordHasher)
+	passwordResetRepo := repository.NewPasswordResetRepository(infra.Cache.PasswordResetCache)
+	passwordResetService := identityservice.NewPasswordResetService(passwordResetRepo, userRepo, userService)
 	userSessionRepo := repository.NewUserSessionRepository(infra.Cache.UserSessionCache)
 
 	if !cfg.Auth.EmailVerificationRequired {
@@ -225,6 +227,7 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 			UserRepo:               userRepo,
 			UserService:            userService,
 			SignupService:          signupService,
+			PasswordResetService:   passwordResetService,
 			UserSessionRepo:        userSessionRepo,
 			Mailer:                 mailer,
 

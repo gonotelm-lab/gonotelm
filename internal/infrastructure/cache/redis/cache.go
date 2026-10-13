@@ -18,5 +18,6 @@ func NewCache(
 		StylePreviewCache:       NewStylePreviewCacheImpl(rdb),
 		UserCache:               NewUserCacheImpl(rdb),
 		SignupCache:             NewSignupCacheImpl(rdb),
+		PasswordResetCache:      NewPasswordResetCacheImpl(rdb),
 	}
 }

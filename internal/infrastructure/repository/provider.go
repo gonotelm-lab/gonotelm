@@ -16,7 +16,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/idp/google"
 )
 
-// ProviderRegistryImpl 按配置创建三方 provider，未配置凭据的跳过
+// ProviderRegistryImpl 按配置创建三方 provider，未配置凭证的跳过
 type ProviderRegistryImpl struct {
 	mu        sync.RWMutex
 	providers map[entity.ProviderType]entity.Provider
@@ -42,7 +42,7 @@ func (r *ProviderRegistryImpl) initProviders(ctx context.Context, providersConfi
 	for k, v := range providersConfig {
 		providerType := entity.ProviderType(k)
 
-		// 未配置凭据的提供商直接跳过，避免前端拿到一个无法完成登录的入口
+		// 未配置凭证的提供商直接跳过，避免前端拿到一个无法完成登录的入口
 		if v.ClientID == "" || v.ClientSecret == "" {
 			slog.WarnContext(ctx, "skip login provider without credentials", slog.String("provider_type", k))
 			continue

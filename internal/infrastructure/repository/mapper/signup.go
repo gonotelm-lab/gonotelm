@@ -8,24 +8,22 @@ import (
 
 func SignupToSchema(p *identityentity.SignupPending) *schema.SignupPending {
 	return &schema.SignupPending{
-		Email:         p.Email,
-		PasswordHash:  p.PasswordHash,
-		TicketHash:    p.TicketHash,
-		LinkTokenHash: p.LinkTokenHash,
-		CodeHash:      p.CodeHash,
-		CodeExpireAt:  p.CodeExpireAt.Value(),
-		CreatedAt:     p.CreatedAt.Value(),
+		Email:        p.Email,
+		PasswordHash: p.PasswordHash,
+		TicketHash:   p.TicketHash,
+		CodeHash:     p.CodeHash,
+		CodeExpireAt: p.CodeExpireAt.Value(),
+		CreatedAt:    p.CreatedAt.Value(),
 	}
 }
 
 func SignupFromSchema(p *schema.SignupPending) *identityentity.SignupPending {
 	return &identityentity.SignupPending{
-		Email:         p.Email,
-		PasswordHash:  p.PasswordHash,
-		TicketHash:    p.TicketHash,
-		LinkTokenHash: p.LinkTokenHash,
-		CodeHash:      p.CodeHash,
-		CodeExpireAt:  valobj.NewTimeFrom(p.CodeExpireAt),
-		CreatedAt:     valobj.NewTimeFrom(p.CreatedAt),
+		Email:        p.Email,
+		PasswordHash: p.PasswordHash,
+		TicketHash:   p.TicketHash,
+		CodeHash:     p.CodeHash,
+		CodeExpireAt: valobj.NewTimeFrom(p.CodeExpireAt),
+		CreatedAt:    valobj.NewTimeFrom(p.CreatedAt),
 	}
 }

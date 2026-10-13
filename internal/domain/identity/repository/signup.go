@@ -8,10 +8,9 @@ import (
 
 // SignupRepository 邮箱注册待验证记录的读写，记录是短时状态，存在 Redis 里
 type SignupRepository interface {
-	// Save 写入记录与链接索引，previousLinkTokenHash 非空时旧链接立即失效
-	Save(ctx context.Context, pending *entity.SignupPending, previousLinkTokenHash string) error
+	// Save 写入记录，ttl 由实现按 SignupPendingTTL 固定
+	Save(ctx context.Context, pending *entity.SignupPending) error
 	GetByEmail(ctx context.Context, email string) (*entity.SignupPending, error)
-	GetByLinkToken(ctx context.Context, linkToken string) (*entity.SignupPending, error)
 	DeleteByEmail(ctx context.Context, email string) error
 	IncrAttempts(ctx context.Context, email string) (int64, error)
 	// StartSendCooldown 开始计时发邮件间隔，间隔内返回 ErrTooManyRequests

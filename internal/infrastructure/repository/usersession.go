@@ -24,7 +24,7 @@ func NewUserSessionRepository(cache cache.UserSessionCache) identityrepo.UserSes
 }
 
 func (r *UserSessionRepositoryImpl) Save(ctx context.Context, session *identityentity.UserSession) error {
-	// TTL 取会话当前的闲置过期时间点;滑动续期后 ExpireAt 前移,TTL 随之延长。
+	// TTL 取会话当前的闲置过期时间，续期后一起前移
 	ttl := time.Until(session.ExpireAt.Time())
 	if ttl <= 0 {
 		return errors.ErrParams.Msg("user session already expired")

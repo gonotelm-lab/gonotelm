@@ -11,7 +11,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
-// BindHandler 发起三方绑定：state 记录里带上发起会话，回调必须是同一个会话。
+// BindHandler 发起三方绑定：state 里记录发起会话，回调必须来自同一个会话
 type BindHandler struct {
 	registry       identrepo.ProviderRegistry
 	oauthStateRepo identrepo.OAuthStateRepository

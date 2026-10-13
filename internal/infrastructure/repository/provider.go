@@ -16,7 +16,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/idp/google"
 )
 
-// ProviderRegistryImpl 按配置构造三方 provider；未配置凭据的直接跳过。
+// ProviderRegistryImpl 按配置创建三方 provider，未配置凭据的跳过
 type ProviderRegistryImpl struct {
 	mu        sync.RWMutex
 	providers map[entity.ProviderType]entity.Provider
@@ -99,8 +99,7 @@ func (r *ProviderRegistryImpl) AvailableProviders() []entity.Provider {
 	return providers
 }
 
-// oauthLoginProvider adapts an idp.Provider to the identity domain Provider
-// interface for all OAuth2/OIDC providers.
+// oauthLoginProvider wraps an idp.Provider as entity.Provider
 type oauthLoginProvider struct {
 	providerType entity.ProviderType
 	config       idp.Config

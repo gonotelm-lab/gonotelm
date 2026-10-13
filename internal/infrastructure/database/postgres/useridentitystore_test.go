@@ -71,8 +71,8 @@ func TestUserIdentityStoreProviderSubjectUnique(t *testing.T) {
 	})
 }
 
-// uk_user_identities_v2_user_provider：一个账号在每个 provider 上最多一个身份，
-// 但换 provider 必须放行，否则"一个账号绑 github + google"会被误伤。
+// uk_user_identities_v2_user_provider：一个账号在每个 provider 上最多一个身份
+// 换 provider 必须放行，否则一个账号绑 github + google 会被误伤
 func TestUserIdentityStoreUserProviderUnique(t *testing.T) {
 	Convey("UserIdentityStore allows one identity per account and provider", t, func() {
 		ctx := t.Context()
@@ -122,7 +122,7 @@ func TestUserIdentityStoreDeleteOne(t *testing.T) {
 	})
 }
 
-// 归属必须由查询保证：别人的 bind_id 取不到，这是解绑接口防越权的根。
+// 归属由查询保证：别人的 bind_id 取不到
 func TestUserIdentityStoreGetByUserIdAndId(t *testing.T) {
 	Convey("UserIdentityStore scopes the lookup by owner", t, func() {
 		ctx := t.Context()

@@ -17,7 +17,7 @@ const (
 	AuthOAuthStateCookieName = "_gnlm_oauth_state"
 	AuthOAuthStateCookieTTL  = 600 // 10 minutes
 
-	// SignupTicketCookieName 注册票据：只有发起注册的浏览器完成验证才激活密码
+	// SignupTicketCookieName 注册 ticket：只有发起注册的浏览器完成验证才写入密码
 	SignupTicketCookieName = "_gnlm_signup_ticket"
 	SignupTicketCookieTTL  = 24 * 60 * 60
 
@@ -31,12 +31,12 @@ const (
 	CSRFHeaderName = "X-CSRF-Token"
 )
 
-// AuthSessionResponse 登录/验证成功后返回的账号标识。
+// AuthSessionResponse 登录/验证成功后返回的账号标识
 type AuthSessionResponse struct {
 	UserId string `json:"user_id"`
 }
 
-// DeviceOrWeb 缺省的登录来源设备。
+// DeviceOrWeb 缺省的登录来源设备
 func DeviceOrWeb(raw string) entity.DeviceType {
 	if raw == "" {
 		return entity.DeviceTypeWeb
@@ -45,14 +45,14 @@ func DeviceOrWeb(raw string) entity.DeviceType {
 	return entity.DeviceType(raw)
 }
 
-// EmailRegisterResponse 注册结果。EmailVerified 为 true 时账号已建好并已签发会话，
-// 客户端可直接进已登录态；false 时账号尚未建立，等待验证信里的链接或验证码。
+// EmailRegisterResponse 注册结果，EmailVerified=true 时账号已建好并创建会话
+// false 时账号未建立，等待验证邮件里的链接或验证码
 type EmailRegisterResponse struct {
 	EmailVerified bool   `json:"email_verified"`
 	UserId        string `json:"user_id,omitempty"`
 }
 
-// EmailRegisterPrefetchResponse 注册前的元数据，客户端据此即时校验表单。
+// EmailRegisterPrefetchResponse 注册前的元数据，客户端据此即时校验表单
 type EmailRegisterPrefetchResponse struct {
 	RequireComplexPassword bool `json:"require_complex_password"`
 }
@@ -158,7 +158,7 @@ func (req *SetPasswordRequest) Validate() error {
 	return nil
 }
 
-// SetPasswordResponse 改密码会作废该账号全部会话（含当前），前端据此引导重新登录。
+// SetPasswordResponse 改密码作废该账号全部会话（含当前），前端据此引导重新登录
 type SetPasswordResponse struct {
 	ReloginRequired bool `json:"relogin_required"`
 }
@@ -179,8 +179,8 @@ func (req *BindProviderRequest) Validate() error {
 	return nil
 }
 
-// UnbindIdentityRequest 解绑三方身份：bind_id 即 /auth/identities 返回的 bind_id。
-// provider 是交叉校验，必须与该条绑定记录的 provider 一致。
+// UnbindIdentityRequest 解绑三方身份：bind_id 即 /auth/identities 返回的 bind_id
+// provider 交叉校验，必须与该条绑定记录的 provider 一致
 type UnbindIdentityRequest struct {
 	BindId   valobj.Id `json:"bind_id"`
 	Provider string    `json:"provider"`
@@ -200,8 +200,8 @@ func (req *UnbindIdentityRequest) Validate() error {
 	return nil
 }
 
-// BindProviderResponse 返回 IdP 授权地址，由前端自行跳转（后端不 302）。
-// AlreadyBound 为 true 时 authorize_url 为空：该 provider 已绑在当前账号上，不必再授权。
+// BindProviderResponse 返回 IdP 授权地址，由前端自行跳转，后端不 302
+// AlreadyBound=true 时 authorize_url 为空，该 provider 已绑在当前账号上
 type BindProviderResponse struct {
 	AuthorizeUrl string `json:"authorize_url"`
 	AlreadyBound bool   `json:"already_bound"`
@@ -221,7 +221,7 @@ type AuthIdentitiesResponse struct {
 	Identities []AuthIdentity `json:"identities"`
 }
 
-// AuthSupportedIdentity 代码支持的身份类型；不含"是否配置了凭据"（那是 /auth/providers 的职责）。
+// AuthSupportedIdentity 代码支持的身份类型，不含是否配置凭据（见 /auth/providers）
 type AuthSupportedIdentity struct {
 	Provider string `json:"provider"`
 }
@@ -318,7 +318,7 @@ func (r *AuthCallbackRequest) IsError() bool {
 }
 
 func (r *AuthCallbackRequest) Validate(req *protocol.Request) error {
-	// 用 domain 错误码：回调失败会 302 并把 reason 带给前端，这里要能映射成具体原因
+	// 用 domain 错误码，回调失败要 302 并把 reason 带给前端
 	if r.State == "" {
 		return identerr.ErrOAuthStateNotFound
 	}

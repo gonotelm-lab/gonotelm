@@ -5,7 +5,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
 )
 
-// RegisterPrefetchHandler 注册前元数据：把服务端配置翻译成表单要用的字段。
+// RegisterPrefetchHandler 注册前元数据：从服务端配置取表单要用的字段
 type RegisterPrefetchHandler struct{}
 
 func NewRegisterPrefetchHandler() *RegisterPrefetchHandler { return &RegisterPrefetchHandler{} }

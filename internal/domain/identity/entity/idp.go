@@ -43,7 +43,7 @@ func (t ProviderType) Iss() string {
 	}
 }
 
-// ProviderLoginMode 区分"用三方登录"与"把三方身份绑到当前账号"。
+// ProviderLoginMode 区分三方登录与绑定到当前账号
 type ProviderLoginMode string
 
 const (
@@ -90,7 +90,7 @@ func (info *ProviderOAuthInfo) ToOAuthState() *OAuthState {
 	}
 }
 
-// OAuthState OAuth 握手期间的一次性状态：state/nonce/code_verifier 等，短 TTL 存储。
+// OAuthState OAuth 握手期间的一次性状态，state/nonce/code_verifier 等，短 TTL 存储
 type OAuthState struct {
 	State               string
 	Nonce               string
@@ -117,8 +117,7 @@ type ProviderUserInfo struct {
 	Subject   string
 	Name      string
 	AvatarURL string
-	// Email 与 EmailVerified 是 provider 声明的邮箱及其验证状态；
-	// 只有 EmailVerified=true 时才允许作为账号邮箱的来源。
+	// Email provider 声明的邮箱，只有 EmailVerified=true 才能作为账号邮箱来源
 	Email         string
 	EmailVerified bool
 	Raw           map[string]any

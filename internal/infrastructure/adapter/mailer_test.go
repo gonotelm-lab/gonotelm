@@ -66,7 +66,7 @@ func TestMailerKeepsIdempotencyKeyPerCredentials(t *testing.T) {
 
 	_ = mailer.SendEmailVerification(t.Context(), "user@example.com", "https://a.example.com/#token=1", "111111")
 	_ = mailer.SendEmailVerification(t.Context(), "user@example.com", "https://a.example.com/#token=1", "111111")
-	// 重发会轮换凭证，因此必须拿到新的 key，否则第二封会被上游当成重复投递丢掉
+	// 重发轮换凭证必须拿到新 key，否则第二封会被上游当成重复邮件丢掉
 	_ = mailer.SendEmailVerification(t.Context(), "user@example.com", "https://a.example.com/#token=2", "222222")
 
 	if rec.sent[0].IdempotencyKey != rec.sent[1].IdempotencyKey {

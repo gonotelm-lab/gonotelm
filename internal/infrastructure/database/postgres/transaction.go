@@ -24,7 +24,7 @@ func (t *TransactorImpl) Transaction(ctx context.Context, fn func(ctx context.Co
 	})
 }
 
-// dbFromContext 优先用 ctx 里的事务句柄，没有则回落到连接池。
+// dbFromContext 优先用 ctx 里的事务句柄，没有则用连接池
 func dbFromContext(ctx context.Context, fallback *gorm.DB) *gorm.DB {
 	if tx, ok := database.TxFromContext(ctx); ok {
 		if gormTx, ok := tx.(*gorm.DB); ok {

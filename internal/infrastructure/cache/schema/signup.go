@@ -1,6 +1,6 @@
 package schema
 
-// SignupPending 待验证的邮箱注册：账号在验证通过后才建立。
+// SignupPending 待验证的邮箱注册，账号在验证通过后才建立
 type SignupPending struct {
 	Email         string `json:"email"           msgpack:"email"`
 	PasswordHash  string `json:"password_hash"   msgpack:"password_hash"`

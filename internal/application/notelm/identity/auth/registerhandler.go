@@ -13,8 +13,9 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
-// RegisterHandler 邮箱注册。是否走邮件验证由 auth.emailVerificationRequired 决定：
-// 需要验证时下发验证凭证并寄信、验证通过才建号；免验证时邮箱视为已验证，直接建号并签发会话。
+// RegisterHandler 邮箱注册，是否走邮件验证由 auth.emailVerificationRequired 决定
+// 需要验证时返回凭证并发送验证邮件，验证通过才建号
+// 免验证时邮箱视为已验证，直接建号并创建会话
 type RegisterHandler struct {
 	*baseHandler
 	signupService *identityservice.SignupService
@@ -41,8 +42,8 @@ type RegisterCommand struct {
 }
 
 type RegisterResult struct {
-	// Ticket 非空时由 interfaces 层写进 _gnlm_signup_ticket；
-	// 重复注册会保留首次票据，不重置 cookie。
+	// Ticket 非空时由 interfaces 层写进 _gnlm_signup_ticket
+	// 重复注册沿用旧 ticket，不重置 cookie
 	Ticket string
 	// Session 非空时 interfaces 层写会话 cookie
 	Session *SessionResult
@@ -69,7 +70,7 @@ func (h *RegisterHandler) Handle(ctx context.Context, cmd *RegisterCommand) (*Re
 	return &RegisterResult{Ticket: dispatch.Ticket}, nil
 }
 
-// registerVerified 免验证注册：建号成功后签发会话。会话签发失败不回滚账号——账号已合法落库。
+// registerVerified 免验证注册：建号后创建会话，创建失败不回滚账号
 func (h *RegisterHandler) registerVerified(
 	ctx context.Context,
 	cmd *RegisterCommand,
@@ -90,7 +91,7 @@ func (h *RegisterHandler) registerVerified(
 	}}, nil
 }
 
-// sendVerification 拼验证链接并发送验证信；失败撤销本次占用的发信冷却位后归一化为 ErrMailSendFailed。
+// sendVerification 拼验证链接并发送验证邮件，失败撤销本次占用的发送间隔，统一返回 ErrMailSendFailed
 func sendVerification(
 	ctx context.Context,
 	mailer adapter.Mailer,
@@ -105,7 +106,7 @@ func sendVerification(
 	return nil
 }
 
-// buildVerifyLink 验证链接落到前端页面，token 放 URL 片段，不进服务端日志也不进 Referer。
+// buildVerifyLink 验证链接指向前端页面，token 放 URL 片段，不进服务端日志与 Referer
 func buildVerifyLink(base, linkToken string) string {
 	return strings.TrimRight(base, "/") + "#token=" + linkToken
 }

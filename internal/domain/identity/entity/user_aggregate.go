@@ -34,7 +34,7 @@ func (a *UserAggregate) Identities() []*UserIdentity {
 	return append([]*UserIdentity(nil), a.identities...)
 }
 
-// LoginMethodCount 密码算一种登录方式，每条三方身份算一种。
+// LoginMethodCount 密码算一种登录方式，每条三方身份算一种
 func (a *UserAggregate) LoginMethodCount() int {
 	n := len(a.identities)
 	if a.hasPassword {
@@ -68,7 +68,7 @@ func (a *UserAggregate) HasIdentityOfAnotherSubject(provider ProviderType, subje
 	return false
 }
 
-// BindIdentity 追加一条身份；每个 provider 每账号至多一个身份。
+// BindIdentity 追加一条身份，每个 provider 每账号至多一个身份
 func (a *UserAggregate) BindIdentity(identity *UserIdentity) error {
 	if a.HasIdentity(identity.Provider) {
 		return identerr.ErrProviderAlreadyBound
@@ -79,7 +79,7 @@ func (a *UserAggregate) BindIdentity(identity *UserIdentity) error {
 	return nil
 }
 
-// UnbindIdentity 摘除一条身份。错误优先级：ErrLastLoginMethod > ErrIdentityNotFound > provider mismatch。
+// UnbindIdentity 删除一条身份，错误优先级 ErrLastLoginMethod > ErrIdentityNotFound > provider mismatch
 func (a *UserAggregate) UnbindIdentity(id valobj.Id, provider ProviderType) (*UserIdentity, error) {
 	if a.LoginMethodCount() <= 1 {
 		return nil, identerr.ErrLastLoginMethod
@@ -98,7 +98,7 @@ func (a *UserAggregate) UnbindIdentity(id valobj.Id, provider ProviderType) (*Us
 	return target, nil
 }
 
-// TouchIdentityLogin 更新该身份的最近登录时间，返回被更新的身份（账号下没有该身份时返回 nil）。
+// TouchIdentityLogin 更新该身份的最近登录时间，账号下没有该身份时返回 nil
 func (a *UserAggregate) TouchIdentityLogin(id valobj.Id, at valobj.Time) *UserIdentity {
 	identity := a.findIdentityById(id)
 	if identity == nil {

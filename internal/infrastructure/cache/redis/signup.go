@@ -40,7 +40,7 @@ func (c *SignupCacheImpl) pendingKey(email string) string {
 	return fmt.Sprintf("gonotelm:identity:signup:%s", hashKey(email))
 }
 
-// linkKeyByHash 索引键直接用已算好的 token 哈希；调用方拿明文时先 hashKey 一次。
+// linkKeyByHash 直接用算好的 token 哈希组 key
 func (c *SignupCacheImpl) linkKeyByHash(tokenHash string) string {
 	return fmt.Sprintf("gonotelm:identity:signup:link:%s", tokenHash)
 }
@@ -108,7 +108,7 @@ func (c *SignupCacheImpl) DeleteByEmail(ctx context.Context, email string) error
 	return nil
 }
 
-// IncrAttempts 原子自增验证码错误次数，并让它与 pending 同寿。
+// IncrAttempts 原子自增验证码错误次数，TTL 与 pending 相同
 func (c *SignupCacheImpl) IncrAttempts(ctx context.Context, email string, ttl time.Duration) (int64, error) {
 	key := c.attemptsKey(email)
 
@@ -122,7 +122,7 @@ func (c *SignupCacheImpl) IncrAttempts(ctx context.Context, email string, ttl ti
 	return incr.Val(), nil
 }
 
-// SetCooldown 用 SET NX EX 原子写入冷却标记，返回是否写入成功（已存在则为 false）。
+// SetCooldown 用 SET NX EX 原子写入发邮件间隔标记，返回是否写入成功（已存在为 false）
 func (c *SignupCacheImpl) SetCooldown(ctx context.Context, email string, ttl time.Duration) (bool, error) {
 	ok, err := c.rd.SetNX(ctx, c.cooldownKey(email), "1", ttl).Result()
 	if err != nil {

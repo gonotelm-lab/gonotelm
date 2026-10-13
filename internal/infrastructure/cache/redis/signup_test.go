@@ -12,7 +12,7 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-// 真实形态：pending 里只放 token 的哈希，查询用明文 token。
+// pending 里只放 token 哈希，查询时用邮件里的原始 token
 func secretHash(raw string) string {
 	sum := sha256.Sum256([]byte(raw))
 
@@ -64,7 +64,7 @@ func TestSignupCacheLinkIndex(t *testing.T) {
 		So(err, ShouldBeNil)
 		So(got.Email, ShouldEqual, pending.Email)
 
-		// 不仅认条目，明文 token 也要真能命中（哈希推导必须和写入侧一致）
+		// 原始 token 要真能查到，哈希推导与写入侧一致
 		_, err = testSignupCache.GetByLinkToken(ctx, "link-token-unknown")
 		So(pkgerrors.Is(err, pkgerrors.ErrNoRecord), ShouldBeTrue)
 

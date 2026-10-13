@@ -59,7 +59,7 @@ func (s *UserService) GetUser(ctx context.Context, userId valobj.Uid) (*entity.U
 	return s.userRepo.GetById(ctx, userId)
 }
 
-// GetAccount 装载账号聚合：User + 全部身份
+// GetAccount 读取账号聚合
 func (s *UserService) GetAccount(ctx context.Context, userId valobj.Uid) (*entity.UserAggregate, error) {
 	user, err := s.userRepo.GetById(ctx, userId)
 	if err != nil {
@@ -92,7 +92,7 @@ func (s *UserService) assembleAccount(ctx context.Context, user *entity.User) (*
 	return entity.NewUserAggregate(user, identities, hash != ""), nil
 }
 
-// UnbindIdentity 摘除账号下的一条身份并落库。
+// UnbindIdentity 解绑账号下的一条身份并写库
 func (s *UserService) UnbindIdentity(
 	ctx context.Context,
 	agg *entity.UserAggregate,
@@ -120,13 +120,13 @@ type ResolveProviderParams struct {
 	OuterAvatarURL string
 }
 
-// registerLockKey 首登建号的分布式锁：key 与身份键一致，避免同一 (provider, subject) 并发建号。
+// registerLockKey 首登建号的分布式锁，key 与身份键一致，避免同一 (provider, subject) 并发建号
 func registerLockKey(provider entity.ProviderType, subject string) string {
 	return fmt.Sprintf("gonotelm:identity:lock:login:%s:%s", provider, subject)
 }
 
-// ResolveOrCreateByProvider 三方登录入口：先按 (provider, subject) 认身份；
-// 未命中时只认 provider 已验证的邮箱，命中既有账号则关联，否则建号。
+// ResolveOrCreateByProvider 三方登录入口：先按 (provider, subject) 查身份
+// 查不到时只接受 provider 已验证的邮箱，邮箱已有账号则绑定，否则建号
 func (s *UserService) ResolveOrCreateByProvider(
 	ctx context.Context,
 	params ResolveProviderParams,
@@ -191,7 +191,7 @@ func (s *UserService) loginWithIdentity(
 	return agg, nil
 }
 
-// linkIdentity 邮箱验证过的账号已存在 → 直接把身份挂上去。
+// linkIdentity 邮箱验证过的账号已存在 → 直接把身份挂上去
 func (s *UserService) linkIdentity(
 	ctx context.Context,
 	agg *entity.UserAggregate,
@@ -199,7 +199,7 @@ func (s *UserService) linkIdentity(
 	email string,
 ) (*entity.UserAggregate, error) {
 	if agg.HasIdentityOfAnotherSubject(params.Provider, params.Subject) {
-		// 邮箱已验证说明就是本人，登录放行；只是不再挂第二个同 provider 身份
+		// 邮箱已验证说明就是本人，登录放行，只是不再挂第二个同 provider 身份
 		slog.WarnContext(ctx, "skip linking second identity of same provider",
 			slog.String("user_id", agg.Id().String()),
 			slog.String("provider", params.Provider.String()),
@@ -215,7 +215,7 @@ func (s *UserService) linkIdentity(
 	}
 
 	if err := s.identityRepo.Create(ctx, identity); err != nil {
-		// 并发兜底：唯一索引冲突说明身份已被建好，重查即可
+		// 唯一索引冲突说明并发下身份已被建好，重查即可
 		if existing, lookupErr := s.identityRepo.GetByProviderAndSubject(
 			ctx, params.Provider, params.Subject,
 		); lookupErr == nil {
@@ -248,7 +248,7 @@ func (s *UserService) createAccount(
 			s.deleteAvatar(ctx, user.Id.String(), avatarKey)
 		}
 
-		// 并发兜底：另一请求可能已建好身份
+		// 并发下另一请求可能已建好身份
 		if existing, lookupErr := s.identityRepo.GetByProviderAndSubject(
 			ctx, params.Provider, params.Subject,
 		); lookupErr == nil {
@@ -261,7 +261,7 @@ func (s *UserService) createAccount(
 	return entity.NewUserAggregate(user, []*entity.UserIdentity{identity}, false), nil
 }
 
-// createVerifiedAccount 邮箱被证明后建号；passwordHash 非空时一并写入
+// createVerifiedAccount 邮箱验证通过后建号，passwordHash 非空时一并写入
 func (s *UserService) createVerifiedAccount(
 	ctx context.Context,
 	email, passwordHash string,
@@ -276,7 +276,7 @@ func (s *UserService) createVerifiedAccount(
 		err = s.userRepo.Create(ctx, user)
 	}
 	if err != nil {
-		// 同一邮箱只允许一个账号：冲突统一按"邮箱已注册"返回
+		// 同一邮箱只允许一个账号，冲突统一按邮箱已注册返回
 		if existing, lookupErr := s.userRepo.GetByEmail(ctx, normalized); lookupErr == nil && existing != nil {
 			return nil, domainerr.ErrEmailTaken
 		}
@@ -287,8 +287,8 @@ func (s *UserService) createVerifiedAccount(
 	return entity.NewUserAggregate(user, nil, passwordHash != ""), nil
 }
 
-// BindIdentity 已登录态下的显式绑定：同一个身份不会挂到两个账号，
-// 同一账号在每个 provider 上也只允许一个身份（(user_id, provider) 唯一）。
+// BindIdentity 已登录时主动绑定：同一个身份不会挂到两个账号
+// 同一账号在每个 provider 上也只允许一个身份（(user_id, provider) 唯一）
 func (s *UserService) BindIdentity(
 	ctx context.Context,
 	userId valobj.Uid,
@@ -327,7 +327,7 @@ func (s *UserService) BindIdentity(
 	}
 
 	if err := s.identityRepo.Create(ctx, identity); err != nil {
-		// 并发兜底：唯一索引冲突说明已被建好
+		// 唯一索引冲突说明并发下已被建好
 		if again, lookupErr := s.identityRepo.GetByProviderAndSubject(
 			ctx, params.Provider, params.Subject,
 		); lookupErr == nil {
@@ -338,7 +338,7 @@ func (s *UserService) BindIdentity(
 			return s.GetAccount(ctx, userId)
 		}
 
-		// 并发兜底：同 provider 的另一个身份刚被挂到这个账号上
+		// 并发下同 provider 的另一个身份刚被挂到这个账号上
 		if reloaded, checkErr := s.GetAccount(ctx, userId); checkErr == nil &&
 			reloaded.HasIdentityOfAnotherSubject(params.Provider, params.Subject) {
 			return nil, domainerr.ErrProviderAlreadyBound
@@ -350,7 +350,7 @@ func (s *UserService) BindIdentity(
 	return agg, nil
 }
 
-// VerifyPassword 校验账号密码；无密码与密码错误一样返回 ErrInvalidCredentials。
+// VerifyPassword 校验账号密码，无密码与密码错误一样返回 ErrInvalidCredentials
 func (s *UserService) VerifyPassword(ctx context.Context, userId valobj.Uid, plain string) error {
 	hash, err := s.userRepo.GetPasswordHash(ctx, userId)
 	if err != nil {
@@ -366,7 +366,7 @@ func (s *UserService) VerifyPassword(ctx context.Context, userId valobj.Uid, pla
 	return nil
 }
 
-// SetPassword 设置或修改密码：无密码时直接设置；已有密码必须给出正确的旧密码，
+// SetPassword 改密码，已有密码时必须先校验旧密码
 func (s *UserService) SetPassword(
 	ctx context.Context,
 	userId valobj.Uid,
@@ -388,7 +388,7 @@ func (s *UserService) SetPassword(
 		if err := s.hasher.Verify(ctx, current, oldPassword); err != nil {
 			return domainerr.ErrInvalidCredentials
 		}
-		// 与库那份哈希比，而不是比客户端传来的两个明文：这才是"当前密码"的权威来源
+		// 与库里的哈希比，不比客户端传来的两个密码
 		if err := s.hasher.Verify(ctx, current, newPassword); err == nil {
 			return domainerr.ErrPasswordUnchanged
 		}
@@ -508,7 +508,7 @@ func (s *UserService) fetchAvatar(ctx context.Context, rawURL string) ([]byte, s
 	return body, contentType, nil
 }
 
-// resolveAvatarContentType 优先信响应头，响应头缺失或不是 image/* 时按内容嗅探。
+// resolveAvatarContentType 先看响应头，再按内容嗅探
 func resolveAvatarContentType(header string, body []byte) string {
 	if mediaType, _, err := mime.ParseMediaType(header); err == nil && strings.HasPrefix(mediaType, "image/") {
 		return mediaType

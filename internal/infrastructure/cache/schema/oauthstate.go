@@ -1,6 +1,6 @@
 package schema
 
-// OAuthState OAuth 握手状态在 Redis 里的载荷。
+// OAuthState OAuth 握手状态写入 Redis 的内容
 type OAuthState struct {
 	State               string `msgpack:"state"`
 	Nonce               string `msgpack:"nonce"`

@@ -257,8 +257,7 @@ func (s *syncerCloser) Close() error {
 	return nil
 }
 
-// newMailer builds the transactional email sender. Anything that cannot be built falls back to the log sender rather than
-// blocking startup.
+// newMailer 构造事务性邮件 sender，构造失败则用 log sender，不阻塞启动
 func newMailer(ctx context.Context, cfg conf.MailerConfig) coreadapter.Mailer {
 	return adapter.NewMailer(newMailSender(ctx, cfg))
 }

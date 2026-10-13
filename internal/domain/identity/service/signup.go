@@ -14,8 +14,8 @@ import (
 
 const signupTicketLength = 32
 
-// SignupService 编排邮箱注册：签发验证凭证、占发信冷却、消费 pending 建号。
-// 邮件发送与链接拼接属于投递，由 app 层负责，服务只返回待发送的明文凭证。
+// SignupService 处理邮箱注册：生成凭证、限制发邮件间隔、验证后建号
+// 发邮件与拼链接由 app 层负责，本服务只返回 token 与验证码
 type SignupService struct {
 	signupRepo  repository.SignupRepository
 	userRepo    repository.UserRepository
@@ -37,9 +37,9 @@ func NewSignupService(
 	}
 }
 
-// SignupDispatch 一次凭证下发的结果：明文 token/code 只交给 app 层发信，不进库；
-// Ticket 仅首次注册下发（重复注册为空，前端保留旧票据）；
-// Rollback 在 app 层发信失败时调用，撤销本次占用的发信冷却，让用户可立即重试。
+// SignupDispatch 给 app 层返回凭证时的结果，token 与验证码只用于发邮件，不进库
+// Ticket 仅首次注册返回，重复注册为空，前端保留旧 ticket
+// Rollback 在 app 层发邮件失败时调用，撤销本次写入的发送间隔，允许立即重试
 type SignupDispatch struct {
 	Email     string
 	Ticket    string
@@ -48,7 +48,7 @@ type SignupDispatch struct {
 	Rollback  func(ctx context.Context)
 }
 
-// Start 邮箱注册第一步：校验 → 邮箱未占用 → 哈希密码 → 复用或新建 pending → 下发凭证。
+// Start 邮箱注册第一步：校验 → 邮箱未占用 → 哈希密码 → 沿用或新建 pending → 返回凭证
 func (s *SignupService) Start(ctx context.Context, email, password string) (*SignupDispatch, error) {
 	email, passwordHash, err := s.prepareCredentials(ctx, email, password)
 	if err != nil {
@@ -82,7 +82,7 @@ func (s *SignupService) DirectSignup(
 	return s.userService.createVerifiedAccount(ctx, email, passwordHash)
 }
 
-// prepareCredentials 两条注册入口共用的前置校验，返回归一化邮箱与密码哈希。
+// prepareCredentials 两条注册入口共用的校验，返回统一格式的邮箱与密码哈希
 func (s *SignupService) prepareCredentials(
 	ctx context.Context,
 	email, password string,
@@ -126,7 +126,7 @@ func (s *SignupService) Resend(ctx context.Context, email string) (*SignupDispat
 	return s.dispatch(ctx, pending, pending.LinkTokenHash)
 }
 
-// VerifyLink 链接验证：明文 token 换出 pending，再建号。
+// VerifyLink 链接验证：用邮件里的 token 取出 pending 再建号
 func (s *SignupService) VerifyLink(
 	ctx context.Context,
 	linkToken, ticket string,
@@ -139,8 +139,8 @@ func (s *SignupService) VerifyLink(
 	return s.activate(ctx, pending, ticket)
 }
 
-// VerifyCode 验证码验证：先按 email 取 pending；码不匹配只累加 attempts，
-// 达到 SignupMaxCodeAttempts 就作废整个 pending（用户需重新注册）。
+// VerifyCode 验证码验证：先按 email 取 pending，码不匹配只累加 attempts
+// 达到 SignupMaxCodeAttempts 就作废整个 pending，用户需重新注册
 func (s *SignupService) VerifyCode(
 	ctx context.Context,
 	email, code, ticket string,
@@ -172,7 +172,7 @@ func (s *SignupService) VerifyCode(
 	return s.activate(ctx, pending, ticket)
 }
 
-// ensureEmailAvailable 已注册的邮箱不再进入验证流程。
+// ensureEmailAvailable 已注册的邮箱不再进入验证流程
 func (s *SignupService) ensureEmailAvailable(ctx context.Context, email string) error {
 	if _, err := s.userRepo.GetByEmail(ctx, email); err == nil {
 		return identerr.ErrEmailTaken
@@ -183,7 +183,7 @@ func (s *SignupService) ensureEmailAvailable(ctx context.Context, email string) 
 	return nil
 }
 
-// preparePending 重复注册时保留首次的密码与票据，只轮换两条验证凭证。
+// preparePending 重复注册时保留首次的密码与 ticket，只轮换链接 token 和验证码
 func (s *SignupService) preparePending(
 	ctx context.Context,
 	email, passwordHash string,
@@ -204,8 +204,8 @@ func (s *SignupService) preparePending(
 	return entity.NewSignupPending(email, passwordHash, ticket), "", ticket, nil
 }
 
-// dispatch 签发凭证 → 占发信冷却 → 落库。占位在落库前，避免被限流的请求轮换了
-// 链接却没发信；落库失败时立即撤销冷却，允许用户重试。
+// dispatch 生成凭证 → 写发送间隔 → 写库
+// 先写发送间隔再写库，否则限流请求会换掉链接却没发邮件，写库失败立即撤销间隔
 func (s *SignupService) dispatch(
 	ctx context.Context,
 	pending *entity.SignupPending,
@@ -234,7 +234,7 @@ func (s *SignupService) dispatch(
 	}, nil
 }
 
-// activate 邮箱被证明后建号：只有发起注册的那个浏览器完成验证，才把惰性密码激活。
+// activate 邮箱验证通过后建号：只有发起注册的浏览器完成验证才写入密码
 func (s *SignupService) activate(
 	ctx context.Context,
 	pending *entity.SignupPending,

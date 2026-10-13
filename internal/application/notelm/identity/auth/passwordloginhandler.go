@@ -10,7 +10,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
-// PasswordLoginHandler 邮箱密码登录；失败一律返回统一文案，避免账号枚举。
+// PasswordLoginHandler 邮箱密码登录，失败一律返回统一文案，避免账号枚举
 type PasswordLoginHandler struct {
 	*baseHandler
 }

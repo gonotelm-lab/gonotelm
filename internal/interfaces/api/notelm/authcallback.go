@@ -14,7 +14,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 )
 
-// redirectCallbackError 回调失败一律 302 回前端：登录错误落登录页，绑定错误落账号设置页，有 return_to 时优先回 return_to。
+// redirectCallbackError 回调失败一律 302 回前端：登录错误落登录页，绑定错误落账号设置页，return_to 优先
 func (s *Server) redirectCallbackError(
 	ctx context.Context,
 	c *app.RequestContext,
@@ -45,7 +45,7 @@ func (s *Server) redirectCallbackError(
 
 	targetURL, err := query.AppendTo(target)
 	if err != nil {
-		// 兜底地址都解析不了：只能回 JSON，避免把浏览器留在回调地址上
+		// 错误页地址和 return_to 都解析不了，只能回 JSON
 		http.ErrResp(c, err)
 		return
 	}

@@ -51,7 +51,7 @@ func (r *UserRepositoryImpl) CreateWithPassword(
 	return r.create(ctx, mapper.UserToSchemaWithPassword(user, passwordHash))
 }
 
-// CreateWithFirstIdentity 建号与挂第一个身份必须原子，否则会留下没有登录方式的孤儿账号。
+// CreateWithFirstIdentity 建号与挂第一个身份必须原子，避免留下没有登录方式的孤儿账号
 func (r *UserRepositoryImpl) CreateWithFirstIdentity(
 	ctx context.Context,
 	user *identityentity.User,

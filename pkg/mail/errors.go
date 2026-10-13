@@ -8,17 +8,15 @@ import (
 	"time"
 )
 
-// Failure kinds; callers use them to decide whether to retry.
+// Failure kinds, callers check IsTransient before retrying
 var (
-	// ErrTransient: upstream temporarily unavailable (rate limit, network, timeout, 5xx).
+	// ErrTransient upstream temporarily unavailable: rate limit, network, timeout, 5xx
 	ErrTransient = stderr.New("mail: transient failure")
-	// ErrPermanent: this email cannot be delivered (bad address, unverified domain,
-	// rejected); retrying will not help.
+	// ErrPermanent the email cannot be sent: bad address, unverified domain, rejected
 	ErrPermanent = stderr.New("mail: permanent failure")
 )
 
-// RateLimitError means the upstream throttled us. RetryAfter is the suggested wait,
-// 0 when the upstream did not say.
+// RateLimitError upstream rate limited, RetryAfter is the suggested wait, 0 means upstream did not say
 type RateLimitError struct {
 	Message    string
 	RetryAfter time.Duration
@@ -32,12 +30,12 @@ func (e *RateLimitError) Error() string {
 	return "mail: rate limited: " + e.Message
 }
 
-// Is makes RateLimitError match ErrTransient.
+// Is makes RateLimitError match ErrTransient
 func (e *RateLimitError) Is(target error) bool {
 	return target == ErrTransient
 }
 
-// Transient marks err retryable, keeping the cause.
+// Transient marks err retryable and keeps the cause
 func Transient(err error) error {
 	if err == nil {
 		return nil
@@ -46,7 +44,7 @@ func Transient(err error) error {
 	return &classified{kind: ErrTransient, err: err}
 }
 
-// Permanent marks err not retryable, keeping the cause.
+// Permanent marks err not retryable and keeps the cause
 func Permanent(err error) error {
 	if err == nil {
 		return nil
@@ -55,10 +53,8 @@ func Permanent(err error) error {
 	return &classified{kind: ErrPermanent, err: err}
 }
 
-// IsTransient reports whether a failure is worth retrying. A caller-initiated
-// context.Canceled is not: we gave up ourselves. Unclassified network errors count
-// as transient, so an implementation that forgets to classify retries once too often
-// rather than never.
+// IsTransient checks if a failure is retryable
+// context.Canceled is not, unclassified network errors are transient
 func IsTransient(err error) bool {
 	if err == nil || stderr.Is(err, context.Canceled) {
 		return false
@@ -77,7 +73,7 @@ func IsTransient(err error) bool {
 	return false
 }
 
-// IsPermanent reports whether a failure is explicitly classified as not retryable.
+// IsPermanent checks if a failure is permanent
 func IsPermanent(err error) bool {
 	return stderr.Is(err, ErrPermanent)
 }

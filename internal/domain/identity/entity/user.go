@@ -38,12 +38,12 @@ type User struct {
 	UpdatedAt       valobj.Time
 }
 
-// NormalizeEmail 全量小写 + 去空白；模型只做这一种归一化，不碰 . 与 + 别名。
+// NormalizeEmail 只做转小写和去空白，不处理 . 与 + 别名
 func NormalizeEmail(raw string) string {
 	return strings.ToLower(strings.TrimSpace(raw))
 }
 
-// NewUser 只在邮箱已被证明（provider verified 或验证链接/验证码通过）时调用。
+// NewUser 只在邮箱已被证明（provider verified 或验证链接/验证码通过）时调用
 func NewUser(email, nickname string, emailVerifiedAt valobj.Time) *User {
 	now := valobj.NewTime()
 	u := &User{

@@ -118,7 +118,7 @@ func TestGetUserInfoEmail(t *testing.T) {
 				t.Fatalf("expected emails call %v, got %d", tc.wantEmailsCall, emailsCalls)
 			}
 
-			// the remaining UserInfo fields are untouched by this change
+			// other UserInfo fields stay untouched
 			if userInfo.Name != "octocat" {
 				t.Fatalf("unexpected name: %q", userInfo.Name)
 			}

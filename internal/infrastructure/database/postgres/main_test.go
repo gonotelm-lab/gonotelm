@@ -31,7 +31,7 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
-	// 与 cmd/migrate 共用 goose 迁移文件。
+	// 与 cmd/migrate 共用 goose 迁移文件
 	if err := testDatabase.Setup(context.Background(), postgres18.Migrate); err != nil {
 		panic(err)
 	}

@@ -13,22 +13,22 @@ import (
 
 type CallbackHandler struct {
 	*baseHandler
-	registry    identrepo.ProviderRegistry
-	stateRepo   identrepo.OAuthStateRepository
-	userService *identityservice.UserService
+	registry       identrepo.ProviderRegistry
+	oauthStateRepo identrepo.OAuthStateRepository
+	userService    *identityservice.UserService
 }
 
 func NewCallbackHandler(
 	registry identrepo.ProviderRegistry,
-	stateRepo identrepo.OAuthStateRepository,
+	oauthStateRepo identrepo.OAuthStateRepository,
 	userService *identityservice.UserService,
 	userSessionRepo identrepo.UserSessionRepository,
 ) *CallbackHandler {
 	return &CallbackHandler{
-		baseHandler: newBaseHandler(userService, userSessionRepo),
-		registry:    registry,
-		stateRepo:   stateRepo,
-		userService: userService,
+		baseHandler:    newBaseHandler(userService, userSessionRepo),
+		registry:       registry,
+		oauthStateRepo: oauthStateRepo,
+		userService:    userService,
 	}
 }
 
@@ -55,13 +55,11 @@ type CallbackHandleResult struct {
 	SessionId string
 	UserId    string
 	ReturnTo  string
-	// Mode 本次回调属于登录还是绑定：登录签发会话，绑定只挂身份。
-	// 失败时也会带回 Mode 与 ReturnTo——回调是浏览器整页导航，出错同样要 302 回前端。
+	// Mode 本次回调属于登录还是绑定，登录创建会话，绑定只挂身份
 	Mode entity.ProviderLoginMode
 }
 
 func (h *CallbackHandler) Handle(ctx context.Context, cmd *CallbackHandleCommand) (*CallbackHandleResult, error) {
-	// 失败也要知道跳回哪里，所以结果在入口就建好，各分支只填字段
 	result := &CallbackHandleResult{Mode: entity.ProviderLoginModeLogin}
 
 	if err := cmd.validate(); err != nil {
@@ -69,7 +67,7 @@ func (h *CallbackHandler) Handle(ctx context.Context, cmd *CallbackHandleCommand
 	}
 
 	// check state
-	oauthState, err := h.stateRepo.Get(ctx, cmd.State)
+	oauthState, err := h.oauthStateRepo.Get(ctx, cmd.State)
 	if err != nil {
 		if errors.Is(err, errors.ErrNoRecord) {
 			// state not found or expired
@@ -88,7 +86,7 @@ func (h *CallbackHandler) Handle(ctx context.Context, cmd *CallbackHandleCommand
 	}
 
 	// now state is valid here, delete it
-	if err := h.stateRepo.Delete(ctx, cmd.State); err != nil {
+	if err := h.oauthStateRepo.Delete(ctx, cmd.State); err != nil {
 		slog.ErrorContext(ctx, "failed to delete login state", slog.Any("err", err))
 	}
 
@@ -111,7 +109,7 @@ func (h *CallbackHandler) Handle(ctx context.Context, cmd *CallbackHandleCommand
 		return result, nil
 	}
 
-	// 身份优先，邮箱只在建新身份时用来决定挂到哪个账号
+	// 先认身份，建新身份时才按邮箱决定挂到哪个账号
 	agg, err := h.userService.ResolveOrCreateByProvider(ctx,
 		identityservice.ResolveProviderParams{
 			Provider:       cmd.ProviderType,
@@ -125,12 +123,12 @@ func (h *CallbackHandler) Handle(ctx context.Context, cmd *CallbackHandleCommand
 		return result, errors.WithMessage(err, "resolve user failed")
 	}
 
-	// 封禁用户不允许重新登录，否则封禁只需等到下一次登录就被绕过。
+	// 封禁用户不允许重新登录，否则下一次登录就能绕过封禁
 	if agg.IsBanned() {
 		return result, domainerr.ErrUserBanned
 	}
 
-	// 登录后轮换会话：先作废旧会话，再签发新会话，防止 session fixation
+	// 登录后轮换会话：先作废旧会话，再创建新会话，防止 session fixation
 	if err := h.signOut(ctx, cmd.CurrentSessionId); err != nil {
 		return result, err
 	}
@@ -156,14 +154,13 @@ func (h *CallbackHandler) Handle(ctx context.Context, cmd *CallbackHandleCommand
 	return result, nil
 }
 
-// PeekState 只读解析 state 对应的回调上下文（流程 + 回跳地址），不消费 state。
-// provider 直接报错（如用户拒绝授权）时回调拿不到 Handle 的返回值，用它照样选对落地页。
+// PeekState 解析 state 对应的流程与回跳地址，不消费 state
 func (h *CallbackHandler) PeekState(ctx context.Context, state string) *CallbackHandleResult {
 	if state == "" {
 		return nil
 	}
 
-	oauthState, err := h.stateRepo.Get(ctx, state)
+	oauthState, err := h.oauthStateRepo.Get(ctx, state)
 	if err != nil {
 		return nil
 	}
@@ -171,8 +168,8 @@ func (h *CallbackHandler) PeekState(ctx context.Context, state string) *Callback
 	return &CallbackHandleResult{Mode: oauthState.Mode, ReturnTo: oauthState.ReturnTo}
 }
 
-// handleBind 绑定分支：回调必须来自发起绑定的那个会话，否则就是账户关联 CSRF。
-// 结果写进调用方的 result，失败时由它带着 Mode/ReturnTo 走错误跳转。
+// handleBind 绑定分支：回调必须来自发起绑定的那个会话，否则就是账户关联 CSRF
+// 结果写进调用方的 result，失败时由它带 Mode/ReturnTo 跳转
 func (h *CallbackHandler) handleBind(
 	ctx context.Context,
 	cmd *CallbackHandleCommand,

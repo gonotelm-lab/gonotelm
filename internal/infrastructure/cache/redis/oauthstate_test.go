@@ -64,7 +64,7 @@ func TestOAuthStateCacheImpl_KeyIsHashed(t *testing.T) {
 		So(err, ShouldBeNil)
 		defer testOAuthStateCache.Delete(ctx, state)
 
-		// state 明文不能出现在 redis key 里，只能出现其 sha256 十六进制摘要。
+		// state 本身不能出现在 redis key 里，只能是它的 sha256 十六进制摘要
 		hashed := cacheImpl.sha256State(state)
 		So(cacheImpl.key(state), ShouldEqual, "gonotelm:identity:oauth_state:"+hashed)
 		So(len(hashed), ShouldEqual, 64)
@@ -170,7 +170,7 @@ func TestOAuthStateCacheImpl_CorruptedPayload(t *testing.T) {
 		So(err, ShouldBeNil)
 		defer testOAuthStateCache.Delete(ctx, state)
 
-		// 写入合法数据后手工篡改 payload，读取时必须报 ErrSerde 而不是返回脏数据。
+		// 写入合法数据后手工篡改 payload，读取时必须报 ErrSerde，不返回脏数据
 		err = testRedis.Set(ctx, cacheImpl.key(state), []byte{0xc1}, time.Minute).Err()
 		So(err, ShouldBeNil)
 

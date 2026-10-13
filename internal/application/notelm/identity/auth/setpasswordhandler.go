@@ -41,8 +41,7 @@ func (h *SetPasswordHandler) Handle(ctx context.Context, cmd *SetPasswordCommand
 		return nil, err
 	}
 
-	// 作废全部会话（含当前）。这里失败不回滚密码：若返回错误，用户重试时会拿旧密码再试、
-	// 得到"旧密码错误"，反而更糟；按 relogin_required 引导重新登录即可。
+	// 作废全部会话（含当前），失败不回滚密码，按 relogin_required 引导重新登录
 	if err := h.sessionRepo.DeleteByUserId(ctx, cmd.UserId); err != nil {
 		slog.ErrorContext(ctx, "revoke sessions after password change failed",
 			slog.String("user_id", cmd.UserId.String()),

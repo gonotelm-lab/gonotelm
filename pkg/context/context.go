@@ -119,7 +119,7 @@ func IsSubagent(ctx context.Context) bool {
 	return ok && subagent
 }
 
-// WithLoginSource 记录本次请求会话的登录方式。
+// WithLoginSource 记录本次请求会话的登录方式
 func WithLoginSource(ctx context.Context, loginSource string) context.Context {
 	return context.WithValue(ctx, ContextKeyLoginSource, loginSource)
 }

@@ -11,7 +11,7 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-// 直接复用实现里的 key 生成逻辑，避免测试里硬编码 key 格式。
+// 复用实现的 key 生成，避免测试硬编码
 func sessionKeyOf(c cache.UserSessionCache, id string) string {
 	impl, ok := c.(*UserSessionCacheImpl)
 	if !ok {
@@ -82,7 +82,7 @@ func TestUserSessionCacheImplNotFound(t *testing.T) {
 	})
 }
 
-// 一个用户可以有多个会话：Set 要往 user 集合里累加，Delete 只摘掉自己那一份。
+// 一个用户多个会话，Delete 只删自己那份
 func TestUserSessionCacheImplMultipleSessionsPerUser(t *testing.T) {
 	Convey("UserSessionCache keeps multiple sessions per user", t, func() {
 		ctx := t.Context()
@@ -107,7 +107,7 @@ func TestUserSessionCacheImplMultipleSessionsPerUser(t *testing.T) {
 		So(err, ShouldBeNil)
 		So(gotB.UserId, ShouldEqual, userId)
 
-		// 删掉 A 不应影响 B，且 user 集合里仍保留 B。
+		// 删掉 A 不应影响 B，user 集合里仍保留 B
 		err = testUserSessionCache.Delete(ctx, idA)
 		So(err, ShouldBeNil)
 
@@ -117,7 +117,7 @@ func TestUserSessionCacheImplMultipleSessionsPerUser(t *testing.T) {
 		_, err = testUserSessionCache.Get(ctx, idB)
 		So(err, ShouldBeNil)
 
-		// DeleteByUserId 应把该用户剩余的会话全部清掉。
+		// DeleteByUserId 清掉该用户剩余的会话
 		err = testUserSessionCache.DeleteByUserId(ctx, userId)
 		So(err, ShouldBeNil)
 
@@ -126,7 +126,7 @@ func TestUserSessionCacheImplMultipleSessionsPerUser(t *testing.T) {
 	})
 }
 
-// session 记录已过期/不存在时，Delete 仍要摘掉 user 集合成员并不报错。
+// session 记录已过期或不存在时，Delete 仍要摘掉 user 集合成员并不报错
 func TestUserSessionCacheImplDeleteWithoutRecord(t *testing.T) {
 	Convey("UserSessionCache Delete without session record", t, func() {
 		ctx := t.Context()
@@ -142,7 +142,7 @@ func TestUserSessionCacheImplDeleteWithoutRecord(t *testing.T) {
 		So(err, ShouldBeNil)
 		defer testUserSessionCache.DeleteByUserId(ctx, userId)
 
-		// 直接把 session 记录删掉，模拟 TTL 先于集合成员失效。
+		// 先删掉 session 记录，模拟 TTL 早于集合成员失效
 		err = testRedis.Del(ctx, sessionKeyOf(testUserSessionCache, id)).Err()
 		So(err, ShouldBeNil)
 
@@ -162,7 +162,7 @@ func TestUserSessionCacheImplDeleteByUserIdWithoutSessions(t *testing.T) {
 	})
 }
 
-// Set 的 TTL 同时作用于 session 记录和 user 集合，避免集合成员永久残留。
+// Set 的 TTL 同时作用于 session 记录和 user 集合，避免集合成员永久残留
 func TestUserSessionCacheImplSetTTL(t *testing.T) {
 	Convey("UserSessionCache Set applies ttl to both keys", t, func() {
 		ctx := t.Context()
@@ -190,7 +190,7 @@ func TestUserSessionCacheImplSetTTL(t *testing.T) {
 	})
 }
 
-// DeleteByUserId 只清理目标用户，其他用户的会话不能被误删。
+// DeleteByUserId 只清理目标用户，其他用户的会话不能误删
 func TestUserSessionCacheImplDeleteByUserIdScopedToUser(t *testing.T) {
 	Convey("UserSessionCache DeleteByUserId only targets one user", t, func() {
 		ctx := t.Context()

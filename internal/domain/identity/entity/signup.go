@@ -20,15 +20,15 @@ const (
 	SignupLinkTokenLength = 32
 	SignupCodeTTL         = 15 * time.Minute
 	SignupMaxCodeAttempts = 5
-	// SignupSendCooldown 同一邮箱两次发送验证信的最小间隔。
+	// SignupSendCooldown 同一邮箱两次发验证邮件的最小间隔
 	SignupSendCooldown = 60 * time.Second
 
 	MinPasswordBytes = 8
-	// bcrypt 只使用前 72 字节，超长必须直接拒绝而不是静默截断
+	// bcrypt 只使用前 72 字节，超长直接拒绝
 	MaxPasswordBytes = 72
 )
 
-// SignupPending 待验证的邮箱注册。账号在验证通过后才建立
+// SignupPending 待验证的邮箱注册，验证通过后才建号
 type SignupPending struct {
 	Email         string
 	PasswordHash  string
@@ -48,7 +48,7 @@ func NewSignupPending(email, passwordHash, ticket string) *SignupPending {
 	}
 }
 
-// IssueCredentials 生成链接 token 与 6 位验证码，只把哈希写回记录；明文仅出现在邮件里。
+// IssueCredentials 生成链接 token 与 6 位验证码，只把哈希写回记录，token 本身只出现在邮件里
 func (p *SignupPending) IssueCredentials() (linkToken, code string, err error) {
 	linkToken, err = idp.RandomString(SignupLinkTokenLength)
 	if err != nil {
@@ -67,7 +67,7 @@ func (p *SignupPending) IssueCredentials() (linkToken, code string, err error) {
 	return linkToken, code, nil
 }
 
-// MatchesTicket 注册票据只属于发起注册的那个浏览器，命中才允许激活密码
+// MatchesTicket 注册 ticket 只属于发起注册的那个浏览器，匹配才写入密码
 func (p *SignupPending) MatchesTicket(ticket string) bool {
 	return p.TicketHash != "" && constantTimeEqual(p.TicketHash, HashSecret(ticket))
 }
@@ -94,13 +94,13 @@ func constantTimeEqual(a, b string) bool {
 	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
 }
 
-// 邮箱形状：允许的 local part 按 HTML5 规范去掉反引号；域名必须带点且 TLD 为字母。
-// 有意不接受 IP 字面量与 Unicode（IDN）地址——归一化按 ASCII 小写处理。
+// 邮箱形状：local part 按 HTML5 规范去掉反引号，域名带点且 TLD 为字母
+// 不接受 IP 字面量与 Unicode（IDN）地址，统一按 ASCII 小写处理
 var emailRegexp = regexp.MustCompile(
 	`^[A-Za-z0-9.!#$%&'*+/=?^_{|}~-]+@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$`,
 )
 
-// ValidateEmail 只做格式粗筛，邮箱是否真实由验证链接/验证码证明。
+// ValidateEmail 只做格式粗筛，邮箱真实性由验证链接/验证码证明
 func ValidateEmail(email string) error {
 	if email == "" || len(email) > 255 || !emailRegexp.MatchString(email) {
 		return identerr.ErrEmailInvalid
@@ -109,7 +109,7 @@ func ValidateEmail(email string) error {
 	return nil
 }
 
-// ValidatePassword 密码长度按字节计：下限防弱密码，上限对齐 bcrypt。
+// ValidatePassword 长度下限防弱密码，上限对齐 bcrypt
 func ValidatePassword(plain string) error {
 	if len(plain) < MinPasswordBytes || len(plain) > MaxPasswordBytes {
 		return identerr.ErrWeakPassword
@@ -118,8 +118,8 @@ func ValidatePassword(plain string) error {
 	return nil
 }
 
-// ValidateComplexPassword 复杂密码：长度照旧要过，另需同时含大写字母、小写字母与数字。
-// 是否启用由部署配置决定。
+// ValidateComplexPassword 复杂密码校验，要求含大写、小写和数字
+// 是否启用由部署配置决定
 func ValidateComplexPassword(plain string) error {
 	if err := ValidatePassword(plain); err != nil {
 		return err

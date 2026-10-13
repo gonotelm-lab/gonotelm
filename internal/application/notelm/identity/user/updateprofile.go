@@ -20,7 +20,7 @@ func NewUpdateProfileHandler(userRepo repository.UserRepository) *UpdateProfileH
 	return &UpdateProfileHandler{userRepo: userRepo}
 }
 
-// Handle 返回是否真实发生变更,无变更时跳过写入。
+// Handle 返回是否真实发生变更，无变更不写入
 func (h *UpdateProfileHandler) Handle(ctx context.Context, cmd *UpdateProfileCommand) (bool, error) {
 	user, err := h.userRepo.GetById(ctx, pkgcontext.GetUserId(ctx))
 	if err != nil {

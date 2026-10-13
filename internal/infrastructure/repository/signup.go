@@ -17,18 +17,18 @@ type SignupRepositoryImpl struct {
 
 var _ identityrepo.SignupRepository = &SignupRepositoryImpl{}
 
-// NewSignupRepository 构造待验证注册的存取实现。落库形态（Redis，key 推导见
+// NewSignupRepository 创建待验证注册的读写实现，写库形态（Redis，key 推导见
 // internal/infrastructure/cache/redis/signup.go）：
 //
 //	gonotelm:identity:signup:{sha256(email)}           -> SignupPending(msgpack)，TTL 24h
-//	    值里是 email、惰性 password_hash、ticket_hash、link_token_hash、code_hash、code_expire_at、created_at
+//	    值里是 email、验证通过后才写入的 password_hash、ticket_hash、link_token_hash、code_hash、code_expire_at、created_at
 //	gonotelm:identity:signup:link:{sha256(link_token)} -> sha256(email)，TTL 24h
-//	    链接索引：明文 token 只出现在邮件里，库里存它的哈希，指向 pending
+//	    链接索引：原始 token 只在邮件里，库里存哈希，指向 pending
 //	gonotelm:identity:signup:attempts:{sha256(email)}  -> 验证码错误次数（INCR），TTL 24h
-//	gonotelm:identity:signup:cooldown:{sha256(email)}  -> 发信冷却位（SET NX），TTL 60s
+//	gonotelm:identity:signup:cooldown:{sha256(email)}  -> 发邮件间隔标记（SET NX），TTL 60s
 //
-// 验证通过、验证码超限或重发时：前两个 key 会被覆盖，重发还会删掉旧的 link 索引让旧链接立即失效；
-// 建号成功后整组删除。
+// 验证通过、验证码超限或重发时前两个 key 会被覆盖，重发会删掉旧的 link 索引让旧链接立即失效
+// 建号成功后整组删除
 func NewSignupRepository(signupCache cache.SignupCache) identityrepo.SignupRepository {
 	return &SignupRepositoryImpl{cache: signupCache}
 }

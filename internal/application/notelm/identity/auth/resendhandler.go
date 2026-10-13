@@ -7,7 +7,7 @@ import (
 	identityservice "github.com/gonotelm-lab/gonotelm/internal/domain/identity/service"
 )
 
-// ResendHandler 重发验证信：只重置两条验证凭证，密码与票据保持不变。
+// ResendHandler 重发验证邮件：只重置链接 token 和验证码，密码与 ticket 不变
 type ResendHandler struct {
 	signupService *identityservice.SignupService
 	mailer        adapter.Mailer

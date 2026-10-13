@@ -7,8 +7,7 @@ import (
 	identityservice "github.com/gonotelm-lab/gonotelm/internal/domain/identity/service"
 )
 
-// AuthHandler 是 interfaces 层使用的会话认证入口,
-// 会话能力来自公共的 baseHandler。
+// AuthHandler 是 interfaces 层用的会话认证入口
 type AuthHandler struct {
 	*baseHandler
 }

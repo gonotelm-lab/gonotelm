@@ -8,7 +8,7 @@ import (
 	identityservice "github.com/gonotelm-lab/gonotelm/internal/domain/identity/service"
 )
 
-// UnbindHandler 解绑三方身份：bind_id 必须属于当前账号，且 provider 与记录一致。
+// UnbindHandler 解绑三方身份：bind_id 必须属于当前账号，provider 与记录一致
 type UnbindHandler struct {
 	userService *identityservice.UserService
 }

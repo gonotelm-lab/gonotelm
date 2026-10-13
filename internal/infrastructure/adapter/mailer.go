@@ -8,9 +8,8 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/mail"
 )
 
-// MailerImpl implements core/adapter.Mailer: it renders the business semantics
-// (verification link + code) into an email and hands it to a mail.Sender. The body
-// lives here only once, so swapping the transport never changes the email.
+// MailerImpl implements core/adapter.Mailer
+// renders the verification link and code into an email, then sends it with mail.Sender
 type MailerImpl struct {
 	sender mail.Sender
 }

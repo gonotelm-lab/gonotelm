@@ -1,6 +1,5 @@
-// Package log implements mail.Sender by writing the email to the log instead of
-// sending it. It is the dev sender and the fallback when a real sender cannot be
-// built, which is why printing the body (link and code) is acceptable.
+// Package log implements mail.Sender and writes the email to the log instead of sending it
+// it is the dev sender, used when no real sender is built
 package log
 
 import (
@@ -17,7 +16,7 @@ type Sender struct {
 
 var _ mail.Sender = (*Sender)(nil)
 
-// New builds the log sender; every email is written at level.
+// New creates the log sender, every email is written at level
 func New(level slog.Level) *Sender {
 	return &Sender{level: level}
 }

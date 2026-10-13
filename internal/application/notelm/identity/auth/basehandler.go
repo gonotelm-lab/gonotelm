@@ -13,8 +13,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
-// baseHandler 收敛 auth 包内各 handler 共用的会话能力。
-// 各 handler 通过嵌入 *baseHandler 复用，而不是互相依赖。
+// baseHandler auth 包内各 handler 共用的会话认证方法
 type baseHandler struct {
 	userService     *identityservice.UserService
 	userSessionRepo identrepo.UserSessionRepository
@@ -35,7 +34,7 @@ type AuthenticateResult struct {
 	LoginSource string
 }
 
-// authenticate 校验会话凭证。凭证为空、会话不存在或已失效统一返回 identerr.ErrUserSessionNotFound。
+// authenticate 校验会话凭证，凭证为空、会话不存在或已失效统一返回 identerr.ErrUserSessionNotFound
 func (h *baseHandler) authenticate(ctx context.Context, sessionId string) (*AuthenticateResult, error) {
 	if sessionId == "" {
 		return nil, identerr.ErrUserSessionNotFound
@@ -51,7 +50,7 @@ func (h *baseHandler) authenticate(ctx context.Context, sessionId string) (*Auth
 		return nil, identerr.ErrUserSessionNotFound
 	}
 
-	// 会话有效不代表用户可用：封禁可能发生在会话签发之后，
+	// 会话有效不代表用户可用，封禁可能在会话创建之后发生
 	user, err := h.userService.GetUser(ctx, session.UserId)
 	if err != nil {
 		// 用户已被删除，会话一并视为失效，走 401 重新登录
@@ -65,8 +64,8 @@ func (h *baseHandler) authenticate(ctx context.Context, sessionId string) (*Auth
 	}
 
 	// 会话有效时按需滑动续期(闲置 UserSessionIdleTimeout,自登录起最长 UserSessionMaxAge);
-	// 活跃则延长会话,但不越过绝对上限。
-	// 续期失败不影响本次认证,最差情况是会话按旧的过期时间失效。
+	// 活跃时延长会话，不越过绝对上限
+	// 续期失败不影响本次认证，最坏是会话按旧的过期时间失效
 	if session.Touch(now) {
 		if err := h.userSessionRepo.Save(ctx, session); err != nil {
 			slog.WarnContext(ctx, "renew user session failed, session will expire earlier",
@@ -77,7 +76,7 @@ func (h *baseHandler) authenticate(ctx context.Context, sessionId string) (*Auth
 	return &AuthenticateResult{UserId: session.UserId, LoginSource: session.LoginSource}, nil
 }
 
-// issueSession 为用户签发新会话并持久化。
+// issueSession 为用户创建新会话并保存
 func (h *baseHandler) issueSession(
 	ctx context.Context,
 	user *identityentity.User,
@@ -95,7 +94,7 @@ func (h *baseHandler) issueSession(
 	return session, nil
 }
 
-// signOut 作废会话凭证,登出。凭证为空视为已登出,直接成功。
+// signOut 登出，作废会话凭证，凭证为空直接返回成功
 func (h *baseHandler) signOut(ctx context.Context, sessionId string) error {
 	if sessionId == "" {
 		return nil

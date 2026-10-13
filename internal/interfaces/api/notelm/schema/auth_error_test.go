@@ -20,7 +20,7 @@ func TestCallbackReasonMapsDomainErrors(t *testing.T) {
 		{identerr.ErrUserBanned, "user-banned"},
 		{identerr.ErrIdentityAlreadyLinked, "identity-already-linked"},
 		{identerr.ErrProviderAlreadyBound, "provider-already-bound"},
-		// 回调链路里错误都是 WithMessage 包过一层再上来的
+		// 回调里的错误都经 WithMessage 包过一层
 		{pkgerrors.WithMessage(identerr.ErrUserBanned, "resolve user failed"), "user-banned"},
 		{stderrors.New("boom"), CallbackReasonInternal},
 	}

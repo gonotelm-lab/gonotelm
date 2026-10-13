@@ -10,8 +10,8 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
-// OAuthStateRepositoryImpl 把 OAuth 握手状态落到 Redis，state 明文只出现在客户端，
-// key 用 sha256(state)，TTL 见 cache 实现。
+// OAuthStateRepositoryImpl 把 OAuth 握手状态写入 Redis，state 本身只在客户端
+// key 用 sha256(state)，TTL 见 cache 实现
 type OAuthStateRepositoryImpl struct {
 	cache cache.OAuthStateCache
 }

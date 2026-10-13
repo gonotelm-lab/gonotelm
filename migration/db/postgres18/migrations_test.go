@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// 空文件或漏写注解的文件会让 goose 在运行时才报错，这里提前拦住。
+// 空文件或漏写注解的文件会让 goose 在运行时才报错，这里提前拦住
 func TestEmbeddedMigrations_AreGooseFormatted(t *testing.T) {
 	names, err := fs.Glob(FS(), "*.sql")
 	require.NoError(t, err)
@@ -36,11 +36,11 @@ func TestMigrate_RejectsNilDB(t *testing.T) {
 }
 
 // Migrate 是单测与 cmd/migrate 共用的入口，这里用托管测试库覆盖真实执行路径：
-// 首次调用应用全部迁移，重复调用必须幂等。
+// 首次调用应用全部迁移，重复调用必须幂等
 func TestMigrate_AppliesAndIsIdempotent(t *testing.T) {
 	ctx := t.Context()
 
-	// 自行建库（migrate 传 nil，让 Setup 只建库不迁移），再手动驱动 Migrate。
+	// 自行建库（migrate 传 nil，让 Setup 只建库不迁移），再手动调用 Migrate
 	testDB, err := sqltestsuite.NewTestGormDBFromEnv("pgsql")
 	require.NoError(t, err)
 	require.NoError(t, testDB.Setup(ctx, func(context.Context, *sql.DB) error { return nil }))
@@ -53,7 +53,7 @@ func TestMigrate_AppliesAndIsIdempotent(t *testing.T) {
 
 	require.NoError(t, Migrate(ctx, stdDB))
 
-	// not just record a version.
+	// 0002_init.sql 和 0003_init.sql 必须真的建表，不能只记一个版本号
 	for _, name := range []string{
 		"users", "initjob_runs", "initjob_tasks", "users_v2", "user_identities_v2",
 	} {
@@ -65,7 +65,7 @@ func TestMigrate_AppliesAndIsIdempotent(t *testing.T) {
 		assert.Equal(t, name, tableName)
 	}
 
-	// 身份唯一性只靠索引表达，漏了不会报错、只会静默放行重复数据，所以显式断言。
+	// 身份唯一性只靠索引，漏索引会静默放行重复数据，这里断言索引存在
 	for _, name := range []string{
 		"uq_user_identities_v2_provider_subject", "uk_user_identities_v2_user_provider",
 	} {
@@ -77,6 +77,6 @@ func TestMigrate_AppliesAndIsIdempotent(t *testing.T) {
 		assert.Equal(t, name, indexName)
 	}
 
-	// 二次调用不报错：goose 已应用的迁移会被跳过。
+	// 二次调用不报错：goose 已应用的迁移会被跳过
 	require.NoError(t, Migrate(ctx, stdDB))
 }

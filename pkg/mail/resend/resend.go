@@ -1,4 +1,4 @@
-// Package resend implements mail.Sender on top of the Resend HTTP API.
+// Package resend implements mail.Sender with the Resend HTTP API
 //
 //	API: https://resend.com/docs/api-reference/emails/send-email
 //	SDK: https://github.com/resend/resend-go
@@ -23,11 +23,11 @@ import (
 )
 
 const (
-	// defaultTimeout applies only when no http client is supplied; normal wiring
-	// passes the project-wide pkg/httpclient (tracing + transport-level retries).
+	// defaultTimeout is used only when no http client is passed in
+	// normal wiring passes pkg/httpclient
 	defaultTimeout = 10 * time.Second
 
-	// quoteTriggers are the characters that force quoting in a display name.
+	// quoteTriggers force quoting in a display name
 	quoteTriggers = `()<>[]:;@\,."`
 )
 
@@ -38,8 +38,7 @@ type Sender struct {
 
 var _ mail.Sender = (*Sender)(nil)
 
-// New builds the Resend sender. A missing api key or From is an error: wiring
-// mistakes must surface at startup, not when a user clicks "register".
+// New creates the Resend sender, a missing api key or From is a startup error
 func New(c mail.Config, apiKey string, opts ...Option) (*Sender, error) {
 	from, err := bareAddress(c.From)
 	if err != nil {
@@ -70,9 +69,8 @@ func New(c mail.Config, apiKey string, opts ...Option) (*Sender, error) {
 	return &Sender{client: client, config: c}, nil
 }
 
-// bareAddress rejects anything that is not a bare email address. A display name
-// belongs in Config.FromName — accepting "Name <addr>" here would send
-// "Name <Name <addr>>", and a bare domain is not an address at all.
+// bareAddress accepts only a bare email address, the display name goes in Config.FromName
+// passing "Name <addr>" here would send "Name <Name <addr>>", a bare domain is not an address
 func bareAddress(raw string) (string, error) {
 	from := strings.TrimSpace(raw)
 	if from == "" {
@@ -117,8 +115,8 @@ func (s *Sender) Send(ctx context.Context, msg mail.Message) (*mail.Result, erro
 	return &mail.Result{Id: resp.Id}, nil
 }
 
-// idempotencyKey keeps transport-level retries of one Send from delivering twice.
-// A deterministic caller-supplied value also covers business-level resends.
+// idempotencyKey dedupes transport-level retries of one Send
+// a caller-supplied value also covers business-level resends
 func idempotencyKey(msg mail.Message) string {
 	if msg.IdempotencyKey != "" {
 		return msg.IdempotencyKey
@@ -140,8 +138,7 @@ func (s *Sender) from() string {
 	return formatAddress(s.config.FromName, s.config.From)
 }
 
-// formatAddress builds the RFC 5322 "display name <addr>" form, quoting and
-// escaping the display name when it contains specials.
+// formatAddress creates the RFC 5322 "display name <addr>" form, quoting and escaping specials in the name
 func formatAddress(name, addr string) string {
 	if name == "" {
 		return addr
@@ -156,9 +153,8 @@ func formatAddress(name, addr string) string {
 	return name + " <" + addr + ">"
 }
 
-// classify maps SDK errors onto retryability. pkg/httpclient has already retried
-// 5xx / 429 / 408 at the transport level, so anything reaching here is out of
-// retries: default to permanent and only keep explicit network errors transient.
+// classify marks SDK errors transient or permanent, pkg/httpclient already retried 5xx / 429 / 408
+// errors reaching here are past retries, only deadline and network errors stay transient
 func classify(err error) error {
 	var rateLimit *resend.RateLimitError
 	if stderr.As(err, &rateLimit) {
@@ -183,8 +179,7 @@ func classify(err error) error {
 	return mail.Permanent(err)
 }
 
-// parseRetryAfter reads the seconds form of Retry-After (RFC 9110 also allows an
-// HTTP date, which we ignore).
+// parseRetryAfter reads the seconds form of Retry-After, the HTTP date form in RFC 9110 is ignored
 func parseRetryAfter(raw string) time.Duration {
 	seconds, err := strconv.Atoi(strings.TrimSpace(raw))
 	if err != nil || seconds <= 0 {

@@ -54,7 +54,7 @@ func (h *GetMeHandler) Handle(ctx context.Context) (*MeResult, error) {
 	}, nil
 }
 
-// loginSource 优先取会话携带的登录方式；旧会话缺该字段时退回最早绑定的身份。
+// loginSource 优先取会话携带的登录方式，旧会话缺该字段时改用最早绑定的身份
 func (h *GetMeHandler) loginSource(ctx context.Context, agg *entity.UserAggregate) string {
 	if source := pkgcontext.GetLoginSource(ctx); source != "" {
 		return source

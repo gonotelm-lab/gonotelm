@@ -18,7 +18,7 @@ const (
 	sessionIdLength = 32
 )
 
-// 会话里记录的登录方式。
+// 会话里记录的登录方式
 const (
 	LoginSourcePassword = "password"
 	LoginSourceEmail    = "email"

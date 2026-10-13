@@ -77,7 +77,7 @@ func TestUserSessionIsExpired(t *testing.T) {
 		t.Fatal("session must expire after the idle timeout")
 	}
 
-	// 绝对上限兜底:即使 ExpireAt 被错误地设得很远,过了上限也算过期
+	// 绝对上限优先：ExpireAt 设得再远，过了上限也算过期
 	s.ExpireAt = valobj.NewTimeFrom(now.Add(UserSessionMaxAge * 2).UnixMilli())
 	if !s.IsExpired(s.AbsoluteExpireAt().Add(time.Second)) {
 		t.Fatal("session must expire at the absolute cap")

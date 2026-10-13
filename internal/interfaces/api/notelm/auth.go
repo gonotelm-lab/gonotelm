@@ -21,7 +21,7 @@ import (
 func (s *Server) registerAuthRoutes(g *route.RouterGroup) {
 	authGroup := g.Group("/auth")
 	{
-		// GET /api/v1/auth/login 发起三方登录（302 跳 IdP）
+		// GET /api/v1/auth/login 发起三方登录，302 跳 IdP
 		authGroup.GET("/login", s.AuthLogin)
 		// POST /api/v1/auth/logout
 		authGroup.POST("/logout", s.AuthLogout)
@@ -30,7 +30,7 @@ func (s *Server) registerAuthRoutes(g *route.RouterGroup) {
 
 		emailGroup := authGroup.Group("/email")
 		{
-			// GET /api/v1/auth/email/register/prefetch 注册前元数据（密码策略）
+			// GET /api/v1/auth/email/register/prefetch 注册前元数据，含密码复杂度要求
 			emailGroup.GET("/register/prefetch", s.AuthEmailRegisterPrefetch)
 			// POST /api/v1/auth/email/register
 			emailGroup.POST("/register", s.AuthEmailRegister)
@@ -55,7 +55,7 @@ func (s *Server) registerAuthRoutes(g *route.RouterGroup) {
 	}
 }
 
-// registerAuthBindRoutes 挂在鉴权组下：身份相关（已绑列表、支持的类型目录、绑定）与设置密码都要求已登录。
+// registerAuthBindRoutes 挂在鉴权组下，身份与设置密码相关接口都要求已登录
 func (s *Server) registerAuthBindRoutes(g *route.RouterGroup) {
 	authGroup := g.Group("/auth")
 	{
@@ -152,7 +152,7 @@ func (s *Server) AuthProviders(ctx context.Context, c *app.RequestContext) {
 	})
 }
 
-// AuthEmailRegisterPrefetch 注册前元数据：让前端先知道密码策略再决定怎么校验。
+// AuthEmailRegisterPrefetch 注册前元数据：密码复杂度要求
 func (s *Server) AuthEmailRegisterPrefetch(ctx context.Context, c *app.RequestContext) {
 	resp := s.authRegisterPrefetchHandler.Handle()
 
@@ -178,7 +178,7 @@ func (s *Server) AuthEmailRegister(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	// 免验证：账号与会话已就绪，不下发注册票据
+	// 免验证：账号与会话已就绪，不返回注册 ticket
 	if resp.Session != nil {
 		c.SetCookie(schema.SignupTicketCookieName, "", -1, "/", "", protocol.CookieSameSiteLaxMode, true, true)
 		s.setSessionCookies(c, resp.Session.SessionId, resp.Session.UserId)
@@ -190,7 +190,7 @@ func (s *Server) AuthEmailRegister(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	// 只有首次注册才下发票据；重复注册保留首次票据，不重置 cookie
+	// 只有首次注册返回 ticket，重复注册沿用旧 ticket，不重置 cookie
 	if resp.Ticket != "" {
 		c.SetCookie(schema.SignupTicketCookieName,
 			resp.Ticket,
@@ -356,13 +356,13 @@ func (s *Server) AuthBind(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	// 已绑在当前账号上：不发 state、不返回授权地址
+	// 已绑在当前账号上：不发 state，不返回授权地址
 	if resp.AlreadyBound {
 		http.OkResp(c, schema.BindProviderResponse{AlreadyBound: true})
 		return
 	}
 
-	// state cookie 仍由后端下发，回调时校验；跳转交给前端
+	// state cookie 由后端写入并在回调时校验，跳转交给前端
 	c.SetCookie(schema.AuthOAuthStateCookieName,
 		resp.LoginInfo.State,
 		schema.AuthOAuthStateCookieTTL,
@@ -395,7 +395,7 @@ func (s *Server) AuthUnbind(ctx context.Context, c *app.RequestContext) {
 	http.OkRespNoContent(c)
 }
 
-// finishSession 登录/验证成功的收口：写会话 cookie、清注册票据、返回账号标识。
+// finishSession 登录/验证成功统一处理：写会话 cookie，清注册 ticket，返回账号标识
 func (s *Server) finishSession(c *app.RequestContext, resp *authapp.SessionResult, err error) {
 	if err != nil {
 		http.ErrResp(c, err)
@@ -439,14 +439,14 @@ func (s *Server) AuthCallback(providerType entity.ProviderType) func(ctx context
 	return func(ctx context.Context, c *app.RequestContext) {
 		var req schema.AuthCallbackRequest
 		if err := c.BindAndValidate(&req); err != nil {
-			// 浏览器整页导航到回调地址，任何失败都必须 302 回前端而不是回 JSON
+			// 回调地址是浏览器整页导航，失败一律 302 回前端，不能回 JSON
 			s.redirectCallbackError(ctx, c, providerType, nil, err)
 			return
 		}
 
 		// check if is error
 		if req.IsError() {
-			// provider 侧报错（如用户拒绝授权）：state 还在，只读它决定落登录页还是账号设置页
+			// provider 侧报错时 state 还在，用它决定跳到登录页还是账号设置页
 			s.redirectCallbackError(ctx, c, providerType,
 				s.authCallbackHandler.PeekState(ctx, req.State), domainerr.ErrIDPError)
 			return
@@ -469,7 +469,7 @@ func (s *Server) AuthCallback(providerType entity.ProviderType) func(ctx context
 			return
 		}
 
-		// 只有登录流程签发新会话；绑定流程复用当前会话
+		// 只有登录流程创建新会话，绑定流程继续用当前会话
 		if !resp.Mode.IsBindMode() {
 			s.setSessionCookies(c, resp.SessionId, resp.UserId)
 		}

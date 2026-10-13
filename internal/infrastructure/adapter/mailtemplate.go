@@ -20,7 +20,7 @@ var (
 	verifyEmailText = texttmpl.Must(texttmpl.ParseFS(mailTemplateFS, "mailtemplate/verify_email.txt"))
 )
 
-// verifyEmailSubject carries no code: subjects show up on lock screens.
+// verifyEmailSubject has no code, subjects show up on lock screens
 const verifyEmailSubject = "验证你的 GoNoteLM 邮箱"
 
 type verifyEmailData struct {
@@ -28,10 +28,8 @@ type verifyEmailData struct {
 	Code string
 }
 
-// renderEmailVerification renders the verification email. The idempotency key is
-// derived from the recipient and both credentials: a resend rotates the credentials
-// and therefore gets a new key (it really goes out), while transport-level retries of
-// the same email keep the key (no double delivery).
+// idempotency key includes recipient and both credentials: a resend rotates them and gets
+// a new key, retries of the same email keep the key
 func renderEmailVerification(to, link, code string) (mail.Message, error) {
 	data := verifyEmailData{Link: link, Code: code}
 
@@ -49,7 +47,7 @@ func renderEmailVerification(to, link, code string) (mail.Message, error) {
 		HTML:    htmlBody.String(),
 		Text:    textBody.String(),
 		Headers: map[string]string{
-			// RFC 3834: mark this as auto-generated so auto-responders cannot loop.
+			// RFC 3834: mark as auto-generated to stop auto-responder loops
 			"Auto-Submitted": "auto-generated",
 		},
 		IdempotencyKey: verifyIdempotencyKey(to, link, code),

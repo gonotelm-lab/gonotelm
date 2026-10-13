@@ -6,7 +6,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
 )
 
-// ListSupportedIdentitiesHandler 返回代码支持的身份类型（ProviderType 枚举）。
+// ListSupportedIdentitiesHandler 返回代码支持的身份类型
 type ListSupportedIdentitiesHandler struct{}
 
 func NewListSupportedIdentitiesHandler() *ListSupportedIdentitiesHandler {

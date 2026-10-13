@@ -29,7 +29,7 @@ const (
 	CallbackReasonTooManyRequests       = "too-many-requests"
 )
 
-// CallbackReason 把 domain 错误翻成前端可读的 reason，横线格式。
+// CallbackReason domain 错误 -> 前端 reason
 func CallbackReason(err error) string {
 	switch {
 	case errors.Is(err, identerr.ErrOAuthStateNotFound):
@@ -65,7 +65,7 @@ func CallbackReason(err error) string {
 	}
 }
 
-// AuthCallbackErrorQuery 回调失败跳转时附带的 query 参数。
+// AuthCallbackErrorQuery 回调失败跳转时附带的 query 参数
 type AuthCallbackErrorQuery struct {
 	Reason   string
 	Provider string
@@ -73,12 +73,12 @@ type AuthCallbackErrorQuery struct {
 	Settings string
 }
 
-// Encode 转成 query 字符串（不含 '?'）。
+// Encode 转成 query 字符串（不含 '?'）
 func (q AuthCallbackErrorQuery) Encode() string {
 	return q.values().Encode()
 }
 
-// AppendTo 把参数拼到 raw 上，保留 raw 已有的 query 与 fragment。
+// AppendTo 拼到 raw 上，保留原有 query 与 fragment
 func (q AuthCallbackErrorQuery) AppendTo(raw string) (string, error) {
 	target, err := url.Parse(raw)
 	if err != nil {

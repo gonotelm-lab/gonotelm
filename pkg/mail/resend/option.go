@@ -7,18 +7,17 @@ type options struct {
 	baseURL    string
 }
 
-// Option adjusts how the Resend sender is built.
+// Option changes how New creates the Resend sender
 type Option func(*options)
 
-// WithHTTPClient injects the project-wide http client (timeout, tracing,
-// transport-level retries all live there).
+// WithHTTPClient sets the project-wide http client
 func WithHTTPClient(client *http.Client) Option {
 	return func(o *options) {
 		o.httpClient = client
 	}
 }
 
-// WithBaseURL overrides the API endpoint; for tests and self-hosted proxies.
+// WithBaseURL sets the API endpoint, for tests and self-hosted proxies
 func WithBaseURL(baseURL string) Option {
 	return func(o *options) {
 		o.baseURL = baseURL

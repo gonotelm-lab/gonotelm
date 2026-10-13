@@ -154,19 +154,19 @@ type AuthConfig struct {
 	// ReturnToAllowOrigins 登录后 return_to 允许跳转的站外来源白名单
 	ReturnToAllowOrigins []string `toml:"returnToAllowOrigins"`
 
-	// EmailVerificationRequired 注册是否必须完成邮箱验证；false 时邮箱视为已验证
+	// EmailVerificationRequired 注册是否必须完成邮箱验证，false 时邮箱视为已验证
 	EmailVerificationRequired bool `toml:"emailVerificationRequired"`
 
 	// RequireComplexPassword 密码是否必须同时含大写字母、小写字母与数字
 	RequireComplexPassword bool `toml:"requireComplexPassword"`
 
-	// EmailVerifyURLBase 邮件里验证链接的前端落地页，最终链接为 base#token=xxx
+	// EmailVerifyURLBase 邮件里验证链接的前端页面，最终链接为 base#token=xxx
 	EmailVerifyURLBase string `toml:"emailVerifyUrlBase"`
 
-	// LoginErrorURL 三方登录回调失败时的落地页
+	// LoginErrorURL 三方登录回调失败时的前端页面
 	LoginErrorURL string `toml:"loginErrorUrl"`
 
-	// BindErrorURL 三方绑定回调失败时的落地页
+	// BindErrorURL 三方绑定回调失败时的前端页面
 	BindErrorURL string `toml:"bindErrorUrl"`
 }
 
@@ -182,9 +182,7 @@ func (c *AuthConfig) Init() {
 	c.ReturnToAllowOrigins = origins
 }
 
-// MailerConfig configures transactional email sending. Type-specific settings live
-// in the matching sub-config; everything shared by all senders stays here. Type
-// picks one of them, and log is the fallback when the picked one cannot be built.
+// MailerConfig 事务性邮件的公共配置，type 选具体 sender，构建失败则用 log
 type MailerConfig struct {
 	Type     string        `toml:"type"`     // resend | log
 	FromName string        `toml:"fromName"` // display name, shared by every sender
@@ -194,8 +192,7 @@ type MailerConfig struct {
 	Log    LogMailerConfig    `toml:"log"`
 }
 
-// ResendMailerConfig holds the Resend credentials and the From address: which
-// addresses may be used as From is decided by the provider.
+// ResendMailerConfig Resend credentials, provider decides which addresses can be From
 type ResendMailerConfig struct {
 	APIKey string `toml:"apiKey"`
 	From   string `toml:"from"`
@@ -214,7 +211,7 @@ func (c *MailerConfig) Init() {
 	}
 }
 
-// Level is the slog level the log mailer writes at; defaults to info.
+// Level slog level of the log mailer, defaults to info
 func (c *LogMailerConfig) Level() slog.Level {
 	if strings.TrimSpace(c.LogLevel) == "" {
 		return slog.LevelInfo

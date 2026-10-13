@@ -47,13 +47,13 @@ type SandboxCache interface {
 	// Set 保存 userId 对应 notebookId 的沙箱描述，过期时间由 ttl 指定
 	Set(ctx context.Context, userId, notebookId string, desc *schema.SandboxDescription, ttl time.Duration) error
 
-	// Get 获取沙箱描述，不存在时返回 nil，非错误
+	// Get 获取沙箱描述，不存在时返回 nil，不算错误
 	Get(ctx context.Context, userId, notebookId string) (*schema.SandboxDescription, error)
 
 	Delete(ctx context.Context, userId, notebookId string) error
 }
 
-// OAuthStateCache OAuth 握手的一次性状态，state 明文不入 key。
+// OAuthStateCache OAuth 握手的一次性状态，state 本身不入 key
 type OAuthStateCache interface {
 	Set(ctx context.Context, state string, oauthState *schema.OAuthState) error
 	Get(ctx context.Context, state string) (*schema.OAuthState, error)
@@ -67,15 +67,15 @@ type UserSessionCache interface {
 	DeleteByUserId(ctx context.Context, userId string) error
 }
 
-// StylePreviewCache 缓存风格预览图记录，键为 StylePreviewIdentifier。
-// 预览图由 initjob 播种，量少读多，写路径负责刷新/失效，TTL 仅作兜底。
+// StylePreviewCache 缓存风格预览图记录，键为 StylePreviewIdentifier
+// 预览图由 initjob 写入，读多写少，写入时刷新或删除，TTL 到期自动删除
 type StylePreviewCache interface {
 	Set(ctx context.Context, identifier string, preview *schema.StylePreview) error
 	SetMulti(ctx context.Context, previews []*schema.StylePreview) error
-	// Get 不存在时返回 nil，非错误。
+	// Get 不存在时返回 nil，不算错误
 	Get(ctx context.Context, identifier string) (*schema.StylePreview, error)
-	// GetMulti 只返回命中的条目，miss 不出现在结果里。
-	// 注意：实现不能直接用 MGET，否则 redis 集群下多 key 跨 slot 会被 CROSSSLOT 拒绝。
+	// GetMulti 只返回查到的条目，miss 不出现在结果里
+	// 注意：实现不能直接用 MGET，否则 redis 集群下多 key 跨 slot 会被 CROSSSLOT 拒绝
 	GetMulti(ctx context.Context, identifiers []string) (map[string]*schema.StylePreview, error)
 	Delete(ctx context.Context, identifier string) error
 }
@@ -86,17 +86,17 @@ type UserCache interface {
 	Delete(ctx context.Context, id string) error
 }
 
-// SignupCache 邮箱注册的待验证记录：主记录 + 链接索引 + 验证码错误计数。
+// SignupCache 邮箱注册的待验证记录：主记录 + 链接索引 + 验证码错误计数
 type SignupCache interface {
-	// Set 写入 pending 与链接索引；previousLinkTokenHash 非空时顺带删掉旧链接索引。
+	// Set 写入 pending 与链接索引，previousLinkTokenHash 非空时顺带删掉旧链接索引
 	Set(ctx context.Context, pending *schema.SignupPending, previousLinkTokenHash string, ttl time.Duration) error
-	// GetByEmail 不存在时返回 errors.ErrNoRecord。
+	// GetByEmail 不存在时返回 errors.ErrNoRecord
 	GetByEmail(ctx context.Context, email string) (*schema.SignupPending, error)
 	GetByLinkToken(ctx context.Context, linkToken string) (*schema.SignupPending, error)
 	DeleteByEmail(ctx context.Context, email string) error
-	// IncrAttempts 原子自增并返回新值。
+	// IncrAttempts 原子自增并返回新值
 	IncrAttempts(ctx context.Context, email string, ttl time.Duration) (int64, error)
-	// SetCooldown 原子写入冷却标记（SET NX）；已存在时不覆盖并返回 false。
+	// SetCooldown 用 SET NX 原子写入发邮件间隔标记，已存在则不覆盖并返回 false
 	SetCooldown(ctx context.Context, email string, ttl time.Duration) (bool, error)
 	DeleteCooldown(ctx context.Context, email string) error
 }
@@ -133,8 +133,8 @@ func Init(cfg *RedisCacheConfig) error {
 			ClientName:            "gonotelm-redis-v9",
 			Username:              cfg.Username,
 			Password:              cfg.Password,
-			// CLIENT MAINT_NOTIFICATIONS (Redis 8.0 feature) is not supported
-			// by Redis 7.x servers; disable it to avoid handshake errors.
+			// CLIENT MAINT_NOTIFICATIONS is a Redis 8.0 feature, not supported
+			// by Redis 7.x servers, disable it to avoid handshake errors
 			MaintNotificationsConfig: &maintnotifications.Config{
 				Mode: maintnotifications.ModeDisabled,
 			},
@@ -144,7 +144,7 @@ func Init(cfg *RedisCacheConfig) error {
 			},
 		})
 
-		// equipped with opentelemetry
+		// enable opentelemetry tracing
 		err = redisotel.InstrumentTracing(gRedis)
 	})
 

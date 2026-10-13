@@ -2,7 +2,7 @@ package entity
 
 import "github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 
-// UserIdentity 一个三方登录身份，(Provider, Subject) 全局唯一。
+// UserIdentity 一个三方登录身份，(Provider, Subject) 全局唯一
 type UserIdentity struct {
 	Id                    valobj.Id
 	UserId                valobj.Uid

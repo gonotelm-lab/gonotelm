@@ -9,7 +9,7 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-// 事务内的 store 调用必须并入同一事务：这里用"跨表写入 + 中途失败"验证回滚。
+// 事务内的 store 调用必须并入同一事务，用跨表写入中途失败验证回滚
 func TestTransactorCommitsAllWrites(t *testing.T) {
 	Convey("Transactor commits every store call inside the closure", t, func() {
 		ctx := t.Context()
@@ -40,7 +40,7 @@ func TestTransactorRollsBackOnError(t *testing.T) {
 		user := newTestUserRow("")
 		cleanupTestUser(t, user.Id)
 
-		// 先占位一个 provider+subject，让闭包里的第二次写入撞唯一索引
+		// 先写入一个 provider+subject，让闭包里的第二次写入撞唯一索引
 		conflict := newTestIdentityRow(valobj.NewUid())
 		cleanupTestIdentity(t, conflict.Id)
 		So(testUserIdentityStore.Create(ctx, conflict), ShouldBeNil)

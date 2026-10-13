@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -172,5 +173,28 @@ func TestUserIdentityStoreTouchAndDelete(t *testing.T) {
 		list, err := testUserIdentityStore.ListByUserId(ctx, userId)
 		So(err, ShouldBeNil)
 		So(len(list), ShouldEqual, 0)
+	})
+}
+
+func TestUserIdentityStoreDatabaseErrors(t *testing.T) {
+	Convey("UserIdentityStore wraps database errors as ErrDatabase", t, func() {
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+
+		userId := valobj.NewUid()
+		identity := newTestIdentityRow(userId)
+
+		So(pkgerrors.Is(testUserIdentityStore.Create(ctx, identity), pkgerrors.ErrDatabase), ShouldBeTrue)
+
+		_, err := testUserIdentityStore.ListByUserId(ctx, userId)
+		So(pkgerrors.Is(err, pkgerrors.ErrDatabase), ShouldBeTrue)
+
+		So(pkgerrors.Is(
+			testUserIdentityStore.UpdateLastLoginAt(ctx, identity.Id, time.Now().UnixMilli()),
+			pkgerrors.ErrDatabase,
+		), ShouldBeTrue)
+
+		So(pkgerrors.Is(testUserIdentityStore.Delete(ctx, identity.Id), pkgerrors.ErrDatabase), ShouldBeTrue)
+		So(pkgerrors.Is(testUserIdentityStore.DeleteByUserId(ctx, userId), pkgerrors.ErrDatabase), ShouldBeTrue)
 	})
 }

@@ -1,6 +1,8 @@
 package redis
 
 import (
+	"context"
+	stderrors "errors"
 	"testing"
 	"time"
 
@@ -8,8 +10,26 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
+	goredis "github.com/redis/go-redis/v9"
 	. "github.com/smartystreets/goconvey/convey"
 )
+
+// pipelineFailClient lets every other command through, only pipeline Exec fails
+type pipelineFailClient struct {
+	goredis.UniversalClient
+}
+
+func (c *pipelineFailClient) TxPipeline() goredis.Pipeliner {
+	return &pipelineFailPipeliner{Pipeliner: c.UniversalClient.TxPipeline()}
+}
+
+type pipelineFailPipeliner struct {
+	goredis.Pipeliner
+}
+
+func (p *pipelineFailPipeliner) Exec(context.Context) ([]goredis.Cmder, error) {
+	return nil, stderrors.New("pipeline exec failed")
+}
 
 // 复用实现的 key 生成，避免测试硬编码
 func sessionKeyOf(c cache.UserSessionCache, id string) string {
@@ -219,5 +239,75 @@ func TestUserSessionCacheImplDeleteByUserIdScopedToUser(t *testing.T) {
 
 		_, err = testUserSessionCache.Get(ctx, otherId)
 		So(err, ShouldBeNil)
+	})
+}
+
+func TestUserSessionCacheImplCancelledContext(t *testing.T) {
+	Convey("UserSessionCache wraps redis failures as ErrCache", t, func() {
+		ctx := canceledCtx(t)
+		userId := "user-cancelled-" + uuid.NewV7().String()
+		id := "sess-cancelled-" + uuid.NewV7().String()
+		session := &schema.UserSession{
+			UserId:    userId,
+			CreatedAt: time.Now().UnixMilli(),
+			ExpireAt:  time.Now().Add(time.Hour).UnixMilli(),
+		}
+
+		So(errors.Is(testUserSessionCache.Set(ctx, id, session, time.Hour), errors.ErrCache), ShouldBeTrue)
+
+		_, err := testUserSessionCache.Get(ctx, id)
+		So(errors.Is(err, errors.ErrCache), ShouldBeTrue)
+
+		// Delete returns the Get error as-is when it is not ErrNoRecord
+		So(errors.Is(testUserSessionCache.Delete(ctx, id), errors.ErrCache), ShouldBeTrue)
+
+		So(errors.Is(testUserSessionCache.DeleteByUserId(ctx, userId), errors.ErrCache), ShouldBeTrue)
+	})
+}
+
+func TestUserSessionCacheImplCorruptedPayload(t *testing.T) {
+	Convey("UserSessionCache rejects a corrupted payload with ErrSerde", t, func() {
+		ctx := t.Context()
+		impl := testUserSessionCache.(*UserSessionCacheImpl)
+		id := "sess-corrupted-" + uuid.NewV7().String()
+		key := impl.sessionKey(id)
+		t.Cleanup(func() { _ = testRedis.Del(ctx, key).Err() })
+
+		So(testRedis.Set(ctx, key, []byte{0xc1}, time.Minute).Err(), ShouldBeNil)
+
+		_, err := testUserSessionCache.Get(ctx, id)
+		So(errors.Is(err, errors.ErrSerde), ShouldBeTrue)
+	})
+}
+
+func TestUserSessionCacheImplPipelineErrors(t *testing.T) {
+	Convey("UserSessionCache wraps pipeline exec failures as ErrCache", t, func() {
+		ctx := t.Context()
+		impl := NewUserSessionCacheImpl(&pipelineFailClient{UniversalClient: testRedis})
+
+		userId := "user-pipe-" + uuid.NewV7().String()
+		id := "sess-pipe-" + uuid.NewV7().String()
+		session := &schema.UserSession{
+			UserId:    userId,
+			CreatedAt: time.Now().UnixMilli(),
+			ExpireAt:  time.Now().Add(time.Hour).UnixMilli(),
+		}
+
+		// the record must exist for Delete, so write it with a working client first
+		So(testUserSessionCache.Set(ctx, id, session, time.Hour), ShouldBeNil)
+		t.Cleanup(func() { _ = testUserSessionCache.DeleteByUserId(ctx, userId) })
+
+		So(errors.Is(impl.Set(ctx, id, session, time.Hour), errors.ErrCache), ShouldBeTrue)
+
+		// Delete: Get succeeds, the pipeline fails
+		So(errors.Is(impl.Delete(ctx, id), errors.ErrCache), ShouldBeTrue)
+
+		// DeleteByUserId: SMembers succeeds, the pipeline fails
+		So(errors.Is(impl.DeleteByUserId(ctx, userId), errors.ErrCache), ShouldBeTrue)
+
+		// nothing was actually written or deleted by the failing pipeline
+		got, err := testUserSessionCache.Get(ctx, id)
+		So(err, ShouldBeNil)
+		So(got.UserId, ShouldEqual, userId)
 	})
 }

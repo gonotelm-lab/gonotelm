@@ -3,7 +3,9 @@ gofmt:
 	go fmt ./...
 
 TEST_PKGS := \
+	./internal/infrastructure/database \
 	./internal/infrastructure/database/postgres/... \
+	./internal/infrastructure/cache \
 	./internal/infrastructure/cache/redis/... \
 	./internal/infrastructure/olap/... \
 	./internal/infrastructure/repository/... \

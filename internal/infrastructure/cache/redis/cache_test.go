@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -67,4 +68,14 @@ func TestNewCache_WiresAllCaches(t *testing.T) {
 		So(c.StylePreviewCache, ShouldNotBeNil)
 		So(c.UserCache, ShouldNotBeNil)
 	})
+}
+
+// canceledCtx returns an already cancelled ctx to exercise redis error paths
+func canceledCtx(t *testing.T) context.Context {
+	t.Helper()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	return ctx
 }

@@ -178,3 +178,17 @@ func TestOAuthStateCacheImpl_CorruptedPayload(t *testing.T) {
 		So(errors.Is(err, errors.ErrSerde), ShouldBeTrue)
 	})
 }
+
+func TestOAuthStateCacheImpl_CancelledContext(t *testing.T) {
+	Convey("OAuthStateCache wraps redis failures as ErrCache", t, func() {
+		ctx := canceledCtx(t)
+		state := "state-cancelled-" + uuid.NewV7().String()
+
+		So(errors.Is(testOAuthStateCache.Set(ctx, state, newTestOAuthState()), errors.ErrCache), ShouldBeTrue)
+
+		_, err := testOAuthStateCache.Get(ctx, state)
+		So(errors.Is(err, errors.ErrCache), ShouldBeTrue)
+
+		So(errors.Is(testOAuthStateCache.Delete(ctx, state), errors.ErrCache), ShouldBeTrue)
+	})
+}

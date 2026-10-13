@@ -139,3 +139,42 @@ func TestSignupCacheCooldown(t *testing.T) {
 		So(ok, ShouldBeTrue)
 	})
 }
+
+func TestSignupCacheCancelledContext(t *testing.T) {
+	Convey("SignupCache wraps redis failures as ErrCache", t, func() {
+		ctx := canceledCtx(t)
+		pending := newTestSignupPending("link-token-cancelled")
+
+		So(pkgerrors.Is(testSignupCache.Set(ctx, pending, "", time.Hour), pkgerrors.ErrCache), ShouldBeTrue)
+
+		_, err := testSignupCache.GetByEmail(ctx, pending.Email)
+		So(pkgerrors.Is(err, pkgerrors.ErrCache), ShouldBeTrue)
+
+		_, err = testSignupCache.GetByLinkToken(ctx, "link-token-cancelled")
+		So(pkgerrors.Is(err, pkgerrors.ErrCache), ShouldBeTrue)
+
+		_, err = testSignupCache.IncrAttempts(ctx, pending.Email, time.Hour)
+		So(pkgerrors.Is(err, pkgerrors.ErrCache), ShouldBeTrue)
+
+		_, err = testSignupCache.SetCooldown(ctx, pending.Email, time.Minute)
+		So(pkgerrors.Is(err, pkgerrors.ErrCache), ShouldBeTrue)
+
+		So(pkgerrors.Is(testSignupCache.DeleteByEmail(ctx, pending.Email), pkgerrors.ErrCache), ShouldBeTrue)
+		So(pkgerrors.Is(testSignupCache.DeleteCooldown(ctx, pending.Email), pkgerrors.ErrCache), ShouldBeTrue)
+	})
+}
+
+func TestSignupCacheCorruptedPayload(t *testing.T) {
+	Convey("SignupCache rejects a corrupted payload with ErrSerde", t, func() {
+		ctx := t.Context()
+		impl := testSignupCache.(*SignupCacheImpl)
+		pending := newTestSignupPending("link-token-corrupted")
+		key := impl.pendingKey(pending.Email)
+		t.Cleanup(func() { _ = testRedis.Del(ctx, key).Err() })
+
+		So(testRedis.Set(ctx, key, []byte{0xc1}, time.Minute).Err(), ShouldBeNil)
+
+		_, err := testSignupCache.GetByEmail(ctx, pending.Email)
+		So(pkgerrors.Is(err, pkgerrors.ErrSerde), ShouldBeTrue)
+	})
+}

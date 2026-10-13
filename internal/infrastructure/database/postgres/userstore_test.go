@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -123,5 +124,27 @@ func TestUserStoreNarrowUpdates(t *testing.T) {
 		got, err = testUserStore.GetById(ctx, user.Id)
 		So(err, ShouldBeNil)
 		So(got.Nickname, ShouldEqual, "renamed")
+	})
+}
+
+func TestUserStoreUpdateDatabaseErrors(t *testing.T) {
+	Convey("UserStore update wraps database errors as ErrDatabase", t, func() {
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+
+		id := valobj.NewUid()
+		now := time.Now().UnixMilli()
+
+		So(pkgerrors.Is(testUserStore.UpdateProfile(ctx, &schema.UserUpdateProfileParams{
+			Id: id, Nickname: "nick", UpdatedAt: now,
+		}), pkgerrors.ErrDatabase), ShouldBeTrue)
+
+		So(pkgerrors.Is(testUserStore.UpdateAvatar(ctx, &schema.UserUpdateAvatarParams{
+			Id: id, Avatar: "stkv1-avatar", UpdatedAt: now,
+		}), pkgerrors.ErrDatabase), ShouldBeTrue)
+
+		So(pkgerrors.Is(testUserStore.UpdatePasswordHash(ctx, &schema.UserUpdatePasswordParams{
+			Id: id, PasswordHash: "bcrypt-hash", UpdatedAt: now,
+		}), pkgerrors.ErrDatabase), ShouldBeTrue)
 	})
 }

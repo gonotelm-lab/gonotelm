@@ -196,7 +196,7 @@ func (h *CallbackHandler) handleBind(
 			OuterAvatarURL: userInfo.AvatarURL,
 		})
 	if err != nil {
-		return errors.WithMessage(err, "link identity failed")
+		return errors.WithMessage(err, "bind identity failed")
 	}
 
 	slog.InfoContext(ctx, "callback handler bind ok",

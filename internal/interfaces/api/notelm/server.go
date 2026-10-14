@@ -120,8 +120,8 @@ type Server struct {
 	authPasswordResetHandler           *authapp.PasswordResetHandler
 	authPasswordLoginHandler           *authapp.PasswordLoginHandler
 	authSetPasswordHandler             *authapp.SetPasswordHandler
-	authBindHandler                    *authapp.BindHandler
-	authUnbindHandler                  *authapp.UnbindHandler
+	authBindIdentityHandler            *authapp.BindIdentityHandler
+	authUnbindIdentityHandler          *authapp.UnbindIdentityHandler
 	authListIdentitiesHandler          *authapp.ListIdentitiesHandler
 	authListSupportedIdentitiesHandler *authapp.ListSupportedIdentitiesHandler
 	getMeHandler                       *userapp.GetMeHandler
@@ -260,8 +260,8 @@ func NewServer(
 		),
 		authPasswordLoginHandler:           authapp.NewPasswordLoginHandler(deps.UserService, deps.UserSessionRepo),
 		authSetPasswordHandler:             authapp.NewSetPasswordHandler(deps.UserService, deps.UserSessionRepo),
-		authBindHandler:                    authapp.NewBindHandler(deps.ProviderRegistry, deps.OAuthStateRepo, deps.UserService),
-		authUnbindHandler:                  authapp.NewUnbindHandler(deps.UserService),
+		authBindIdentityHandler:            authapp.NewBindIdentityHandler(deps.ProviderRegistry, deps.OAuthStateRepo, deps.UserService),
+		authUnbindIdentityHandler:          authapp.NewUnbindIdentityHandler(deps.UserService),
 		authListIdentitiesHandler:          authapp.NewListIdentitiesHandler(deps.UserService),
 		authListSupportedIdentitiesHandler: authapp.NewListSupportedIdentitiesHandler(),
 		getMeHandler:                       userapp.NewGetMeHandler(deps.UserService, deps.ObjectStore),

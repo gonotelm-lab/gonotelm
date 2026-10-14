@@ -11,39 +11,39 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
-// BindHandler 发起三方绑定：state 里记录发起会话，回调必须来自同一个会话
-type BindHandler struct {
+// BindIdentityHandler 发起三方绑定：state 里记录发起会话，回调必须来自同一个会话
+type BindIdentityHandler struct {
 	registry       identrepo.ProviderRegistry
 	oauthStateRepo identrepo.OAuthStateRepository
 	userService    *identityservice.UserService
 }
 
-func NewBindHandler(
+func NewBindIdentityHandler(
 	registry identrepo.ProviderRegistry,
 	oauthStateRepo identrepo.OAuthStateRepository,
 	userService *identityservice.UserService,
-) *BindHandler {
-	return &BindHandler{
+) *BindIdentityHandler {
+	return &BindIdentityHandler{
 		registry:       registry,
 		oauthStateRepo: oauthStateRepo,
 		userService:    userService,
 	}
 }
 
-type BindCommand struct {
+type BindIdentityCommand struct {
 	ProviderType entity.ProviderType
 	UserId       valobj.Uid
 	SessionId    string
 	ReturnTo     string
 }
 
-type BindResult struct {
+type BindIdentityResult struct {
 	LoginInfo *entity.ProviderOAuthInfo
 	// AlreadyBound 该 provider 已经绑在当前账号上，不必再走一遍 OAuth
 	AlreadyBound bool
 }
 
-func (h *BindHandler) Handle(ctx context.Context, cmd *BindCommand) (*BindResult, error) {
+func (h *BindIdentityHandler) Handle(ctx context.Context, cmd *BindIdentityCommand) (*BindIdentityResult, error) {
 	agg, err := h.userService.GetAccount(ctx, cmd.UserId)
 	if err != nil {
 		return nil, err
@@ -52,7 +52,7 @@ func (h *BindHandler) Handle(ctx context.Context, cmd *BindCommand) (*BindResult
 		return nil, identerr.ErrEmailNotVerified
 	}
 	if agg.HasIdentity(cmd.ProviderType) {
-		return &BindResult{AlreadyBound: true}, nil
+		return &BindIdentityResult{AlreadyBound: true}, nil
 	}
 
 	provider, err := h.registry.GetProvider(ctx, cmd.ProviderType)
@@ -74,5 +74,5 @@ func (h *BindHandler) Handle(ctx context.Context, cmd *BindCommand) (*BindResult
 		return nil, errors.WithMessage(err, "save login state failed")
 	}
 
-	return &BindResult{LoginInfo: oauthInfo}, nil
+	return &BindIdentityResult{LoginInfo: oauthInfo}, nil
 }

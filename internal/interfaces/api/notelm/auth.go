@@ -376,7 +376,7 @@ func (s *Server) AuthBind(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp, err := s.authBindHandler.Handle(ctx, &authapp.BindCommand{
+	resp, err := s.authBindIdentityHandler.Handle(ctx, &authapp.BindIdentityCommand{
 		ProviderType: entity.ProviderType(req.Provider),
 		UserId:       pkgcontext.GetUserId(ctx),
 		SessionId:    string(c.Cookie(schema.AuthSessionCookieName)),
@@ -414,7 +414,7 @@ func (s *Server) AuthUnbind(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	if err := s.authUnbindHandler.Handle(ctx, &authapp.UnbindCommand{
+	if err := s.authUnbindIdentityHandler.Handle(ctx, &authapp.UnbindIdentityCommand{
 		BindId:       req.BindId,
 		ProviderType: entity.ProviderType(req.Provider),
 		UserId:       pkgcontext.GetUserId(ctx),

@@ -11,6 +11,7 @@ import (
 	chatsuggest "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/suggestion"
 	bootshared "github.com/gonotelm-lab/gonotelm/internal/bootstrap/shared"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
+	coreadapter "github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	identityservice "github.com/gonotelm-lab/gonotelm/internal/domain/identity/service"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
@@ -18,6 +19,10 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository"
 	notelmapi "github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm"
 	eventnotelm "github.com/gonotelm-lab/gonotelm/internal/interfaces/event/notelm"
+	"github.com/gonotelm-lab/gonotelm/pkg/httpclient"
+	"github.com/gonotelm-lab/gonotelm/pkg/mail"
+	maillog "github.com/gonotelm-lab/gonotelm/pkg/mail/log"
+	mailresend "github.com/gonotelm-lab/gonotelm/pkg/mail/resend"
 	"github.com/gonotelm-lab/gonotelm/pkg/trace"
 )
 
@@ -91,20 +96,31 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 	)
 	streamTaskRepo := repository.NewStreamTaskRepository(infra.Cache.ChatMessageStreamCache)
 	suggestionRepo := repository.NewSuggestionRepository(infra.Cache.ChatSuggestionCache)
-	loginInfoRepo, err := repository.NewLoginInfoRepository(rootCtx, infra.Cache.LoginInfoCache, cfg.ToIDPConfig())
+	providerRegistry, err := repository.NewProviderRegistry(rootCtx, cfg.ToIDPConfig())
 	if err != nil {
 		return nil, err
 	}
+	oauthStateRepo := repository.NewOAuthStateRepository(infra.Cache.OAuthStateCache)
 	userRepo := repository.NewUserRepository(
 		infra.Database.UserStore,
+		infra.Database.UserIdentityStore,
+		infra.Database.Transactor,
 		infra.Cache.UserCache,
 	)
+	userIdentityRepo := repository.NewUserIdentityRepository(infra.Database.UserIdentityStore)
+	signupRepo := repository.NewSignupRepository(infra.Cache.SignupCache)
+	passwordHasher := adapter.NewBcryptHasher()
 	userService := identityservice.NewUserService(
 		userRepo,
+		userIdentityRepo,
 		infra.DistLock,
 		infra.KeyFactory,
 		infra.ObjectStore,
+		passwordHasher,
 	)
+	signupService := identityservice.NewSignupService(signupRepo, userRepo, userService, passwordHasher)
+	passwordResetRepo := repository.NewPasswordResetRepository(infra.Cache.PasswordResetCache)
+	passwordResetService := identityservice.NewPasswordResetService(passwordResetRepo, userRepo, userService)
 	userSessionRepo := repository.NewUserSessionRepository(infra.Cache.UserSessionCache)
 
 	// ── 3. Event Bus ──
@@ -123,6 +139,9 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 		cfg.Source.ModelProvider,
 		cfg.Source.Model,
 	)
+	mailer := newMailer(rootCtx, cfg.Mailer)
+	// 身份域的两类事务邮件端口共用这个实现：内部选模板，发送交给通用的 mailer
+	identityMailer := adapter.NewIdentityMailer(mailer)
 
 	// ── 4.1 Suggestion service (单例) ──
 	suggestionService := chatsuggest.NewService(
@@ -198,10 +217,15 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 			ChatSuggestService:     suggestionService,
 			ArtifactRepo:           artifactRepo,
 			StylePreviewRepo:       stylePreviewRepo,
-			LoginInfoRepo:          loginInfoRepo,
+			ProviderRegistry:       providerRegistry,
+			OAuthStateRepo:         oauthStateRepo,
 			UserRepo:               userRepo,
 			UserService:            userService,
+			SignupService:          signupService,
+			PasswordResetService:   passwordResetService,
 			UserSessionRepo:        userSessionRepo,
+			VerifyMailer:           identityMailer,
+			ResetMailer:            identityMailer,
 
 			EventBus:   eventBus,
 			WaitGroup:  wg,
@@ -230,4 +254,39 @@ type syncerCloser struct {
 func (s *syncerCloser) Close() error {
 	s.syncer.Shutdown(context.Background())
 	return nil
+}
+
+// newMailer 构造事务性邮件 sender，构造失败则用 log sender，不阻塞启动
+func newMailer(ctx context.Context, cfg conf.MailerConfig) coreadapter.Mailer {
+	return adapter.NewMailer(newMailSender(ctx, cfg))
+}
+
+func newMailSender(ctx context.Context, cfg conf.MailerConfig) mail.Sender {
+	switch mail.ParseType(cfg.Type) {
+	case mail.TypeResend:
+		sender, err := newResendSender(cfg)
+		if err == nil {
+			return sender
+		}
+
+		slog.ErrorContext(ctx, "init resend mailer failed, falling back to log mailer", slog.Any("err", err))
+	case mail.TypeLog:
+	default:
+		slog.ErrorContext(ctx, "unknown mailer type, falling back to log mailer", slog.String("type", cfg.Type))
+	}
+
+	return maillog.New(cfg.Log.Level())
+}
+
+func newResendSender(cfg conf.MailerConfig) (mail.Sender, error) {
+	httpClient := httpclient.NewBuilder(nil).WithTimeout(cfg.Timeout).Build()
+
+	return mailresend.New(
+		mail.Config{
+			From:     cfg.Resend.From,
+			FromName: cfg.FromName,
+		},
+		cfg.Resend.APIKey,
+		mailresend.WithHTTPClient(httpClient),
+	)
 }

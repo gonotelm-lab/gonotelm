@@ -9,7 +9,7 @@ type ChatMessageTask struct {
 	UpdatedAt int64    `json:"updated_at" msgpack:"updated_at"` // 任务更新时间
 	ChatId    string   `json:"chat_id"    msgpack:"chat_id"`    // 会话id
 	SourceIds []string `json:"source_ids" msgpack:"source_ids"` // 本次任务选中的source id列表
-	UserId    string   `json:"user_id"    msgpack:"user_id"`    // 用户id
+	UserId    string   `json:"user_id"    msgpack:"user_id"`    // 账号id
 
 	ExpireDuration time.Duration `json:"-" msgpack:"-"` // 任务过期时间
 }

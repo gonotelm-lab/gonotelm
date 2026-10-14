@@ -3,9 +3,7 @@ package notelm
 import (
 	"context"
 
-	"github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
 	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/schema"
-	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	pkgerrors "github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 	"github.com/gonotelm-lab/gonotelm/pkg/http/middleware"
@@ -14,6 +12,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/protocol"
 )
 
+// csrfMiddleware 双提交校验；鉴权中间件在 auth 包里（auth.Server.Authenticate）
 func (s *Server) csrfMiddleware() app.HandlerFunc {
 	return middleware.CSRF(middleware.CSRFConfig{
 		CookieName: schema.CSRFCookieName,
@@ -24,24 +23,4 @@ func (s *Server) csrfMiddleware() app.HandlerFunc {
 			http.ErrResp(c, pkgerrors.ErrCSRF)
 		},
 	})
-}
-
-func (s *Server) authMiddleware() app.HandlerFunc {
-	return func(ctx context.Context, c *app.RequestContext) {
-		sid := string(c.Cookie(schema.AuthSessionCookieName))
-
-		authn, err := s.authHandler.Authenticate(ctx, sid)
-		if err != nil {
-			if pkgerrors.Is(err, errors.ErrUserSessionNotFound) {
-				http.ErrResp(c, pkgerrors.ErrNotLogin)
-				return
-			}
-
-			http.ErrResp(c, err)
-			return
-		}
-
-		ctx = pkgcontext.WithUserId(ctx, authn.UserId)
-		c.Next(ctx)
-	}
 }

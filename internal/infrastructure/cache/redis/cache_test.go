@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -17,10 +18,12 @@ var (
 	testChatMessageStreamCache  cache.ChatMessageStreamCache
 	testChatSuggestionCache     cache.ChatSuggestionCache
 	testSandboxCache            cache.SandboxCache
-	testLoginInfoCache          cache.TransientProviderLoginInfoCache
+	testOAuthStateCache         cache.OAuthStateCache
 	testUserSessionCache        cache.UserSessionCache
 	testStylePreviewCache       cache.StylePreviewCache
 	testUserCache               cache.UserCache
+	testSignupCache             cache.SignupCache
+	testPasswordResetCache      cache.PasswordResetCache
 )
 
 func TestMain(m *testing.M) {
@@ -39,10 +42,12 @@ func TestMain(m *testing.M) {
 	testChatMessageStreamCache = NewChatMessageStreamCacheImpl(testRedis)
 	testChatSuggestionCache = NewChatSuggestionCacheImpl(testRedis)
 	testSandboxCache = NewSandboxCacheImpl(testRedis)
-	testLoginInfoCache = NewTransientProviderLoginInfoCacheImpl(testRedis)
+	testOAuthStateCache = NewOAuthStateCacheImpl(testRedis)
 	testUserSessionCache = NewUserSessionCacheImpl(testRedis)
 	testStylePreviewCache = NewStylePreviewCacheImpl(testRedis)
 	testUserCache = NewUserCacheImpl(testRedis)
+	testSignupCache = NewSignupCacheImpl(testRedis)
+	testPasswordResetCache = NewPasswordResetCacheImpl(testRedis)
 
 	code := m.Run()
 
@@ -60,9 +65,21 @@ func TestNewCache_WiresAllCaches(t *testing.T) {
 		So(c.ChatMessageStreamCache, ShouldNotBeNil)
 		So(c.ChatSuggestionCache, ShouldNotBeNil)
 		So(c.SandboxCache, ShouldNotBeNil)
-		So(c.LoginInfoCache, ShouldNotBeNil)
+		So(c.OAuthStateCache, ShouldNotBeNil)
 		So(c.UserSessionCache, ShouldNotBeNil)
 		So(c.StylePreviewCache, ShouldNotBeNil)
 		So(c.UserCache, ShouldNotBeNil)
+		So(c.SignupCache, ShouldNotBeNil)
+		So(c.PasswordResetCache, ShouldNotBeNil)
 	})
+}
+
+// canceledCtx returns an already cancelled ctx to exercise redis error paths
+func canceledCtx(t *testing.T) context.Context {
+	t.Helper()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	return ctx
 }

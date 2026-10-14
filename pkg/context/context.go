@@ -17,6 +17,7 @@ const (
 	ContextLang            = contextKey("_lang")
 	ContextOperatorType    = contextKey("_operator_type")
 	ContextKeySubagent     = contextKey("_subagent")
+	ContextKeyLoginSource  = contextKey("_login_source")
 )
 
 func WithReqId(ctx context.Context, reqId requestid.ID) context.Context {
@@ -116,4 +117,18 @@ func WithSubagent(ctx context.Context) context.Context {
 func IsSubagent(ctx context.Context) bool {
 	subagent, ok := ctx.Value(ContextKeySubagent).(bool)
 	return ok && subagent
+}
+
+// WithLoginSource 记录本次请求会话的登录方式
+func WithLoginSource(ctx context.Context, loginSource string) context.Context {
+	return context.WithValue(ctx, ContextKeyLoginSource, loginSource)
+}
+
+func GetLoginSource(ctx context.Context) string {
+	loginSource, ok := ctx.Value(ContextKeyLoginSource).(string)
+	if !ok {
+		return ""
+	}
+
+	return loginSource
 }

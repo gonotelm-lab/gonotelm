@@ -17,7 +17,7 @@ type NotebookStore interface {
 	Upsert(ctx context.Context, notebook *schema.Notebook) error
 	GetById(ctx context.Context, id Id) (*schema.Notebook, error)
 	GetByNameAndOwnerId(ctx context.Context, name string, ownerId valobj.Uid) (*schema.Notebook, error)
-	// orderBy=0 -> default order; orderBy=1 -> order by updated_at
+	// orderBy=0 -> default order, orderBy=1 -> order by updated_at
 	ListByOwnerId(ctx context.Context, ownerId valobj.Uid, limit, offset, orderBy int) ([]*schema.Notebook, error)
 	Update(ctx context.Context, notebook *schema.Notebook) error
 	DeleteById(ctx context.Context, id Id) error
@@ -60,7 +60,7 @@ type ChatMessageStore interface {
 	Create(ctx context.Context, message *schema.ChatMessage) error
 	GetById(ctx context.Context, id Id) (*schema.ChatMessage, error)
 	GetByIdAndChatId(ctx context.Context, id Id, chatId Id) (*schema.ChatMessage, error)
-	// 按照seqno从大到小排序, orderBy=0 -> default; orderBy=1 -> seq_no ASC
+	// 按照seqno从大到小排序, orderBy=0 -> default, orderBy=1 -> seq_no ASC
 	ListByChatId(ctx context.Context, chatId Id, limit, offset, orderBy int) ([]*schema.ChatMessage, error)
 	// 按照seqno从大到小排序, 查询seq_no < beforeSeqNo的消息
 	ListByChatIdBeforeSeqNo(ctx context.Context, chatId Id, beforeSeqNo int64, limit int) ([]*schema.ChatMessage, error)
@@ -94,13 +94,28 @@ type WorkerCheckpointStore interface {
 
 type UserStore interface {
 	Create(ctx context.Context, user *schema.User) error
-	Upsert(ctx context.Context, user *schema.User) error
 	GetById(ctx context.Context, id valobj.Uid) (*schema.User, error)
-	GetByProviderAndSub(ctx context.Context, provider, sub string) (*schema.User, error)
+	GetByEmail(ctx context.Context, email string) (*schema.User, error)
+	// GetPasswordHash 单独读取密码列，避免它混进账号实体/缓存/日志
+	GetPasswordHash(ctx context.Context, id valobj.Uid) (string, error)
+	UpdateProfile(ctx context.Context, params *schema.UserUpdateProfileParams) error
+	UpdateAvatar(ctx context.Context, params *schema.UserUpdateAvatarParams) error
+	UpdatePasswordHash(ctx context.Context, params *schema.UserUpdatePasswordParams) error
 }
 
-// InitJobStore persists initjob run and task records. It speaks rows only; the
-// adapter in internal/infrastructure/repository translates it to initjob.Recorder.
+type UserIdentityStore interface {
+	Create(ctx context.Context, identity *schema.UserIdentity) error
+	GetByProviderAndSubject(ctx context.Context, provider, subject string) (*schema.UserIdentity, error)
+	// GetByUserIdAndId 按 (账号, 身份 id) 取，归属由查询本身保证，不靠调用方再比对 user_id
+	GetByUserIdAndId(ctx context.Context, userId valobj.Uid, id valobj.Id) (*schema.UserIdentity, error)
+	ListByUserId(ctx context.Context, userId valobj.Uid) ([]*schema.UserIdentity, error)
+	UpdateLastLoginAt(ctx context.Context, id valobj.Id, lastLoginAt int64) error
+	Delete(ctx context.Context, id valobj.Id) error
+	DeleteByUserId(ctx context.Context, userId valobj.Uid) error
+}
+
+// InitJobStore stores initjob run and task rows
+// the adapter in internal/infrastructure/repository maps rows to initjob.Recorder
 type InitJobStore interface {
 	AbortStale(ctx context.Context, params *schema.InitJobAbortStaleParams) (
 		abortedRuns int64, abortedTasks int64, err error,
@@ -124,6 +139,8 @@ type Dao struct {
 	WorkerCheckpointStore     WorkerCheckpointStore
 	InitJobStore              InitJobStore
 	UserStore                 UserStore
+	UserIdentityStore         UserIdentityStore
+	Transactor                Transactor
 }
 
 func NewDao(
@@ -137,6 +154,8 @@ func NewDao(
 	workerCheckpointStore WorkerCheckpointStore,
 	initJobStore InitJobStore,
 	userStore UserStore,
+	userIdentityStore UserIdentityStore,
+	transactor Transactor,
 ) *Dao {
 	return &Dao{
 		Closer:                    closer,
@@ -149,6 +168,8 @@ func NewDao(
 		WorkerCheckpointStore:     workerCheckpointStore,
 		InitJobStore:              initJobStore,
 		UserStore:                 userStore,
+		UserIdentityStore:         userIdentityStore,
+		Transactor:                transactor,
 	}
 }
 

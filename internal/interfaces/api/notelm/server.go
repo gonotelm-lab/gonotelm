@@ -1,3 +1,6 @@
+// Package notelm 是 HTTP API 的组装入口：拼 hertz、挂全局中间件与 /api/v1 分组，
+// 然后把各功能域子包（auth / notebook / source / chat / studio / user）的路由挂上去。
+// 每个功能域自己持有 Server 与处理器，本包只做装配，不写业务处理。
 package notelm
 
 import (
@@ -7,12 +10,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/app/server"
 	"github.com/cloudwego/hertz/pkg/common/config"
 	artifactapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/artifact"
-	chatapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat"
 	chatsuggest "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/suggestion"
-	authapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/identity/auth"
-	userapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/identity/user"
-	notebookapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/notebook"
-	sourceapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/source"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
@@ -23,12 +21,19 @@ import (
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
+	llmchat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
+	authapi "github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/auth"
+	chatapi "github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/chat"
+	notebookapi "github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/notebook"
 	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/schema"
+	sourceapi "github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/source"
+	studioapi "github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/studio"
+	userapi "github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/user"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 	"github.com/gonotelm-lab/gonotelm/pkg/http/middleware"
 )
 
+// ServerDeps 是 HTTP 层唯一的注入面：deps 里的字段按功能域裁剪后传给各子包。
 type ServerDeps struct {
 	RootCtx stdcontext.Context
 
@@ -44,15 +49,20 @@ type ServerDeps struct {
 	ChatContextMessageRepo chatrepo.ContextMessageRepository
 	ChatStreamTaskRepo     chatrepo.StreamTaskRepository
 	ChatSuggestionRepo     chatrepo.SuggestionRepository
-	LoginInfoRepo          identrepo.LoginInfoRepository
+	ProviderRegistry       identrepo.ProviderRegistry
+	OAuthStateRepo         identrepo.OAuthStateRepository
 	UserRepo               identrepo.UserRepository
 	UserSessionRepo        identrepo.UserSessionRepository
 	UserService            *identityservice.UserService
+	SignupService          *identityservice.SignupService
+	PasswordResetService   *identityservice.PasswordResetService
+	VerifyMailer           identrepo.EmailVerificationMailer
+	ResetMailer            identrepo.PasswordResetMailer
 
 	ChatSuggestService *chatsuggest.Service
 	EventBus           eventbus.Publisher
 	WaitGroup          *sync.WaitGroup
-	LLMGateway         *chat.Gateway
+	LLMGateway         *llmchat.Gateway
 	DistLock           adapter.DistributedLock
 	Summarizer         adapter.Summarizer
 
@@ -62,55 +72,16 @@ type ServerDeps struct {
 	TitleMaker adapter.TitleMaker
 }
 
+// Server HTTP 服务本体：只持有各功能域子 Server
 type Server struct {
 	h *server.Hertz
 
-	getNotebookHandler                 *notebookapp.GetNotebookHandler
-	createNotebookHandler              *notebookapp.CreateNotebookHandler
-	listNotebooksHandler               *notebookapp.ListNotebooksHandler
-	deleteNotebookHandler              *notebookapp.DeleteNotebookHandler
-	updateNotebookNameHandler          *notebookapp.UpdateNotebookNameHandler
-	generateNotebookDescriptionHandler *notebookapp.GenerateDescriptionHandler
-
-	getSourceHandler              *sourceapp.GetSourceHandler
-	createSourceHandler           *sourceapp.CreateSourceHandler
-	deleteSourceHandler           *sourceapp.DeleteSourceHandler
-	presignUploadFileHandler      *sourceapp.PresignUploadFileHandler
-	pollSourceStatusHandler       *sourceapp.PollSourceStatusHandler
-	retrySourcePreparationHandler *sourceapp.RetrySourcePreparationHandler
-	updateSourceTitleHandler      *sourceapp.UpdateSourceTitleHandler
-
-	getSourceDocHandler      *sourceapp.GetSourceDocHandler
-	batchGetSourceDocHandler *sourceapp.BatchGetSourceDocsHandler
-
-	listSourcesHandler *sourceapp.ListSourcesHandler
-	createChatHandler  *chatapp.CreateChatHandler
-
-	createChatMessageHandler  *chatapp.CreateMessageHandler
-	listChatMessagesHandler   *chatapp.ListMessagesHandler
-	getChatStreamHandler      *chatapp.GetStreamHandler
-	getChatRunningTaskHandler *chatapp.GetRunningTaskHandler
-	abortChatStreamHandler    *chatapp.AbortStreamHandler
-	deleteChatContextHandler  *chatapp.DeleteChatContextHandler
-	getChatSuggestionsHandler *chatapp.ChatSuggestHandler
-
-	generateArtifactHandler      *artifactapp.GenerateArtifactHandler
-	getArtifactStatusHandler     *artifactapp.GetArtifactStatusHandler
-	listNotebookArtifactsHandler *artifactapp.ListArtifactsHandler
-	cancelArtifactHandler        *artifactapp.CancelArtifactHandler
-	deleteArtifactHandler        *artifactapp.DeleteArtifactHandler
-	retryArtifactHandler         *artifactapp.RetryArtifactHandler
-	updateArtifactHandler        *artifactapp.UpdateArtifactHandler
-	convertNoteToSourceHandler   *artifactapp.ConvertNoteToSourceHandler
-	listStylePreviewsHandler     *artifactapp.ListStylePreviewsHandler
-
-	authLoginHandler     *authapp.LoginHandler
-	authCallbackHandler  *authapp.CallbackHandler
-	authProvidersHandler *authapp.ProvidersHandler
-	authHandler          *authapp.AuthHandler
-	getMeHandler         *userapp.GetMeHandler
-	updateProfileHandler *userapp.UpdateProfileHandler
-	updateAvatarHandler  *userapp.UpdateAvatarHandler
+	auth     *authapi.Server
+	notebook *notebookapi.Server
+	source   *sourceapi.Server
+	chat     *chatapi.Server
+	studio   *studioapi.Server
+	user     *userapi.Server
 }
 
 func NewServer(
@@ -134,102 +105,75 @@ func NewServer(
 	)
 
 	s := &Server{
-		h:                         hz,
-		getNotebookHandler:        notebookapp.NewGetNotebookHandler(deps.NotebookRepo),
-		createNotebookHandler:     notebookapp.NewCreateNotebookHandler(deps.NotebookRepo, deps.EventBus),
-		listNotebooksHandler:      notebookapp.NewListNotebooksHandler(deps.NotebookRepo),
-		deleteNotebookHandler:     notebookapp.NewDeleteNotebookHandler(deps.NotebookRepo, deps.EventBus),
-		updateNotebookNameHandler: notebookapp.NewUpdateNotebookNameHandler(deps.NotebookRepo),
-		generateNotebookDescriptionHandler: notebookapp.NewGenerateDescriptionHandler(
-			deps.NotebookRepo,
-			deps.SourceRepo,
-			deps.DistLock,
-			deps.Summarizer,
-		),
+		h: hz,
 
-		getSourceHandler:              sourceapp.NewGetSourceHandler(deps.SourceRepo, deps.ObjectStore),
-		createSourceHandler:           sourceapp.NewCreateSourceHandler(deps.SourceRepo, deps.NotebookRepo, deps.EventBus),
-		deleteSourceHandler:           sourceapp.NewDeleteSourceHandler(deps.SourceRepo, deps.EventBus),
-		presignUploadFileHandler:      sourceapp.NewPresignUploadFileHandler(deps.SourceRepo, deps.ObjectStore, deps.KeyFactory),
-		pollSourceStatusHandler:       sourceapp.NewPollSourceStatusHandler(deps.SourceRepo, deps.ObjectStore, deps.EventBus),
-		retrySourcePreparationHandler: sourceapp.NewRetrySourcePreparationHandler(deps.SourceRepo, deps.EventBus),
-		updateSourceTitleHandler:      sourceapp.NewUpdateSourceTitleHandler(deps.SourceRepo),
+		auth: authapi.NewServer(authapi.Deps{
+			ProviderRegistry:        deps.ProviderRegistry,
+			OAuthStateRepo:          deps.OAuthStateRepo,
+			UserService:             deps.UserService,
+			SignupService:           deps.SignupService,
+			PasswordResetService:    deps.PasswordResetService,
+			UserSessionRepo:         deps.UserSessionRepo,
+			EmailVerificationMailer: deps.VerifyMailer,
+			PasswordResetMailer:     deps.ResetMailer,
+		}),
 
-		getSourceDocHandler:      sourceapp.NewGetSourceDocHandler(deps.SourceRepo, deps.SourceDocRepo),
-		batchGetSourceDocHandler: sourceapp.NewBatchGetSourceDocsHandler(deps.SourceRepo, deps.SourceDocRepo),
+		notebook: notebookapi.NewServer(notebookapi.Deps{
+			NotebookRepo: deps.NotebookRepo,
+			SourceRepo:   deps.SourceRepo,
+			EventBus:     deps.EventBus,
+			DistLock:     deps.DistLock,
+			Summarizer:   deps.Summarizer,
+		}),
 
-		createChatHandler:  chatapp.NewCreateChatHandler(deps.NotebookRepo, deps.ChatRepo),
-		listSourcesHandler: sourceapp.NewListSourcesHandler(deps.NotebookRepo, deps.SourceRepo, deps.ObjectStore),
-		getChatSuggestionsHandler: chatapp.NewChatSuggestHandler(
-			deps.ChatRepo,
-			deps.ChatSuggestService,
-		),
+		source: sourceapi.NewServer(sourceapi.Deps{
+			SourceRepo:    deps.SourceRepo,
+			NotebookRepo:  deps.NotebookRepo,
+			ObjectStore:   deps.ObjectStore,
+			KeyFactory:    deps.KeyFactory,
+			SourceDocRepo: deps.SourceDocRepo,
+			EventBus:      deps.EventBus,
+		}),
 
-		createChatMessageHandler: chatapp.NewCreateMessageHandler(
-			deps.WaitGroup,
-			deps.DistLock,
-			deps.NotebookRepo,
-			deps.ChatRepo,
-			deps.ChatMessageRepo,
-			deps.ChatContextMessageRepo,
-			deps.ChatStreamTaskRepo,
-			deps.SourceRepo,
-			deps.ObjectStore,
-			deps.SourceDocRepo,
-			deps.LLMGateway,
-			deps.EventBus,
-		),
-		listChatMessagesHandler: chatapp.NewListMessagesHandler(
-			deps.ChatRepo,
-			deps.ChatMessageRepo,
-		),
-		getChatStreamHandler: chatapp.NewGetStreamHandler(deps.ChatStreamTaskRepo),
-		getChatRunningTaskHandler: chatapp.NewGetRunningTaskHandler(
-			deps.ChatRepo,
-			deps.ChatStreamTaskRepo,
-		),
-		abortChatStreamHandler: chatapp.NewAbortStreamHandler(deps.ChatStreamTaskRepo, deps.EventBus),
-		deleteChatContextHandler: chatapp.NewDeleteChatContextHandler(
-			deps.ChatRepo,
-			deps.ChatContextMessageRepo,
-			deps.ChatSuggestionRepo,
-		),
+		chat: chatapi.NewServer(chatapi.Deps{
+			WaitGroup:              deps.WaitGroup,
+			DistLock:               deps.DistLock,
+			NotebookRepo:           deps.NotebookRepo,
+			ChatRepo:               deps.ChatRepo,
+			ChatMessageRepo:        deps.ChatMessageRepo,
+			ChatContextMessageRepo: deps.ChatContextMessageRepo,
+			ChatStreamTaskRepo:     deps.ChatStreamTaskRepo,
+			ChatSuggestionRepo:     deps.ChatSuggestionRepo,
+			SourceRepo:             deps.SourceRepo,
+			ObjectStore:            deps.ObjectStore,
+			SourceDocRepo:          deps.SourceDocRepo,
+			LLMGateway:             deps.LLMGateway,
+			EventBus:               deps.EventBus,
+			ChatSuggestService:     deps.ChatSuggestService,
+		}),
 
-		generateArtifactHandler: artifactapp.NewGenerateArtifactHandler(
-			deps.WaitGroup,
-			deps.ArtifactRepo,
-			deps.NotebookRepo,
-			deps.SourceRepo,
-			deps.ChatRepo,
-			deps.ChatMessageRepo,
-			deps.FlowClient,
-			deps.Poller,
-			deps.EventBus,
-			deps.TitleMaker,
-		),
-		getArtifactStatusHandler:     artifactapp.NewGetArtifactStatusHandler(deps.ArtifactRepo, deps.ObjectStore),
-		listNotebookArtifactsHandler: artifactapp.NewListArtifactsHandler(deps.NotebookRepo, deps.ArtifactRepo),
-		cancelArtifactHandler:        artifactapp.NewCancelArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.EventBus),
-		deleteArtifactHandler:        artifactapp.NewDeleteArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.ObjectStore),
-		retryArtifactHandler:         artifactapp.NewRetryArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.Poller, deps.EventBus),
-		updateArtifactHandler:        artifactapp.NewUpdateArtifactHandler(deps.ArtifactRepo),
-		convertNoteToSourceHandler: artifactapp.NewConvertNoteToSourceHandler(
-			deps.ArtifactRepo,
-			deps.SourceRepo,
-			deps.NotebookRepo,
-			deps.ObjectStore,
-			deps.KeyFactory,
-			deps.EventBus,
-		),
-		listStylePreviewsHandler: artifactapp.NewListStylePreviewsHandler(deps.StylePreviewRepo, deps.ObjectStore),
+		studio: studioapi.NewServer(studioapi.Deps{
+			WaitGroup:        deps.WaitGroup,
+			ArtifactRepo:     deps.ArtifactRepo,
+			StylePreviewRepo: deps.StylePreviewRepo,
+			NotebookRepo:     deps.NotebookRepo,
+			SourceRepo:       deps.SourceRepo,
+			ChatRepo:         deps.ChatRepo,
+			ChatMessageRepo:  deps.ChatMessageRepo,
+			FlowClient:       deps.FlowClient,
+			Poller:           deps.Poller,
+			EventBus:         deps.EventBus,
+			TitleMaker:       deps.TitleMaker,
+			ObjectStore:      deps.ObjectStore,
+			KeyFactory:       deps.KeyFactory,
+		}),
 
-		authLoginHandler:     authapp.NewLoginHandler(deps.LoginInfoRepo, deps.UserRepo, deps.UserSessionRepo),
-		authCallbackHandler:  authapp.NewCallbackHandler(deps.LoginInfoRepo, deps.UserService, deps.UserRepo, deps.UserSessionRepo),
-		authProvidersHandler: authapp.NewProvidersHandler(deps.LoginInfoRepo),
-		authHandler:          authapp.NewAuthHandler(deps.UserRepo, deps.UserSessionRepo),
-		getMeHandler:         userapp.NewGetMeHandler(deps.UserRepo, deps.ObjectStore),
-		updateProfileHandler: userapp.NewUpdateProfileHandler(deps.UserRepo),
-		updateAvatarHandler:  userapp.NewUpdateAvatarHandler(deps.UserRepo, deps.ObjectStore, deps.KeyFactory),
+		user: userapi.NewServer(userapi.Deps{
+			UserRepo:    deps.UserRepo,
+			UserService: deps.UserService,
+			ObjectStore: deps.ObjectStore,
+			KeyFactory:  deps.KeyFactory,
+		}),
 	}
 
 	s.registerRoutes()
@@ -240,16 +184,17 @@ func NewServer(
 func (s *Server) registerRoutes() {
 	v1Group := s.h.Group("/api/v1", s.csrfMiddleware())
 	{
-		v1AuthedGroup := v1Group.Group("/", s.authMiddleware())
+		v1AuthedGroup := v1Group.Group("/", s.auth.Authenticate())
 		{
-			s.registerNotebooksRoutes(v1AuthedGroup)
-			s.registerSourcesRoutes(v1AuthedGroup)
-			s.registerChatRoutes(v1AuthedGroup)
-			s.registerStudioRoutes(v1AuthedGroup)
-			s.registerUserRoutes(v1AuthedGroup)
+			s.notebook.RegisterRoutes(v1AuthedGroup)
+			s.source.RegisterRoutes(v1AuthedGroup)
+			s.chat.RegisterRoutes(v1AuthedGroup)
+			s.studio.RegisterRoutes(v1AuthedGroup)
+			s.user.RegisterRoutes(v1AuthedGroup)
+			s.auth.RegisterAuthedRoutes(v1AuthedGroup)
 		}
 
-		s.registerAuthRoutes(v1Group)
+		s.auth.RegisterPublicRoutes(v1Group)
 	}
 }
 

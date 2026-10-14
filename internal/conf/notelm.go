@@ -2,6 +2,7 @@ package conf
 
 import (
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 	"sync"
@@ -25,6 +26,7 @@ type NotelmConfig struct {
 	Api       ApiConfig            `toml:"api"`
 	Cors      CorsConfig           `toml:"cors"`
 	Auth      AuthConfig           `toml:"auth"`
+	Mailer    MailerConfig         `toml:"mailer"`
 	Chat      ChatConfig           `toml:"chat"`
 	Source    SourceConfig         `toml:"source"`
 	Rerank    rerank.RerankConfig  `toml:"rerank"`
@@ -151,6 +153,21 @@ func (c *CorsConfig) Init() {
 type AuthConfig struct {
 	// ReturnToAllowOrigins 登录后 return_to 允许跳转的站外来源白名单
 	ReturnToAllowOrigins []string `toml:"returnToAllowOrigins"`
+
+	// EmailVerificationRequired 注册是否必须完成邮箱验证，false 时邮箱视为已验证
+	EmailVerificationRequired bool `toml:"emailVerificationRequired"`
+
+	// RequireComplexPassword 密码是否必须同时含大写字母、小写字母与数字
+	RequireComplexPassword bool `toml:"requireComplexPassword"`
+
+	// PasswordResetURLBase 找回密码邮件里重置链接的前端页面，最终链接为 base#token=xxx
+	PasswordResetURLBase string `toml:"passwordResetUrlBase"`
+
+	// LoginErrorURL 三方登录回调失败时的前端页面
+	LoginErrorURL string `toml:"loginErrorUrl"`
+
+	// BindErrorURL 三方绑定回调失败时的前端页面
+	BindErrorURL string `toml:"bindErrorUrl"`
 }
 
 func (c *AuthConfig) Init() {
@@ -163,6 +180,49 @@ func (c *AuthConfig) Init() {
 		}
 	}
 	c.ReturnToAllowOrigins = origins
+}
+
+// MailerConfig 事务性邮件的公共配置，type 选具体 sender，构建失败则用 log
+type MailerConfig struct {
+	Type     string        `toml:"type"`     // resend | log
+	FromName string        `toml:"fromName"` // display name, shared by every sender
+	Timeout  time.Duration `toml:"timeout"`
+
+	Resend ResendMailerConfig `toml:"resend"`
+	Log    LogMailerConfig    `toml:"log"`
+}
+
+// ResendMailerConfig Resend credentials, provider decides which addresses can be From
+type ResendMailerConfig struct {
+	APIKey string `toml:"apiKey"`
+	From   string `toml:"from"`
+}
+
+type LogMailerConfig struct {
+	LogLevel string `toml:"logLevel"`
+}
+
+func (c *MailerConfig) Init() {
+	if c.Type == "" {
+		c.Type = "log"
+	}
+	if c.Timeout <= 0 {
+		c.Timeout = 10 * time.Second
+	}
+}
+
+// Level slog level of the log mailer, defaults to info
+func (c *LogMailerConfig) Level() slog.Level {
+	if strings.TrimSpace(c.LogLevel) == "" {
+		return slog.LevelInfo
+	}
+
+	var level slog.Level
+	if err := level.UnmarshalText([]byte(c.LogLevel)); err != nil {
+		return slog.LevelInfo
+	}
+
+	return level
 }
 
 type IDPConfig struct {
@@ -194,6 +254,7 @@ func (c *NotelmConfig) init() {
 	c.Flow.Init()
 	c.Cors.Init()
 	c.Auth.Init()
+	c.Mailer.Init()
 
 	if c.MessageQueue.Type == "" {
 		c.MessageQueue.Type = mqimpl.Kafka

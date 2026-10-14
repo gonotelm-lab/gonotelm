@@ -16,8 +16,8 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 )
 
-// gonotelm:user_session:id:{sha256(sessionId)}  ->  UserSession(msgpack)   TTL
-// gonotelm:user_session:user:{userId}           ->  SET{sha256(sessionId)}  TTL
+// gonotelm:identity:session:id:{sha256(sessionId)}  ->  UserSession(msgpack)   TTL
+// gonotelm:identity:session:user:{userId}           ->  SET{sha256(sessionId)}  TTL
 type UserSessionCacheImpl struct {
 	rd goredis.UniversalClient
 }
@@ -34,11 +34,11 @@ func (c *UserSessionCacheImpl) hash(id string) string {
 }
 
 func (c *UserSessionCacheImpl) sessionKey(id string) string {
-	return fmt.Sprintf("gonotelm:user_session:id:%s", c.hash(id))
+	return fmt.Sprintf("gonotelm:identity:session:id:%s", c.hash(id))
 }
 
 func (c *UserSessionCacheImpl) userKey(userId string) string {
-	return fmt.Sprintf("gonotelm:user_session:user:%s", userId)
+	return fmt.Sprintf("gonotelm:identity:session:user:%s", userId)
 }
 
 func (c *UserSessionCacheImpl) Set(ctx context.Context, id string, session *schema.UserSession, ttl time.Duration) error {
@@ -101,7 +101,7 @@ func (c *UserSessionCacheImpl) DeleteByUserId(ctx context.Context, userId string
 
 	pipe := c.rd.TxPipeline()
 	for _, hashedId := range hashedIds {
-		pipe.Del(ctx, fmt.Sprintf("gonotelm:user_session:id:%s", hashedId))
+		pipe.Del(ctx, fmt.Sprintf("gonotelm:identity:session:id:%s", hashedId))
 	}
 	pipe.Del(ctx, c.userKey(userId))
 	if _, err := pipe.Exec(ctx); err != nil {

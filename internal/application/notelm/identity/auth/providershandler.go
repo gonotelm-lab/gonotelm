@@ -3,19 +3,20 @@ package auth
 import (
 	"sort"
 
-	"github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
+	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 )
 
+// ProvidersHandler 只列当前部署配好凭证、能真正完成登录的 provider
 type ProvidersHandler struct {
-	loginRepo repository.LoginInfoRepository
+	registry identrepo.ProviderRegistry
 }
 
-func NewProvidersHandler(loginRepo repository.LoginInfoRepository) *ProvidersHandler {
-	return &ProvidersHandler{loginRepo: loginRepo}
+func NewProvidersHandler(registry identrepo.ProviderRegistry) *ProvidersHandler {
+	return &ProvidersHandler{registry: registry}
 }
 
 func (h *ProvidersHandler) Handle() []string {
-	providers := h.loginRepo.AvailableProviders()
+	providers := h.registry.AvailableProviders()
 
 	types := make([]string, 0, len(providers))
 	for _, provider := range providers {

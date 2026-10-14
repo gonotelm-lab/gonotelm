@@ -4,24 +4,29 @@ import (
 	"context"
 
 	"github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
-	identityerrors "github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
-	"github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
+	identerr "github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
+	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
+	identityservice "github.com/gonotelm-lab/gonotelm/internal/domain/identity/service"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
+// LoginHandler 发起三方登录：取 authorize URL，state 存本次握手
 type LoginHandler struct {
 	*baseHandler
-	loginRepo repository.LoginInfoRepository
+	registry       identrepo.ProviderRegistry
+	oauthStateRepo identrepo.OAuthStateRepository
 }
 
 func NewLoginHandler(
-	loginProviderRepo repository.LoginInfoRepository,
-	userRepo repository.UserRepository,
-	userSessionRepo repository.UserSessionRepository,
+	registry identrepo.ProviderRegistry,
+	oauthStateRepo identrepo.OAuthStateRepository,
+	userService *identityservice.UserService,
+	userSessionRepo identrepo.UserSessionRepository,
 ) *LoginHandler {
 	return &LoginHandler{
-		baseHandler: newBaseHandler(userRepo, userSessionRepo),
-		loginRepo:   loginProviderRepo,
+		baseHandler:    newBaseHandler(userService, userSessionRepo),
+		registry:       registry,
+		oauthStateRepo: oauthStateRepo,
 	}
 }
 
@@ -35,13 +40,13 @@ type LoginHandleCommand struct {
 type LoginHandleResult struct {
 	Authenticated bool
 	ReturnTo      string
-	LoginInfo     *entity.ProviderLoginInfo
+	LoginInfo     *entity.ProviderOAuthInfo
 }
 
 func (h *LoginHandler) Handle(ctx context.Context, cmd *LoginHandleCommand) (*LoginHandleResult, error) {
-	// 已登录则跳过 OAuth，直接返回。
-	// 复用 baseHandler.authenticate 判定登录态：它负责闲置/绝对过期校验并按需滑动续期，
-	// 避免这里的判定比正常请求更宽松（否则已失效的会话仍会被当作已登录）。
+	// 已登录则跳过 OAuth，直接返回
+	// 用 baseHandler.authenticate 检查登录态，它校验闲置/绝对过期并按需滑动续期
+	// 否则失效的会话也会被当成已登录
 	if cmd.CurrentSessionId != "" {
 		_, err := h.authenticate(ctx, cmd.CurrentSessionId)
 		if err == nil {
@@ -50,30 +55,27 @@ func (h *LoginHandler) Handle(ctx context.Context, cmd *LoginHandleCommand) (*Lo
 				ReturnTo:      cmd.ReturnTo,
 			}, nil
 		}
-		if !errors.Is(err, identityerrors.ErrUserSessionNotFound) {
+		if !errors.Is(err, identerr.ErrUserSessionNotFound) {
 			return nil, errors.WithMessage(err, "check current session failed")
 		}
 	}
 
-	provider, err := h.loginRepo.GetProvider(ctx, cmd.LoginProvider)
+	provider, err := h.registry.GetProvider(ctx, cmd.LoginProvider)
 	if err != nil {
 		return nil, errors.WithMessage(err, "provide login provider failed")
 	}
 
-	request := &entity.LoginInfoRequest{
+	loginInfo, err := provider.OAuthInfo(ctx, &entity.OAuthInfoRequest{
 		ReturnTo: cmd.ReturnTo,
 		Device:   cmd.LoginFrom,
-	}
-
-	loginInfo, err := provider.LoginInfo(ctx, request)
+		Mode:     entity.ProviderLoginModeLogin,
+	})
 	if err != nil {
 		return nil, errors.WithMessage(err, "get login info failed")
 	}
 
-	// store short lived login info
-	err = h.loginRepo.SaveTransientLoginInfo(ctx, loginInfo.ToTransient())
-	if err != nil {
-		return nil, errors.WithMessage(err, "save transient login info failed")
+	if err := h.oauthStateRepo.Save(ctx, loginInfo.ToOAuthState()); err != nil {
+		return nil, errors.WithMessage(err, "save login state failed")
 	}
 
 	return &LoginHandleResult{

@@ -141,7 +141,7 @@ func (g *Google) GetUserInfo(ctx context.Context, code, verifier, nonce string) 
 		return nil, fmt.Errorf("get google user info: %w", err)
 	}
 
-	// UserInfo 的 sub 必须与 id_token 的 sub 完全一致，否则 UserInfo 的值不可用。
+	// UserInfo 的 sub 必须与 id_token 的 sub 一致，否则 UserInfo 不可用
 	// https://openid.net/specs/openid-connect-core-1_0.html#UserInfoResponse
 	if user.Sub != idToken.Subject {
 		return nil, fmt.Errorf("userinfo sub %q does not match id_token sub %q", user.Sub, idToken.Subject)
@@ -153,16 +153,18 @@ func (g *Google) GetUserInfo(ctx context.Context, code, verifier, nonce string) 
 	}
 
 	return &idp.UserInfo{
-		Issuer:    issuer,
-		Subject:   user.Sub,
-		Name:      name,
-		AvatarURL: user.Picture,
-		Raw:       user.raw(),
+		Issuer:        issuer,
+		Subject:       user.Sub,
+		Name:          name,
+		Email:         user.Email,
+		EmailVerified: user.EmailVerified,
+		AvatarURL:     user.Picture,
+		Raw:           user.raw(),
 	}, nil
 }
 
-// verifyIDToken 校验 token 响应里的 id_token：签名(JWKS)、iss、aud、exp 以及 nonce。
-// 这一步也能挡住"换回来的不是发给本 client 的 token"这类问题。
+// verifyIDToken 校验 token 响应里的 id_token：签名(JWKS)、iss、aud、exp、nonce
+// 也能挡住换回来的 token 不是发给本 client 的情况
 func (g *Google) verifyIDToken(ctx context.Context, token *oauth2.Token, nonce string) (*oidc.IDToken, error) {
 	rawIDToken, ok := token.Extra("id_token").(string)
 	if !ok || rawIDToken == "" {
@@ -185,15 +187,15 @@ func (g *Google) verifyIDToken(ctx context.Context, token *oauth2.Token, nonce s
 	return idToken, nil
 }
 
-// verifierFor 惰性构建 id_token 校验器。这里用 RemoteKeySet 而不是 oidc.NewProvider，
-// 因为 issuer 和 JWKS URL 是固定的，没必要为校验再多做一次 discovery。
+// verifierFor 构建 id_token 校验器，用 RemoteKeySet 而不是 oidc.NewProvider
+// issuer 和 JWKS URL 固定，不用多做一次 discovery
 func (g *Google) verifierFor() *oidc.IDTokenVerifier {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
 	if g.verifier == nil {
-		// NewRemoteKeySet 把 ctx 当配置载体(注入 http client)用，取消会被忽略，
-		// 因此这里用 Background 并带上自己的 client。
+		// NewRemoteKeySet 把 ctx 当配置载体(注入 http client)用，取消会被忽略
+		// 这里用 Background 并带上自己的 client
 		keySet := oidc.NewRemoteKeySet(
 			oidc.ClientContext(context.Background(), g.httpClient),
 			g.jwksURL,

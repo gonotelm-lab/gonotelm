@@ -9,7 +9,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/sql"
 
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 type UserStoreImpl struct {
@@ -23,28 +22,7 @@ func NewUserStoreImpl(db *gorm.DB) *UserStoreImpl {
 }
 
 func (s *UserStoreImpl) Create(ctx context.Context, user *schema.User) error {
-	if err := s.db.WithContext(ctx).Create(user).Error; err != nil {
-		return sql.WrapErr(err)
-	}
-
-	return nil
-}
-
-func (s *UserStoreImpl) Upsert(ctx context.Context, user *schema.User) error {
-	cl := clause.OnConflict{
-		Columns: []clause.Column{{Name: "id"}},
-		DoUpdates: clause.Assignments(map[string]any{
-			"email":      user.Email,
-			"nickname":   user.Nickname,
-			"status":     user.Status,
-			"avatar":     user.Avatar,
-			"updated_at": user.UpdatedAt,
-		}),
-	}
-	if err := s.db.WithContext(ctx).
-		Model(&schema.User{}).
-		Clauses(cl).
-		Create(user).Error; err != nil {
+	if err := dbFromContext(ctx, s.db).Create(user).Error; err != nil {
 		return sql.WrapErr(err)
 	}
 
@@ -53,7 +31,7 @@ func (s *UserStoreImpl) Upsert(ctx context.Context, user *schema.User) error {
 
 func (s *UserStoreImpl) GetById(ctx context.Context, id valobj.Uid) (*schema.User, error) {
 	var user schema.User
-	err := s.db.WithContext(ctx).
+	err := dbFromContext(ctx, s.db).
 		Where("id = ?", id).
 		Take(&user).Error
 	if err != nil {
@@ -63,17 +41,63 @@ func (s *UserStoreImpl) GetById(ctx context.Context, id valobj.Uid) (*schema.Use
 	return &user, nil
 }
 
-func (s *UserStoreImpl) GetByProviderAndSub(
-	ctx context.Context,
-	provider, sub string,
-) (*schema.User, error) {
+func (s *UserStoreImpl) GetByEmail(ctx context.Context, email string) (*schema.User, error) {
 	var user schema.User
-	err := s.db.WithContext(ctx).
-		Where("provider = ? AND sub = ?", provider, sub).
+	err := dbFromContext(ctx, s.db).
+		Where("email = ?", email).
 		Take(&user).Error
 	if err != nil {
 		return nil, sql.WrapErr(err)
 	}
 
 	return &user, nil
+}
+
+func (s *UserStoreImpl) GetPasswordHash(ctx context.Context, id valobj.Uid) (string, error) {
+	var row struct {
+		PasswordHash string `gorm:"column:password_hash"`
+	}
+	err := dbFromContext(ctx, s.db).
+		Model(&schema.User{}).
+		Select("password_hash").
+		Where("id = ?", id).
+		Take(&row).Error
+	if err != nil {
+		return "", sql.WrapErr(err)
+	}
+
+	return row.PasswordHash, nil
+}
+
+func (s *UserStoreImpl) UpdateProfile(ctx context.Context, params *schema.UserUpdateProfileParams) error {
+	return s.update(ctx, params.Id, map[string]any{
+		"nickname":   params.Nickname,
+		"updated_at": params.UpdatedAt,
+	})
+}
+
+func (s *UserStoreImpl) UpdateAvatar(ctx context.Context, params *schema.UserUpdateAvatarParams) error {
+	return s.update(ctx, params.Id, map[string]any{
+		"avatar":     params.Avatar,
+		"updated_at": params.UpdatedAt,
+	})
+}
+
+func (s *UserStoreImpl) UpdatePasswordHash(ctx context.Context, params *schema.UserUpdatePasswordParams) error {
+	return s.update(ctx, params.Id, map[string]any{
+		"password_hash": params.PasswordHash,
+		"updated_at":    params.UpdatedAt,
+	})
+}
+
+func (s *UserStoreImpl) update(ctx context.Context, id valobj.Uid, columns map[string]any) error {
+	err := dbFromContext(ctx, s.db).
+		Model(&schema.User{}).
+		Where("id = ?", id).
+		Updates(columns).Error
+	if err != nil {
+		return sql.WrapErr(err)
+	}
+
+	return nil
 }

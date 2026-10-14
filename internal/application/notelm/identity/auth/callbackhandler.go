@@ -13,20 +13,22 @@ import (
 
 type CallbackHandler struct {
 	*baseHandler
-	loginInfoRepo identrepo.LoginInfoRepository
-	userService   *identityservice.UserService
+	registry       identrepo.ProviderRegistry
+	oauthStateRepo identrepo.OAuthStateRepository
+	userService    *identityservice.UserService
 }
 
 func NewCallbackHandler(
-	loginInfoRepo identrepo.LoginInfoRepository,
+	registry identrepo.ProviderRegistry,
+	oauthStateRepo identrepo.OAuthStateRepository,
 	userService *identityservice.UserService,
-	userRepo identrepo.UserRepository,
 	userSessionRepo identrepo.UserSessionRepository,
 ) *CallbackHandler {
 	return &CallbackHandler{
-		baseHandler:   newBaseHandler(userRepo, userSessionRepo),
-		loginInfoRepo: loginInfoRepo,
-		userService:   userService,
+		baseHandler:    newBaseHandler(userService, userSessionRepo),
+		registry:       registry,
+		oauthStateRepo: oauthStateRepo,
+		userService:    userService,
 	}
 }
 
@@ -53,87 +55,158 @@ type CallbackHandleResult struct {
 	SessionId string
 	UserId    string
 	ReturnTo  string
+	// Mode 本次回调属于登录还是绑定，登录创建会话，绑定只挂身份
+	Mode entity.ProviderLoginMode
 }
 
 func (h *CallbackHandler) Handle(ctx context.Context, cmd *CallbackHandleCommand) (*CallbackHandleResult, error) {
+	result := &CallbackHandleResult{Mode: entity.ProviderLoginModeLogin}
+
 	if err := cmd.validate(); err != nil {
-		return nil, err
+		return result, err
 	}
 
 	// check state
-	loginState, err := h.loginInfoRepo.GetTransientLoginInfo(ctx, cmd.State)
+	oauthState, err := h.oauthStateRepo.Get(ctx, cmd.State)
 	if err != nil {
 		if errors.Is(err, errors.ErrNoRecord) {
 			// state not found or expired
-			return nil, domainerr.ErrLoginStateNotFound
+			return result, domainerr.ErrOAuthStateNotFound
 		}
-		return nil, errors.WithMessage(err, "failed to get login state")
+		return result, errors.WithMessage(err, "failed to get login state")
 	}
 
-	if loginState.State != cmd.State {
-		return nil, domainerr.ErrLoginStateMismatch
+	result.ReturnTo = oauthState.ReturnTo
+	if oauthState.Mode != "" {
+		result.Mode = oauthState.Mode
+	}
+
+	if oauthState.State != cmd.State {
+		return result, domainerr.ErrOAuthStateMismatch
 	}
 
 	// now state is valid here, delete it
-	if err := h.loginInfoRepo.DeleteTransientLoginInfo(ctx, cmd.State); err != nil {
-		slog.ErrorContext(ctx, "failed to delete transient login info", slog.Any("err", err))
+	if err := h.oauthStateRepo.Delete(ctx, cmd.State); err != nil {
+		slog.ErrorContext(ctx, "failed to delete login state", slog.Any("err", err))
 	}
 
 	// get access token or id token to get user info
-	provider, err := h.loginInfoRepo.GetProvider(ctx, cmd.ProviderType)
+	provider, err := h.registry.GetProvider(ctx, cmd.ProviderType)
 	if err != nil {
-		return nil, errors.WithMessage(err, "failed to get provider")
+		return result, errors.WithMessage(err, "failed to get provider")
 	}
 
-	userInfo, err := provider.GetUserInfo(ctx, cmd.Code, loginState)
+	userInfo, err := provider.GetUserInfo(ctx, cmd.Code, oauthState)
 	if err != nil {
-		return nil, errors.WithMessage(err, "failed to get user info")
+		return result, errors.WithMessage(err, "failed to get user info")
 	}
 
-	user, err := h.userService.Get(ctx, cmd.ProviderType, userInfo.Subject)
-	if err != nil {
-		if !errors.Is(err, domainerr.ErrUserNotFound) {
-			return nil, errors.WithMessage(err, "failed to get user")
+	if oauthState.Mode.IsBindMode() {
+		if err := h.handleBind(ctx, cmd, oauthState, userInfo, result); err != nil {
+			return result, err
 		}
 
-		user, err = h.userService.Register(ctx, identityservice.RegisterParams{
+		return result, nil
+	}
+
+	// 先认身份，建新身份时才按邮箱决定挂到哪个账号
+	agg, err := h.userService.ResolveOrCreateByProvider(ctx,
+		identityservice.ResolveProviderParams{
 			Provider:       cmd.ProviderType,
 			Subject:        userInfo.Subject,
+			Email:          userInfo.Email,
+			EmailVerified:  userInfo.EmailVerified,
 			Nickname:       userInfo.Name,
 			OuterAvatarURL: userInfo.AvatarURL,
 		})
-		if err != nil {
-			return nil, errors.WithMessage(err, "failed to register user")
-		}
-	}
-
-	// 封禁用户不允许重新登录，否则封禁只需等到下一次登录就被绕过。
-	if user.IsBanned() {
-		return nil, domainerr.ErrUserBanned
-	}
-
-	// 登录后轮换会话：先作废旧会话，再签发新会话，防止 session fixation
-	if err := h.signOut(ctx, cmd.CurrentSessionId); err != nil {
-		return nil, err
-	}
-
-	session, err := h.issueSession(ctx, user, loginState.Device)
 	if err != nil {
-		return nil, err
+		return result, errors.WithMessage(err, "resolve user failed")
+	}
+
+	// 封禁账号不允许重新登录，否则下一次登录就能绕过封禁
+	if agg.IsBanned() {
+		return result, domainerr.ErrUserBanned
+	}
+
+	// 登录后轮换会话：先作废旧会话，再创建新会话，防止 session fixation
+	if err := h.signOut(ctx, cmd.CurrentSessionId); err != nil {
+		return result, err
+	}
+
+	session, err := h.issueSession(ctx, agg.User(), oauthState.Device, cmd.ProviderType.String())
+	if err != nil {
+		return result, err
 	}
 
 	slog.DebugContext(ctx, "callback handler login ok",
 		slog.String("provider_type", string(cmd.ProviderType)),
 		slog.String("issuer", userInfo.Issuer),
 		slog.String("subject", userInfo.Subject),
-		slog.String("user_id", user.Id.String()),
+		slog.String("user_id", agg.Id().String()),
 		slog.String("session_id", session.Id),
-		slog.String("avatar", user.Avatar.String()),
+		slog.String("avatar", agg.User().Avatar.String()),
+		slog.Any("raw", userInfo.Raw),
 	)
 
-	return &CallbackHandleResult{
-		SessionId: session.Id,
-		UserId:    user.Id.String(),
-		ReturnTo:  loginState.ReturnTo,
-	}, nil
+	result.SessionId = session.Id
+	result.UserId = agg.Id().String()
+
+	return result, nil
+}
+
+// PeekState 解析 state 对应的流程与回跳地址，不消费 state
+func (h *CallbackHandler) PeekState(ctx context.Context, state string) *CallbackHandleResult {
+	if state == "" {
+		return nil
+	}
+
+	oauthState, err := h.oauthStateRepo.Get(ctx, state)
+	if err != nil {
+		return nil
+	}
+
+	return &CallbackHandleResult{Mode: oauthState.Mode, ReturnTo: oauthState.ReturnTo}
+}
+
+// handleBind 绑定分支：回调必须来自发起绑定的那个会话，否则就是账号关联 CSRF
+// 结果写进调用方的 result，失败时由它带 Mode/ReturnTo 跳转
+func (h *CallbackHandler) handleBind(
+	ctx context.Context,
+	cmd *CallbackHandleCommand,
+	oauthState *entity.OAuthState,
+	userInfo *entity.ProviderUserInfo,
+	result *CallbackHandleResult,
+) error {
+	if oauthState.SessionId == "" || oauthState.SessionId != cmd.CurrentSessionId {
+		return domainerr.ErrOAuthStateMismatch
+	}
+
+	authn, err := h.authenticate(ctx, cmd.CurrentSessionId)
+	if err != nil {
+		return err
+	}
+
+	agg, err := h.userService.BindIdentity(ctx, authn.UserId,
+		identityservice.ResolveProviderParams{
+			Provider:       cmd.ProviderType,
+			Subject:        userInfo.Subject,
+			Email:          userInfo.Email,
+			EmailVerified:  userInfo.EmailVerified,
+			Nickname:       userInfo.Name,
+			OuterAvatarURL: userInfo.AvatarURL,
+		})
+	if err != nil {
+		return errors.WithMessage(err, "bind identity failed")
+	}
+
+	slog.InfoContext(ctx, "callback handler bind ok",
+		slog.String("provider_type", string(cmd.ProviderType)),
+		slog.String("subject", userInfo.Subject),
+		slog.String("user_id", agg.Id().String()),
+	)
+
+	result.Mode = entity.ProviderLoginModeBind
+	result.UserId = agg.Id().String()
+
+	return nil
 }

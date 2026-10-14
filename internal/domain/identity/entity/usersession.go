@@ -1,6 +1,7 @@
 package entity
 
 import (
+	"encoding/base64"
 	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
@@ -16,32 +17,66 @@ const (
 	UserSessionMaxAge = time.Hour * 24 * 60
 
 	sessionIdLength = 32
+
+	sessionIdSeparator = "."
+
+	userIdSegmentSize = 4
+)
+
+// 会话里记录的登录方式
+const (
+	LoginSourcePassword = "password"
+	LoginSourceEmail    = "email"
 )
 
 type UserSession struct {
-	Id        string
-	UserId    valobj.Uid
-	CreatedAt valobj.Time
+	Id     string
+	UserId valobj.Uid
+	// LoginSource 本次登录方式：provider 名（github/google）或 password
+	LoginSource string
+	CreatedAt   valobj.Time
 	// ExpireAt 当前闲置过期时间点;活跃时滑动前移,但不越过绝对上限。
 	ExpireAt valobj.Time
 	Device   DeviceType
 }
 
-func NewUserSession(user *User, device DeviceType) (*UserSession, error) {
-	id, err := idp.RandomString(sessionIdLength)
+func NewUserSession(user *User, device DeviceType, loginSource string) (*UserSession, error) {
+	id, err := newSessionId(user.Id)
 	if err != nil {
 		return nil, err
 	}
 
 	createdAt := valobj.NewTime()
 	s := &UserSession{
-		Id:        id,
-		UserId:    user.Id,
-		CreatedAt: createdAt,
-		ExpireAt:  valobj.NewTimeFrom(createdAt.Time().Add(UserSessionIdleTimeout).UnixMilli()),
-		Device:    device,
+		Id:          id,
+		UserId:      user.Id,
+		LoginSource: loginSource,
+		CreatedAt:   createdAt,
+		ExpireAt:    valobj.NewTimeFrom(createdAt.Time().Add(UserSessionIdleTimeout).UnixMilli()),
+		Device:      device,
 	}
 	return s, nil
+}
+
+func newSessionId(userId valobj.Uid) (string, error) {
+	random, err := idp.RandomString(sessionIdLength)
+	if err != nil {
+		return "", err
+	}
+
+	return random + sessionIdSeparator + encodeUserId(userId), nil
+}
+
+func encodeUserId(userId valobj.Uid) string {
+	var buf [16]byte
+	copy(buf[:], userId.Bytes())
+
+	for i := range userIdSegmentSize {
+		j := 2*userIdSegmentSize + i
+		buf[i], buf[j] = buf[j], buf[i]
+	}
+
+	return base64.RawURLEncoding.EncodeToString(buf[:])
 }
 
 // AbsoluteExpireAt 自登录起的绝对过期时间点,任何续期都不能越过它。

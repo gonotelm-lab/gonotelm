@@ -1,6 +1,9 @@
 package entity
 
 import (
+	"bytes"
+	"encoding/base64"
+	"strings"
 	"testing"
 	"time"
 
@@ -27,6 +30,68 @@ func assertExpireAt(t *testing.T, s *UserSession, want time.Time) {
 	if got := s.ExpireAt.Value(); got != want.UnixMilli() {
 		t.Fatalf("unexpected expire at: got %v want %v",
 			time.UnixMilli(got), want.Truncate(time.Millisecond))
+	}
+}
+
+func TestNewUserSessionId(t *testing.T) {
+	user := NewUser("tester@example.com", "tester", valobj.NewTime())
+	s, err := NewUserSession(user, DeviceTypeWeb, LoginSourcePassword)
+	if err != nil {
+		t.Fatalf("NewUserSession failed: %v", err)
+	}
+	if !s.UserId.EqualsTo(user.Id) {
+		t.Fatal("session must carry the user id")
+	}
+
+	t.Log(s.Id)
+
+	parts := strings.Split(s.Id, sessionIdSeparator)
+	if len(parts) != 2 {
+		t.Fatalf("unexpected session id shape: got %q want <random>%s<account>", s.Id, sessionIdSeparator)
+	}
+
+	random, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		t.Fatalf("random segment is not base64url: %v", err)
+	}
+	if len(random) != sessionIdLength {
+		t.Fatalf("unexpected random segment length: got %d want %d", len(random), sessionIdLength)
+	}
+
+	account, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		t.Fatalf("account segment is not base64url: %v", err)
+	}
+
+	want := make([]byte, 16)
+	copy(want, user.Id.Bytes())
+	for i := 0; i < userIdSegmentSize; i++ {
+		want[i], want[2*userIdSegmentSize+i] = want[2*userIdSegmentSize+i], want[i]
+	}
+	if !bytes.Equal(account, want) {
+		t.Fatalf("unexpected account segment: got %x want %x", account, want)
+	}
+}
+
+func TestNewUserSessionIdAccountSegmentStable(t *testing.T) {
+	user := NewUser("tester@example.com", "tester", valobj.NewTime())
+
+	first, err := NewUserSession(user, DeviceTypeWeb, LoginSourcePassword)
+	if err != nil {
+		t.Fatalf("NewUserSession failed: %v", err)
+	}
+	second, err := NewUserSession(user, DeviceTypeWeb, LoginSourcePassword)
+	if err != nil {
+		t.Fatalf("NewUserSession failed: %v", err)
+	}
+
+	if first.Id == second.Id {
+		t.Fatal("session ids of the same user must differ in the random segment")
+	}
+	firstParts := strings.Split(first.Id, sessionIdSeparator)
+	secondParts := strings.Split(second.Id, sessionIdSeparator)
+	if firstParts[1] != secondParts[1] {
+		t.Fatalf("account segment must be stable for the same user: got %q and %q", firstParts[1], secondParts[1])
 	}
 }
 
@@ -77,7 +142,7 @@ func TestUserSessionIsExpired(t *testing.T) {
 		t.Fatal("session must expire after the idle timeout")
 	}
 
-	// 绝对上限兜底:即使 ExpireAt 被错误地设得很远,过了上限也算过期
+	// 绝对上限优先：ExpireAt 设得再远，过了上限也算过期
 	s.ExpireAt = valobj.NewTimeFrom(now.Add(UserSessionMaxAge * 2).UnixMilli())
 	if !s.IsExpired(s.AbsoluteExpireAt().Add(time.Second)) {
 		t.Fatal("session must expire at the absolute cap")

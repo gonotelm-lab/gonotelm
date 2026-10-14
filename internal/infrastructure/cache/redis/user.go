@@ -26,7 +26,7 @@ func NewUserCacheImpl(rdb goredis.UniversalClient) *UserCacheImpl {
 }
 
 func (c *UserCacheImpl) cacheKey(id string) string {
-	return fmt.Sprintf("gonotelm:identity:user:id:%s", id)
+	return fmt.Sprintf("gonotelm:identity:user:v2:id:%s", id)
 }
 
 func (c *UserCacheImpl) Set(ctx context.Context, user *schema.User) error {

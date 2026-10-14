@@ -6,7 +6,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	identityentity "github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
-	identityerrors "github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
+	identerr "github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
 	identityrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository/mapper"
@@ -24,7 +24,7 @@ func NewUserSessionRepository(cache cache.UserSessionCache) identityrepo.UserSes
 }
 
 func (r *UserSessionRepositoryImpl) Save(ctx context.Context, session *identityentity.UserSession) error {
-	// TTL 取会话当前的闲置过期时间点;滑动续期后 ExpireAt 前移,TTL 随之延长。
+	// TTL 取会话当前的闲置过期时间，续期后一起前移
 	ttl := time.Until(session.ExpireAt.Time())
 	if ttl <= 0 {
 		return errors.ErrParams.Msg("user session already expired")
@@ -42,7 +42,7 @@ func (r *UserSessionRepositoryImpl) Get(ctx context.Context, id string) (*identi
 	sch, err := r.cache.Get(ctx, id)
 	if err != nil {
 		if errors.Is(err, errors.ErrNoRecord) {
-			return nil, identityerrors.ErrUserSessionNotFound
+			return nil, identerr.ErrUserSessionNotFound
 		}
 
 		return nil, errors.WithMessage(err, "failed to get user session")

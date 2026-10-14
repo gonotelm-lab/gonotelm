@@ -6,7 +6,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
-	identityerrors "github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
+	identerr "github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -37,7 +37,7 @@ func (h *UpdateAvatarHandler) Handle(ctx context.Context, content []byte) (strin
 		MaxDimension: entity.MaxAvatarDimension,
 	})
 	if err != nil {
-		return "", errors.WithMessage(identityerrors.ErrInvalidAvatar, err.Error())
+		return "", errors.WithMessage(identerr.ErrInvalidAvatar, err.Error())
 	}
 
 	user, err := h.userRepo.GetById(ctx, pkgcontext.GetUserId(ctx))
@@ -57,7 +57,7 @@ func (h *UpdateAvatarHandler) Handle(ctx context.Context, content []byte) (strin
 
 	user.SetAvatar(newAvatar)
 
-	if err := h.userRepo.Save(ctx, user); err != nil {
+	if err := h.userRepo.UpdateAvatar(ctx, user); err != nil {
 		if delErr := h.objectStore.DeleteObject(ctx, newAvatar); delErr != nil {
 			slog.ErrorContext(ctx, "rollback uploaded avatar failed",
 				slog.String("user_id", user.Id.String()),

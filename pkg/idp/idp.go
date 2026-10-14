@@ -16,11 +16,13 @@ const (
 )
 
 type UserInfo struct {
-	Issuer    string
-	Subject   string
-	Name      string
-	AvatarURL string
-	Raw       map[string]any
+	Issuer        string
+	Subject       string
+	Name          string
+	Email         string
+	EmailVerified bool
+	AvatarURL     string
+	Raw           map[string]any
 }
 
 type Provider interface {
@@ -95,8 +97,8 @@ func (b *BaseProvider) AuthURL() (*url.URL, *State, error) {
 		state.State,
 		oauth2.AccessTypeOffline,
 		oauth2.S256ChallengeOption(state.CodeVerifier),
-		// OIDC provider 会把 nonce 写进 id_token；非 OIDC 的 provider(GitHub)
-		// 没有 id_token，会忽略这个参数。
+		// OIDC provider 会把 nonce 写进 id_token，非 OIDC 的 provider(GitHub)
+		// 没有 id_token，会忽略这个参数
 		oauth2.SetAuthURLParam("nonce", state.Nonce),
 	)
 	res, err := url.Parse(u)

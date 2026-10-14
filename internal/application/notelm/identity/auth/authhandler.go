@@ -4,19 +4,19 @@ import (
 	"context"
 
 	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
+	identityservice "github.com/gonotelm-lab/gonotelm/internal/domain/identity/service"
 )
 
-// AuthHandler 是 interfaces 层使用的会话认证入口,
-// 会话能力来自公共的 baseHandler。
+// AuthHandler 是 interfaces 层用的会话认证入口
 type AuthHandler struct {
 	*baseHandler
 }
 
 func NewAuthHandler(
-	userRepo identrepo.UserRepository,
+	userService *identityservice.UserService,
 	userSessionRepo identrepo.UserSessionRepository,
 ) *AuthHandler {
-	return &AuthHandler{baseHandler: newBaseHandler(userRepo, userSessionRepo)}
+	return &AuthHandler{baseHandler: newBaseHandler(userService, userSessionRepo)}
 }
 
 func (h *AuthHandler) Authenticate(ctx context.Context, sessionId string) (*AuthenticateResult, error) {

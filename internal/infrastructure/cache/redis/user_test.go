@@ -5,7 +5,6 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/ulid"
-	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -13,15 +12,14 @@ func newTestUser() (*schema.User, string) {
 	id := ulid.New().String()
 
 	return &schema.User{
-		Id:        id,
-		Email:     "nick@example.com",
-		Nickname:  "nick",
-		Status:    "active",
-		Avatar:    "stkv1-avatar",
-		Provider:  "github",
-		Sub:       uuid.NewV7().String(),
-		CreatedAt: 1700000000000,
-		UpdatedAt: 1700000000001,
+		Id:              id,
+		Email:           "nick@example.com",
+		EmailVerifiedAt: 1700000000002,
+		Nickname:        "nick",
+		Status:          "active",
+		Avatar:          "stkv1-avatar",
+		CreatedAt:       1700000000000,
+		UpdatedAt:       1700000000001,
 	}, id
 }
 
@@ -39,8 +37,7 @@ func TestUserCacheImplSetGetById(t *testing.T) {
 		So(got.Nickname, ShouldEqual, "nick")
 		So(got.Status, ShouldEqual, "active")
 		So(got.Avatar, ShouldEqual, "stkv1-avatar")
-		So(got.Provider, ShouldEqual, "github")
-		So(got.Sub, ShouldEqual, user.Sub)
+		So(got.EmailVerifiedAt, ShouldEqual, 1700000000002)
 		So(got.CreatedAt, ShouldEqual, 1700000000000)
 		So(got.UpdatedAt, ShouldEqual, 1700000000001)
 	})

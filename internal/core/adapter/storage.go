@@ -55,7 +55,7 @@ type ObjectDeleter interface {
 
 // ObjectPublicURLer 只需要"公有读对象的直链"能力的调用方依赖它即可。
 type ObjectPublicURLer interface {
-	// PublicURL 返回无需凭据即可访问的 URL；对象不是公有读（StoreKey.IsPublic=false）时返回错误。
+	// PublicURL 返回无需凭证即可访问的 URL；对象不是公有读（StoreKey.IsPublic=false）时返回错误。
 	PublicURL(ctx context.Context, key valobj.StoreKey) (string, error)
 }
 

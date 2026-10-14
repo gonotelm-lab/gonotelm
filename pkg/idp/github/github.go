@@ -55,8 +55,8 @@ func (g *GitHub) Type() idp.Type {
 	return idp.TypeGithub
 }
 
-// GetUserInfo exchanges the code and reads the profile from the REST API.
-// GitHub 只实现 OAuth2、不实现 OIDC，因此没有 id_token，nonce 在授权请求里会被忽略。
+// GetUserInfo exchanges the code for an access token, then reads the profile from the REST API
+// GitHub 只实现 OAuth2、不实现 OIDC，没有 id_token，nonce 在授权请求里会被忽略
 func (g *GitHub) GetUserInfo(ctx context.Context, code, verifier, _ string) (*idp.UserInfo, error) {
 	token, err := g.ExchangeOAuth2Token(ctx, code, verifier)
 	if err != nil {
@@ -68,12 +68,24 @@ func (g *GitHub) GetUserInfo(ctx context.Context, code, verifier, _ string) (*id
 		return nil, fmt.Errorf("get github user: %w", err)
 	}
 
+	// /user carries the email only when the user made it public, a non-empty value is verified
+	// empty means call /user/emails, needs the user:email scope
+	email, emailVerified := user.Email, user.Email != ""
+	if email == "" {
+		email, emailVerified, err = g.getUserEmails(ctx, token.AccessToken)
+		if err != nil {
+			return nil, fmt.Errorf("get github user emails: %w", err)
+		}
+	}
+
 	return &idp.UserInfo{
-		Issuer:    issuer,
-		Subject:   strconv.FormatInt(user.ID, 10),
-		Name:      user.Login,
-		AvatarURL: user.AvatarURL,
-		Raw:       user.raw(),
+		Issuer:        issuer,
+		Subject:       strconv.FormatInt(user.ID, 10),
+		Name:          user.Login,
+		Email:         email,
+		EmailVerified: emailVerified,
+		AvatarURL:     user.AvatarURL,
+		Raw:           user.raw(),
 	}, nil
 }
 
@@ -95,7 +107,7 @@ func (u *user) raw() map[string]any {
 	}
 }
 
-// getUser calls the GitHub "Get the authenticated user" API.
+// getUser calls the GitHub "Get the authenticated user" API
 // Docs: https://docs.github.com/en/rest/users/users#get-the-authenticated-user
 func (g *GitHub) getUser(ctx context.Context, accessToken string) (*user, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, g.apiBaseURL+"/user", nil)
@@ -122,4 +134,49 @@ func (g *GitHub) getUser(ctx context.Context, accessToken string) (*user, error)
 	}
 
 	return &u, nil
+}
+
+type email struct {
+	Email    string `json:"email"`
+	Primary  bool   `json:"primary"`
+	Verified bool   `json:"verified"`
+}
+
+// getUserEmails lists the GitHub emails API, picks the primary verified address
+// Docs: https://docs.github.com/en/rest/users/emails#list-email-addresses-for-the-authenticated-user
+func (g *GitHub) getUserEmails(ctx context.Context, accessToken string) (string, bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, g.apiBaseURL+"/user/emails", nil)
+	if err != nil {
+		return "", false, err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Accept", "application/vnd.github+json")
+
+	resp, err := g.httpClient.Do(req)
+	if err != nil {
+		return "", false, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return "", false, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var emails []email
+	if err := json.NewDecoder(resp.Body).Decode(&emails); err != nil {
+		return "", false, err
+	}
+
+	var verified string
+	for _, e := range emails {
+		if e.Primary && e.Verified {
+			return e.Email, true, nil
+		}
+		if e.Verified && verified == "" {
+			verified = e.Email
+		}
+	}
+
+	return verified, verified != "", nil
 }

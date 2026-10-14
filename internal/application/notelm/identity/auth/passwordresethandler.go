@@ -42,7 +42,7 @@ type PasswordResetCommand struct {
 
 type PasswordResetResult struct{}
 
-// Handle 发起找回：只有账号存在才真发信，其余情况什么都不做也返回成功
+// Handle 发起找回：只有账号存在才真发送邮件，其余情况什么都不做也返回成功
 func (h *PasswordResetHandler) Handle(
 	ctx context.Context,
 	cmd *PasswordResetCommand,
@@ -52,7 +52,7 @@ func (h *PasswordResetHandler) Handle(
 		return nil, err
 	}
 
-	// 账号不存在：不写 pending 也不发信，返回结果和成功时一样
+	// 账号不存在：不写 state 也不发送邮件，返回结果和成功时一样
 	if !dispatch.Sent {
 		return &PasswordResetResult{}, nil
 	}

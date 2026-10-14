@@ -13,8 +13,8 @@ import (
 )
 
 // RegisterHandler 邮箱注册，是否走邮件验证由 auth.emailVerificationRequired 决定
-// 需要验证时返回凭证并发送验证邮件，验证通过才建号
-// 免验证时邮箱视为已验证，直接建号并创建会话
+// 需要验证时返回凭证并发送验证邮件，验证通过才创建账号
+// 免验证时邮箱视为已验证，直接创建账号并创建会话
 type RegisterHandler struct {
 	*baseHandler
 	signupService *identityservice.SignupService
@@ -69,7 +69,7 @@ func (h *RegisterHandler) Handle(ctx context.Context, cmd *RegisterCommand) (*Re
 	return &RegisterResult{Ticket: dispatch.Ticket}, nil
 }
 
-// registerVerified 免验证注册：建号后创建会话，创建失败不回滚账号
+// registerVerified 免验证注册：创建账号后创建会话，创建失败不回滚账号
 func (h *RegisterHandler) registerVerified(
 	ctx context.Context,
 	cmd *RegisterCommand,

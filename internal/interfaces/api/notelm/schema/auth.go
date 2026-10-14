@@ -53,14 +53,10 @@ type EmailRegisterResponse struct {
 	UserId        string `json:"user_id,omitempty"`
 }
 
-// EmailRegisterPrefetchResponse 注册前的元数据，客户端据此即时校验表单
-type EmailRegisterPrefetchResponse struct {
+// AuthPrefetchResponse 注册页与重置页共用的表单元数据，客户端据此即时校验表单
+type AuthPrefetchResponse struct {
 	RequireComplexPassword bool `json:"require_complex_password"`
 }
-
-// PasswordResetPrefetchResponse 重置页与注册页共用同一份密码策略，字段一致
-// 单独起名是为了让路由与 DTO 对得上，线上契约不变
-type PasswordResetPrefetchResponse = EmailRegisterPrefetchResponse
 
 type EmailRegisterRequest struct {
 	Email     string `json:"email"`

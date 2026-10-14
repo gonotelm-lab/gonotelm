@@ -119,22 +119,14 @@ func TestAuthRequestStringRedactsCredentials(t *testing.T) {
 	}
 }
 
-// 重置页与注册页共用同一份密码策略契约，字段名与含义都不能各自漂
-func TestPasswordResetPrefetchResponseSharesRegisterContract(t *testing.T) {
-	resetBody, err := json.Marshal(PasswordResetPrefetchResponse{RequireComplexPassword: true})
+// 注册页与重置页共用同一份 prefetch 契约，字段名与含义都不能漂
+func TestAuthPrefetchResponseBody(t *testing.T) {
+	body, err := json.Marshal(AuthPrefetchResponse{RequireComplexPassword: true})
 	if err != nil {
-		t.Fatalf("marshal reset prefetch failed: %v", err)
+		t.Fatalf("marshal prefetch failed: %v", err)
 	}
-	registerBody, err := json.Marshal(EmailRegisterPrefetchResponse{RequireComplexPassword: true})
-	if err != nil {
-		t.Fatalf("marshal register prefetch failed: %v", err)
-	}
-
-	if string(resetBody) != string(registerBody) {
-		t.Fatalf("prefetch bodies diverged: reset=%s register=%s", resetBody, registerBody)
-	}
-	if string(resetBody) != `{"require_complex_password":true}` {
-		t.Fatalf("unexpected prefetch body: %s", resetBody)
+	if string(body) != `{"require_complex_password":true}` {
+		t.Fatalf("unexpected prefetch body: %s", body)
 	}
 }
 

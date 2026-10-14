@@ -8,11 +8,11 @@ import (
 )
 
 type UserRepository interface {
-	// 建号
+	// 创建账号
 	Create(ctx context.Context, user *entity.User) error
-	// CreateWithPassword 建号并同时写入密码
+	// CreateWithPassword 创建账号并同时写入密码
 	CreateWithPassword(ctx context.Context, user *entity.User, passwordHash string) error
-	// CreateWithFirstIdentity 建号与挂第一个身份必须原子
+	// CreateWithFirstIdentity 创建账号与挂第一个身份必须原子
 	CreateWithFirstIdentity(ctx context.Context, user *entity.User, identity *entity.UserIdentity) error
 	GetById(ctx context.Context, id valobj.Uid) (*entity.User, error)
 	GetByEmail(ctx context.Context, email string) (*entity.User, error)

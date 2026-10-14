@@ -8,31 +8,31 @@ import (
 )
 
 const (
-	// PasswordResetPendingTTL 找回密码链接有效期
+	// PasswordResetStateTTL 找回密码链接有效期
 	// 链接一被用掉就能改密码，所以只给 30 分钟
-	PasswordResetPendingTTL      = 30 * time.Minute
+	PasswordResetStateTTL        = 30 * time.Minute
 	PasswordResetLinkTokenLength = 64
-	// PasswordResetSendCooldown 同一邮箱两次发信的最小间隔，跟注册一致
+	// PasswordResetSendCooldown 同一邮箱两次发送邮件的最小间隔，跟注册一致
 	PasswordResetSendCooldown = SignupSendCooldown
 )
 
-// PasswordResetPending 待确认的找回密码请求
-// 跟注册 pending 不同：不带密码，只有邮箱与一条一次性链接 token
-type PasswordResetPending struct {
+// PasswordResetState 待确认的找回密码请求
+// 跟注册 state 不同：不带密码，只有邮箱与一条一次性链接 token
+type PasswordResetState struct {
 	Email         string
 	LinkTokenHash string
 	CreatedAt     valobj.Time
 }
 
-func NewPasswordResetPending(email string) *PasswordResetPending {
-	return &PasswordResetPending{
+func NewPasswordResetState(email string) *PasswordResetState {
+	return &PasswordResetState{
 		Email:     NormalizeEmail(email),
 		CreatedAt: valobj.NewTime(),
 	}
 }
 
 // IssueCredentials 生成链接 token，只把哈希写回记录，明文只出现在邮件里
-func (p *PasswordResetPending) IssueCredentials() (linkToken string, err error) {
+func (p *PasswordResetState) IssueCredentials() (linkToken string, err error) {
 	linkToken, err = idp.RandomString(PasswordResetLinkTokenLength)
 	if err != nil {
 		return "", err

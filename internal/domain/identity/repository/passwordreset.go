@@ -10,9 +10,9 @@ import (
 // 走链接而不是验证码，所以没有「验证码错误次数」这一项
 type PasswordResetRepository interface {
 	// Save 写入记录与链接索引，previousLinkTokenHash 非空时旧链接立即失效
-	Save(ctx context.Context, pending *entity.PasswordResetPending, previousLinkTokenHash string) error
-	GetByEmail(ctx context.Context, email string) (*entity.PasswordResetPending, error)
-	GetByLinkToken(ctx context.Context, linkToken string) (*entity.PasswordResetPending, error)
+	Save(ctx context.Context, state *entity.PasswordResetState, previousLinkTokenHash string) error
+	GetByEmail(ctx context.Context, email string) (*entity.PasswordResetState, error)
+	GetByLinkToken(ctx context.Context, linkToken string) (*entity.PasswordResetState, error)
 	DeleteByEmail(ctx context.Context, email string) error
 	// StartSendCooldown 开始计时发邮件间隔，间隔内返回 ErrTooManyRequests
 	StartSendCooldown(ctx context.Context, email string) error

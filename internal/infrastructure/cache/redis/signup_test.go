@@ -12,17 +12,17 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-// pending 里只放验证码哈希，匹配时用邮件里的原始验证码
+// state 里只放验证码哈希，匹配时用邮件里的原始验证码
 func secretHash(raw string) string {
 	sum := sha256.Sum256([]byte(raw))
 
 	return hex.EncodeToString(sum[:])
 }
 
-func newTestSignupPending() *schema.SignupPending {
+func newTestSignupState() *schema.SignupState {
 	now := time.Now().UnixMilli()
 
-	return &schema.SignupPending{
+	return &schema.SignupState{
 		Email:        uuid.NewV7().String() + "@example.com",
 		PasswordHash: "bcrypt-hash",
 		TicketHash:   secretHash("ticket"),
@@ -33,35 +33,35 @@ func newTestSignupPending() *schema.SignupPending {
 }
 
 func TestSignupCacheSetGetByEmail(t *testing.T) {
-	Convey("SignupCache stores and reads a pending by email", t, func() {
+	Convey("SignupCache stores and reads a state by email", t, func() {
 		ctx := t.Context()
-		pending := newTestSignupPending()
+		state := newTestSignupState()
 
-		_, err := testSignupCache.GetByEmail(ctx, pending.Email)
+		_, err := testSignupCache.GetByEmail(ctx, state.Email)
 		So(pkgerrors.Is(err, pkgerrors.ErrNoRecord), ShouldBeTrue)
 
-		So(testSignupCache.Set(ctx, pending, time.Hour), ShouldBeNil)
-		t.Cleanup(func() { _ = testSignupCache.DeleteByEmail(ctx, pending.Email) })
+		So(testSignupCache.Set(ctx, state, time.Hour), ShouldBeNil)
+		t.Cleanup(func() { _ = testSignupCache.DeleteByEmail(ctx, state.Email) })
 
-		got, err := testSignupCache.GetByEmail(ctx, pending.Email)
+		got, err := testSignupCache.GetByEmail(ctx, state.Email)
 		So(err, ShouldBeNil)
-		So(got.Email, ShouldEqual, pending.Email)
+		So(got.Email, ShouldEqual, state.Email)
 		So(got.PasswordHash, ShouldEqual, "bcrypt-hash")
-		So(got.TicketHash, ShouldEqual, pending.TicketHash)
-		So(got.CodeHash, ShouldEqual, pending.CodeHash)
-		So(got.CodeExpireAt, ShouldEqual, pending.CodeExpireAt)
+		So(got.TicketHash, ShouldEqual, state.TicketHash)
+		So(got.CodeHash, ShouldEqual, state.CodeHash)
+		So(got.CodeExpireAt, ShouldEqual, state.CodeExpireAt)
 	})
 }
 
 func TestSignupCacheIncrAttempts(t *testing.T) {
 	Convey("SignupCache increments code attempts atomically", t, func() {
 		ctx := t.Context()
-		pending := newTestSignupPending()
-		So(testSignupCache.Set(ctx, pending, time.Hour), ShouldBeNil)
-		t.Cleanup(func() { _ = testSignupCache.DeleteByEmail(ctx, pending.Email) })
+		state := newTestSignupState()
+		So(testSignupCache.Set(ctx, state, time.Hour), ShouldBeNil)
+		t.Cleanup(func() { _ = testSignupCache.DeleteByEmail(ctx, state.Email) })
 
 		for i := int64(1); i <= 3; i++ {
-			attempts, err := testSignupCache.IncrAttempts(ctx, pending.Email, time.Hour)
+			attempts, err := testSignupCache.IncrAttempts(ctx, state.Email, time.Hour)
 			So(err, ShouldBeNil)
 			So(attempts, ShouldEqual, i)
 		}
@@ -69,20 +69,20 @@ func TestSignupCacheIncrAttempts(t *testing.T) {
 }
 
 func TestSignupCacheDeleteRemovesAttempts(t *testing.T) {
-	Convey("SignupCache delete drops the pending and its attempt counter", t, func() {
+	Convey("SignupCache delete drops the state and its attempt counter", t, func() {
 		ctx := t.Context()
-		pending := newTestSignupPending()
-		So(testSignupCache.Set(ctx, pending, time.Hour), ShouldBeNil)
+		state := newTestSignupState()
+		So(testSignupCache.Set(ctx, state, time.Hour), ShouldBeNil)
 
-		_, err := testSignupCache.IncrAttempts(ctx, pending.Email, time.Hour)
+		_, err := testSignupCache.IncrAttempts(ctx, state.Email, time.Hour)
 		So(err, ShouldBeNil)
 
-		So(testSignupCache.DeleteByEmail(ctx, pending.Email), ShouldBeNil)
+		So(testSignupCache.DeleteByEmail(ctx, state.Email), ShouldBeNil)
 
-		_, err = testSignupCache.GetByEmail(ctx, pending.Email)
+		_, err = testSignupCache.GetByEmail(ctx, state.Email)
 		So(pkgerrors.Is(err, pkgerrors.ErrNoRecord), ShouldBeTrue)
 
-		attempts, err := testSignupCache.IncrAttempts(ctx, pending.Email, time.Hour)
+		attempts, err := testSignupCache.IncrAttempts(ctx, state.Email, time.Hour)
 		So(err, ShouldBeNil)
 		So(attempts, ShouldEqual, 1)
 	})
@@ -114,21 +114,21 @@ func TestSignupCacheCooldown(t *testing.T) {
 func TestSignupCacheCancelledContext(t *testing.T) {
 	Convey("SignupCache wraps redis failures as ErrCache", t, func() {
 		ctx := canceledCtx(t)
-		pending := newTestSignupPending()
+		state := newTestSignupState()
 
-		So(pkgerrors.Is(testSignupCache.Set(ctx, pending, time.Hour), pkgerrors.ErrCache), ShouldBeTrue)
+		So(pkgerrors.Is(testSignupCache.Set(ctx, state, time.Hour), pkgerrors.ErrCache), ShouldBeTrue)
 
-		_, err := testSignupCache.GetByEmail(ctx, pending.Email)
+		_, err := testSignupCache.GetByEmail(ctx, state.Email)
 		So(pkgerrors.Is(err, pkgerrors.ErrCache), ShouldBeTrue)
 
-		_, err = testSignupCache.IncrAttempts(ctx, pending.Email, time.Hour)
+		_, err = testSignupCache.IncrAttempts(ctx, state.Email, time.Hour)
 		So(pkgerrors.Is(err, pkgerrors.ErrCache), ShouldBeTrue)
 
-		_, err = testSignupCache.SetCooldown(ctx, pending.Email, time.Minute)
+		_, err = testSignupCache.SetCooldown(ctx, state.Email, time.Minute)
 		So(pkgerrors.Is(err, pkgerrors.ErrCache), ShouldBeTrue)
 
-		So(pkgerrors.Is(testSignupCache.DeleteByEmail(ctx, pending.Email), pkgerrors.ErrCache), ShouldBeTrue)
-		So(pkgerrors.Is(testSignupCache.DeleteCooldown(ctx, pending.Email), pkgerrors.ErrCache), ShouldBeTrue)
+		So(pkgerrors.Is(testSignupCache.DeleteByEmail(ctx, state.Email), pkgerrors.ErrCache), ShouldBeTrue)
+		So(pkgerrors.Is(testSignupCache.DeleteCooldown(ctx, state.Email), pkgerrors.ErrCache), ShouldBeTrue)
 	})
 }
 
@@ -136,13 +136,13 @@ func TestSignupCacheCorruptedPayload(t *testing.T) {
 	Convey("SignupCache rejects a corrupted payload with ErrSerde", t, func() {
 		ctx := t.Context()
 		impl := testSignupCache.(*SignupCacheImpl)
-		pending := newTestSignupPending()
-		key := impl.pendingKey(pending.Email)
+		state := newTestSignupState()
+		key := impl.stateKey(state.Email)
 		t.Cleanup(func() { _ = testRedis.Del(ctx, key).Err() })
 
 		So(testRedis.Set(ctx, key, []byte{0xc1}, time.Minute).Err(), ShouldBeNil)
 
-		_, err := testSignupCache.GetByEmail(ctx, pending.Email)
+		_, err := testSignupCache.GetByEmail(ctx, state.Email)
 		So(pkgerrors.Is(err, pkgerrors.ErrSerde), ShouldBeTrue)
 	})
 }

@@ -5,17 +5,17 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
 )
 
-// RegisterPrefetchHandler 注册前元数据：从服务端配置取表单要用的字段
-type RegisterPrefetchHandler struct{}
+// PrefetchHandler 表单前元数据：注册页与重置页共用同一份密码策略，从服务端配置取
+type PrefetchHandler struct{}
 
-func NewRegisterPrefetchHandler() *RegisterPrefetchHandler { return &RegisterPrefetchHandler{} }
+func NewPrefetchHandler() *PrefetchHandler { return &PrefetchHandler{} }
 
-type RegisterPrefetchResult struct {
+type PrefetchResult struct {
 	RequireComplexPassword bool
 }
 
-func (h *RegisterPrefetchHandler) Handle() *RegisterPrefetchResult {
-	return &RegisterPrefetchResult{RequireComplexPassword: requireComplexPassword()}
+func (h *PrefetchHandler) Handle() *PrefetchResult {
+	return &PrefetchResult{RequireComplexPassword: requireComplexPassword()}
 }
 
 func requireComplexPassword() bool {

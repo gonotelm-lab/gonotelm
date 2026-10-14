@@ -14,9 +14,9 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 )
 
-// gonotelm:identity:passwordreset:{sha256(email)}          -> PasswordResetPending(msgpack)
+// gonotelm:identity:passwordreset:{sha256(email)}          -> PasswordResetState(msgpack)
 // gonotelm:identity:passwordreset:link:{sha256(token)}     -> sha256(email)
-// gonotelm:identity:passwordreset:cooldown:{sha256(email)} -> 发信冷却位(SET NX EX)
+// gonotelm:identity:passwordreset:cooldown:{sha256(email)} -> 发送邮件冷却位(SET NX EX)
 type PasswordResetCacheImpl struct {
 	rd goredis.UniversalClient
 }
@@ -27,7 +27,7 @@ func NewPasswordResetCacheImpl(rdb goredis.UniversalClient) *PasswordResetCacheI
 	return &PasswordResetCacheImpl{rd: rdb}
 }
 
-func (c *PasswordResetCacheImpl) pendingKey(email string) string {
+func (c *PasswordResetCacheImpl) stateKey(email string) string {
 	return fmt.Sprintf("gonotelm:identity:passwordreset:%s", hashKey(email))
 }
 
@@ -46,24 +46,24 @@ func (c *PasswordResetCacheImpl) cooldownKey(email string) string {
 
 func (c *PasswordResetCacheImpl) Set(
 	ctx context.Context,
-	pending *schema.PasswordResetPending,
+	state *schema.PasswordResetState,
 	previousLinkTokenHash string,
 	ttl time.Duration,
 ) error {
-	data, err := msgpack.Marshal(pending)
+	data, err := msgpack.Marshal(state)
 	if err != nil {
-		return errors.Wrapf(errors.ErrSerde, "marshal password reset pending failed, err=%s", err.Error())
+		return errors.Wrapf(errors.ErrSerde, "marshal password reset state failed, err=%s", err.Error())
 	}
 
 	pipe := c.rd.TxPipeline()
-	pipe.Set(ctx, c.pendingKey(pending.Email), data, ttl)
-	pipe.Set(ctx, c.linkKeyByHash(pending.LinkTokenHash), hashKey(pending.Email), ttl)
-	if previousLinkTokenHash != "" && previousLinkTokenHash != pending.LinkTokenHash {
+	pipe.Set(ctx, c.stateKey(state.Email), data, ttl)
+	pipe.Set(ctx, c.linkKeyByHash(state.LinkTokenHash), hashKey(state.Email), ttl)
+	if previousLinkTokenHash != "" && previousLinkTokenHash != state.LinkTokenHash {
 		// 重发后旧链接立即失效
 		pipe.Del(ctx, c.linkKeyByHash(previousLinkTokenHash))
 	}
 	if _, err := pipe.Exec(ctx); err != nil {
-		return errors.Wrapf(errors.ErrCache, "set password reset pending failed, err=%s", err.Error())
+		return errors.Wrapf(errors.ErrCache, "set password reset state failed, err=%s", err.Error())
 	}
 
 	return nil
@@ -72,14 +72,14 @@ func (c *PasswordResetCacheImpl) Set(
 func (c *PasswordResetCacheImpl) GetByEmail(
 	ctx context.Context,
 	email string,
-) (*schema.PasswordResetPending, error) {
-	return c.get(ctx, c.pendingKey(email))
+) (*schema.PasswordResetState, error) {
+	return c.get(ctx, c.stateKey(email))
 }
 
 func (c *PasswordResetCacheImpl) GetByLinkToken(
 	ctx context.Context,
 	linkToken string,
-) (*schema.PasswordResetPending, error) {
+) (*schema.PasswordResetState, error) {
 	emailHash, err := c.rd.Get(ctx, c.linkKeyByToken(linkToken)).Result()
 	if err != nil {
 		if errors.Is(err, goredis.Nil) {
@@ -93,8 +93,8 @@ func (c *PasswordResetCacheImpl) GetByLinkToken(
 }
 
 func (c *PasswordResetCacheImpl) DeleteByEmail(ctx context.Context, email string) error {
-	if err := c.rd.Del(ctx, c.pendingKey(email)).Err(); err != nil {
-		return errors.Wrapf(errors.ErrCache, "delete password reset pending failed, err=%s", err.Error())
+	if err := c.rd.Del(ctx, c.stateKey(email)).Err(); err != nil {
+		return errors.Wrapf(errors.ErrCache, "delete password reset state failed, err=%s", err.Error())
 	}
 
 	return nil
@@ -125,20 +125,20 @@ func (c *PasswordResetCacheImpl) DeleteCooldown(ctx context.Context, email strin
 func (c *PasswordResetCacheImpl) get(
 	ctx context.Context,
 	key string,
-) (*schema.PasswordResetPending, error) {
+) (*schema.PasswordResetState, error) {
 	data, err := c.rd.Get(ctx, key).Result()
 	if err != nil {
 		if errors.Is(err, goredis.Nil) {
 			return nil, errors.ErrNoRecord
 		}
 
-		return nil, errors.Wrapf(errors.ErrCache, "get password reset pending failed, err=%s", err.Error())
+		return nil, errors.Wrapf(errors.ErrCache, "get password reset state failed, err=%s", err.Error())
 	}
 
-	pending := &schema.PasswordResetPending{}
-	if err := msgpack.Unmarshal(pkgstring.AsBytes(data), pending); err != nil {
-		return nil, errors.Wrapf(errors.ErrSerde, "unmarshal password reset pending failed, err=%s", err.Error())
+	state := &schema.PasswordResetState{}
+	if err := msgpack.Unmarshal(pkgstring.AsBytes(data), state); err != nil {
+		return nil, errors.Wrapf(errors.ErrSerde, "unmarshal password reset state failed, err=%s", err.Error())
 	}
 
-	return pending, nil
+	return state, nil
 }

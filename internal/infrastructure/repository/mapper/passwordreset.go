@@ -6,16 +6,16 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache/schema"
 )
 
-func PasswordResetToSchema(p *identityentity.PasswordResetPending) *schema.PasswordResetPending {
-	return &schema.PasswordResetPending{
+func PasswordResetToSchema(p *identityentity.PasswordResetState) *schema.PasswordResetState {
+	return &schema.PasswordResetState{
 		Email:         p.Email,
 		LinkTokenHash: p.LinkTokenHash,
 		CreatedAt:     p.CreatedAt.Value(),
 	}
 }
 
-func PasswordResetFromSchema(p *schema.PasswordResetPending) *identityentity.PasswordResetPending {
-	return &identityentity.PasswordResetPending{
+func PasswordResetFromSchema(p *schema.PasswordResetState) *identityentity.PasswordResetState {
+	return &identityentity.PasswordResetState{
 		Email:         p.Email,
 		LinkTokenHash: p.LinkTokenHash,
 		CreatedAt:     valobj.NewTimeFrom(p.CreatedAt),

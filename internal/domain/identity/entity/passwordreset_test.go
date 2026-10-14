@@ -4,43 +4,43 @@ import (
 	"testing"
 )
 
-func TestPasswordResetPendingCredentials(t *testing.T) {
-	pending := NewPasswordResetPending("User@Example.COM")
+func TestPasswordResetStateCredentials(t *testing.T) {
+	state := NewPasswordResetState("User@Example.COM")
 
-	if pending.Email != "user@example.com" {
-		t.Fatalf("email = %q, want normalized lower-case", pending.Email)
+	if state.Email != "user@example.com" {
+		t.Fatalf("email = %q, want normalized lower-case", state.Email)
 	}
 	// 找回密码请求本身不带密码，记录里也不能有
-	if pending.LinkTokenHash != "" {
-		t.Fatal("a fresh pending must not carry credentials yet")
+	if state.LinkTokenHash != "" {
+		t.Fatal("a fresh state must not carry credentials yet")
 	}
 
-	linkToken, err := pending.IssueCredentials()
+	linkToken, err := state.IssueCredentials()
 	if err != nil {
 		t.Fatalf("IssueCredentials failed: %v", err)
 	}
 	if linkToken == "" {
 		t.Fatal("token must be returned to the caller for the email")
 	}
-	if pending.LinkTokenHash != HashSecret(linkToken) {
+	if state.LinkTokenHash != HashSecret(linkToken) {
 		t.Fatal("link token must be stored hashed")
 	}
-	if pending.LinkTokenHash == linkToken {
+	if state.LinkTokenHash == linkToken {
 		t.Fatal("record must not keep the plaintext token")
 	}
 }
 
 // 重新发起要换掉链接 token，旧链接不能继续可用
-func TestPasswordResetPendingRotatesCredentials(t *testing.T) {
-	pending := NewPasswordResetPending("user@example.com")
+func TestPasswordResetStateRotatesCredentials(t *testing.T) {
+	state := NewPasswordResetState("user@example.com")
 
-	first, err := pending.IssueCredentials()
+	first, err := state.IssueCredentials()
 	if err != nil {
 		t.Fatalf("first IssueCredentials failed: %v", err)
 	}
-	firstHash := pending.LinkTokenHash
+	firstHash := state.LinkTokenHash
 
-	second, err := pending.IssueCredentials()
+	second, err := state.IssueCredentials()
 	if err != nil {
 		t.Fatalf("second IssueCredentials failed: %v", err)
 	}
@@ -48,15 +48,15 @@ func TestPasswordResetPendingRotatesCredentials(t *testing.T) {
 	if second == first {
 		t.Fatal("re-issuing must produce a new token")
 	}
-	if pending.LinkTokenHash != HashSecret(second) || pending.LinkTokenHash == firstHash {
+	if state.LinkTokenHash != HashSecret(second) || state.LinkTokenHash == firstHash {
 		t.Fatal("link token hash must be replaced")
 	}
 }
 
 // 重置链接比注册验证短命：点开一次就能改密码
-func TestPasswordResetPendingTTLShorterThanSignup(t *testing.T) {
-	if PasswordResetPendingTTL >= SignupPendingTTL {
+func TestPasswordResetStateTTLShorterThanSignup(t *testing.T) {
+	if PasswordResetStateTTL >= SignupStateTTL {
 		t.Fatalf("password reset TTL (%s) must be shorter than signup TTL (%s)",
-			PasswordResetPendingTTL, SignupPendingTTL)
+			PasswordResetStateTTL, SignupStateTTL)
 	}
 }

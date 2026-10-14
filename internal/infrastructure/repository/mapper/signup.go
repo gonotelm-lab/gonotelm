@@ -6,8 +6,8 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache/schema"
 )
 
-func SignupToSchema(p *identityentity.SignupPending) *schema.SignupPending {
-	return &schema.SignupPending{
+func SignupToSchema(p *identityentity.SignupState) *schema.SignupState {
+	return &schema.SignupState{
 		Email:        p.Email,
 		PasswordHash: p.PasswordHash,
 		TicketHash:   p.TicketHash,
@@ -17,8 +17,8 @@ func SignupToSchema(p *identityentity.SignupPending) *schema.SignupPending {
 	}
 }
 
-func SignupFromSchema(p *schema.SignupPending) *identityentity.SignupPending {
-	return &identityentity.SignupPending{
+func SignupFromSchema(p *schema.SignupState) *identityentity.SignupState {
+	return &identityentity.SignupState{
 		Email:        p.Email,
 		PasswordHash: p.PasswordHash,
 		TicketHash:   p.TicketHash,

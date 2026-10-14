@@ -102,7 +102,7 @@ Comments, docs, and copy are Chinese; pick one word per concept and keep it. A t
 | 凭证 | Any credential — 会话凭证, 验证凭证, provider 凭证. |
 | 三方 | 三方登录, 三方身份. |
 | 封禁 | Matches `UserStatusBanned` / `ErrUserBanned`. |
-| 建号 | Concretely: insert one row into `users_v2`. |
+| 创建账号 | Concretely: insert one row into `users_v2`. |
 | 落库 | Persisting to a store — Postgres, Redis and MinIO all take the same word. |
 | 注销账号 | The user ending their own account. |
 

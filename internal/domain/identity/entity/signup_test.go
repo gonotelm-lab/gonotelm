@@ -74,42 +74,42 @@ func TestValidateComplexPassword(t *testing.T) {
 	}
 }
 
-func TestSignupPendingCredentials(t *testing.T) {
-	pending := NewSignupPending("User@Example.COM", "bcrypt-hash", "raw-ticket")
+func TestSignupStateCredentials(t *testing.T) {
+	state := NewSignupState("User@Example.COM", "bcrypt-hash", "raw-ticket")
 
-	if pending.Email != "user@example.com" {
-		t.Fatalf("email = %q, want normalized lower-case", pending.Email)
+	if state.Email != "user@example.com" {
+		t.Fatalf("email = %q, want normalized lower-case", state.Email)
 	}
-	if pending.TicketHash != HashSecret("raw-ticket") {
+	if state.TicketHash != HashSecret("raw-ticket") {
 		t.Fatal("ticket must be stored hashed")
 	}
-	if !pending.MatchesTicket("raw-ticket") || pending.MatchesTicket("other-ticket") {
+	if !state.MatchesTicket("raw-ticket") || state.MatchesTicket("other-ticket") {
 		t.Fatal("ticket match is wrong")
 	}
 
-	code, err := pending.IssueCredentials()
+	code, err := state.IssueCredentials()
 	if err != nil {
 		t.Fatalf("IssueCredentials failed: %v", err)
 	}
-	if pending.CodeHash != HashSecret(code) {
+	if state.CodeHash != HashSecret(code) {
 		t.Fatal("code must be stored hashed")
 	}
-	if pending.CodeHash == code {
+	if state.CodeHash == code {
 		t.Fatal("record must not keep the plaintext code")
 	}
 	if len(code) != 6 {
 		t.Fatalf("code = %q, want 6 digits", code)
 	}
-	if !pending.MatchesCode(code) {
+	if !state.MatchesCode(code) {
 		t.Fatal("issue then match should succeed")
 	}
-	if pending.MatchesCode("000000") && code != "000000" {
+	if state.MatchesCode("000000") && code != "000000" {
 		t.Fatal("wrong code must not match")
 	}
 
 	// 验证码过期后即使值正确也不再匹配
-	pending.CodeExpireAt = valobj.NewTimeFrom(time.Now().Add(-time.Minute).UnixMilli())
-	if pending.MatchesCode(code) {
+	state.CodeExpireAt = valobj.NewTimeFrom(time.Now().Add(-time.Minute).UnixMilli())
+	if state.MatchesCode(code) {
 		t.Fatal("expired code must not match")
 	}
 }

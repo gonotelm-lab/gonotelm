@@ -29,11 +29,11 @@ func (s *Server) registerAuthRoutes(g *route.RouterGroup) {
 		authGroup.POST("/logout", s.AuthLogout)
 		// GET /api/v1/auth/providers
 		authGroup.GET("/providers", s.AuthProviders)
+		// GET /api/v1/auth/prefetch 注册页与重置页共用的表单元数据，含密码复杂度要求
+		authGroup.GET("/prefetch", s.AuthPrefetch)
 
 		emailGroup := authGroup.Group("/email")
 		{
-			// GET /api/v1/auth/email/register/prefetch 注册前元数据，含密码复杂度要求
-			emailGroup.GET("/register/prefetch", s.AuthEmailRegisterPrefetch)
 			// POST /api/v1/auth/email/register
 			emailGroup.POST("/register", s.AuthEmailRegister)
 			// POST /api/v1/auth/email/login 邮箱密码登录
@@ -46,8 +46,6 @@ func (s *Server) registerAuthRoutes(g *route.RouterGroup) {
 
 		passwordGroup := authGroup.Group("/password")
 		{
-			// GET /api/v1/auth/password/reset/prefetch 重置页元数据，含密码复杂度要求
-			passwordGroup.GET("/reset/prefetch", s.AuthPasswordResetPrefetch)
 			// POST /api/v1/auth/password/reset 发起找回密码，账号不存在也返回 204
 			passwordGroup.POST("/reset", s.AuthPasswordReset)
 			// POST /api/v1/auth/password/reset/verify 邮件链接确认
@@ -163,11 +161,11 @@ func (s *Server) AuthProviders(ctx context.Context, c *app.RequestContext) {
 	})
 }
 
-// AuthEmailRegisterPrefetch 注册前元数据：密码复杂度要求
-func (s *Server) AuthEmailRegisterPrefetch(ctx context.Context, c *app.RequestContext) {
-	resp := s.authRegisterPrefetchHandler.Handle()
+// AuthPrefetch 注册页与重置页共用的表单元数据：密码复杂度要求
+func (s *Server) AuthPrefetch(ctx context.Context, c *app.RequestContext) {
+	resp := s.authPrefetchHandler.Handle()
 
-	http.OkResp(c, schema.EmailRegisterPrefetchResponse{
+	http.OkResp(c, schema.AuthPrefetchResponse{
 		RequireComplexPassword: resp.RequireComplexPassword,
 	})
 }
@@ -290,17 +288,7 @@ func (s *Server) AuthSetPassword(ctx context.Context, c *app.RequestContext) {
 	http.OkResp(c, schema.SetPasswordResponse{ReloginRequired: resp.ReloginRequired})
 }
 
-// AuthPasswordResetPrefetch 重置页元数据：密码复杂度要求
-// 复用注册页那份策略，两处校验的是同一份配置
-func (s *Server) AuthPasswordResetPrefetch(ctx context.Context, c *app.RequestContext) {
-	resp := s.authRegisterPrefetchHandler.Handle()
-
-	http.OkResp(c, schema.PasswordResetPrefetchResponse{
-		RequireComplexPassword: resp.RequireComplexPassword,
-	})
-}
-
-// AuthPasswordReset 发起找回密码：账号存在才发信，响应跟账号存不存在无关
+// AuthPasswordReset 发起找回密码：账号存在才发送邮件，响应跟账号存不存在无关
 func (s *Server) AuthPasswordReset(ctx context.Context, c *app.RequestContext) {
 	var req schema.PasswordResetRequest
 	if err := c.BindAndValidate(&req); err != nil {

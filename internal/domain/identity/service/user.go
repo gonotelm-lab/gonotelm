@@ -120,13 +120,13 @@ type ResolveProviderParams struct {
 	OuterAvatarURL string
 }
 
-// registerLockKey 首登建号的分布式锁，key 与身份键一致，避免同一 (provider, subject) 并发建号
+// registerLockKey 首登创建账号的分布式锁，key 与身份键一致，避免同一 (provider, subject) 并发创建账号
 func registerLockKey(provider entity.ProviderType, subject string) string {
 	return fmt.Sprintf("gonotelm:identity:lock:login:%s:%s", provider, subject)
 }
 
 // ResolveOrCreateByProvider 三方登录入口：先按 (provider, subject) 查身份
-// 查不到时只接受 provider 已验证的邮箱，邮箱已有账号则绑定，否则建号
+// 查不到时只接受 provider 已验证的邮箱，邮箱已有账号则绑定，否则创建账号
 func (s *UserService) ResolveOrCreateByProvider(
 	ctx context.Context,
 	params ResolveProviderParams,
@@ -261,7 +261,7 @@ func (s *UserService) createAccount(
 	return entity.NewUserAggregate(user, []*entity.UserIdentity{identity}, false), nil
 }
 
-// createVerifiedAccount 邮箱验证通过后建号，passwordHash 非空时一并写入
+// createVerifiedAccount 邮箱验证通过后创建账号，passwordHash 非空时一并写入
 func (s *UserService) createVerifiedAccount(
 	ctx context.Context,
 	email, passwordHash string,
@@ -406,10 +406,11 @@ func (s *UserService) SetPassword(
 	return nil
 }
 
-// ResetPassword 找回密码确认后写入新密码，不校验旧密码
-// 调用方必须先用一次性凭证确认过邮箱归属，否则这个方法等于无条件改号
+// resetPassword 找回密码确认后写入新密码，不校验旧密码
+// 只允许同包的 PasswordResetService 调用：它必须先确认过一次性凭证
+// 否则这个方法等于无条件改号
 // 跟 SetPassword 的区别：不比旧密码，也不判新旧是否相同
-func (s *UserService) ResetPassword(
+func (s *UserService) resetPassword(
 	ctx context.Context,
 	userId valobj.Uid,
 	newPassword string,

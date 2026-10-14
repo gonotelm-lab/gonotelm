@@ -14,7 +14,7 @@ import (
 
 const signupTicketLength = 32
 
-// SignupService 处理邮箱注册：生成凭证、限制发邮件间隔、验证后建号
+// SignupService 处理邮箱注册：生成凭证、限制发邮件间隔、验证后创建账号
 // 发邮件与拼链接由 app 层负责，本服务只返回 token 与验证码
 type SignupService struct {
 	signupRepo  repository.SignupRepository
@@ -47,19 +47,19 @@ type SignupDispatch struct {
 	Rollback func(ctx context.Context)
 }
 
-// Start 邮箱注册第一步：校验 → 邮箱未占用 → 哈希密码 → 沿用或新建 pending → 返回凭证
+// Start 邮箱注册第一步：校验 → 邮箱未占用 → 哈希密码 → 沿用或新建 state → 返回凭证
 func (s *SignupService) Start(ctx context.Context, email, password string) (*SignupDispatch, error) {
 	email, passwordHash, err := s.prepareCredentials(ctx, email, password)
 	if err != nil {
 		return nil, err
 	}
 
-	pending, ticket, err := s.preparePending(ctx, email, passwordHash)
+	state, ticket, err := s.prepareState(ctx, email, passwordHash)
 	if err != nil {
 		return nil, err
 	}
 
-	dispatch, err := s.dispatch(ctx, pending)
+	dispatch, err := s.dispatch(ctx, state)
 	if err != nil {
 		return nil, err
 	}
@@ -117,28 +117,28 @@ func (s *SignupService) Resend(ctx context.Context, email string) (*SignupDispat
 		return nil, err
 	}
 
-	pending, err := s.signupRepo.GetByEmail(ctx, email)
+	state, err := s.signupRepo.GetByEmail(ctx, email)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.dispatch(ctx, pending)
+	return s.dispatch(ctx, state)
 }
 
-// VerifyCode 验证码验证：先按 email 取 pending，码不匹配只累加 attempts
-// 达到 SignupMaxCodeAttempts 就作废整个 pending，用户需重新注册
+// VerifyCode 验证码验证：先按 email 取 state，码不匹配只累加 attempts
+// 达到 SignupMaxCodeAttempts 就作废整个 state，用户需重新注册
 func (s *SignupService) VerifyCode(
 	ctx context.Context,
 	email, code, ticket string,
 ) (*entity.UserAggregate, error) {
 	email = entity.NormalizeEmail(email)
 
-	pending, err := s.signupRepo.GetByEmail(ctx, email)
+	state, err := s.signupRepo.GetByEmail(ctx, email)
 	if err != nil {
 		return nil, err
 	}
 
-	if !pending.MatchesCode(code) {
+	if !state.MatchesCode(code) {
 		attempts, incrErr := s.signupRepo.IncrAttempts(ctx, email)
 		if incrErr != nil {
 			slog.WarnContext(ctx, "incr signup attempts failed", slog.Any("err", incrErr))
@@ -146,7 +146,7 @@ func (s *SignupService) VerifyCode(
 
 		if attempts >= entity.SignupMaxCodeAttempts {
 			if delErr := s.signupRepo.DeleteByEmail(ctx, email); delErr != nil {
-				slog.WarnContext(ctx, "drop signup pending after too many attempts failed", slog.Any("err", delErr))
+				slog.WarnContext(ctx, "drop signup state after too many attempts failed", slog.Any("err", delErr))
 			}
 
 			return nil, identerr.ErrVerificationAttemptsExceeded
@@ -155,7 +155,7 @@ func (s *SignupService) VerifyCode(
 		return nil, identerr.ErrVerificationCodeMismatch
 	}
 
-	return s.activate(ctx, pending, ticket)
+	return s.activate(ctx, state, ticket)
 }
 
 // ensureEmailAvailable 已注册的邮箱不再进入验证流程
@@ -169,11 +169,11 @@ func (s *SignupService) ensureEmailAvailable(ctx context.Context, email string) 
 	return nil
 }
 
-// preparePending 重复注册时保留首次的密码与 ticket，只轮换验证码
-func (s *SignupService) preparePending(
+// prepareState 重复注册时保留首次的密码与 ticket，只轮换验证码
+func (s *SignupService) prepareState(
 	ctx context.Context,
 	email, passwordHash string,
-) (pending *entity.SignupPending, ticket string, err error) {
+) (state *entity.SignupState, ticket string, err error) {
 	existing, err := s.signupRepo.GetByEmail(ctx, email)
 	if err == nil {
 		return existing, "", nil
@@ -187,56 +187,56 @@ func (s *SignupService) preparePending(
 		return nil, "", errors.WithMessage(err, "generate signup ticket failed")
 	}
 
-	return entity.NewSignupPending(email, passwordHash, ticket), ticket, nil
+	return entity.NewSignupState(email, passwordHash, ticket), ticket, nil
 }
 
 // dispatch 生成验证码 → 写发送间隔 → 落库
 // 先写发送间隔再落库，否则限流请求会换掉验证码却没发邮件，落库失败立即撤销间隔
 func (s *SignupService) dispatch(
 	ctx context.Context,
-	pending *entity.SignupPending,
+	state *entity.SignupState,
 ) (*SignupDispatch, error) {
-	code, err := pending.IssueCredentials()
+	code, err := state.IssueCredentials()
 	if err != nil {
 		return nil, errors.WithMessage(err, "issue signup credentials failed")
 	}
 
-	if err := s.signupRepo.StartSendCooldown(ctx, pending.Email); err != nil {
+	if err := s.signupRepo.StartSendCooldown(ctx, state.Email); err != nil {
 		return nil, err
 	}
-	rollback := func(ctx context.Context) { s.clearCooldown(ctx, pending.Email) }
+	rollback := func(ctx context.Context) { s.clearCooldown(ctx, state.Email) }
 
-	if err := s.signupRepo.Save(ctx, pending); err != nil {
+	if err := s.signupRepo.Save(ctx, state); err != nil {
 		rollback(ctx)
-		return nil, errors.WithMessage(err, "save signup pending failed")
+		return nil, errors.WithMessage(err, "save signup state failed")
 	}
 
 	return &SignupDispatch{
-		Email:    pending.Email,
+		Email:    state.Email,
 		Code:     code,
 		Rollback: rollback,
 	}, nil
 }
 
-// activate 邮箱验证通过后建号：只有发起注册的浏览器完成验证才写入密码
+// activate 邮箱验证通过后创建账号：只有发起注册的浏览器完成验证才写入密码
 func (s *SignupService) activate(
 	ctx context.Context,
-	pending *entity.SignupPending,
+	state *entity.SignupState,
 	ticket string,
 ) (*entity.UserAggregate, error) {
 	passwordHash := ""
-	if pending.MatchesTicket(ticket) {
-		passwordHash = pending.PasswordHash
+	if state.MatchesTicket(ticket) {
+		passwordHash = state.PasswordHash
 	}
 
-	agg, err := s.userService.createVerifiedAccount(ctx, pending.Email, passwordHash)
+	agg, err := s.userService.createVerifiedAccount(ctx, state.Email, passwordHash)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := s.signupRepo.DeleteByEmail(ctx, pending.Email); err != nil {
-		slog.WarnContext(ctx, "delete signup pending failed",
-			slog.String("email", pending.Email),
+	if err := s.signupRepo.DeleteByEmail(ctx, state.Email); err != nil {
+		slog.WarnContext(ctx, "delete signup state failed",
+			slog.String("email", state.Email),
 			slog.Any("err", err),
 		)
 	}

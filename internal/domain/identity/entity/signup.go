@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	SignupPendingTTL      = 24 * time.Hour
+	SignupStateTTL        = 24 * time.Hour
 	SignupCodeTTL         = 15 * time.Minute
 	SignupMaxCodeAttempts = 5
 	// SignupSendCooldown 同一邮箱两次发验证邮件的最小间隔
@@ -26,8 +26,8 @@ const (
 	MaxPasswordBytes = 72
 )
 
-// SignupPending 待验证的邮箱注册，验证通过后才建号
-type SignupPending struct {
+// SignupState 待验证的邮箱注册，验证通过后才创建账号
+type SignupState struct {
 	Email        string
 	PasswordHash string
 	TicketHash   string
@@ -36,8 +36,8 @@ type SignupPending struct {
 	CreatedAt    valobj.Time
 }
 
-func NewSignupPending(email, passwordHash, ticket string) *SignupPending {
-	return &SignupPending{
+func NewSignupState(email, passwordHash, ticket string) *SignupState {
+	return &SignupState{
 		Email:        NormalizeEmail(email),
 		PasswordHash: passwordHash,
 		TicketHash:   HashSecret(ticket),
@@ -46,7 +46,7 @@ func NewSignupPending(email, passwordHash, ticket string) *SignupPending {
 }
 
 // IssueCredentials 生成 6 位验证码，只把哈希写回记录，明文只出现在邮件里
-func (p *SignupPending) IssueCredentials() (code string, err error) {
+func (p *SignupState) IssueCredentials() (code string, err error) {
 	code, err = randomVerificationCode()
 	if err != nil {
 		return "", err
@@ -59,11 +59,11 @@ func (p *SignupPending) IssueCredentials() (code string, err error) {
 }
 
 // MatchesTicket 注册 ticket 只属于发起注册的那个浏览器，匹配才写入密码
-func (p *SignupPending) MatchesTicket(ticket string) bool {
+func (p *SignupState) MatchesTicket(ticket string) bool {
 	return p.TicketHash != "" && constantTimeEqual(p.TicketHash, HashSecret(ticket))
 }
 
-func (p *SignupPending) MatchesCode(code string) bool {
+func (p *SignupState) MatchesCode(code string) bool {
 	if p.IsCodeExpired(time.Now()) {
 		return false
 	}
@@ -71,7 +71,7 @@ func (p *SignupPending) MatchesCode(code string) bool {
 	return constantTimeEqual(p.CodeHash, HashSecret(code))
 }
 
-func (p *SignupPending) IsCodeExpired(now time.Time) bool {
+func (p *SignupState) IsCodeExpired(now time.Time) bool {
 	return now.After(p.CodeExpireAt.Time())
 }
 

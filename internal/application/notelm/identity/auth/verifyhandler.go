@@ -36,7 +36,7 @@ type VerifyCommand struct {
 
 type VerifyResult = SessionResult
 
-// VerifyCode 验证码验证：email + 6 位验证码取出 pending 后建号
+// VerifyCode 验证码验证：email + 6 位验证码取出 state 后创建账号
 func (h *VerifyHandler) VerifyCode(ctx context.Context, cmd *VerifyCommand) (*VerifyResult, error) {
 	agg, err := h.signupService.VerifyCode(ctx, cmd.Email, cmd.Code, cmd.Ticket)
 	if err != nil {
@@ -46,7 +46,7 @@ func (h *VerifyHandler) VerifyCode(ctx context.Context, cmd *VerifyCommand) (*Ve
 	return h.issueVerifiedSession(ctx, agg, cmd.Device)
 }
 
-// issueVerifiedSession 建号成功后创建邮箱来源的会话
+// issueVerifiedSession 创建账号成功后创建邮箱来源的会话
 func (h *VerifyHandler) issueVerifiedSession(
 	ctx context.Context,
 	agg *entity.UserAggregate,

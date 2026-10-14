@@ -114,7 +114,7 @@ type Server struct {
 	authHandler          *authapp.AuthHandler
 
 	authRegisterHandler                *authapp.RegisterHandler
-	authRegisterPrefetchHandler        *authapp.RegisterPrefetchHandler
+	authPrefetchHandler                *authapp.PrefetchHandler
 	authVerifyHandler                  *authapp.VerifyHandler
 	authResendHandler                  *authapp.ResendHandler
 	authPasswordResetHandler           *authapp.PasswordResetHandler
@@ -250,9 +250,9 @@ func NewServer(
 			deps.UserSessionRepo,
 			deps.Mailer,
 		),
-		authRegisterPrefetchHandler: authapp.NewRegisterPrefetchHandler(),
-		authVerifyHandler:           authapp.NewVerifyHandler(deps.SignupService, deps.UserService, deps.UserSessionRepo),
-		authResendHandler:           authapp.NewResendHandler(deps.SignupService, deps.Mailer),
+		authPrefetchHandler: authapp.NewPrefetchHandler(),
+		authVerifyHandler:   authapp.NewVerifyHandler(deps.SignupService, deps.UserService, deps.UserSessionRepo),
+		authResendHandler:   authapp.NewResendHandler(deps.SignupService, deps.Mailer),
 		authPasswordResetHandler: authapp.NewPasswordResetHandler(
 			deps.PasswordResetService,
 			deps.UserSessionRepo,

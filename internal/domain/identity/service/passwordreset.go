@@ -11,24 +11,18 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
-// passwordSetter 只暴露「不校验旧密码、直接重设」这一个方法
-// 不依赖整个 *UserService，单测换个假实现就能跑
-type passwordSetter interface {
-	ResetPassword(ctx context.Context, userId valobj.Uid, newPassword string) error
-}
-
-// PasswordResetService 处理找回密码：发链接凭证、限制发信间隔、确认后重设密码
+// PasswordResetService 处理找回密码：发链接凭证、限制发送邮件间隔、确认后重设密码
 // 发邮件与拼链接由 app 层负责，本服务只返回 token
 type PasswordResetService struct {
 	resetRepo   repository.PasswordResetRepository
 	userRepo    repository.UserRepository
-	userService passwordSetter
+	userService *UserService
 }
 
 func NewPasswordResetService(
 	resetRepo repository.PasswordResetRepository,
 	userRepo repository.UserRepository,
-	userService passwordSetter,
+	userService *UserService,
 ) *PasswordResetService {
 	return &PasswordResetService{
 		resetRepo:   resetRepo,
@@ -38,8 +32,8 @@ func NewPasswordResetService(
 }
 
 // PasswordResetDispatch 发起找回的结果，token 只用于拼邮件里的链接，不进库
-// Sent 为 false 表示这个邮箱没有账号，接口照常返回成功，但不发信也不写 pending
-// Rollback 在 app 层发信失败时调用，撤销本次占用的发送间隔，允许立即重试
+// Sent 为 false 表示这个邮箱没有账号，接口照常返回成功，但不发送邮件也不写 state
+// Rollback 在 app 层发送邮件失败时调用，撤销本次占用的发送间隔，允许立即重试
 type PasswordResetDispatch struct {
 	Email     string
 	LinkToken string
@@ -47,7 +41,7 @@ type PasswordResetDispatch struct {
 	Rollback  func(ctx context.Context)
 }
 
-// Start 发起找回：占发送间隔 → 查账号 → 账号存在才写 pending 并返回 token
+// Start 发起找回：占发送间隔 → 查账号 → 账号存在才写 state 并返回 token
 // 账号不存在也一样返回成功（Sent=false），别让调用方有机会据此判断邮箱是否注册
 func (s *PasswordResetService) Start(
 	ctx context.Context,
@@ -67,7 +61,7 @@ func (s *PasswordResetService) Start(
 
 	if _, err := s.userRepo.GetByEmail(ctx, email); err != nil {
 		if errors.Is(err, identerr.ErrUserNotFound) {
-			// 不写 pending 也不发信，但发送间隔留着，表现和账号存在时一样
+			// 不写 state 也不发送邮件，但发送间隔留着，表现和账号存在时一样
 			return &PasswordResetDispatch{Rollback: rollback}, nil
 		}
 
@@ -76,24 +70,24 @@ func (s *PasswordResetService) Start(
 		return nil, errors.WithMessage(err, "lookup account failed")
 	}
 
-	pending, previousLinkTokenHash, err := s.preparePending(ctx, email)
+	state, previousLinkTokenHash, err := s.prepareState(ctx, email)
 	if err != nil {
 		rollback(ctx)
 
 		return nil, err
 	}
 
-	linkToken, err := pending.IssueCredentials()
+	linkToken, err := state.IssueCredentials()
 	if err != nil {
 		rollback(ctx)
 
 		return nil, errors.WithMessage(err, "issue password reset credentials failed")
 	}
 
-	if err := s.resetRepo.Save(ctx, pending, previousLinkTokenHash); err != nil {
+	if err := s.resetRepo.Save(ctx, state, previousLinkTokenHash); err != nil {
 		rollback(ctx)
 
-		return nil, errors.WithMessage(err, "save password reset pending failed")
+		return nil, errors.WithMessage(err, "save password reset state failed")
 	}
 
 	return &PasswordResetDispatch{
@@ -110,20 +104,20 @@ func (s *PasswordResetService) ConfirmLink(
 	ctx context.Context,
 	linkToken, newPassword string,
 ) (valobj.Uid, error) {
-	pending, err := s.resetRepo.GetByLinkToken(ctx, linkToken)
+	state, err := s.resetRepo.GetByLinkToken(ctx, linkToken)
 	if err != nil {
 		return valobj.Uid{}, err
 	}
 
-	return s.confirm(ctx, pending, newPassword)
+	return s.confirm(ctx, state, newPassword)
 }
 
-// preparePending 同邮箱已有 pending 就复用，只轮换链接 token，没有则新建
+// prepareState 同邮箱已有 state 就复用，只轮换链接 token，没有则新建
 // 返回旧的链接哈希，落库时顺带删掉它，旧链接立即失效
-func (s *PasswordResetService) preparePending(
+func (s *PasswordResetService) prepareState(
 	ctx context.Context,
 	email string,
-) (*entity.PasswordResetPending, string, error) {
+) (*entity.PasswordResetState, string, error) {
 	existing, err := s.resetRepo.GetByEmail(ctx, email)
 	if err == nil {
 		return existing, existing.LinkTokenHash, nil
@@ -133,17 +127,17 @@ func (s *PasswordResetService) preparePending(
 		return nil, "", err
 	}
 
-	return entity.NewPasswordResetPending(email), "", nil
+	return entity.NewPasswordResetState(email), "", nil
 }
 
 // confirm 取账号 → 改密码 → 删凭证
 // 改密码失败就不删凭证，用户能用同一个链接重试
 func (s *PasswordResetService) confirm(
 	ctx context.Context,
-	pending *entity.PasswordResetPending,
+	state *entity.PasswordResetState,
 	newPassword string,
 ) (valobj.Uid, error) {
-	user, err := s.userRepo.GetByEmail(ctx, pending.Email)
+	user, err := s.userRepo.GetByEmail(ctx, state.Email)
 	if err != nil {
 		// 账号在发起后被删了，凭证不再指向任何账号，按凭证过期处理
 		if errors.Is(err, identerr.ErrUserNotFound) {
@@ -153,14 +147,14 @@ func (s *PasswordResetService) confirm(
 		return valobj.Uid{}, errors.WithMessage(err, "lookup account failed")
 	}
 
-	if err := s.userService.ResetPassword(ctx, user.Id, newPassword); err != nil {
+	if err := s.userService.resetPassword(ctx, user.Id, newPassword); err != nil {
 		return valobj.Uid{}, err
 	}
 
-	if err := s.resetRepo.DeleteByEmail(ctx, pending.Email); err != nil {
+	if err := s.resetRepo.DeleteByEmail(ctx, state.Email); err != nil {
 		// 密码已经改完，凭证删不掉就留着，最多等 TTL 过期，不影响这次重置
-		slog.WarnContext(ctx, "delete password reset pending failed",
-			slog.String("email", pending.Email),
+		slog.WarnContext(ctx, "delete password reset state failed",
+			slog.String("email", state.Email),
 			slog.Any("err", err),
 		)
 	}

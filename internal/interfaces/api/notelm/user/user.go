@@ -1,29 +1,15 @@
-package notelm
+package user
 
 import (
 	"context"
 	"io"
 
+	"github.com/cloudwego/hertz/pkg/app"
 	userapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/identity/user"
 	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
-
-	"github.com/cloudwego/hertz/pkg/app"
-	"github.com/cloudwego/hertz/pkg/route"
 )
-
-func (s *Server) registerUserRoutes(g *route.RouterGroup) {
-	userGroup := g.Group("/user")
-	{
-		// GET /api/v1/user/me
-		userGroup.GET("/me", s.GetMe)
-		// PATCH /api/v1/user/me
-		userGroup.PATCH("/me", s.UpdateMe)
-		// POST /api/v1/user/me/avatar
-		userGroup.POST("/me/avatar", s.UpdateAvatar)
-	}
-}
 
 func (s *Server) GetMe(ctx context.Context, c *app.RequestContext) {
 	resp, err := s.getMeHandler.Handle(ctx)

@@ -1,0 +1,36 @@
+package auth
+
+import (
+	"context"
+
+	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/schema"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
+	pkgerrors "github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/http"
+
+	"github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
+
+	"github.com/cloudwego/hertz/pkg/app"
+)
+
+// Authenticate 鉴权中间件：读会话 cookie，把用户放进 ctx；未登录一律 401
+func (s *Server) Authenticate() app.HandlerFunc {
+	return func(ctx context.Context, c *app.RequestContext) {
+		sid := string(c.Cookie(schema.AuthSessionCookieName))
+
+		authn, err := s.authHandler.Authenticate(ctx, sid)
+		if err != nil {
+			if pkgerrors.Is(err, errors.ErrUserSessionNotFound) {
+				http.ErrResp(c, pkgerrors.ErrNotLogin)
+				return
+			}
+
+			http.ErrResp(c, err)
+			return
+		}
+
+		ctx = pkgcontext.WithUserId(ctx, authn.UserId)
+		ctx = pkgcontext.WithLoginSource(ctx, authn.LoginSource)
+		c.Next(ctx)
+	}
+}

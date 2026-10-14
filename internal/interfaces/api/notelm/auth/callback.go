@@ -1,4 +1,4 @@
-package notelm
+package auth
 
 import (
 	"context"

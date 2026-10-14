@@ -123,13 +123,6 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 	passwordResetService := identityservice.NewPasswordResetService(passwordResetRepo, userRepo, userService)
 	userSessionRepo := repository.NewUserSessionRepository(infra.Cache.UserSessionCache)
 
-	if !cfg.Auth.EmailVerificationRequired {
-		slog.WarnContext(rootCtx,
-			"email verification is disabled: signup will treat any address as verified and log the user in",
-			slog.Bool("email_verification_required", cfg.Auth.EmailVerificationRequired),
-		)
-	}
-
 	// ── 3. Event Bus ──
 	inprocessBus := eventbus.NewInProcessEventBus()
 	interprocessBus := eventbus.NewInterProcessEventBus(infra.MessageQueue)
@@ -147,6 +140,8 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 		cfg.Source.Model,
 	)
 	mailer := newMailer(rootCtx, cfg.Mailer)
+	// 身份域的两类事务邮件端口共用这个实现：内部选模板，发送交给通用的 mailer
+	identityMailer := adapter.NewIdentityMailer(mailer)
 
 	// ── 4.1 Suggestion service (单例) ──
 	suggestionService := chatsuggest.NewService(
@@ -229,7 +224,8 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 			SignupService:          signupService,
 			PasswordResetService:   passwordResetService,
 			UserSessionRepo:        userSessionRepo,
-			Mailer:                 mailer,
+			VerifyMailer:           identityMailer,
+			ResetMailer:            identityMailer,
 
 			EventBus:   eventBus,
 			WaitGroup:  wg,

@@ -1,5 +1,3 @@
-// Package studio 提供产物（artifact）相关接口：生成、查询状态、重试/取消、
-// 风格预览，以及把笔记转成来源。
 package studio
 
 import (

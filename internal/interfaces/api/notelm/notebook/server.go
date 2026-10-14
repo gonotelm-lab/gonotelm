@@ -1,4 +1,3 @@
-// Package notebook 提供 /api/v1/notebooks 下笔记本相关的接口。
 package notebook
 
 import (

@@ -89,7 +89,7 @@ func (s *Server) AuthEmailResend(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	if _, err := s.authResendHandler.Handle(ctx, &authapp.ResendCommand{Email: req.Email}); err != nil {
+	if _, err := s.authResendMailHandler.Handle(ctx, &authapp.ResendCommand{Email: req.Email}); err != nil {
 		http.ErrResp(c, err)
 		return
 	}

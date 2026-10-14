@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	identerr "github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
 	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
@@ -21,13 +20,13 @@ import (
 type PasswordResetHandler struct {
 	resetService *identityservice.PasswordResetService
 	sessionRepo  identrepo.UserSessionRepository
-	mailer       adapter.Mailer
+	mailer       identrepo.PasswordResetMailer
 }
 
 func NewPasswordResetHandler(
 	resetService *identityservice.PasswordResetService,
 	userSessionRepo identrepo.UserSessionRepository,
-	mailer adapter.Mailer,
+	mailer identrepo.PasswordResetMailer,
 ) *PasswordResetHandler {
 	return &PasswordResetHandler{
 		resetService: resetService,

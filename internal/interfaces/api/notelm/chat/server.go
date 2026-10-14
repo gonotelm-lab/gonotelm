@@ -1,4 +1,3 @@
-// Package chat 提供会话与消息相关接口：创建会话、发消息、SSE 拉流、中断与建议问题。
 package chat
 
 import (

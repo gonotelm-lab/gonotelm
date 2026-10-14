@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
-	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	identityentity "github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
 	identerr "github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
 	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
@@ -18,14 +17,14 @@ import (
 type RegisterHandler struct {
 	*baseHandler
 	signupService *identityservice.SignupService
-	mailer        adapter.Mailer
+	mailer        identrepo.EmailVerificationMailer
 }
 
 func NewRegisterHandler(
 	signupService *identityservice.SignupService,
 	userService *identityservice.UserService,
 	userSessionRepo identrepo.UserSessionRepository,
-	mailer adapter.Mailer,
+	mailer identrepo.EmailVerificationMailer,
 ) *RegisterHandler {
 	return &RegisterHandler{
 		baseHandler:   newBaseHandler(userService, userSessionRepo),
@@ -93,7 +92,7 @@ func (h *RegisterHandler) registerVerified(
 // sendVerification 发送验证码邮件，失败撤销本次占用的发送间隔，统一返回 ErrMailSendFailed
 func sendVerification(
 	ctx context.Context,
-	mailer adapter.Mailer,
+	mailer identrepo.EmailVerificationMailer,
 	dispatch *identityservice.SignupDispatch,
 ) error {
 	if err := mailer.SendEmailVerification(ctx, dispatch.Email, dispatch.Code); err != nil {

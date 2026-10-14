@@ -1,5 +1,3 @@
-// Package source 提供来源（notebook 下的文档/链接/笔记）相关接口：
-// 创建、上传、轮询状态、重试解析，以及来源文档片段与来源列表。
 package source
 
 import (

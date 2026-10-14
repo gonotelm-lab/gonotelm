@@ -1,4 +1,3 @@
-// Package user 提供当前账号的资料接口：读取资料、改昵称、换头像。
 package user
 
 import (

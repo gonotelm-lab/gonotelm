@@ -56,7 +56,8 @@ type ServerDeps struct {
 	UserService            *identityservice.UserService
 	SignupService          *identityservice.SignupService
 	PasswordResetService   *identityservice.PasswordResetService
-	Mailer                 adapter.Mailer
+	VerifyMailer           identrepo.EmailVerificationMailer
+	ResetMailer            identrepo.PasswordResetMailer
 
 	ChatSuggestService *chatsuggest.Service
 	EventBus           eventbus.Publisher
@@ -107,13 +108,14 @@ func NewServer(
 		h: hz,
 
 		auth: authapi.NewServer(authapi.Deps{
-			ProviderRegistry:     deps.ProviderRegistry,
-			OAuthStateRepo:       deps.OAuthStateRepo,
-			UserService:          deps.UserService,
-			SignupService:        deps.SignupService,
-			PasswordResetService: deps.PasswordResetService,
-			UserSessionRepo:      deps.UserSessionRepo,
-			Mailer:               deps.Mailer,
+			ProviderRegistry:        deps.ProviderRegistry,
+			OAuthStateRepo:          deps.OAuthStateRepo,
+			UserService:             deps.UserService,
+			SignupService:           deps.SignupService,
+			PasswordResetService:    deps.PasswordResetService,
+			UserSessionRepo:         deps.UserSessionRepo,
+			EmailVerificationMailer: deps.VerifyMailer,
+			PasswordResetMailer:     deps.ResetMailer,
 		}),
 
 		notebook: notebookapi.NewServer(notebookapi.Deps{
@@ -189,11 +191,9 @@ func (s *Server) registerRoutes() {
 			s.chat.RegisterRoutes(v1AuthedGroup)
 			s.studio.RegisterRoutes(v1AuthedGroup)
 			s.user.RegisterRoutes(v1AuthedGroup)
-			// 身份绑定与改密码要登录，仍挂 /auth 前缀
 			s.auth.RegisterAuthedRoutes(v1AuthedGroup)
 		}
 
-		// 登录/注册/找回密码等公开接口挂 /api/v1 上
 		s.auth.RegisterPublicRoutes(v1Group)
 	}
 }

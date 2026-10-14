@@ -1,6 +1,7 @@
 package entity
 
 import (
+	"encoding/base64"
 	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
@@ -16,6 +17,10 @@ const (
 	UserSessionMaxAge = time.Hour * 24 * 60
 
 	sessionIdLength = 32
+
+	sessionIdSeparator = "."
+
+	userIdSegmentSize = 4
 )
 
 // 会话里记录的登录方式
@@ -36,7 +41,7 @@ type UserSession struct {
 }
 
 func NewUserSession(user *User, device DeviceType, loginSource string) (*UserSession, error) {
-	id, err := idp.RandomString(sessionIdLength)
+	id, err := newSessionId(user.Id)
 	if err != nil {
 		return nil, err
 	}
@@ -51,6 +56,27 @@ func NewUserSession(user *User, device DeviceType, loginSource string) (*UserSes
 		Device:      device,
 	}
 	return s, nil
+}
+
+func newSessionId(userId valobj.Uid) (string, error) {
+	random, err := idp.RandomString(sessionIdLength)
+	if err != nil {
+		return "", err
+	}
+
+	return random + sessionIdSeparator + encodeUserId(userId), nil
+}
+
+func encodeUserId(userId valobj.Uid) string {
+	var buf [16]byte
+	copy(buf[:], userId.Bytes())
+
+	for i := range userIdSegmentSize {
+		j := 2*userIdSegmentSize + i
+		buf[i], buf[j] = buf[j], buf[i]
+	}
+
+	return base64.RawURLEncoding.EncodeToString(buf[:])
 }
 
 // AbsoluteExpireAt 自登录起的绝对过期时间点,任何续期都不能越过它。

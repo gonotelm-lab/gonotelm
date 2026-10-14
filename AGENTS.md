@@ -57,7 +57,9 @@ internal/
     adapter/              implementations of the core/adapter ports (object storage, summarizer, title, image interpretation, distributed lock)
     eventbus/             routes by event.Category(): inprocess dispatches locally, interprocess goes to MQ; CompositeEventBus is the single publish entry point
   interfaces/             delivery layer
-    api/notelm/           Hertz routes and middleware; schema/ holds request/response DTOs
+    api/notelm/           composition root: builds Hertz, mounts /api/v1 groups, delegates to one sub-package per domain
+      auth|notebook|source|chat|studio|user/   one Server + Deps per domain, owns its handlers and routes
+      schema/             request/response DTOs shared by every sub-package
     entrypoint/worker/    decodes a flow task into contract.WorkerInput and calls into application
     event/                per-process event handler registration (notelm in-process, sourcejob over MQ)
   conf/                   one config struct per binary, loading etc/<binary>.toml.tpl with env substitution; shared/ holds the common InfraConfig
@@ -75,13 +77,14 @@ assets/                   slides templates, artifact preview images, opensandbox
 
 ## HTTP API layer (`internal/interfaces/api/notelm`)
 
-- **Routing**: `server.go` is the only place that builds the server and its groups. `registerRoutes` mounts `/api/v1` (CSRF) → `v1AuthedGroup` (`authMiddleware`) → one `register<Domain>Routes(g *route.RouterGroup)` per file. Public routes are registered against `v1Group` instead (only `/api/v1/auth` today). Adding an endpoint = a handler method on `*Server` + one line in a `register*Routes`. A static sibling wins over a `:param` (`/artifacts/style-previews` vs `/artifacts/:id`), so both can coexist.
+- **Structure**: the root package only assembles. `server.go` builds Hertz and the groups, then calls `RegisterRoutes(g)` on each domain sub-package (`auth`, `notebook`, `source`, `chat`, `studio`, `user`); only the CSRF middleware in `middleware.go` lives beside it. A sub-package holds its own `Server` + `Deps` + handler fields, constructs them in `NewServer(deps)`, and registers its own routes — handlers live in files split by topic (e.g. `auth/oauth.go`, `auth/email.go`, `auth/password.go`, `auth/identity.go`). `/notebooks/:id/{sources,artifacts,chats}` are registered by the source/studio/chat packages, not the notebook package.
+- **Routing**: `registerRoutes` in the root mounts `/api/v1` (CSRF) → `v1AuthedGroup` (`auth.Server.Authenticate()`) → every sub-package's authed routes, then the auth package's public routes against `v1Group` (only `/api/v1/auth` today). Adding an endpoint = a handler method on the sub-package `*Server` + one line in its `RegisterRoutes`. A static sibling wins over a `:param` (`/artifacts/style-previews` vs `/artifacts/:id`), so both can coexist.
 - **Middleware**: global chain is `Tracing → Recovery → CORS → Logging`; CSRF is double-submit and exempts GET/HEAD/OPTIONS; auth reads the `gnlm_user_sid` cookie, puts the user in ctx (`pkgcontext.GetUserId`), and returns 401 `ErrNotLogin` when the session is missing.
 - **Envelope**: `http.OkResp(c, data)` → 200 `{"code":0,"msg":"ok","data":…}`; `http.ErrResp(c, err)` writes `{code,msg}` at `InnerError.Status`. **Business errors are HTTP 200** — `ErrParams`(1000), `ErrNoRecord`(1001) and every domain error derived from them; only the 2000–2003 builtins produce 401/403; a non-`InnerError` becomes 500 `code:-999`.
 - **Request binding**: `c.BindAndValidate(&req)` runs the custom binder in `pkg/http/binder.go` — `path:`/`query:`/`json:` tags, then `validator/v10` tags, then the DTO's own `Validate() error`. A plain validator failure surfaces as 200 `code:1000`.
 - **Object URLs are never persisted**: only the encoded `StoreKey` is stored (mapper); every URL is resolved per request. Public-read assets (avatars, style previews) use `adapter.ObjectPublicURLer.PublicURL`; private ones (source content, artifact results) use `PresignGet`. A resolve failure normally degrades to an empty URL plus a WARN, not an API error.
 - **Error codes**: 100xxx notebook, 101xxx chat, 102xxx artifact, 103xxx source, 104xxx worker, 105xxx sandbox, 106xxx identity. Each is declared as `errors.ErrXxx.ErrCode(n).Msg(…)`, so its HTTP status is inherited from the builtin it derives from.
-- **Wiring**: `ServerDeps` in `server.go` is the only injection surface — add the repo field there, build it in `bootstrap/notelm.go`, construct the application handler in the `NewServer` literal. There is no route manifest to update.
+- **Wiring**: `ServerDeps` in the root `server.go` is the only injection surface — add the repo field there, build it in `bootstrap/notelm.go`, map it into the sub-package's `Deps` in the root `NewServer`, and construct the application handler in that sub-package's `NewServer`. There is no route manifest to update.
 
 ## Cross-process flows
 

@@ -113,7 +113,7 @@ var emailRegexp = regexp.MustCompile(
 	`^[A-Za-z0-9.!#$%&'*+/=?^_{|}~-]+@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$`,
 )
 
-// ValidateEmail 只做格式粗筛，邮箱真实性由验证链接/验证码证明
+// ValidateEmail 只做格式粗筛，邮箱真实性由验证码证明
 func ValidateEmail(email string) error {
 	if email == "" || len(email) > 255 || !emailRegexp.MatchString(email) {
 		return identerr.ErrEmailInvalid

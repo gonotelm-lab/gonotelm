@@ -43,7 +43,7 @@ func NormalizeEmail(raw string) string {
 	return strings.ToLower(strings.TrimSpace(raw))
 }
 
-// NewUser 只在邮箱已被证明（provider verified 或验证链接/验证码通过）时调用
+// NewUser 只在邮箱已被证明（provider verified 或验证码通过）时调用
 func NewUser(email, nickname string, emailVerifiedAt valobj.Time) *User {
 	now := valobj.NewTime()
 	u := &User{

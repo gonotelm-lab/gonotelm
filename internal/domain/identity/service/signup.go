@@ -12,7 +12,7 @@ import (
 )
 
 // SignupService 处理邮箱注册：生成凭证、限制发邮件间隔、验证后创建账号
-// 发邮件与拼链接由 app 层负责，本服务只返回 token 与验证码
+// 发验证码邮件由 app 层负责，本服务返回注册票据与验证码
 type SignupService struct {
 	signupRepo  repository.SignupRepository
 	userRepo    repository.UserRepository

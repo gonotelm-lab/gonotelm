@@ -47,7 +47,7 @@ func DeviceOrWeb(raw string) entity.DeviceType {
 }
 
 // EmailRegisterResponse 注册结果，EmailVerified=true 时账号已建好并创建会话
-// false 时账号未建立，等待验证邮件里的链接或验证码
+// false 时账号未建立，等待验证邮件里的验证码
 type EmailRegisterResponse struct {
 	EmailVerified bool   `json:"email_verified"`
 	UserId        string `json:"user_id,omitempty"`

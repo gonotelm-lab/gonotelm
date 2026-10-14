@@ -12,6 +12,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	identerr "github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/idp"
 )
 
 const (
@@ -20,6 +21,8 @@ const (
 	SignupMaxCodeAttempts = 5
 	// SignupSendCooldown 同一邮箱两次发验证邮件的最小间隔
 	SignupSendCooldown = 60 * time.Second
+	// SignupTicketLength 注册票据的随机字节长度
+	SignupTicketLength = 32
 
 	MinPasswordBytes = 8
 	// bcrypt 只使用前 72 字节，超长直接拒绝
@@ -34,6 +37,11 @@ type SignupState struct {
 	CodeHash     string
 	CodeExpireAt valobj.Time
 	CreatedAt    valobj.Time
+}
+
+// NewSignupTicket 生成注册票据明文，记录里只保存 HashSecret(ticket)
+func NewSignupTicket() (string, error) {
+	return idp.RandomString(SignupTicketLength)
 }
 
 func NewSignupState(email, passwordHash, ticket string) *SignupState {
@@ -61,6 +69,20 @@ func (p *SignupState) IssueCredentials() (code string, err error) {
 // MatchesTicket 注册 ticket 只属于发起注册的那个浏览器，匹配才写入密码
 func (p *SignupState) MatchesTicket(ticket string) bool {
 	return p.TicketHash != "" && constantTimeEqual(p.TicketHash, HashSecret(ticket))
+}
+
+// RotateCredentials 轮换注册票据，并把记录里的密码哈希换成本次请求提供的，返回新票据明文
+// 票据与密码必须同源：只换票据，完成验证的一方就会把别人先前写进记录的密码写进账号
+func (p *SignupState) RotateCredentials(passwordHash string) (string, error) {
+	ticket, err := NewSignupTicket()
+	if err != nil {
+		return "", err
+	}
+
+	p.TicketHash = HashSecret(ticket)
+	p.PasswordHash = passwordHash
+
+	return ticket, nil
 }
 
 func (p *SignupState) MatchesCode(code string) bool {

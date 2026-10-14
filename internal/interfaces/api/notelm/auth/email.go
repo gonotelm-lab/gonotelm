@@ -31,6 +31,7 @@ func (s *Server) AuthEmailRegister(ctx context.Context, c *app.RequestContext) {
 		Email:    req.Email,
 		Password: req.Password,
 		Device:   schema.DeviceOrWeb(req.LoginFrom),
+		Ticket:   s.signupTicket(c),
 	})
 	if err != nil {
 		http.ErrResp(c, err)
@@ -49,7 +50,7 @@ func (s *Server) AuthEmailRegister(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	// 只有首次注册返回 ticket，重复注册沿用旧 ticket，不重置 cookie
+	// 当前浏览器没有有效票据时才回传 ticket：首次注册，或上次发信失败后重试
 	if resp.Ticket != "" {
 		c.SetCookie(schema.SignupTicketCookieName,
 			resp.Ticket,

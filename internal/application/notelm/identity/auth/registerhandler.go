@@ -37,11 +37,12 @@ type RegisterCommand struct {
 	Email    string
 	Password string
 	Device   identityentity.DeviceType
+	// Ticket 当前浏览器持有的注册票据，缺失或不匹配时由服务层轮换
+	Ticket string
 }
 
 type RegisterResult struct {
-	// Ticket 非空时由 interfaces 层写进 _gnlm_signup_ticket
-	// 重复注册沿用旧 ticket，不重置 cookie
+	// Ticket 非空时由 interfaces 层写进 _gnlm_signup_ticket，重复注册为空
 	Ticket string
 	// Session 非空时 interfaces 层写会话 cookie
 	Session *SessionResult
@@ -56,7 +57,7 @@ func (h *RegisterHandler) Handle(ctx context.Context, cmd *RegisterCommand) (*Re
 		return h.registerVerified(ctx, cmd)
 	}
 
-	dispatch, err := h.signupService.Start(ctx, cmd.Email, cmd.Password)
+	dispatch, err := h.signupService.Start(ctx, cmd.Email, cmd.Password, cmd.Ticket)
 	if err != nil {
 		return nil, err
 	}

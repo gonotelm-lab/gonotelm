@@ -49,7 +49,7 @@
 | `gonotelm-lockup-{forest,navy,mono,reverse}.svg` | 横版字标：标记 + Geist 600 字标（已转路径） |
 | `gonotelm-appicon-{forest,navy}.svg` | App 图标：满幅色块 + 居中标记 |
 | `favicon.svg` / `favicon-dark.svg` | 主站 favicon 的浅色底 / 深色标签栏两版 |
-| `png/` | 16 / 32 / 48 / 512 favicon、180 apple-touch-icon、512 标记、288/576 字标 |
+| `png/` | 16 / 32 / 48 / 512 favicon、180 apple-touch-icon、512 标记、1200 宽字标（forest / navy / reverse） |
 | `preview.png` | 品牌总览页（颜色、尺寸阶梯、lockup、App 图标、安全边距） |
 
 ## 用法
@@ -59,7 +59,10 @@
 - **继承文字色**用 `-mono`（`currentColor`）。
 - 主站 favicon 已经是 `gonotelm-web/public/favicon.svg`，深色标签栏走 `favicon-dark.svg`，
   两者都在 `index.html` 里由 `media="(prefers-color-scheme: dark)"` 切换。
-- README 顶图用 `<picture>` 在 `docs/readme/hero.svg`（navy）与 `hero-dark.svg`（navy-light）之间切换。
+- README 顶图用**横版字标**：`docs/readme/hero-lockup.png`（navy）与 `hero-lockup-dark.png`（paper）
+  由 `<picture>` + `prefers-color-scheme` 切换。PNG 不能像 `currentColor` 那样跟随主题换色，
+  所以深色主题必须单独出一张——**不要只放浅色那张**，GitHub 深色下 navy 会糊进背景。
+- 字标 PNG 一律**等比缩放**（1200 × 210，5.71:1）；导出时只给宽度，不要同时写死宽高。
 
 ## 禁止
 

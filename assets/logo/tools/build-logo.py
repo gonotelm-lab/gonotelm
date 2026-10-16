@@ -211,13 +211,22 @@ def write(path: str, content: str) -> None:
     print(f"  {os.path.relpath(path, ROOT)}  ({len(content.encode())} B)")
 
 
-def export_png(svg: str, path: str, size: int, bg: str | None = None) -> None:
+def export_png(svg: str, path: str, size: int | None = None, *,
+               width: int | None = None, bg: str | None = None) -> None:
+    """按方形边长（size）或按宽度等比（width）导出 PNG，二者取其一。"""
     import cairosvg
 
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    cairosvg.svg2png(bytestring=svg.encode(), write_to=path,
-                     output_width=size, output_height=size, background_color=bg)
-    print(f"  {os.path.relpath(path, ROOT)}  ({size}px)")
+    kwargs: dict = {"background_color": bg}
+    if width is not None:
+        kwargs["output_width"] = width
+        label = f"{width}px wide"
+    else:
+        kwargs["output_width"] = size
+        kwargs["output_height"] = size
+        label = f"{size}px"
+    cairosvg.svg2png(bytestring=svg.encode(), write_to=path, **kwargs)
+    print(f"  {os.path.relpath(path, ROOT)}  ({label})")
 
 
 def render_preview() -> None:
@@ -337,9 +346,8 @@ def main() -> int:
     write(os.path.join(LOGO_DIR, "gonotelm-appicon-forest.svg"), appicon_svg(FOREST, PAPER))
     write(os.path.join(LOGO_DIR, "gonotelm-appicon-navy.svg"), appicon_svg(NAVY, NAVY_LIGHT))
 
-    # README 顶图：本仓库沿用 navy，深色主题用浅色反转版
-    write(os.path.join(ROOT, "docs", "readme", "hero.svg"), mark_svg(NAVY))
-    write(os.path.join(ROOT, "docs", "readme", "hero-dark.svg"), mark_svg(NAVY_LIGHT))
+    # 本仓库 README 顶图：navy 的横版字标，深浅主题各一张，交给 <picture> 切换。
+    # 注：这里只出 PNG，SVG 版字标在 assets/logo/ 下另有 4 套。
 
     if args.svg_only:
         return 0
@@ -358,9 +366,14 @@ def main() -> int:
     export_png(mark_svg(NAVY), os.path.join(PNG_DIR, "mark-navy-512.png"), 512)
     export_png(mark_svg(PAPER), os.path.join(PNG_DIR, "mark-reverse-512.png"), 512)
     export_png(appicon_svg(NAVY, NAVY_LIGHT), os.path.join(PNG_DIR, "appicon-navy-512.png"), 512)
-    lk = lockup_svg(FOREST, INK)
-    export_png(lk, os.path.join(PNG_DIR, "lockup-forest-288.png"), 288)
-    export_png(lk, os.path.join(PNG_DIR, "lockup-forest-576.png"), 576)
+    for name, lk in (("forest", lockup_svg(FOREST, INK)),
+                     ("navy", lockup_svg(NAVY, NAVY)),
+                     ("reverse", lockup_svg(PAPER, PAPER))):
+        export_png(lk, os.path.join(PNG_DIR, f"lockup-{name}-1200.png"), width=1200)
+    export_png(lockup_svg(NAVY, NAVY),
+               os.path.join(ROOT, "docs", "readme", "hero-lockup.png"), width=1200)
+    export_png(lockup_svg(PAPER, PAPER),
+               os.path.join(ROOT, "docs", "readme", "hero-lockup-dark.png"), width=1200)
     print("品牌总览页：")
     render_preview()
     return 0

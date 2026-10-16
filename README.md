@@ -4,8 +4,8 @@
 <br />
 <div align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/readme/hero-lockup-dark.png" />
-    <img src="docs/readme/hero-lockup.png" alt="GoNoteLM" width="420" />
+    <source media="(prefers-color-scheme: dark)" srcset="docs/readme/hero-dark.svg" />
+    <img src="docs/readme/hero.svg" alt="GoNoteLM" width="88" height="88" />
   </picture>
 </div>
 

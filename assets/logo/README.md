@@ -59,9 +59,13 @@
 - **继承文字色**用 `-mono`（`currentColor`）。
 - 主站 favicon 已经是 `gonotelm-web/public/favicon.svg`，深色标签栏走 `favicon-dark.svg`，
   两者都在 `index.html` 里由 `media="(prefers-color-scheme: dark)"` 切换。
-- README 顶图用**横版字标**：`docs/readme/hero-lockup.png`（navy）与 `hero-lockup-dark.png`（paper）
-  由 `<picture>` + `prefers-color-scheme` 切换。PNG 不能像 `currentColor` 那样跟随主题换色，
-  所以深色主题必须单独出一张——**不要只放浅色那张**，GitHub 深色下 navy 会糊进背景。
+- README 顶图只放**标记本体**：`docs/readme/hero.svg`（navy）与 `hero-dark.svg`（navy-light）
+  由 `<picture>` + `prefers-color-scheme` 切换。背景干净时标记比字标更克制，字标交给正文标题。
+- 横版字标 PNG 作为**常备素材**保留在 `docs/readme/hero-lockup.png`（navy）与
+  `hero-lockup-dark.png`（paper），以及 `assets/logo/png/lockup-*-1200.png`
+  （forest / navy / reverse）——用于幻灯片、社交预览、文档封面等需要署名的地方。
+  PNG 不能像 `currentColor` 那样跟随主题换色，**深色底必须用 `-dark` 或 `reverse` 那张**，
+  否则 navy 会糊进背景。
 - 字标 PNG 一律**等比缩放**（1200 × 210，5.71:1）；导出时只给宽度，不要同时写死宽高。
 
 ## 禁止

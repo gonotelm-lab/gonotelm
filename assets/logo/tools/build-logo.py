@@ -346,8 +346,9 @@ def main() -> int:
     write(os.path.join(LOGO_DIR, "gonotelm-appicon-forest.svg"), appicon_svg(FOREST, PAPER))
     write(os.path.join(LOGO_DIR, "gonotelm-appicon-navy.svg"), appicon_svg(NAVY, NAVY_LIGHT))
 
-    # 本仓库 README 顶图：navy 的横版字标，深浅主题各一张，交给 <picture> 切换。
-    # 注：这里只出 PNG，SVG 版字标在 assets/logo/ 下另有 4 套。
+    # 本仓库 README 顶图：只放标记本体（navy），深色主题用浅色版，二者同源同形。
+    write(os.path.join(ROOT, "docs", "readme", "hero.svg"), mark_svg(NAVY))
+    write(os.path.join(ROOT, "docs", "readme", "hero-dark.svg"), mark_svg(NAVY_LIGHT))
 
     if args.svg_only:
         return 0
@@ -370,6 +371,7 @@ def main() -> int:
                      ("navy", lockup_svg(NAVY, NAVY)),
                      ("reverse", lockup_svg(PAPER, PAPER))):
         export_png(lk, os.path.join(PNG_DIR, f"lockup-{name}-1200.png"), width=1200)
+    # README 顶图只放标记本体，横版字标 PNG 作为素材常备（幻灯片、社交预览、文档封面）。
     export_png(lockup_svg(NAVY, NAVY),
                os.path.join(ROOT, "docs", "readme", "hero-lockup.png"), width=1200)
     export_png(lockup_svg(PAPER, PAPER),

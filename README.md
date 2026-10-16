@@ -3,7 +3,10 @@
 
 <br />
 <div align="center">
-  <img src="docs/readme/hero.svg" alt="GoNoteLM" width="96" height="92" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/readme/hero-dark.svg" />
+    <img src="docs/readme/hero.svg" alt="GoNoteLM" width="88" height="88" />
+  </picture>
 </div>
 
 <br />

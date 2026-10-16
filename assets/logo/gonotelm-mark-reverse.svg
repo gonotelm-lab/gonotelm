@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="GoNoteLM" focusable="false">
+  <title>GoNoteLM</title>
+  <desc>刻槽：源料被引用逐层取走</desc>
+  <path fill="#f7f4ed" fill-rule="evenodd" d="M10 5 H54 A5 5 0 0 1 59 10 V45 L45 59 H10 A5 5 0 0 1 5 54 V10 A5 5 0 0 1 10 5 ZM5 12.05 H36.5 A2.5 2.5 0 0 1 39 14.55 V17.85 A2.5 2.5 0 0 1 36.5 20.35 H5 ZM5 27.85 H27.5 A2.5 2.5 0 0 1 30 30.35 V33.65 A2.5 2.5 0 0 1 27.5 36.15 H5 ZM5 43.65 H18.5 A2.5 2.5 0 0 1 21 46.15 V49.45 A2.5 2.5 0 0 1 18.5 51.95 H5 Z"/>
+</svg>

@@ -16,6 +16,8 @@ type NotebookStore interface {
 	Create(ctx context.Context, notebook *schema.Notebook) error
 	Upsert(ctx context.Context, notebook *schema.Notebook) error
 	GetById(ctx context.Context, id Id) (*schema.Notebook, error)
+	// Exists 只判断行是否存在，供解析前后检查，比 FindById 轻。
+	Exists(ctx context.Context, id Id) (bool, error)
 	GetByNameAndOwnerId(ctx context.Context, name string, ownerId valobj.Uid) (*schema.Notebook, error)
 	// orderBy=0 -> default order, orderBy=1 -> order by updated_at
 	ListByOwnerId(ctx context.Context, ownerId valobj.Uid, limit, offset, orderBy int) ([]*schema.Notebook, error)
@@ -29,7 +31,8 @@ type NotebookStore interface {
 
 type SourceStore interface {
 	Create(ctx context.Context, source *schema.Source) error
-	Upsert(ctx context.Context, source *schema.Source) error
+	// UpdateExisting 只更新已存在的行，返回受影响行数；0 表示行已不存在，永不插入。
+	UpdateExisting(ctx context.Context, source *schema.Source) (int64, error)
 	GetById(ctx context.Context, id Id) (*schema.Source, error)
 	CountByNotebookId(ctx context.Context, notebookId Id) (int64, error)
 	BatchCountByNotebookIds(ctx context.Context, notebookIds []Id) (map[Id]int64, error)

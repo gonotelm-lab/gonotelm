@@ -39,6 +39,10 @@ func NewSourceJob(ctx context.Context, cfg *conf.SourceJobConfig) (*SourceJob, e
 	}
 
 	sourceRepo := repository.NewSourceRepository(infra.Database.SourceStore)
+	notebookRepo := repository.NewNotebookRepository(
+		infra.Database.NotebookStore,
+		infra.Database.SourceStore,
+	)
 	sourceDocRepo := repository.NewSourceDocRepository(
 		infra.Embedder,
 		infra.VectorDatabase.SourceDocStore,
@@ -69,6 +73,7 @@ func NewSourceJob(ctx context.Context, cfg *conf.SourceJobConfig) (*SourceJob, e
 
 	eventsourcejob.Init(ctx, &eventsourcejob.EventDeps{
 		SourceRepo:       sourceRepo,
+		NotebookRepo:     notebookRepo,
 		ObjectStore:      infra.ObjectStore,
 		KeyFactory:       infra.KeyFactory,
 		SourceDocRepo:    sourceDocRepo,

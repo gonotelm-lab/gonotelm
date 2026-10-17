@@ -10,7 +10,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/sql"
 
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 type SourceStoreImpl struct {
@@ -33,27 +32,24 @@ func (s *SourceStoreImpl) Create(ctx context.Context, source *schema.Source) err
 	return nil
 }
 
-func (s *SourceStoreImpl) Upsert(ctx context.Context, source *schema.Source) error {
-	cl := clause.OnConflict{
-		Columns: []clause.Column{{Name: "id"}},
-		DoUpdates: clause.Assignments(map[string]any{
+// UpdateExisting 只更新已存在的行，返回受影响行数
+func (s *SourceStoreImpl) UpdateExisting(ctx context.Context, source *schema.Source) (int64, error) {
+	result := s.db.WithContext(ctx).
+		Model(&schema.Source{}).
+		Where("id = ?", source.Id).
+		Updates(map[string]any{
 			"status":             source.Status,
 			"title":              source.Title,
 			"content":            source.Content,
 			"abstract":           source.Abstract,
 			"parsed_content_key": source.ParsedContentKey,
 			"updated_at":         source.UpdatedAt,
-		}),
+		})
+	if result.Error != nil {
+		return 0, sql.WrapErr(result.Error)
 	}
 
-	if err := s.db.WithContext(ctx).
-		Model(&schema.Source{}).
-		Clauses(cl).
-		Create(source).Error; err != nil {
-		return sql.WrapErr(err)
-	}
-
-	return nil
+	return result.RowsAffected, nil
 }
 
 func (s *SourceStoreImpl) GetById(ctx context.Context, id database.Id) (*schema.Source, error) {

@@ -38,6 +38,10 @@ func (s *NotebookRepositoryImpl) Save(ctx context.Context, notebook *notebookent
 	return s.notebookStore.Upsert(ctx, sch)
 }
 
+func (s *NotebookRepositoryImpl) Exists(ctx context.Context, id valobj.Id) (bool, error) {
+	return s.notebookStore.Exists(ctx, id)
+}
+
 func (s *NotebookRepositoryImpl) FindById(ctx context.Context, id valobj.Id) (*notebookentity.Notebook, error) {
 	notebook, err := s.notebookStore.GetById(ctx, id)
 	if err != nil {

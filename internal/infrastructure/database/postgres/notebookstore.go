@@ -57,6 +57,18 @@ func (s *NotebookStoreImpl) Upsert(
 	return nil
 }
 
+func (s *NotebookStoreImpl) Exists(ctx context.Context, id database.Id) (bool, error) {
+	var count int64
+	if err := s.db.WithContext(ctx).
+		Model(&schema.Notebook{}).
+		Where("id = ?", id).
+		Count(&count).Error; err != nil {
+		return false, sql.WrapErr(err)
+	}
+
+	return count > 0, nil
+}
+
 func (s *NotebookStoreImpl) GetById(
 	ctx context.Context, id database.Id,
 ) (*schema.Notebook, error) {

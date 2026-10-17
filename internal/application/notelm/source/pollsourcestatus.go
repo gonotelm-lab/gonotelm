@@ -93,8 +93,7 @@ func (h *PollSourceStatusHandler) pollFileSourceStatus(
 			// uploaded, make it preparing
 			targetSource.MarkPreparing() // with events
 		}
-		err = h.sourceRepo.Save(ctx, targetSource)
-		if err != nil {
+		if err := h.updateSource(ctx, targetSource); err != nil {
 			return "", errors.WithMessagef(err, "save source failed, source_id=%s", targetSource.Id)
 		}
 

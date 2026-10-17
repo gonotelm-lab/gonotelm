@@ -33,8 +33,7 @@ func (h *DeleteSourceHandler) Handle(ctx context.Context, id valobj.Id) error {
 	}
 
 	targetSource.Delete()
-	err = h.sourceRepo.Save(ctx, targetSource)
-	if err != nil {
+	if err := h.sourceRepo.DeleteById(ctx, targetSource.Id); err != nil {
 		return errors.WithMessagef(err, "delete source failed, source_id=%s", id)
 	}
 

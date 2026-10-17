@@ -471,3 +471,27 @@ func TestBuildBatchGetFilterExpr(t *testing.T) {
 		))
 	})
 }
+
+func TestBuildBatchDeleteExprs(t *testing.T) {
+	Convey("buildBatchDeleteExprs should chunk source ids into one expression per batch", t, func() {
+		So(buildBatchDeleteExprs("nb-1", nil, 2), ShouldBeNil)
+
+		exprs := buildBatchDeleteExprs("nb-1", []string{"s1", "s2", "s3"}, 2)
+		So(len(exprs), ShouldEqual, 2)
+		So(exprs[0], ShouldEqual, fmt.Sprintf(
+			`%s == "nb-1" && %s in ["s1","s2"]`,
+			schema.FieldNotebookID, schema.FieldSourceID,
+		))
+		So(exprs[1], ShouldEqual, fmt.Sprintf(
+			`%s == "nb-1" && %s in ["s3"]`,
+			schema.FieldNotebookID, schema.FieldSourceID,
+		))
+
+		// batchSize <= 0 时使用默认批大小
+		ids := make([]string, sourceIDsDeleteBatchSize*2+1)
+		for i := range ids {
+			ids[i] = fmt.Sprintf("s-%d", i)
+		}
+		So(len(buildBatchDeleteExprs("nb-1", ids, 0)), ShouldEqual, 3)
+	})
+}

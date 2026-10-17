@@ -10,5 +10,6 @@ import (
 type Repository interface {
 	Save(ctx context.Context, ns *notebookentity.Notebook) error
 	FindById(ctx context.Context, id valobj.Id) (*notebookentity.Notebook, error)
+	Exists(ctx context.Context, id valobj.Id) (bool, error)
 	ListByOwner(ctx context.Context, ownerId valobj.Uid, spec *ListSpec) ([]*notebookentity.Notebook, error)
 }

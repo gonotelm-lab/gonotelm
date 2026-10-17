@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/entity/vo"
 	domainerr "github.com/gonotelm-lab/gonotelm/internal/domain/source/errors"
@@ -120,6 +121,23 @@ func (s *Service) IndexSource(
 		ParsedContentType: handleResult.ParsedContentType,
 		Extras:            handleResult.Extras,
 	}, nil
+}
+
+func (s *Service) DeleteSources(
+	ctx context.Context,
+	notebookId valobj.Id,
+	sourceIds []valobj.Id,
+) error {
+	if len(sourceIds) == 0 {
+		return nil
+	}
+
+	if err := s.sourceDocRepo.BatchDeleteBySourceId(ctx, notebookId, sourceIds); err != nil {
+		return errors.WithMessagef(err,
+			"delete source docs failed, notebook_id=%s, source_count=%d", notebookId, len(sourceIds))
+	}
+
+	return nil
 }
 
 func (s *Service) convertSource(ctx context.Context, source *entity.Source) (*convertdoc.HandleResult, error) {

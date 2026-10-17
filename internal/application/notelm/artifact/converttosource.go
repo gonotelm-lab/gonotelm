@@ -14,6 +14,7 @@ import (
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourcevo "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity/vo"
+	domainerr "github.com/gonotelm-lab/gonotelm/internal/domain/source/errors"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
@@ -119,7 +120,7 @@ func (h *ConvertNoteToSourceHandler) Handle(
 	newSource.UpdateTitle(title)
 	newSource.MarkUploading()
 
-	if err := h.sourceRepo.Save(ctx, newSource); err != nil {
+	if err := h.sourceRepo.Create(ctx, newSource); err != nil {
 		return nil, errors.WithMessagef(err, "save source failed, source_id=%s", newSource.Id)
 	}
 
@@ -142,7 +143,12 @@ func (h *ConvertNoteToSourceHandler) Handle(
 
 	// 上传成功后进入 preparing，触发下游解析
 	newSource.MarkPreparing()
-	if err := h.sourceRepo.Save(ctx, newSource); err != nil {
+	affected, updateErr := h.sourceRepo.UpdateExisting(ctx, newSource)
+	if updateErr != nil || affected == 0 {
+		err := updateErr
+		if err == nil {
+			err = domainerr.ErrSourceNotFound
+		}
 		// 回滚：删除已上传的对象，避免遗留孤儿文件
 		if rollbackErr := h.objectStore.DeleteObject(ctx, fileContent.StoreKey); rollbackErr != nil {
 			slog.ErrorContext(ctx, "rollback delete uploaded object failed",

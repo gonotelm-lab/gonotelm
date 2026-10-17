@@ -248,10 +248,10 @@ type StorageTypeConfig struct {
 }
 
 type MinioConfig struct {
-	Endpoint      string        `toml:"endpoint"`
-	AccessKey     string        `toml:"accessKey"`
-	SecretKey     string        `toml:"secretKey"`
-	Bucket        string        `toml:"bucket"`
+	Endpoint      string        `toml:"endpoint"  validate:"required"`
+	AccessKey     string        `toml:"accessKey" validate:"required"`
+	SecretKey     string        `toml:"secretKey" validate:"required"`
+	Bucket        string        `toml:"bucket"    validate:"required"`
 	Region        string        `toml:"region"`
 	Secure        bool          `toml:"secure"`
 	PresignExpiry time.Duration `toml:"presignExpiry"`

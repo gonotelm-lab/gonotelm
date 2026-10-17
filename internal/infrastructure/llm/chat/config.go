@@ -64,7 +64,7 @@ type Model struct {
 }
 
 type DeepSeekChatConfig struct {
-	ApiKey                string           `toml:"apiKey"`
+	ApiKey                string           `toml:"apiKey" validate:"required"`
 	Timeout               time.Duration    `toml:"timeout"`
 	ResponseHeaderTimeout time.Duration    `toml:"responseHeaderTimeout"`
 	BaseURL               string           `toml:"baseUrl"`

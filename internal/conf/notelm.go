@@ -107,10 +107,9 @@ type SyncerConfig struct {
 	GlobalBatchSize int           `toml:"globalBatchSize"`
 }
 
-// CleanupConfig 删除后的清理检查点：到期由 flow 回调 notelm 补删残留。
+// 删除后的清理逻辑配置
 type CleanupConfig struct {
-	// BaseURL 是 notelm 对 flow 可达的地址；回调路径由代码写死，为空则不注册检查点。
-	BaseURL string        `toml:"baseURL"`
+	BaseURL string        `toml:"baseURL" validate:"required"`
 	Delay   time.Duration `toml:"delay"`
 	Jitter  time.Duration `toml:"jitter"`
 }
@@ -144,7 +143,7 @@ func (c *NotelmConfig) ToIDPConfig() map[string]idp.Config {
 }
 
 type ApiConfig struct {
-	Port            int           `toml:"port"`
+	Port            int           `toml:"port"            validate:"required"`
 	ExitWaitTimeout time.Duration `toml:"exitWaitTimeout"`
 }
 

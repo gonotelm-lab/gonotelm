@@ -32,9 +32,9 @@ func (c *LoggingConfig) Init() {
 }
 
 type FlowConfig struct {
-	Addr        string        `toml:"addr"`
-	Namespace   string        `toml:"namespace"`
-	APIKey      string        `toml:"apiKey"`
+	Addr        string        `toml:"addr"        validate:"required"`
+	Namespace   string        `toml:"namespace"   validate:"required"`
+	APIKey      string        `toml:"apiKey"      validate:"required"`
 	MaxRetry    int           `toml:"maxRetry"`
 	DialTimeout time.Duration `toml:"dialTimeout"`
 }
@@ -49,12 +49,12 @@ func (c *FlowConfig) Init() {
 }
 
 type DatabaseConfig struct {
-	Type     string `toml:"type"`
-	Host     string `toml:"host"`
-	Port     int    `toml:"port"`
-	User     string `toml:"user"`
-	Password string `toml:"password"`
-	DBName   string `toml:"dbName"`
+	Type     string `toml:"type"     validate:"required"`
+	Host     string `toml:"host"     validate:"required"`
+	Port     int    `toml:"port"     validate:"required"`
+	User     string `toml:"user"     validate:"required"`
+	Password string `toml:"password" validate:"required"`
+	DBName   string `toml:"dbName"   validate:"required"`
 }
 
 func (d *DatabaseConfig) ToSQLConfig() *sql.Config {
@@ -112,20 +112,21 @@ func (c *ProviderBillingConfig) Init() {
 }
 
 // InfraConfig 共用的基础设施配置。
+// 标注 omitempty 的段落在没配时整段跳过校验，配了就必须完整
 type InfraConfig struct {
 	Database        DatabaseConfig              `toml:"database"`
-	VectorDB        vectordb.Config             `toml:"vectorDb"`
+	VectorDB        vectordb.Config             `toml:"vectorDb"        validate:"omitempty"`
 	Storage         storage.StorageTypeConfig   `toml:"storage"`
-	Provider        llmchat.ProviderConfig      `toml:"provider"`
-	ProviderBilling ProviderBillingConfig       `toml:"providerBilling"`
-	LLMRecord       llmchat.RecordConfig        `toml:"llmRecord"`
-	Embedding       embedding.EmbeddingConfig   `toml:"embedding"`
-	Text2Image      text2image.Text2ImageConfig `toml:"text2image"`
-	Text2Audio      text2audio.Text2AudioConfig `toml:"text2audio"`
-	Sandbox         sandbox.ProviderConfig      `toml:"sandbox"`
-	DatabaseOlap    DatabaseConfig              `toml:"databaseOlap"`
+	Provider        llmchat.ProviderConfig      `toml:"provider"        validate:"omitempty"`
+	ProviderBilling ProviderBillingConfig       `toml:"providerBilling" validate:"omitempty"`
+	LLMRecord       llmchat.RecordConfig        `toml:"llmRecord"       validate:"omitempty"`
+	Embedding       embedding.EmbeddingConfig   `toml:"embedding"       validate:"omitempty"`
+	Text2Image      text2image.Text2ImageConfig `toml:"text2image"      validate:"omitempty"`
+	Text2Audio      text2audio.Text2AudioConfig `toml:"text2audio"      validate:"omitempty"`
+	Sandbox         sandbox.ProviderConfig      `toml:"sandbox"         validate:"omitempty"`
+	DatabaseOlap    DatabaseConfig              `toml:"databaseOlap"    validate:"omitempty"`
 	Redis           cache.RedisCacheConfig      `toml:"redis"`
-	MessageQueue    mq.Config                   `toml:"messageQueue"`
+	MessageQueue    mq.Config                   `toml:"messageQueue"    validate:"omitempty"`
 }
 
 func (c *InfraConfig) InitInfra() {
@@ -167,6 +168,10 @@ func LoadTOML(path string, cfg any) error {
 
 	if _, err := toml.Decode(expanded, cfg); err != nil {
 		return fmt.Errorf("decode config file %q failed: %w", path, err)
+	}
+
+	if err := Validate(cfg); err != nil {
+		return fmt.Errorf("validate config file %q failed: %w", path, err)
 	}
 
 	return nil

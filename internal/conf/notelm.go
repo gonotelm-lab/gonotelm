@@ -34,6 +34,7 @@ type NotelmConfig struct {
 	Chunking  ChunkingConfig       `toml:"chunking"`
 	Flow      shared.FlowConfig    `toml:"flow"`
 	Syncer    SyncerConfig         `toml:"syncer"`
+	Cleanup   CleanupConfig        `toml:"cleanup"`
 	OtelTrace trace.Config         `toml:"otelTrace"`
 	IDP       map[string]IDPConfig `toml:"idp"`
 }
@@ -104,6 +105,23 @@ type SyncerConfig struct {
 	PerTaskInterval time.Duration `toml:"perTaskInterval"`
 	GlobalInterval  time.Duration `toml:"globalInterval"`
 	GlobalBatchSize int           `toml:"globalBatchSize"`
+}
+
+// CleanupConfig 删除后的清理检查点：到期由 flow 回调 notelm 补删残留。
+type CleanupConfig struct {
+	// BaseURL 是 notelm 对 flow 可达的地址；回调路径由代码写死，为空则不注册检查点。
+	BaseURL string        `toml:"baseURL"`
+	Delay   time.Duration `toml:"delay"`
+	Jitter  time.Duration `toml:"jitter"`
+}
+
+func (c *CleanupConfig) Init() {
+	if c.Delay <= 0 {
+		c.Delay = 30 * time.Minute
+	}
+	if c.Jitter <= 0 {
+		c.Jitter = 10 * time.Minute
+	}
 }
 
 func (c *NotelmConfig) IsDev() bool {
@@ -252,6 +270,7 @@ func (c *NotelmConfig) init() {
 	c.InitInfra()
 	c.Logging.Init()
 	c.Flow.Init()
+	c.Cleanup.Init()
 	c.Cors.Init()
 	c.Auth.Init()
 	c.Mailer.Init()

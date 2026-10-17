@@ -34,6 +34,7 @@ func (c *LoggingConfig) Init() {
 type FlowConfig struct {
 	Addr        string        `toml:"addr"`
 	Namespace   string        `toml:"namespace"`
+	APIKey      string        `toml:"apiKey"`
 	MaxRetry    int           `toml:"maxRetry"`
 	DialTimeout time.Duration `toml:"dialTimeout"`
 }

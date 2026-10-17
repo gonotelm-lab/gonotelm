@@ -11,6 +11,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/common/config"
 	artifactapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/artifact"
 	chatsuggest "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/suggestion"
+	"github.com/gonotelm-lab/gonotelm/internal/application/notelm/source/cleanup"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
@@ -29,6 +30,7 @@ import (
 	sourceapi "github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/source"
 	studioapi "github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/studio"
 	userapi "github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/user"
+	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/webhook"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 	"github.com/gonotelm-lab/gonotelm/pkg/http/middleware"
 )
@@ -69,6 +71,10 @@ type ServerDeps struct {
 	FlowClient flow.TaskClient
 	Poller     artifactapp.Poller
 
+	// 两者都为空时不挂 flow 回调端点。
+	CleanupFlowClient flow.ScheduleClient
+	CleanupSweeper    *cleanup.Sweeper
+
 	TitleMaker adapter.TitleMaker
 }
 
@@ -82,6 +88,8 @@ type Server struct {
 	chat     *chatapi.Server
 	studio   *studioapi.Server
 	user     *userapi.Server
+
+	webhook *webhook.Server
 }
 
 func NewServer(
@@ -176,12 +184,21 @@ func NewServer(
 		}),
 	}
 
+	if deps.CleanupFlowClient != nil && deps.CleanupSweeper != nil {
+		s.webhook = webhook.NewServer(deps.CleanupFlowClient, deps.CleanupSweeper)
+	}
+
 	s.registerRoutes()
 
 	return s
 }
 
 func (s *Server) registerRoutes() {
+	// flow 回调不走 /api/v1：它没有会话、也不该过 CSRF，安全靠签名校验。
+	if s.webhook != nil {
+		s.webhook.RegisterRoutes(s.h)
+	}
+
 	v1Group := s.h.Group("/api/v1", s.csrfMiddleware())
 	{
 		v1AuthedGroup := v1Group.Group("/", s.auth.Authenticate())

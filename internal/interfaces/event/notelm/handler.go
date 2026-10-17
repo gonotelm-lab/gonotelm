@@ -6,6 +6,7 @@ import (
 	artifact "github.com/gonotelm-lab/gonotelm/internal/application/notelm/artifact/eventhandle"
 	chat "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/eventhandle"
 	"github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/suggestion"
+	"github.com/gonotelm-lab/gonotelm/internal/application/notelm/source/cleanup"
 	source "github.com/gonotelm-lab/gonotelm/internal/application/notelm/source/eventhandle"
 	adapterdefine "github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
@@ -35,6 +36,9 @@ type EventDeps struct {
 
 	EventBus    *eventbus.CompositeEventBus
 	ChatGateway *llmchat.Gateway
+
+	CleanupScheduler *cleanup.CheckpointScheduler
+	CleanupSweeper   *cleanup.Sweeper
 }
 
 func Init(ctx context.Context, deps *EventDeps) {
@@ -55,8 +59,8 @@ func initSourceEventConsumers(deps *EventDeps) error {
 	if err := source.RegisterSourceDeletedConsumer(
 		deps.EventBus.InProcess,
 		source.NewOnSourceDeletedEventHandler(
-			deps.SourceDocRepo,
-			deps.ObjectStore,
+			deps.CleanupScheduler,
+			deps.CleanupSweeper,
 		),
 	); err != nil {
 		return err
@@ -81,8 +85,8 @@ func initNotebookEventConsumers(deps *EventDeps) error {
 		deps.EventBus.InProcess,
 		source.NewOnNotebookEventHandler(
 			deps.SourceRepo,
-			deps.SourceDocRepo,
-			deps.ObjectStore,
+			deps.CleanupScheduler,
+			deps.CleanupSweeper,
 		),
 	); err != nil {
 		return err

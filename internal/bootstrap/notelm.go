@@ -9,6 +9,7 @@ import (
 
 	syncerpkg "github.com/gonotelm-lab/gonotelm/internal/application/notelm/artifact/syncer"
 	chatsuggest "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/suggestion"
+	"github.com/gonotelm-lab/gonotelm/internal/application/notelm/source/cleanup"
 	bootshared "github.com/gonotelm-lab/gonotelm/internal/bootstrap/shared"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	coreadapter "github.com/gonotelm-lab/gonotelm/internal/core/adapter"
@@ -167,6 +168,37 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 	}
 	addCloser(flowClient)
 
+	// ── 6. 删除后的清理检查点（立即清理与 flow 回调共用同一个 Sweeper）──
+	cleanupSweeper := cleanup.NewSweeper(
+		sourceRepo,
+		notebookRepo,
+		sourceDocRepo,
+		infra.ObjectStore,
+	)
+
+	scheduleClient, err := flowcli.NewScheduleClient(cfg.Flow.Addr, cfg.Flow.Namespace, cfg.Flow.APIKey)
+	if err != nil {
+		return nil, err
+	}
+	addCloser(scheduleClient)
+
+	// apiKey 为空时回调无法验签：既不挂端点，也不注册检查点。
+	cleanupBaseURL := cfg.Cleanup.BaseURL
+	var cleanupFlowClient flowcli.ScheduleClient
+	if cfg.Flow.APIKey == "" {
+		cleanupBaseURL = ""
+		slog.WarnContext(rootCtx, "[notelm.bootstrap] flow apiKey is empty, cleanup callback disabled")
+	} else {
+		cleanupFlowClient = scheduleClient
+	}
+
+	cleanupScheduler := cleanup.NewCheckpointScheduler(
+		scheduleClient,
+		cleanupBaseURL,
+		cfg.Cleanup.Delay,
+		cfg.Cleanup.Jitter,
+	)
+
 	// ── 7. Syncer ──
 	syncerCfg := syncerpkg.Config{
 		PerTaskInterval: cfg.Syncer.PerTaskInterval,
@@ -197,6 +229,9 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 
 		EventBus:    eventBus,
 		ChatGateway: infra.LLMGateway,
+
+		CleanupScheduler: cleanupScheduler,
+		CleanupSweeper:   cleanupSweeper,
 	})
 
 	// ── 9. HTTP Server ──
@@ -236,6 +271,9 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 			FlowClient: flowClient,
 			Poller:     syncerInst,
 			TitleMaker: titleMaker,
+
+			CleanupFlowClient: cleanupFlowClient,
+			CleanupSweeper:    cleanupSweeper,
 		},
 	)
 

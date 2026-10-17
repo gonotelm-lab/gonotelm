@@ -16,7 +16,6 @@ type NotebookStore interface {
 	Create(ctx context.Context, notebook *schema.Notebook) error
 	Upsert(ctx context.Context, notebook *schema.Notebook) error
 	GetById(ctx context.Context, id Id) (*schema.Notebook, error)
-	// Exists 只判断行是否存在，供解析前后检查，比 FindById 轻。
 	Exists(ctx context.Context, id Id) (bool, error)
 	GetByNameAndOwnerId(ctx context.Context, name string, ownerId valobj.Uid) (*schema.Notebook, error)
 	// orderBy=0 -> default order, orderBy=1 -> order by updated_at
@@ -31,7 +30,6 @@ type NotebookStore interface {
 
 type SourceStore interface {
 	Create(ctx context.Context, source *schema.Source) error
-	// UpdateExisting 只更新已存在的行，返回受影响行数；0 表示行已不存在，永不插入。
 	UpdateExisting(ctx context.Context, source *schema.Source) (int64, error)
 	GetById(ctx context.Context, id Id) (*schema.Source, error)
 	CountByNotebookId(ctx context.Context, notebookId Id) (int64, error)
@@ -99,7 +97,6 @@ type UserStore interface {
 	Create(ctx context.Context, user *schema.User) error
 	GetById(ctx context.Context, id valobj.Uid) (*schema.User, error)
 	GetByEmail(ctx context.Context, email string) (*schema.User, error)
-	// GetPasswordHash 单独读取密码列，避免它混进账号实体/缓存/日志
 	GetPasswordHash(ctx context.Context, id valobj.Uid) (string, error)
 	UpdateProfile(ctx context.Context, params *schema.UserUpdateProfileParams) error
 	UpdateAvatar(ctx context.Context, params *schema.UserUpdateAvatarParams) error
@@ -109,7 +106,7 @@ type UserStore interface {
 type UserIdentityStore interface {
 	Create(ctx context.Context, identity *schema.UserIdentity) error
 	GetByProviderAndSubject(ctx context.Context, provider, subject string) (*schema.UserIdentity, error)
-	// GetByUserIdAndId 按 (账号, 身份 id) 取，归属由查询本身保证，不靠调用方再比对 user_id
+	// GetByUserIdAndId 按 (账号, 身份 id) 查询
 	GetByUserIdAndId(ctx context.Context, userId valobj.Uid, id valobj.Id) (*schema.UserIdentity, error)
 	ListByUserId(ctx context.Context, userId valobj.Uid) ([]*schema.UserIdentity, error)
 	UpdateLastLoginAt(ctx context.Context, id valobj.Id, lastLoginAt int64) error

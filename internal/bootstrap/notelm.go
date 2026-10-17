@@ -201,7 +201,7 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 	addCloser(&syncerCloser{syncerInstance})
 
 	// ── 8. Event handler registration ──
-	eventnotelm.Init(rootCtx, &eventnotelm.EventDeps{
+	eventnotelm.Init(rootCtx, &eventnotelm.Deps{
 		RootCtx: rootCtx,
 
 		NotebookRepo: notebookRepo,
@@ -222,7 +222,7 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 		ChatGateway: infra.LLMGateway,
 		FlowClient:  flowTaskClient,
 
-		Cleanup: cleaner,
+		Cleaner: cleaner,
 	})
 
 	// ── 9. HTTP Server ──
@@ -263,7 +263,7 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 			Poller:     syncerInstance,
 			TitleMaker: titleMaker,
 
-			Cleanup: cleaner,
+			Cleaner: cleaner,
 		},
 	)
 

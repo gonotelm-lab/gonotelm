@@ -68,7 +68,7 @@ type ServerDeps struct {
 	FlowClient flow.TaskClient
 	Poller     artifactapp.Poller
 
-	Cleanup *cleanup.Cleaner
+	Cleaner *cleanup.Cleaner
 
 	TitleMaker adapter.TitleMaker
 }
@@ -127,7 +127,7 @@ func NewServer(
 			EventBus:     deps.EventBus,
 			DistLock:     deps.DistLock,
 			Summarizer:   deps.Summarizer,
-			Cleanup:      deps.Cleanup,
+			Cleaner:      deps.Cleaner,
 		}),
 
 		source: sourceapi.NewServer(sourceapi.Deps{
@@ -137,7 +137,7 @@ func NewServer(
 			KeyFactory:    deps.KeyFactory,
 			SourceDocRepo: deps.SourceDocRepo,
 			EventBus:      deps.EventBus,
-			Cleanup:       deps.Cleanup,
+			Cleanup:       deps.Cleaner,
 		}),
 
 		chat: chatapi.NewServer(chatapi.Deps{
@@ -171,7 +171,7 @@ func NewServer(
 			TitleMaker:       deps.TitleMaker,
 			ObjectStore:      deps.ObjectStore,
 			KeyFactory:       deps.KeyFactory,
-			Cleanup:          deps.Cleanup,
+			Cleanup:          deps.Cleaner,
 		}),
 
 		user: userapi.NewServer(userapi.Deps{
@@ -182,8 +182,8 @@ func NewServer(
 		}),
 	}
 
-	if deps.Cleanup != nil && deps.Cleanup.Enabled() {
-		s.webhook = webhook.NewServer(deps.Cleanup)
+	if deps.Cleaner != nil && deps.Cleaner.Enabled() {
+		s.webhook = webhook.NewServer(deps.Cleaner)
 	}
 
 	s.registerRoutes()
@@ -192,7 +192,6 @@ func NewServer(
 }
 
 func (s *Server) registerRoutes() {
-	// flow 回调不走 /api/v1：它没有会话、也不该过 CSRF，安全靠签名校验。
 	if s.webhook != nil {
 		s.webhook.RegisterRoutes(s.h)
 	}

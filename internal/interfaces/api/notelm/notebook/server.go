@@ -16,7 +16,7 @@ type Deps struct {
 	EventBus     eventbus.Publisher
 	DistLock     adapter.DistributedLock
 	Summarizer   adapter.Summarizer
-	Cleanup      *cleanup.Cleaner
+	Cleaner      *cleanup.Cleaner
 }
 
 // Server 笔记本接口的处理器集合
@@ -34,7 +34,7 @@ func NewServer(deps Deps) *Server {
 		getNotebookHandler:        notebookapp.NewGetNotebookHandler(deps.NotebookRepo),
 		createNotebookHandler:     notebookapp.NewCreateNotebookHandler(deps.NotebookRepo, deps.EventBus),
 		listNotebooksHandler:      notebookapp.NewListNotebooksHandler(deps.NotebookRepo),
-		deleteNotebookHandler:     notebookapp.NewDeleteNotebookHandler(deps.NotebookRepo, deps.EventBus, deps.Cleanup),
+		deleteNotebookHandler:     notebookapp.NewDeleteNotebookHandler(deps.NotebookRepo, deps.EventBus, deps.Cleaner),
 		updateNotebookNameHandler: notebookapp.NewUpdateNotebookNameHandler(deps.NotebookRepo),
 		generateNotebookDescriptionHandler: notebookapp.NewGenerateDescriptionHandler(
 			deps.NotebookRepo,

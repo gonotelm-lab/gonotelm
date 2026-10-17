@@ -149,7 +149,7 @@ func (s *checkpointScheduler) register(
 	return nil
 }
 
-// nextFireAt = now + delay + [0, jitter)，抖动用来分散删除高峰。
+// nextFireAt = now + delay + [0, jitter)
 func (s *checkpointScheduler) nextFireAt() time.Time {
 	at := s.now().Add(s.cfg.Delay)
 	if s.cfg.Jitter > 0 {
@@ -159,7 +159,7 @@ func (s *checkpointScheduler) nextFireAt() time.Time {
 	return at
 }
 
-// EncodeKeys 把 StoreKey 编成载荷里的字符串形式，跳过无效 key。
+// EncodeKeys 编码 StoreKey，跳过无效 key。
 func EncodeKeys(keys []valobj.StoreKey) []string {
 	if len(keys) == 0 {
 		return nil

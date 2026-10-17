@@ -29,7 +29,7 @@ type Deps struct {
 	TitleMaker       adapter.TitleMaker
 	ObjectStore      adapter.ObjectStore
 	KeyFactory       adapter.StoreKeyFactory
-	Cleanup          *cleanup.Cleaner
+	Cleaner          *cleanup.Cleaner
 }
 
 // Server 产物接口的处理器集合
@@ -62,7 +62,7 @@ func NewServer(deps Deps) *Server {
 		getArtifactStatusHandler:     artifactapp.NewGetArtifactStatusHandler(deps.ArtifactRepo, deps.ObjectStore),
 		listNotebookArtifactsHandler: artifactapp.NewListArtifactsHandler(deps.NotebookRepo, deps.ArtifactRepo),
 		cancelArtifactHandler:        artifactapp.NewCancelArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.EventBus),
-		deleteArtifactHandler:        artifactapp.NewDeleteArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.ObjectStore, deps.Cleanup),
+		deleteArtifactHandler:        artifactapp.NewDeleteArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.ObjectStore, deps.Cleaner),
 		retryArtifactHandler:         artifactapp.NewRetryArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.Poller, deps.EventBus),
 		updateArtifactHandler:        artifactapp.NewUpdateArtifactHandler(deps.ArtifactRepo),
 		convertNoteToSourceHandler: artifactapp.NewConvertNoteToSourceHandler(

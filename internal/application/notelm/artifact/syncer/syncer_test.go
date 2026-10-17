@@ -36,11 +36,21 @@ func newSyncTestRepo(artifacts ...*artifactentity.Artifact) *syncTestRepo {
 	return r
 }
 
-func (s *syncTestRepo) Save(ctx context.Context, a *artifactentity.Artifact) error {
+func (s *syncTestRepo) Create(ctx context.Context, a *artifactentity.Artifact) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.byId[a.Id] = a
 	return nil
+}
+
+func (s *syncTestRepo) UpdateExisting(ctx context.Context, a *artifactentity.Artifact) (int64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.byId[a.Id]; !ok {
+		return 0, nil
+	}
+	s.byId[a.Id] = a
+	return 1, nil
 }
 
 func (s *syncTestRepo) FindById(ctx context.Context, id valobj.Id) (*artifactentity.Artifact, error) {

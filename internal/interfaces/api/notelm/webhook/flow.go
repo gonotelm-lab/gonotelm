@@ -18,7 +18,7 @@ func (s *Server) registerFlowRoutes(h *server.Hertz) {
 	h.POST(cleanup.ArtifactCallbackPath, s.flowCleanupHandler(cleanup.KindArtifact))
 }
 
-// 响应200/400表示处理完成 响应5xx可以利用调度方的重试策略实现重新触发webhook接口
+// 200/400 表示处理完成，5xx 交给调度方重试
 func (s *Server) flowCleanupHandler(expectedKind string) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		req, err := httpadapter.GetCompatRequest(&c.Request, c.RemoteAddr().String())
@@ -34,7 +34,7 @@ func (s *Server) flowCleanupHandler(expectedKind string) app.HandlerFunc {
 			return
 		}
 
-		body, err := io.ReadAll(req.Body) // verify会读body但是会还原 这里照常读入即可
+		body, err := io.ReadAll(req.Body)
 		if err != nil {
 			slog.WarnContext(ctx, "read flow callback body failed", slog.Any("err", err))
 			c.String(http.StatusBadRequest, "read body failed")

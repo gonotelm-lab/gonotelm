@@ -5,6 +5,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
+	"github.com/bytedance/sonic"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifacterrors "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/errors"
 	artifactevent "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/event"
@@ -218,4 +219,85 @@ func newTestArtifact(t *testing.T) *Artifact {
 	a, err := NewArtifact(uuid.NewV7(), valobj.NewUid(), KindMindmap, &MindmapPayload{NotebookId: uuid.NewV7()})
 	require.NoError(t, err)
 	return a
+}
+
+func newTestStoreKey(t *testing.T) valobj.StoreKey {
+	t.Helper()
+	key, err := valobj.NewStoreKey("gonotelm-private", "artifact/notebook/result.pptx", false)
+	require.NoError(t, err)
+
+	return key
+}
+
+func TestParseStorageResult(t *testing.T) {
+	key := newTestStoreKey(t)
+
+	t.Run("round-trips the storage envelope", func(t *testing.T) {
+		data, err := sonic.Marshal(StorageResult{StoreKey: key, ContentType: "application/pdf"})
+		require.NoError(t, err)
+
+		sr, ok := ParseStorageResult(data)
+		require.True(t, ok)
+		assert.Equal(t, key, sr.StoreKey)
+		assert.Equal(t, "application/pdf", sr.ContentType)
+	})
+
+	t.Run("rejects broken json", func(t *testing.T) {
+		_, ok := ParseStorageResult([]byte(`{"store_key":`))
+		assert.False(t, ok)
+	})
+
+	t.Run("rejects an invalid store key", func(t *testing.T) {
+		_, ok := ParseStorageResult([]byte(`{"store_key":{"bucket":"","key":""}}`))
+		assert.False(t, ok)
+	})
+}
+
+func TestArtifactObjectStoreKeys(t *testing.T) {
+	t.Run("storage result yields the object key", func(t *testing.T) {
+		a := newTestArtifact(t)
+		key := newTestStoreKey(t)
+		result, err := sonic.Marshal(StorageResult{StoreKey: key, ContentType: "application/pdf"})
+		require.NoError(t, err)
+
+		a.MarkCompleted(result, ResultKindStorage, "slides")
+
+		keys := a.ObjectStoreKeys()
+		require.Len(t, keys, 1)
+		assert.Equal(t, key, keys[0])
+	})
+
+	t.Run("inline result has no object key", func(t *testing.T) {
+		a := newTestArtifact(t)
+		a.MarkCompleted([]byte(`{"markdown":"# hi"}`), ResultKindInline, "mindmap")
+
+		assert.Empty(t, a.ObjectStoreKeys())
+	})
+
+	t.Run("empty result has no object key", func(t *testing.T) {
+		a := newTestArtifact(t)
+		a.ResultKind = ResultKindStorage
+
+		assert.Empty(t, a.ObjectStoreKeys())
+	})
+
+	t.Run("broken json has no object key", func(t *testing.T) {
+		a := newTestArtifact(t)
+		a.MarkCompleted([]byte(`{"store_key":`), ResultKindStorage, "slides")
+
+		assert.Empty(t, a.ObjectStoreKeys())
+	})
+
+	t.Run("invalid store key is dropped", func(t *testing.T) {
+		a := newTestArtifact(t)
+		a.MarkCompleted([]byte(`{"store_key":{"bucket":"","key":""}}`), ResultKindStorage, "slides")
+
+		assert.Empty(t, a.ObjectStoreKeys())
+	})
+
+	t.Run("nil artifact has no object key", func(t *testing.T) {
+		var a *Artifact
+
+		assert.Empty(t, a.ObjectStoreKeys())
+	})
 }

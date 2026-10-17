@@ -71,7 +71,7 @@ func NewSourceJob(ctx context.Context, cfg *conf.SourceJobConfig) (*SourceJob, e
 		return nil, err
 	}
 
-	eventsourcejob.Init(ctx, &eventsourcejob.EventDeps{
+	eventsourcejob.Init(ctx, &eventsourcejob.Deps{
 		SourceRepo:       sourceRepo,
 		NotebookRepo:     notebookRepo,
 		ObjectStore:      infra.ObjectStore,

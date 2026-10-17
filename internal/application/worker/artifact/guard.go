@@ -1,18 +1,19 @@
-package worker
+// Package artifact 汇总各产物 pipeline 共用的守卫逻辑。
+package artifact
 
 import (
 	"context"
 	"log/slog"
 
-	"github.com/gonotelm-lab/gonotelm/internal/application/shared/contract"
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	artifacterrors "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
-// 查询失败按"产物存在"处理，避免误判
-func artifactGone(ctx context.Context, deps *types.WorkerDeps, artifactId valobj.Id) bool {
+// IsDeleted 判断产物记录是否已被删除；查询失败按存在处理。
+func IsDeleted(ctx context.Context, deps *types.WorkerDeps, artifactId valobj.Id) bool {
 	if deps.ArtifactRepo == nil {
 		return false
 	}
@@ -31,12 +32,13 @@ func artifactGone(ctx context.Context, deps *types.WorkerDeps, artifactId valobj
 	return true
 }
 
-func discardStorageResult(ctx context.Context, deps *types.WorkerDeps, resp *types.Response) {
+// DiscardStorageResult 丢弃无人认领的 storage 产物对象。
+func DiscardStorageResult(ctx context.Context, deps *types.WorkerDeps, resp *types.Response) {
 	if resp == nil || !resp.ResultKind.Storage() || len(resp.Result) == 0 {
 		return
 	}
 
-	sr, ok := contract.ParseStorageResult(resp.Result)
+	sr, ok := artifactentity.ParseStorageResult(resp.Result)
 	if !ok {
 		return
 	}

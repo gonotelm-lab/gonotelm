@@ -44,15 +44,18 @@ func (h *DeleteArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error
 		}
 	}
 
-	var storeKeys []valobj.StoreKey
-	if a.ResultKind.Storage() && a.Result != nil {
-		if storeKey := extractStoreKey(a.Result); storeKey.Valid() {
-			storeKeys = append(storeKeys, storeKey)
-		}
+	var storeKey valobj.StoreKey
+	if a.ResultKind.Storage() && len(a.Result) > 0 {
+		storeKey = extractStoreKey(a.Result)
 	}
 
-	// 先注册兜底再删对象，删失败还能由回调重删
-	if err := h.cleaner.ScheduleArtifactCleanup(ctx, a.NotebookId, a.Id, storeKeys); err != nil {
+	// 先注册兜底再删对象
+	if err := h.cleaner.ScheduleArtifactCleanup(
+		ctx,
+		a.NotebookId,
+		a.Id,
+		[]valobj.StoreKey{storeKey},
+	); err != nil {
 		slog.ErrorContext(ctx, "register artifact cleanup checkpoint failed",
 			slog.String("artifact_id", a.Id.String()),
 			slog.String("notebook_id", a.NotebookId.String()),
@@ -60,8 +63,8 @@ func (h *DeleteArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error
 		)
 	}
 
-	if len(storeKeys) > 0 {
-		_ = h.storage.DeleteObject(ctx, storeKeys[0])
+	if storeKey.Valid() {
+		_ = h.storage.DeleteObject(ctx, storeKey)
 	}
 
 	return h.repo.DeleteById(ctx, a.Id)

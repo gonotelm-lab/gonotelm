@@ -7,6 +7,7 @@ import (
 	"log/slog"
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/shared/contract"
+	artifactapp "github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact"
 	"github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/types"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
@@ -64,7 +65,7 @@ func workerFn(deps *types.WorkerDeps) func(ctx context.Context, in contract.Work
 		ctx = trace.RestoreReqIdFromTrace(ctx)
 		ctx = pkgcontext.WithUserId(ctx, userId)
 
-		if artifactGone(ctx, deps, artifactId) {
+		if artifactapp.IsDeleted(ctx, deps, artifactId) {
 			slog.InfoContext(ctx, "artifact already deleted, skip generation",
 				slog.String("kind", string(kind)),
 				slog.String("artifact_id", artifactId.String()),
@@ -90,8 +91,8 @@ func workerFn(deps *types.WorkerDeps) func(ctx context.Context, in contract.Work
 			}, nil
 		}
 
-		if artifactGone(ctx, deps, artifactId) {
-			discardStorageResult(ctx, deps, resp)
+		if artifactapp.IsDeleted(ctx, deps, artifactId) {
+			artifactapp.DiscardStorageResult(ctx, deps, resp)
 			slog.InfoContext(ctx, "artifact deleted during generation, rolled back objects",
 				slog.String("kind", string(kind)),
 				slog.String("artifact_id", artifactId.String()),

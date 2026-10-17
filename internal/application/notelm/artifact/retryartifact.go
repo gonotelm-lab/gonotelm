@@ -91,8 +91,8 @@ func (h *RetryArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error 
 	if err := artifact.Retry(newFlowTaskId); err != nil {
 		return err
 	}
-	if err := h.repo.Save(ctx, artifact); err != nil {
-		return errors.WithMessage(err, "save retried artifact failed")
+	if err := h.updateArtifact(ctx, artifact); err != nil {
+		return errors.WithMessage(err, "update retried artifact failed")
 	}
 
 	for _, evt := range artifact.PullEvents() {

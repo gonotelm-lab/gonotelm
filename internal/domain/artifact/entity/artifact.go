@@ -129,6 +129,19 @@ func (a *Artifact) validate() error {
 
 func (a *Artifact) IsOwner(userId valobj.Uid) bool { return a.UserId == userId }
 
+func (a *Artifact) ObjectStoreKeys() []valobj.StoreKey {
+	if a == nil || !a.ResultKind.Storage() || len(a.Result) == 0 {
+		return nil
+	}
+
+	sr, ok := ParseStorageResult(a.Result)
+	if !ok {
+		return nil
+	}
+
+	return []valobj.StoreKey{sr.StoreKey}
+}
+
 func (a *Artifact) BindFlowTaskId(flowTaskId string) { a.FlowTaskId = flowTaskId }
 
 func (a *Artifact) MarkRunning() {

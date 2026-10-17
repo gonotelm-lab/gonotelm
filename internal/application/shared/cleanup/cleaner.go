@@ -56,7 +56,6 @@ func (c *Cleaner) Enabled() bool {
 	return c.enabled()
 }
 
-// VerifyCallback 校验 flow 回调的签名。
 func (c *Cleaner) VerifyCallback(req *http.Request) error {
 	return c.client.Verify(req)
 }

@@ -24,21 +24,21 @@ const (
 type Payload struct {
 	Kind       string    `json:"kind"`
 	NotebookId valobj.Id `json:"notebook_id"`
-	SourceId   valobj.Id `json:"source_id,omitzero"`   // 这里不能用omitempty
-	ArtifactId valobj.Id `json:"artifact_id,omitzero"` // 这里不能用omitempty
-	// 对象存储的一些key 必须带入 否则如果记录本身删掉了key就没办法复原去清除脏object
+	SourceId   valobj.Id `json:"source_id,omitzero"`
+	ArtifactId valobj.Id `json:"artifact_id,omitzero"`
+	// 记录删掉后要靠这里带出的 key 清对象
 	Keys      []string      `json:"keys,omitempty"`
 	Sources   []SourceRef   `json:"sources,omitempty"`
 	Artifacts []ArtifactRef `json:"artifacts,omitempty"`
 }
 
-// SourceRef 是 notebook 清理需要的每个 source 及其对象 key（encoded StoreKey）。
+// SourceRef 是 notebook 清理需要的一个 source 及其对象 key。
 type SourceRef struct {
 	SourceId valobj.Id `json:"source_id"`
 	Keys     []string  `json:"keys,omitempty"`
 }
 
-// ArtifactRef 是 notebook 清理需要的每个 artifact 及其对象 key（encoded StoreKey）。
+// ArtifactRef 是 notebook 清理需要的一个 artifact 及其对象 key。
 type ArtifactRef struct {
 	ArtifactId valobj.Id `json:"artifact_id"`
 	Keys       []string  `json:"keys,omitempty"`

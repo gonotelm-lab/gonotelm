@@ -8,7 +8,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/sql"
 
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 type ArtifactStoreImpl struct{ db *gorm.DB }
@@ -26,10 +25,12 @@ func (s *ArtifactStoreImpl) Create(ctx context.Context, a *schema.Artifact) erro
 	return nil
 }
 
-func (s *ArtifactStoreImpl) Upsert(ctx context.Context, a *schema.Artifact) error {
-	cl := clause.OnConflict{
-		Columns: []clause.Column{{Name: "id"}},
-		DoUpdates: clause.Assignments(map[string]any{
+// UpdateExisting 只更新已存在的行，返回受影响行数
+func (s *ArtifactStoreImpl) UpdateExisting(ctx context.Context, a *schema.Artifact) (int64, error) {
+	result := s.db.WithContext(ctx).
+		Model(&schema.Artifact{}).
+		Where("id = ?", a.Id).
+		Updates(map[string]any{
 			"status":       a.Status,
 			"flow_task_id": a.FlowTaskId,
 			"title":        a.Title,
@@ -37,15 +38,12 @@ func (s *ArtifactStoreImpl) Upsert(ctx context.Context, a *schema.Artifact) erro
 			"result_kind":  a.ResultKind,
 			"payload":      a.Payload,
 			"updated_at":   a.UpdatedAt,
-		}),
+		})
+	if result.Error != nil {
+		return 0, sql.WrapErr(result.Error)
 	}
-	if err := s.db.WithContext(ctx).
-		Model(&schema.Artifact{}).
-		Clauses(cl).
-		Create(a).Error; err != nil {
-		return sql.WrapErr(err)
-	}
-	return nil
+
+	return result.RowsAffected, nil
 }
 
 func (s *ArtifactStoreImpl) GetById(ctx context.Context, id database.Id) (*schema.Artifact, error) {

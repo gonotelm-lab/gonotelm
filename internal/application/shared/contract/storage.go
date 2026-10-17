@@ -1,21 +1,8 @@
 package contract
 
 import (
-	"encoding/json"
-
-	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 )
 
-type StorageResult struct {
-	StoreKey    valobj.StoreKey `json:"store_key"`
-	ContentType string          `json:"content_type"`
-}
-
-func ParseStorageResult(data []byte) (StorageResult, bool) {
-	var sr StorageResult
-	if err := json.Unmarshal(data, &sr); err != nil || !sr.StoreKey.Valid() {
-		return StorageResult{}, false
-	}
-
-	return sr, true
-}
+// StorageResult 的权威定义在 domain/artifact/entity。
+type StorageResult = artifactentity.StorageResult

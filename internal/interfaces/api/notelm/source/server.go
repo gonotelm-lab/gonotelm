@@ -17,7 +17,7 @@ type Deps struct {
 	KeyFactory    adapter.StoreKeyFactory
 	SourceDocRepo sourcerepo.SourceDocRepository
 	EventBus      eventbus.Publisher
-	Cleanup       *cleanup.Cleaner
+	Cleaner       *cleanup.Cleaner
 }
 
 // Server 来源接口的处理器集合
@@ -40,7 +40,7 @@ func NewServer(deps Deps) *Server {
 	return &Server{
 		getSourceHandler:              sourceapp.NewGetSourceHandler(deps.SourceRepo, deps.ObjectStore),
 		createSourceHandler:           sourceapp.NewCreateSourceHandler(deps.SourceRepo, deps.NotebookRepo, deps.EventBus),
-		deleteSourceHandler:           sourceapp.NewDeleteSourceHandler(deps.SourceRepo, deps.EventBus, deps.Cleanup),
+		deleteSourceHandler:           sourceapp.NewDeleteSourceHandler(deps.SourceRepo, deps.EventBus, deps.Cleaner),
 		presignUploadFileHandler:      sourceapp.NewPresignUploadFileHandler(deps.SourceRepo, deps.ObjectStore, deps.KeyFactory),
 		pollSourceStatusHandler:       sourceapp.NewPollSourceStatusHandler(deps.SourceRepo, deps.ObjectStore, deps.EventBus),
 		retrySourcePreparationHandler: sourceapp.NewRetrySourcePreparationHandler(deps.SourceRepo, deps.EventBus),

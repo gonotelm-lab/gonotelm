@@ -6,6 +6,7 @@ TEST_PKGS := \
 	./internal/application/notelm/artifact/... \
 	./internal/application/notelm/source/... \
 	./internal/application/shared/cleanup/... \
+	./internal/domain/artifact/... \
 	./internal/infrastructure/database/... \
 	./internal/infrastructure/cache \
 	./internal/infrastructure/cache/redis/... \

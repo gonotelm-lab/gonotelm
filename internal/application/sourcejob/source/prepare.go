@@ -280,7 +280,7 @@ func (h *PrepareSourceHandler) persistUnlessObsolete(ctx context.Context, source
 
 // deleteIndexDocs 删除该 source 已写入的索引文档，失败只记日志。
 func (h *PrepareSourceHandler) deleteIndexDocs(ctx context.Context, source *entity.Source) {
-	if err := h.sourceIndexService.DeleteSources(
+	if err := h.sourceDocRepo.BatchDeleteBySourceId(
 		ctx,
 		source.NotebookId,
 		[]valobj.Id{source.Id},

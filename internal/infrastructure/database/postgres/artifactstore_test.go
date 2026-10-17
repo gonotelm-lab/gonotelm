@@ -40,14 +40,29 @@ func TestArtifactStoreCRUD(t *testing.T) {
 		So(got.UserId, ShouldEqual, artifact.UserId)
 		So(got.Status, ShouldEqual, "pending")
 
-		Convey("Upsert overwrites the row by id", func() {
+		Convey("UpdateExisting overwrites an existing row", func() {
 			artifact.Status = "running"
 			artifact.UpdatedAt = nowMilli() + 1000
-			So(store.Upsert(ctx, artifact), ShouldBeNil)
+
+			affected, err := store.UpdateExisting(ctx, artifact)
+			So(err, ShouldBeNil)
+			So(affected, ShouldEqual, 1)
 
 			got, err := store.GetById(ctx, artifact.Id)
 			So(err, ShouldBeNil)
 			So(got.Status, ShouldEqual, "running")
+		})
+
+		Convey("UpdateExisting returns 0 and never re-inserts a deleted row", func() {
+			So(store.DeleteById(ctx, artifact.Id), ShouldBeNil)
+
+			artifact.Status = "completed"
+			affected, err := store.UpdateExisting(ctx, artifact)
+			So(err, ShouldBeNil)
+			So(affected, ShouldEqual, 0)
+
+			_, err = store.GetById(ctx, artifact.Id)
+			So(err, ShouldNotBeNil)
 		})
 
 		Convey("ListByNotebookId returns the notebook's artifacts", func() {

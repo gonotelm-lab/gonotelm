@@ -83,8 +83,21 @@ func (s *Syncer) pollOnce(ctx context.Context, artifactId valobj.Id, flowTaskId 
 		return false, nil
 	}
 
-	if err := s.repo.Save(ctx, a); err != nil {
+	affected, err := s.repo.UpdateExisting(ctx, a)
+	if err != nil {
 		return false, err
+	}
+
+	if affected == 0 {
+		if newStatus == artifactentity.StatusCompleted {
+			s.deleteOrphanStorage(ctx, a.FlowTaskId, info.Result)
+		}
+
+		slog.InfoContext(ctx, "artifact row already deleted, stop syncing",
+			slog.String("artifact_id", a.Id.String()),
+		)
+
+		return true, nil
 	}
 
 	for _, evt := range a.PullEvents() {
@@ -146,7 +159,7 @@ func (s *Syncer) deleteOrphanStorage(ctx context.Context, flowTaskId string, res
 		return
 	}
 
-	sr, ok := contract.ParseStorageResult(out.Result)
+	sr, ok := artifactentity.ParseStorageResult(out.Result)
 	if !ok {
 		slog.WarnContext(ctx, "orphan artifact result is not a valid storage result, skip",
 			slog.String("flow_task_id", flowTaskId),

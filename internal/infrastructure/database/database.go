@@ -71,7 +71,7 @@ type ChatMessageStore interface {
 
 type ArtifactStore interface {
 	Create(ctx context.Context, artifact *schema.Artifact) error
-	Upsert(ctx context.Context, artifact *schema.Artifact) error
+	UpdateExisting(ctx context.Context, artifact *schema.Artifact) (int64, error)
 	GetById(ctx context.Context, id Id) (*schema.Artifact, error)
 	ListByNotebookId(ctx context.Context, notebookId Id, limit, offset int) ([]*schema.Artifact, error)
 	ListByStatus(ctx context.Context, statuses []string, limit int) ([]*schema.Artifact, error)

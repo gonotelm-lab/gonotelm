@@ -137,7 +137,7 @@ func NewServer(
 			KeyFactory:    deps.KeyFactory,
 			SourceDocRepo: deps.SourceDocRepo,
 			EventBus:      deps.EventBus,
-			Cleanup:       deps.Cleaner,
+			Cleaner:       deps.Cleaner,
 		}),
 
 		chat: chatapi.NewServer(chatapi.Deps{
@@ -171,7 +171,7 @@ func NewServer(
 			TitleMaker:       deps.TitleMaker,
 			ObjectStore:      deps.ObjectStore,
 			KeyFactory:       deps.KeyFactory,
-			Cleanup:          deps.Cleaner,
+			Cleaner:          deps.Cleaner,
 		}),
 
 		user: userapi.NewServer(userapi.Deps{

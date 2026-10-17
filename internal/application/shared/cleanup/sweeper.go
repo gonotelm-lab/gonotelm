@@ -5,7 +5,6 @@ import (
 	stderrors "errors"
 	"log/slog"
 
-	"github.com/gonotelm-lab/gonotelm/internal/application/shared/contract"
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
@@ -78,7 +77,7 @@ func (s *sweeper) SweepSource(
 		slog.Int("keys", len(keys)),
 	)
 
-	// 这里是触发了清理才能到达的流程 如果此时还存在对应的数据记录 则不处理
+	// 记录还在说明是误触发，跳过
 	if _, err := s.sourceRepo.FindById(ctx, sourceId); err == nil {
 		slog.InfoContext(ctx, "source still exists, skip cleanup",
 			slog.String("source_id", sourceId.String()))
@@ -102,7 +101,7 @@ func (s *sweeper) SweepArtifact(
 		slog.Int("keys", len(keys)),
 	)
 
-	// 这里是触发了清理才能到达的流程 如果此时还存在对应的数据记录 则不处理
+	// 记录还在说明是误触发，跳过
 	if _, err := s.artifactRepo.FindById(ctx, artifactId); err == nil {
 		slog.InfoContext(ctx, "artifact still exists, skip cleanup",
 			slog.String("artifact_id", artifactId.String()))
@@ -286,7 +285,7 @@ func collectArtifactRefs(artifacts []*artifactentity.Artifact) []ArtifactRef {
 	refs := make([]ArtifactRef, 0, len(artifacts))
 
 	for _, artifact := range artifacts {
-		keys := artifactStorageKeys(artifact)
+		keys := artifact.ObjectStoreKeys()
 		if len(keys) == 0 {
 			continue
 		}
@@ -298,17 +297,4 @@ func collectArtifactRefs(artifacts []*artifactentity.Artifact) []ArtifactRef {
 	}
 
 	return refs
-}
-
-func artifactStorageKeys(a *artifactentity.Artifact) []valobj.StoreKey {
-	if a == nil || !a.ResultKind.Storage() || len(a.Result) == 0 {
-		return nil
-	}
-
-	sr, ok := contract.ParseStorageResult(a.Result)
-	if !ok {
-		return nil
-	}
-
-	return []valobj.StoreKey{sr.StoreKey}
 }

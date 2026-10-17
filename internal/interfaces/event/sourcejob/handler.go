@@ -10,7 +10,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 )
 
-type EventDeps struct {
+type Deps struct {
 	SourceRepo       sourcerepo.Repository
 	NotebookRepo     notebookrepo.Repository
 	ObjectStore      adapterdefine.ObjectStore
@@ -21,7 +21,7 @@ type EventDeps struct {
 	ImageInterpreter adapterdefine.ImageInterpreter
 }
 
-func Init(ctx context.Context, deps *EventDeps) {
+func Init(ctx context.Context, deps *Deps) {
 	if err := source.RegisterPreparationConsumer(ctx,
 		deps.EventBus.InterProcess,
 		source.NewPrepareSourceHandler(

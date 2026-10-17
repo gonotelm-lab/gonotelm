@@ -93,7 +93,10 @@ type fakeArtifactRepo struct {
 	err         error
 }
 
-func (f *fakeArtifactRepo) Save(context.Context, *artifactentity.Artifact) error { return nil }
+func (f *fakeArtifactRepo) Create(context.Context, *artifactentity.Artifact) error { return nil }
+func (f *fakeArtifactRepo) UpdateExisting(context.Context, *artifactentity.Artifact) (int64, error) {
+	return 1, nil
+}
 func (f *fakeArtifactRepo) FindById(context.Context, valobj.Id) (*artifactentity.Artifact, error) {
 	if f.findErr != nil {
 		return nil, f.findErr

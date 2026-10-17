@@ -45,12 +45,16 @@ func (f *fakeScheduleClient) Verify(*http.Request) error { return nil }
 
 func (f *fakeScheduleClient) Close() error { return nil }
 
-func newTestScheduler(client *fakeScheduleClient, baseURL string) *CheckpointScheduler {
-	s := NewCheckpointScheduler(client, baseURL, 30*time.Minute, 10*time.Minute)
+func newTestScheduler(client *fakeScheduleClient, baseURL string) *checkpointScheduler {
+	s := newCheckpointScheduler(client, testConfig(baseURL))
 	s.now = func() time.Time { return time.Unix(0, 0) }
 	s.randFloat = func() float64 { return 0 }
 
 	return s
+}
+
+func testConfig(baseURL string) Config {
+	return Config{CallbackBaseURL: baseURL, Delay: 30 * time.Minute, Jitter: 10 * time.Minute}
 }
 
 func newTestCtx() (context.Context, valobj.Uid, requestid.ID) {
@@ -65,7 +69,7 @@ func TestSchedulerDisabledWithoutBaseURL(t *testing.T) {
 		client := &fakeScheduleClient{}
 		scheduler := newTestScheduler(client, "")
 
-		So(scheduler.Enabled(), ShouldBeFalse)
+		So(scheduler.enabled(), ShouldBeFalse)
 		So(scheduler.ScheduleSourceCleanup(t.Context(), valobj.NewId(), valobj.NewId(), nil), ShouldBeNil)
 		So(client.calls, ShouldEqual, 0)
 	})
@@ -110,7 +114,7 @@ func TestScheduleNotebookCleanup(t *testing.T) {
 		So(err, ShouldBeNil)
 
 		ctx, userId, reqId := newTestCtx()
-		scheduler.ScheduleNotebookCleanup(ctx, notebookId,
+		scheduler.scheduleNotebookCleanup(ctx, notebookId,
 			[]SourceRef{{SourceId: sourceId, Keys: []string{"k"}}},
 			[]ArtifactRef{{ArtifactId: artifactId, Keys: []string{key.Encode()}}},
 		)
@@ -169,7 +173,7 @@ func TestScheduleNameWithoutRequestContext(t *testing.T) {
 func TestNextFireAtAppliesJitter(t *testing.T) {
 	Convey("jitter stays within [delay, delay+jitter)", t, func() {
 		client := &fakeScheduleClient{}
-		scheduler := NewCheckpointScheduler(client, "http://notelm:7099", 30*time.Minute, 10*time.Minute)
+		scheduler := newCheckpointScheduler(client, testConfig("http://notelm:7099"))
 		now := time.Unix(0, 0)
 		scheduler.now = func() time.Time { return now }
 
@@ -186,7 +190,7 @@ func TestScheduleRegistrationErrorIsReturned(t *testing.T) {
 		client := &fakeScheduleClient{err: errors.ErrInner.Msg("flow down")}
 		scheduler := newTestScheduler(client, "http://notelm:7099")
 
-		err := scheduler.ScheduleNotebookCleanup(t.Context(), valobj.NewId(), nil, nil)
+		err := scheduler.scheduleNotebookCleanup(t.Context(), valobj.NewId(), nil, nil)
 		So(err, ShouldNotBeNil)
 		So(client.calls, ShouldEqual, 1)
 	})

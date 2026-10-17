@@ -68,12 +68,7 @@ type ServerDeps struct {
 	FlowClient flow.TaskClient
 	Poller     artifactapp.Poller
 
-	// 两者都为空时不挂 flow 回调端点。
-	CleanupFlowClient flow.ScheduleClient
-	CleanupScheduler  *cleanup.CheckpointScheduler
-	CleanupSweeper    *cleanup.Sweeper
-	// 删除接口里注册唯一一条 notebook 兜底清理检查点。
-	CleanupRegistrar *cleanup.NotebookCleanupRegistrar
+	Cleanup *cleanup.Cleaner
 
 	TitleMaker adapter.TitleMaker
 }
@@ -127,22 +122,22 @@ func NewServer(
 		}),
 
 		notebook: notebookapi.NewServer(notebookapi.Deps{
-			NotebookRepo:     deps.NotebookRepo,
-			SourceRepo:       deps.SourceRepo,
-			EventBus:         deps.EventBus,
-			DistLock:         deps.DistLock,
-			Summarizer:       deps.Summarizer,
-			CleanupRegistrar: deps.CleanupRegistrar,
+			NotebookRepo: deps.NotebookRepo,
+			SourceRepo:   deps.SourceRepo,
+			EventBus:     deps.EventBus,
+			DistLock:     deps.DistLock,
+			Summarizer:   deps.Summarizer,
+			Cleanup:      deps.Cleanup,
 		}),
 
 		source: sourceapi.NewServer(sourceapi.Deps{
-			SourceRepo:       deps.SourceRepo,
-			NotebookRepo:     deps.NotebookRepo,
-			ObjectStore:      deps.ObjectStore,
-			KeyFactory:       deps.KeyFactory,
-			SourceDocRepo:    deps.SourceDocRepo,
-			EventBus:         deps.EventBus,
-			CleanupScheduler: deps.CleanupScheduler,
+			SourceRepo:    deps.SourceRepo,
+			NotebookRepo:  deps.NotebookRepo,
+			ObjectStore:   deps.ObjectStore,
+			KeyFactory:    deps.KeyFactory,
+			SourceDocRepo: deps.SourceDocRepo,
+			EventBus:      deps.EventBus,
+			Cleanup:       deps.Cleanup,
 		}),
 
 		chat: chatapi.NewServer(chatapi.Deps{
@@ -176,7 +171,7 @@ func NewServer(
 			TitleMaker:       deps.TitleMaker,
 			ObjectStore:      deps.ObjectStore,
 			KeyFactory:       deps.KeyFactory,
-			CleanupScheduler: deps.CleanupScheduler,
+			Cleanup:          deps.Cleanup,
 		}),
 
 		user: userapi.NewServer(userapi.Deps{
@@ -187,8 +182,8 @@ func NewServer(
 		}),
 	}
 
-	if deps.CleanupFlowClient != nil && deps.CleanupSweeper != nil {
-		s.webhook = webhook.NewServer(deps.CleanupFlowClient, deps.CleanupSweeper)
+	if deps.Cleanup != nil && deps.Cleanup.Enabled() {
+		s.webhook = webhook.NewServer(deps.Cleanup)
 	}
 
 	s.registerRoutes()

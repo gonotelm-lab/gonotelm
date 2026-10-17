@@ -58,8 +58,7 @@ type WorkerDeps struct {
 	ObjectStorage        adapter.ObjectStore
 	KeyFactory           adapter.StoreKeyFactory
 	CheckpointRepository workerrepo.CheckpointRepository
-	// ArtifactRepo 供自检产物是否已删；为空则不检查。
-	ArtifactRepo artifactrepo.Repository
+	ArtifactRepo         artifactrepo.Repository
 }
 
 type Generator interface {

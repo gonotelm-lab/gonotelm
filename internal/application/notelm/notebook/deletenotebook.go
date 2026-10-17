@@ -14,19 +14,19 @@ import (
 
 type DeleteNotebookHandler struct {
 	*baseHandler
-	eventBus         eventbus.Publisher
-	cleanupRegistrar *cleanup.NotebookCleanupRegistrar
+	eventBus eventbus.Publisher
+	cleaner  *cleanup.Cleaner
 }
 
 func NewDeleteNotebookHandler(
 	notebookRepo notebookrepo.Repository,
 	eventBus eventbus.Publisher,
-	cleanupRegistrar *cleanup.NotebookCleanupRegistrar,
+	cleaner *cleanup.Cleaner,
 ) *DeleteNotebookHandler {
 	return &DeleteNotebookHandler{
-		baseHandler:      newBaseHandler(notebookRepo),
-		eventBus:         eventBus,
-		cleanupRegistrar: cleanupRegistrar,
+		baseHandler: newBaseHandler(notebookRepo),
+		eventBus:    eventBus,
+		cleaner:     cleaner,
 	}
 }
 
@@ -46,7 +46,7 @@ func (h *DeleteNotebookHandler) Handle(ctx context.Context, id valobj.Id) error 
 	}
 
 	// 发布事件前注册：此时 source/artifact 记录还没删，拿得到对象 key
-	if err := h.cleanupRegistrar.Register(ctx, id); err != nil {
+	if err := h.cleaner.RegisterNotebookCleanup(ctx, id); err != nil {
 		slog.ErrorContext(ctx, "register notebook cleanup checkpoint failed",
 			slog.String("notebook_id", id.String()),
 			slog.Any("err", err),

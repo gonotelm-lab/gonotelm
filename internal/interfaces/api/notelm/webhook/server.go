@@ -4,16 +4,14 @@ package webhook
 import (
 	"github.com/cloudwego/hertz/pkg/app/server"
 	"github.com/gonotelm-lab/gonotelm/internal/application/shared/cleanup"
-	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
 )
 
 type Server struct {
-	flowClient flow.ScheduleClient
-	sweeper    *cleanup.Sweeper
+	cleaner *cleanup.Cleaner
 }
 
-func NewServer(flowClient flow.ScheduleClient, sweeper *cleanup.Sweeper) *Server {
-	return &Server{flowClient: flowClient, sweeper: sweeper}
+func NewServer(cleaner *cleanup.Cleaner) *Server {
+	return &Server{cleaner: cleaner}
 }
 
 func (s *Server) RegisterRoutes(h *server.Hertz) {

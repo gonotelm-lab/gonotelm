@@ -13,17 +13,17 @@ import (
 
 const notebookPageSize = 100
 
-// NotebookCleanupRegistrar 快照 notebook 下 source/artifact 的对象 key，注册唯一一条兜底检查点。
-type NotebookCleanupRegistrar struct {
-	sweeper   *Sweeper
-	scheduler *CheckpointScheduler
+// notebookRegistrar 快照 notebook 下 source/artifact 的对象 key，注册唯一一条兜底检查点。
+type notebookRegistrar struct {
+	sweeper   *sweeper
+	scheduler *checkpointScheduler
 }
 
-func NewNotebookCleanupRegistrar(sweeper *Sweeper, scheduler *CheckpointScheduler) *NotebookCleanupRegistrar {
-	return &NotebookCleanupRegistrar{sweeper: sweeper, scheduler: scheduler}
+func newNotebookRegistrar(sweeper *sweeper, scheduler *checkpointScheduler) *notebookRegistrar {
+	return &notebookRegistrar{sweeper: sweeper, scheduler: scheduler}
 }
 
-func (r *NotebookCleanupRegistrar) Register(ctx context.Context, notebookId valobj.Id) error {
+func (r *notebookRegistrar) RegisterNotebookCleanup(ctx context.Context, notebookId valobj.Id) error {
 	sources, err := r.listSources(ctx, notebookId)
 	if err != nil {
 		return err
@@ -33,7 +33,7 @@ func (r *NotebookCleanupRegistrar) Register(ctx context.Context, notebookId valo
 		return err
 	}
 
-	if err := r.scheduler.ScheduleNotebookCleanup(
+	if err := r.scheduler.scheduleNotebookCleanup(
 		ctx,
 		notebookId,
 		collectSourceRefs(sources),
@@ -45,7 +45,7 @@ func (r *NotebookCleanupRegistrar) Register(ctx context.Context, notebookId valo
 	return nil
 }
 
-func (r *NotebookCleanupRegistrar) listSources(
+func (r *notebookRegistrar) listSources(
 	ctx context.Context,
 	notebookId valobj.Id,
 ) ([]*sourceentity.Source, error) {
@@ -73,7 +73,7 @@ func (r *NotebookCleanupRegistrar) listSources(
 	return sources, nil
 }
 
-func (r *NotebookCleanupRegistrar) listArtifacts(
+func (r *notebookRegistrar) listArtifacts(
 	ctx context.Context,
 	notebookId valobj.Id,
 ) ([]*artifactentity.Artifact, error) {

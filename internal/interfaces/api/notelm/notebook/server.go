@@ -11,12 +11,12 @@ import (
 
 // Deps 笔记本接口所需依赖，由外层 notelm.ServerDeps 裁剪后传入
 type Deps struct {
-	NotebookRepo     notebookrepo.Repository
-	SourceRepo       sourcerepo.Repository
-	EventBus         eventbus.Publisher
-	DistLock         adapter.DistributedLock
-	Summarizer       adapter.Summarizer
-	CleanupRegistrar *cleanup.NotebookCleanupRegistrar
+	NotebookRepo notebookrepo.Repository
+	SourceRepo   sourcerepo.Repository
+	EventBus     eventbus.Publisher
+	DistLock     adapter.DistributedLock
+	Summarizer   adapter.Summarizer
+	Cleanup      *cleanup.Cleaner
 }
 
 // Server 笔记本接口的处理器集合
@@ -34,7 +34,7 @@ func NewServer(deps Deps) *Server {
 		getNotebookHandler:        notebookapp.NewGetNotebookHandler(deps.NotebookRepo),
 		createNotebookHandler:     notebookapp.NewCreateNotebookHandler(deps.NotebookRepo, deps.EventBus),
 		listNotebooksHandler:      notebookapp.NewListNotebooksHandler(deps.NotebookRepo),
-		deleteNotebookHandler:     notebookapp.NewDeleteNotebookHandler(deps.NotebookRepo, deps.EventBus, deps.CleanupRegistrar),
+		deleteNotebookHandler:     notebookapp.NewDeleteNotebookHandler(deps.NotebookRepo, deps.EventBus, deps.Cleanup),
 		updateNotebookNameHandler: notebookapp.NewUpdateNotebookNameHandler(deps.NotebookRepo),
 		generateNotebookDescriptionHandler: notebookapp.NewGenerateDescriptionHandler(
 			deps.NotebookRepo,

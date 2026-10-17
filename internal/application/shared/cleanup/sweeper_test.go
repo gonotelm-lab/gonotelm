@@ -203,11 +203,11 @@ func newTestSweeper(
 	artifacts *fakeArtifactRepo,
 	docs *fakeSourceDocRepo,
 	objects *fakeObjectStore,
-) *Sweeper {
-	return NewSweeper(source, notebook, artifacts, docs, objects)
+) *sweeper {
+	return newSweeper(source, notebook, artifacts, docs, objects)
 }
 
-func newDefaultTestSweeper(source *fakeSourceRepo, notebook *fakeNotebookRepo, docs *fakeSourceDocRepo, objects *fakeObjectStore) *Sweeper {
+func newDefaultTestSweeper(source *fakeSourceRepo, notebook *fakeNotebookRepo, docs *fakeSourceDocRepo, objects *fakeObjectStore) *sweeper {
 	return newTestSweeper(source, notebook, &fakeArtifactRepo{}, docs, objects)
 }
 

@@ -16,36 +16,29 @@ import (
 
 const scheduleNameReqIdLen = 8
 
-// CheckpointScheduler 在删除发生时注册一次性清理检查点。
-type CheckpointScheduler struct {
-	client  flow.ScheduleClient
-	baseURL string
-	delay   time.Duration
-	jitter  time.Duration
+// checkpointScheduler 在删除发生时注册一次性清理检查点。
+type checkpointScheduler struct {
+	client flow.ScheduleClient
+	cfg    Config
 
 	// 单测注入
 	now       func() time.Time
 	randFloat func() float64
 }
 
-func NewCheckpointScheduler(
-	client flow.ScheduleClient,
-	baseURL string,
-	delay, jitter time.Duration,
-) *CheckpointScheduler {
-	return &CheckpointScheduler{
+func newCheckpointScheduler(client flow.ScheduleClient, cfg Config) *checkpointScheduler {
+	cfg.CallbackBaseURL = strings.TrimRight(cfg.CallbackBaseURL, "/")
+
+	return &checkpointScheduler{
 		client:    client,
-		baseURL:   strings.TrimRight(baseURL, "/"),
-		delay:     delay,
-		jitter:    jitter,
+		cfg:       cfg,
 		now:       time.Now,
 		randFloat: rand.Float64,
 	}
 }
 
-// Enabled 没配回调地址或没有 flow 客户端时不注册。
-func (s *CheckpointScheduler) Enabled() bool {
-	return s != nil && s.client != nil && s.baseURL != ""
+func (s *checkpointScheduler) enabled() bool {
+	return s != nil && s.client != nil && s.cfg.CallbackBaseURL != ""
 }
 
 const (
@@ -54,7 +47,7 @@ const (
 	actionDeleteArtifact = "del-artifact"
 )
 
-func (s *CheckpointScheduler) ScheduleSourceCleanup(
+func (s *checkpointScheduler) ScheduleSourceCleanup(
 	ctx context.Context,
 	notebookId, sourceId valobj.Id,
 	keys []valobj.StoreKey,
@@ -71,7 +64,7 @@ func (s *CheckpointScheduler) ScheduleSourceCleanup(
 	return s.register(ctx, p, SourceCallbackPath, key, name)
 }
 
-func (s *CheckpointScheduler) ScheduleNotebookCleanup(
+func (s *checkpointScheduler) scheduleNotebookCleanup(
 	ctx context.Context,
 	notebookId valobj.Id,
 	sources []SourceRef,
@@ -84,7 +77,7 @@ func (s *CheckpointScheduler) ScheduleNotebookCleanup(
 	return s.register(ctx, p, NotebookCallbackPath, key, name)
 }
 
-func (s *CheckpointScheduler) ScheduleArtifactCleanup(
+func (s *checkpointScheduler) ScheduleArtifactCleanup(
 	ctx context.Context,
 	notebookId, artifactId valobj.Id,
 	keys []valobj.StoreKey,
@@ -117,14 +110,14 @@ func scheduleName(ctx context.Context, action string, resourceId valobj.Id) stri
 	return fmt.Sprintf("%s+%s+%s@%s", userId, action, resourceId, reqIdStr)
 }
 
-func (s *CheckpointScheduler) register(
+func (s *checkpointScheduler) register(
 	ctx context.Context,
 	p *Payload,
 	path string,
 	idempotencyKey string,
 	name string,
 ) error {
-	if !s.Enabled() {
+	if !s.enabled() {
 		return nil
 	}
 
@@ -137,7 +130,7 @@ func (s *CheckpointScheduler) register(
 	scheduleId, err := s.client.RegisterOneShot(
 		ctx,
 		fireAt,
-		s.baseURL+path,
+		s.cfg.CallbackBaseURL+path,
 		payload,
 		idempotencyKey,
 		name,
@@ -157,10 +150,10 @@ func (s *CheckpointScheduler) register(
 }
 
 // nextFireAt = now + delay + [0, jitter)，抖动用来分散删除高峰。
-func (s *CheckpointScheduler) nextFireAt() time.Time {
-	at := s.now().Add(s.delay)
-	if s.jitter > 0 {
-		at = at.Add(time.Duration(s.randFloat() * float64(s.jitter)))
+func (s *checkpointScheduler) nextFireAt() time.Time {
+	at := s.now().Add(s.cfg.Delay)
+	if s.cfg.Jitter > 0 {
+		at = at.Add(time.Duration(s.randFloat() * float64(s.cfg.Jitter)))
 	}
 
 	return at

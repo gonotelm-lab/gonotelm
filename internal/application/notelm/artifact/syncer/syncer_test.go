@@ -185,7 +185,7 @@ func TestSyncer_PollOne_ReachesTerminalAndStops(t *testing.T) {
 	require.NoError(t, err)
 	flowc := newSyncTestFlow([]flowschema.TaskState{flowschema.TaskState_RUNNING, flowschema.TaskState_DONE}, workerOutputBytes)
 
-	s := NewSyncer(repo, flowc, &syncTestStorage{}, Config{
+	s := New(repo, flowc, &syncTestStorage{}, Config{
 		PerTaskInterval: 10 * time.Millisecond,
 		GlobalInterval:  10 * time.Millisecond,
 		GlobalBatchSize: 100,
@@ -223,7 +223,7 @@ func TestSyncer_GlobalScan_CatchesPendingArtifacts(t *testing.T) {
 	repo := newSyncTestRepo(a1, a2)
 	flowc := newSyncTestFlow([]flowschema.TaskState{flowschema.TaskState_DONE}, outBytes)
 
-	s := NewSyncer(repo, flowc, &syncTestStorage{}, Config{
+	s := New(repo, flowc, &syncTestStorage{}, Config{
 		PerTaskInterval: 10 * time.Millisecond,
 		GlobalInterval:  10 * time.Millisecond,
 		GlobalBatchSize: 100,
@@ -245,7 +245,7 @@ func TestSyncer_Shutdown_StopsLoops(t *testing.T) {
 	repo := newSyncTestRepo(a)
 	flowc := newSyncTestFlow([]flowschema.TaskState{flowschema.TaskState_RUNNING}, nil)
 
-	s := NewSyncer(repo, flowc, &syncTestStorage{}, Config{
+	s := New(repo, flowc, &syncTestStorage{}, Config{
 		PerTaskInterval: 10 * time.Millisecond,
 		GlobalInterval:  10 * time.Millisecond,
 		GlobalBatchSize: 100,
@@ -289,7 +289,7 @@ func newOrphanSyncer(t *testing.T, states []flowschema.TaskState, result []byte)
 
 	storage := &syncTestStorage{}
 	flowc := newSyncTestFlow(states, result)
-	s := NewSyncer(newSyncTestRepo(), flowc, storage, Config{
+	s := New(newSyncTestRepo(), flowc, storage, Config{
 		PerTaskInterval: 10 * time.Millisecond,
 		GlobalInterval:  10 * time.Millisecond,
 		GlobalBatchSize: 100,

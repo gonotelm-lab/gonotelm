@@ -12,11 +12,11 @@ import (
 
 // OnSourceDeletedEventHandler 只清 source 自己的资源。
 type OnSourceDeletedEventHandler struct {
-	cleanupSweeper *cleanup.Sweeper
+	cleaner *cleanup.Cleaner
 }
 
-func NewOnSourceDeletedEventHandler(cleanupSweeper *cleanup.Sweeper) *OnSourceDeletedEventHandler {
-	return &OnSourceDeletedEventHandler{cleanupSweeper: cleanupSweeper}
+func NewOnSourceDeletedEventHandler(cleaner *cleanup.Cleaner) *OnSourceDeletedEventHandler {
+	return &OnSourceDeletedEventHandler{cleaner: cleaner}
 }
 
 func (h *OnSourceDeletedEventHandler) Handle(ctx context.Context, evt *sourceevent.DeleteEvent) error {
@@ -24,7 +24,7 @@ func (h *OnSourceDeletedEventHandler) Handle(ctx context.Context, evt *sourceeve
 	notebookId := evt.NotebookId()
 	objectKeys := cleanup.EncodeKeys(evt.ObjectStoreKeys())
 
-	if err := h.cleanupSweeper.SweepSource(ctx, notebookId, sourceId, objectKeys); err != nil {
+	if err := h.cleaner.SweepSource(ctx, notebookId, sourceId, objectKeys); err != nil {
 		slog.ErrorContext(ctx, "failed to clean up deleted source",
 			slog.String("source_id", sourceId.String()),
 			slog.String("notebook_id", notebookId.String()),

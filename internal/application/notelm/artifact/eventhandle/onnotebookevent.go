@@ -19,17 +19,17 @@ const notebookArtifactsPageSize = 100
 
 // OnNotebookEventHandler 停掉在途生成任务并删除产物自己的对象和数据记录
 type OnNotebookEventHandler struct {
-	artifactRepo   artifactrepo.Repository
-	flowc          flow.TaskClient
-	cleanupSweeper *cleanup.Sweeper
+	artifactRepo artifactrepo.Repository
+	flowc        flow.TaskClient
+	cleaner      *cleanup.Cleaner
 }
 
 func NewOnNotebookEventHandler(
 	artifactRepo artifactrepo.Repository,
 	flowc flow.TaskClient,
-	cleanupSweeper *cleanup.Sweeper,
+	cleaner *cleanup.Cleaner,
 ) *OnNotebookEventHandler {
-	return &OnNotebookEventHandler{artifactRepo: artifactRepo, flowc: flowc, cleanupSweeper: cleanupSweeper}
+	return &OnNotebookEventHandler{artifactRepo: artifactRepo, flowc: flowc, cleaner: cleaner}
 }
 
 func (h *OnNotebookEventHandler) Handle(
@@ -48,7 +48,7 @@ func (h *OnNotebookEventHandler) Handle(
 
 	cancelled := h.cancelInFlight(ctx, artifacts)
 
-	if err := h.cleanupSweeper.SweepDeletedNotebookArtifacts(ctx, notebookId, artifacts); err != nil {
+	if err := h.cleaner.SweepDeletedNotebookArtifacts(ctx, notebookId, artifacts); err != nil {
 		slog.ErrorContext(ctx, "failed to clean up artifacts for deleted notebook",
 			slog.String("notebook_id", notebookId.String()),
 			slog.Any("err", err),

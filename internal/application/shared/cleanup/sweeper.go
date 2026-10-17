@@ -18,8 +18,8 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
-// Sweeper 幂等清扫删除后残留的行 / 向量 / 对象；立即清理与延迟清理共用同一份逻辑。
-type Sweeper struct {
+// sweeper 幂等清扫删除后残留的行 / 向量 / 对象；立即清理与延迟清理共用同一份逻辑。
+type sweeper struct {
 	sourceRepo    sourcerepo.Repository
 	notebookRepo  notebookrepo.Repository
 	artifactRepo  artifactrepo.Repository
@@ -27,14 +27,14 @@ type Sweeper struct {
 	objectStore   adapter.ObjectStore
 }
 
-func NewSweeper(
+func newSweeper(
 	sourceRepo sourcerepo.Repository,
 	notebookRepo notebookrepo.Repository,
 	artifactRepo artifactrepo.Repository,
 	sourceDocRepo sourcerepo.SourceDocRepository,
 	objectStore adapter.ObjectStore,
-) *Sweeper {
-	return &Sweeper{
+) *sweeper {
+	return &sweeper{
 		sourceRepo:    sourceRepo,
 		notebookRepo:  notebookRepo,
 		artifactRepo:  artifactRepo,
@@ -44,7 +44,7 @@ func NewSweeper(
 }
 
 // Sweep 执行一轮清扫；返回 error 表示外部依赖失败
-func (s *Sweeper) Sweep(ctx context.Context, p *Payload) error {
+func (s *sweeper) Sweep(ctx context.Context, p *Payload) error {
 	slog.DebugContext(ctx, "sweep cleanup payload",
 		slog.String("kind", p.Kind),
 		slog.String("notebook_id", p.NotebookId.String()),
@@ -67,7 +67,7 @@ func (s *Sweeper) Sweep(ctx context.Context, p *Payload) error {
 	}
 }
 
-func (s *Sweeper) SweepSource(
+func (s *sweeper) SweepSource(
 	ctx context.Context,
 	notebookId, sourceId valobj.Id,
 	keys []string,
@@ -78,6 +78,7 @@ func (s *Sweeper) SweepSource(
 		slog.Int("keys", len(keys)),
 	)
 
+	// 这里是触发了清理才能到达的流程 如果此时还存在对应的数据记录 则不处理
 	if _, err := s.sourceRepo.FindById(ctx, sourceId); err == nil {
 		slog.InfoContext(ctx, "source still exists, skip cleanup",
 			slog.String("source_id", sourceId.String()))
@@ -90,7 +91,7 @@ func (s *Sweeper) SweepSource(
 	return s.purgeSources(ctx, notebookId, []SourceRef{{SourceId: sourceId, Keys: keys}})
 }
 
-func (s *Sweeper) SweepArtifact(
+func (s *sweeper) SweepArtifact(
 	ctx context.Context,
 	notebookId, artifactId valobj.Id,
 	keys []string,
@@ -101,6 +102,7 @@ func (s *Sweeper) SweepArtifact(
 		slog.Int("keys", len(keys)),
 	)
 
+	// 这里是触发了清理才能到达的流程 如果此时还存在对应的数据记录 则不处理
 	if _, err := s.artifactRepo.FindById(ctx, artifactId); err == nil {
 		slog.InfoContext(ctx, "artifact still exists, skip cleanup",
 			slog.String("artifact_id", artifactId.String()))
@@ -113,7 +115,7 @@ func (s *Sweeper) SweepArtifact(
 	return s.purgeArtifacts(ctx, []ArtifactRef{{ArtifactId: artifactId, Keys: keys}})
 }
 
-func (s *Sweeper) SweepDeletedNotebookSources(
+func (s *sweeper) SweepDeletedNotebookSources(
 	ctx context.Context,
 	notebookId valobj.Id,
 	sources []*sourceentity.Source,
@@ -129,7 +131,7 @@ func (s *Sweeper) SweepDeletedNotebookSources(
 	return stderrors.Join(errs...)
 }
 
-func (s *Sweeper) SweepDeletedNotebookArtifacts(
+func (s *sweeper) SweepDeletedNotebookArtifacts(
 	ctx context.Context,
 	notebookId valobj.Id,
 	artifacts []*artifactentity.Artifact,
@@ -145,7 +147,7 @@ func (s *Sweeper) SweepDeletedNotebookArtifacts(
 	return stderrors.Join(errs...)
 }
 
-func (s *Sweeper) SweepNotebook(
+func (s *sweeper) SweepNotebook(
 	ctx context.Context,
 	notebookId valobj.Id,
 	sources []SourceRef,
@@ -187,7 +189,7 @@ func (s *Sweeper) SweepNotebook(
 	return stderrors.Join(errs...)
 }
 
-func (s *Sweeper) purgeSources(ctx context.Context, notebookId valobj.Id, refs []SourceRef) error {
+func (s *sweeper) purgeSources(ctx context.Context, notebookId valobj.Id, refs []SourceRef) error {
 	if len(refs) == 0 {
 		return nil
 	}
@@ -222,7 +224,7 @@ func (s *Sweeper) purgeSources(ctx context.Context, notebookId valobj.Id, refs [
 	return stderrors.Join(errs...)
 }
 
-func (s *Sweeper) purgeArtifacts(ctx context.Context, refs []ArtifactRef) error {
+func (s *sweeper) purgeArtifacts(ctx context.Context, refs []ArtifactRef) error {
 	if len(refs) == 0 {
 		return nil
 	}

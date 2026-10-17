@@ -30,7 +30,7 @@ func (s *Server) flowCleanupHandler(expectedKind string) app.HandlerFunc {
 			return
 		}
 
-		if err := s.flowClient.Verify(req); err != nil {
+		if err := s.cleaner.VerifyCallback(req); err != nil {
 			slog.WarnContext(ctx, "flow callback verify failed", slog.Any("err", err))
 			c.String(http.StatusUnauthorized, "unauthorized")
 
@@ -62,7 +62,7 @@ func (s *Server) flowCleanupHandler(expectedKind string) app.HandlerFunc {
 			return
 		}
 
-		if err := s.sweeper.Sweep(ctx, payload); err != nil {
+		if err := s.cleaner.Sweep(ctx, payload); err != nil {
 			// 临时失败：让 flow 重投，清扫本身可重复执行
 			slog.ErrorContext(ctx, "flow callback sweep failed",
 				slog.String("kind", payload.Kind),

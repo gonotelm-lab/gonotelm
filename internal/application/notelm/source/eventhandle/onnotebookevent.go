@@ -18,15 +18,15 @@ const notebookSourcesPageSize = 50
 
 // OnNotebookEventHandler 只清 source 自己的资源。
 type OnNotebookEventHandler struct {
-	sourceRepo     sourcerepo.Repository
-	cleanupSweeper *cleanup.Sweeper
+	sourceRepo sourcerepo.Repository
+	cleaner    *cleanup.Cleaner
 }
 
 func NewOnNotebookEventHandler(
 	sourceRepo sourcerepo.Repository,
-	cleanupSweeper *cleanup.Sweeper,
+	cleaner *cleanup.Cleaner,
 ) *OnNotebookEventHandler {
-	return &OnNotebookEventHandler{sourceRepo: sourceRepo, cleanupSweeper: cleanupSweeper}
+	return &OnNotebookEventHandler{sourceRepo: sourceRepo, cleaner: cleaner}
 }
 
 func (h *OnNotebookEventHandler) Handle(
@@ -46,7 +46,7 @@ func (h *OnNotebookEventHandler) Handle(
 		return nil
 	}
 
-	if err := h.cleanupSweeper.SweepDeletedNotebookSources(ctx, notebookId, sources); err != nil {
+	if err := h.cleaner.SweepDeletedNotebookSources(ctx, notebookId, sources); err != nil {
 		slog.ErrorContext(ctx, "failed to clean up sources for deleted notebook",
 			slog.String("notebook_id", notebookId.String()),
 			slog.Any("err", err),

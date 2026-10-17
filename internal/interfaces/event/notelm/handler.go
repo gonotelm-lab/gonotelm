@@ -39,7 +39,7 @@ type EventDeps struct {
 	ChatGateway *llmchat.Gateway
 	FlowClient  flow.TaskClient
 
-	CleanupSweeper *cleanup.Sweeper
+	Cleanup *cleanup.Cleaner
 }
 
 func Init(ctx context.Context, deps *EventDeps) {
@@ -59,7 +59,7 @@ func Init(ctx context.Context, deps *EventDeps) {
 func initSourceEventConsumers(deps *EventDeps) error {
 	if err := source.RegisterSourceDeletedConsumer(
 		deps.EventBus.InProcess,
-		source.NewOnSourceDeletedEventHandler(deps.CleanupSweeper),
+		source.NewOnSourceDeletedEventHandler(deps.Cleanup),
 	); err != nil {
 		return err
 	}
@@ -81,14 +81,14 @@ func initNotebookEventConsumers(deps *EventDeps) error {
 
 	if err := source.RegisterNotebookEventConsumer(
 		deps.EventBus.InProcess,
-		source.NewOnNotebookEventHandler(deps.SourceRepo, deps.CleanupSweeper),
+		source.NewOnNotebookEventHandler(deps.SourceRepo, deps.Cleanup),
 	); err != nil {
 		return err
 	}
 
 	return artifact.RegisterNotebookEventConsumer(
 		deps.EventBus.InProcess,
-		artifact.NewOnNotebookEventHandler(deps.ArtifactTaskRepo, deps.FlowClient, deps.CleanupSweeper),
+		artifact.NewOnNotebookEventHandler(deps.ArtifactTaskRepo, deps.FlowClient, deps.Cleanup),
 	)
 }
 

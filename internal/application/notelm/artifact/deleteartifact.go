@@ -14,22 +14,22 @@ import (
 
 type DeleteArtifactHandler struct {
 	*baseHandler
-	flowc            flow.TaskClient
-	storage          adapter.ObjectStore
-	cleanupScheduler *cleanup.CheckpointScheduler
+	flowc   flow.TaskClient
+	storage adapter.ObjectStore
+	cleaner *cleanup.Cleaner
 }
 
 func NewDeleteArtifactHandler(
 	repo artifactrepo.Repository,
 	flowc flow.TaskClient,
 	storage adapter.ObjectStore,
-	cleanupScheduler *cleanup.CheckpointScheduler,
+	cleaner *cleanup.Cleaner,
 ) *DeleteArtifactHandler {
 	return &DeleteArtifactHandler{
-		baseHandler:      newBaseHandler(repo),
-		flowc:            flowc,
-		storage:          storage,
-		cleanupScheduler: cleanupScheduler,
+		baseHandler: newBaseHandler(repo),
+		flowc:       flowc,
+		storage:     storage,
+		cleaner:     cleaner,
 	}
 }
 
@@ -52,7 +52,7 @@ func (h *DeleteArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error
 	}
 
 	// 先注册兜底再删对象，删失败还能由回调重删
-	if err := h.cleanupScheduler.ScheduleArtifactCleanup(ctx, a.NotebookId, a.Id, storeKeys); err != nil {
+	if err := h.cleaner.ScheduleArtifactCleanup(ctx, a.NotebookId, a.Id, storeKeys); err != nil {
 		slog.ErrorContext(ctx, "register artifact cleanup checkpoint failed",
 			slog.String("artifact_id", a.Id.String()),
 			slog.String("notebook_id", a.NotebookId.String()),

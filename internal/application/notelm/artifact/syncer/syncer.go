@@ -43,7 +43,7 @@ type Syncer struct {
 	eventBus eventbus.Publisher
 }
 
-func NewSyncer(
+func New(
 	repo artifactrepo.Repository,
 	flowc flow.TaskClient,
 	storage adapter.ObjectStore,

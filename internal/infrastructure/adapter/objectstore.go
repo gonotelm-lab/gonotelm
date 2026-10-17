@@ -2,7 +2,9 @@ package adapter
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"log/slog"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
@@ -259,12 +261,14 @@ func (s *ObjectStoreImpl) BatchDeleteObject(ctx context.Context, keys []valobj.S
 	for bucket, objectKeys := range grouped {
 		st, ok := s.stores[bucket]
 		if !ok {
-			return errors.ErrParams.Msgf("storekey: unknown bucket %q", bucket)
+			slog.WarnContext(ctx, fmt.Sprintf("object store batch delete object unknown bucket %s", bucket))
+			continue
 		}
 
 		err := st.BatchDeleteObject(ctx, &storage.BatchDeleteObjectRequest{Keys: objectKeys})
 		if err != nil {
-			return errors.WithMessagef(err, "batch delete objects failed, bucket=%s", bucket)
+			slog.ErrorContext(ctx, fmt.Sprintf("object store batch delete object failed, bucket=%s, err=%v", bucket, err))
+			continue
 		}
 	}
 

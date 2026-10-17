@@ -182,9 +182,7 @@ func NewServer(
 		}),
 	}
 
-	if deps.Cleaner != nil && deps.Cleaner.Enabled() {
-		s.webhook = webhook.NewServer(deps.Cleaner)
-	}
+	s.webhook = webhook.NewServer(deps.Cleaner)
 
 	s.registerRoutes()
 
@@ -192,9 +190,7 @@ func NewServer(
 }
 
 func (s *Server) registerRoutes() {
-	if s.webhook != nil {
-		s.webhook.RegisterRoutes(s.h)
-	}
+	s.webhook.RegisterRoutes(s.h)
 
 	v1Group := s.h.Group("/api/v1", s.csrfMiddleware())
 	{

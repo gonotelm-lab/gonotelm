@@ -51,11 +51,6 @@ func New(cfg Config, deps Deps) *Cleaner {
 	}
 }
 
-// Enabled 未配置回调地址或没有 flow 客户端时不注册检查点，也不挂回调端点。
-func (c *Cleaner) Enabled() bool {
-	return c.enabled()
-}
-
 func (c *Cleaner) VerifyCallback(req *http.Request) error {
 	return c.client.Verify(req)
 }

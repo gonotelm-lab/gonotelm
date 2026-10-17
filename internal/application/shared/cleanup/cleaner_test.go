@@ -25,20 +25,8 @@ func TestNewCleaner(t *testing.T) {
 			ObjectStore:   &fakeObjectStore{},
 		})
 
-		So(cleaner.Enabled(), ShouldBeTrue)
 		So(cleaner.VerifyCallback(&http.Request{}), ShouldBeNil)
 		So(cleaner.RegisterNotebookCleanup(t.Context(), valobj.NewId()), ShouldBeNil)
 		So(client.calls, ShouldEqual, 1)
-	})
-}
-
-func TestNewCleanerDisabledWithoutCallbackURL(t *testing.T) {
-	Convey("registers nothing when the callback URL is empty", t, func() {
-		client := &fakeScheduleClient{}
-		cleaner := New(Config{}, Deps{ScheduleClient: client, SourceRepo: &fakeSourceRepo{}})
-
-		So(cleaner.Enabled(), ShouldBeFalse)
-		So(cleaner.ScheduleArtifactCleanup(t.Context(), valobj.NewId(), valobj.NewId(), nil), ShouldBeNil)
-		So(client.calls, ShouldEqual, 0)
 	})
 }

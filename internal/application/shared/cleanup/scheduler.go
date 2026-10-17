@@ -37,10 +37,6 @@ func newCheckpointScheduler(client flow.ScheduleClient, cfg Config) *checkpointS
 	}
 }
 
-func (s *checkpointScheduler) enabled() bool {
-	return s != nil && s.client != nil && s.cfg.CallbackBaseURL != ""
-}
-
 const (
 	actionDeleteSource   = "del-source"
 	actionDeleteNotebook = "del-notebook"
@@ -117,10 +113,6 @@ func (s *checkpointScheduler) register(
 	idempotencyKey string,
 	name string,
 ) error {
-	if !s.enabled() {
-		return nil
-	}
-
 	payload, err := p.Marshal()
 	if err != nil {
 		return err

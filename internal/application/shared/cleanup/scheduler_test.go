@@ -64,17 +64,6 @@ func newTestCtx() (context.Context, valobj.Uid, requestid.ID) {
 	return pkgcontext.WithUserId(pkgcontext.WithReqId(context.Background(), reqId), userId), userId, reqId
 }
 
-func TestSchedulerDisabledWithoutBaseURL(t *testing.T) {
-	Convey("does not register without a base URL", t, func() {
-		client := &fakeScheduleClient{}
-		scheduler := newTestScheduler(client, "")
-
-		So(scheduler.enabled(), ShouldBeFalse)
-		So(scheduler.ScheduleSourceCleanup(t.Context(), valobj.NewId(), valobj.NewId(), nil), ShouldBeNil)
-		So(client.calls, ShouldEqual, 0)
-	})
-}
-
 func TestScheduleSourceCleanup(t *testing.T) {
 	Convey("source checkpoint URL, key, name and payload", t, func() {
 		client := &fakeScheduleClient{}

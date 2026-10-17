@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/gonotelm-lab/gonotelm/migration/db/postgres18"
 	sqltestsuite "github.com/gonotelm-lab/gonotelm/pkg/testsuite/sql"
@@ -16,6 +17,7 @@ var (
 	testDB                        *gorm.DB
 	testNotebookStore             *NotebookStoreImpl
 	testSourceStore               *SourceStoreImpl
+	testChatStore                 *ChatStoreImpl
 	testChatMessageStore          *ChatMessageStoreImpl
 	testArtifactStore             *ArtifactStoreImpl
 	testArtifactStylePreviewStore *ArtifactStylePreviewStoreImpl
@@ -25,6 +27,8 @@ var (
 	testUserIdentityStore         *UserIdentityStoreImpl
 	testTransactor                *TransactorImpl
 )
+
+func nowMilli() int64 { return time.Now().UnixMilli() }
 
 func TestMain(m *testing.M) {
 	testDatabase, err := sqltestsuite.NewTestGormDBFromEnv("pgsql")
@@ -38,6 +42,7 @@ func TestMain(m *testing.M) {
 	testDB = testDatabase.GetDB()
 	testNotebookStore = NewNotebookStoreImpl(testDB)
 	testSourceStore = NewSourceStoreImpl(testDB)
+	testChatStore = NewChatStoreImpl(testDB)
 	testChatMessageStore = NewChatMessageStoreImpl(testDB)
 	testArtifactStore = NewArtifactStoreImpl(testDB)
 	testArtifactStylePreviewStore = NewArtifactStylePreviewStoreImpl(testDB)

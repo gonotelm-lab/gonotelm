@@ -1,77 +1,109 @@
 package postgres
 
 import (
-	"context"
-	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"testing"
-	"time"
 
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	. "github.com/smartystreets/goconvey/convey"
 )
 
-func TestArtifactStore_CreateAndGetById(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	store := testArtifactStore
-
-	id := uuid.NewV7()
-	now := nowMilli()
-	in := &schema.Artifact{
-		Id: id, NotebookId: uuid.NewV7(), UserId: valobj.NewUid(),
-		Kind: "mindmap", Status: "pending", FlowTaskId: "ft-1",
-		Payload: []byte(`{}`), CreatedAt: now, UpdatedAt: now,
-	}
-	require.NoError(t, store.Create(ctx, in))
-
-	got, err := store.GetById(ctx, id)
-	require.NoError(t, err)
-	assert.Equal(t, in.UserId, got.UserId)
-	assert.Equal(t, "pending", got.Status)
-}
-
-func TestArtifactStore_Upsert(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	store := testArtifactStore
-	id := uuid.NewV7()
-	nbId := uuid.NewV7()
+func newArtifactFixture(notebookId uuid.UUID, status string) *schema.Artifact {
 	now := nowMilli()
 
-	require.NoError(t, store.Create(ctx, &schema.Artifact{
-		Id: id, NotebookId: nbId, UserId: valobj.NewUid(),
-		Kind: "report", Status: "pending", FlowTaskId: "ft-2",
+	return &schema.Artifact{
+		Id: uuid.NewV7(), NotebookId: notebookId, UserId: valobj.NewUid(),
+		Kind: "mindmap", Status: status, FlowTaskId: uuid.NewV7().String(),
 		Payload: []byte(`{}`), CreatedAt: now, UpdatedAt: now,
-	}))
-
-	require.NoError(t, store.Upsert(ctx, &schema.Artifact{
-		Id: id, NotebookId: nbId, UserId: valobj.NewUid(),
-		Kind: "report", Status: "running", FlowTaskId: "ft-2",
-		Payload: []byte(`{}`), CreatedAt: now, UpdatedAt: now + 1000,
-	}))
-
-	got, err := store.GetById(ctx, id)
-	require.NoError(t, err)
-	assert.Equal(t, "running", got.Status)
-}
-
-func TestArtifactStore_ListByStatus(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	store := testArtifactStore
-	id1, id2 := uuid.NewV7(), uuid.NewV7()
-	for _, id := range []uuid.UUID{id1, id2} {
-		require.NoError(t, store.Create(ctx, &schema.Artifact{
-			Id: id, NotebookId: uuid.NewV7(), UserId: valobj.NewUid(),
-			Kind: "mindmap", Status: "pending", FlowTaskId: uuid.NewV7().String(),
-			Payload: []byte(`{}`), CreatedAt: nowMilli(), UpdatedAt: nowMilli(),
-		}))
 	}
-	got, err := store.ListByStatus(ctx, []string{"pending"}, 100)
-	require.NoError(t, err)
-	assert.GreaterOrEqual(t, len(got), 2)
 }
 
-func nowMilli() int64 { return time.Now().UnixMilli() }
+func TestArtifactStoreCRUD(t *testing.T) {
+	Convey("ArtifactStore create / upsert / get / list / delete", t, func() {
+		store := testArtifactStore
+		ctx := t.Context()
+		notebookId := uuid.NewV7()
+
+		artifact := newArtifactFixture(notebookId, "pending")
+		So(store.Create(ctx, artifact), ShouldBeNil)
+		t.Cleanup(func() {
+			_ = testDB.WithContext(ctx).Where("id = ?", artifact.Id).Delete(&schema.Artifact{}).Error
+		})
+
+		Convey("Create never overwrites an existing row", func() {
+			So(store.Create(ctx, artifact), ShouldNotBeNil)
+		})
+
+		got, err := store.GetById(ctx, artifact.Id)
+		So(err, ShouldBeNil)
+		So(got.UserId, ShouldEqual, artifact.UserId)
+		So(got.Status, ShouldEqual, "pending")
+
+		Convey("Upsert overwrites the row by id", func() {
+			artifact.Status = "running"
+			artifact.UpdatedAt = nowMilli() + 1000
+			So(store.Upsert(ctx, artifact), ShouldBeNil)
+
+			got, err := store.GetById(ctx, artifact.Id)
+			So(err, ShouldBeNil)
+			So(got.Status, ShouldEqual, "running")
+		})
+
+		Convey("ListByNotebookId returns the notebook's artifacts", func() {
+			rows, err := store.ListByNotebookId(ctx, notebookId, 10, 0)
+			So(err, ShouldBeNil)
+			So(rows, ShouldHaveLength, 1)
+			So(rows[0].Id, ShouldEqual, artifact.Id)
+
+			empty, err := store.ListByNotebookId(ctx, uuid.NewV7(), 10, 0)
+			So(err, ShouldBeNil)
+			So(empty, ShouldBeEmpty)
+		})
+
+		Convey("ListByStatus returns artifacts with the wanted status", func() {
+			rows, err := store.ListByStatus(ctx, []string{"pending"}, 100)
+			So(err, ShouldBeNil)
+			So(len(rows), ShouldBeGreaterThanOrEqualTo, 1)
+		})
+
+		Convey("DeleteById removes only the target row", func() {
+			So(store.DeleteById(ctx, artifact.Id), ShouldBeNil)
+			_, err := store.GetById(ctx, artifact.Id)
+			So(err, ShouldNotBeNil)
+		})
+	})
+}
+
+func TestArtifactStoreDeleteByNotebookId(t *testing.T) {
+	Convey("ArtifactStore DeleteByNotebookId", t, func() {
+		store := testArtifactStore
+		ctx := t.Context()
+		targetNotebook, otherNotebook := uuid.NewV7(), uuid.NewV7()
+
+		rows := []*schema.Artifact{
+			newArtifactFixture(targetNotebook, "completed"),
+			newArtifactFixture(targetNotebook, "running"),
+			newArtifactFixture(otherNotebook, "completed"),
+		}
+		for _, row := range rows {
+			So(store.Create(ctx, row), ShouldBeNil)
+		}
+		t.Cleanup(func() {
+			_ = testDB.WithContext(ctx).
+				Where("notebook_id IN ?", []uuid.UUID{targetNotebook, otherNotebook}).
+				Delete(&schema.Artifact{}).Error
+		})
+
+		So(store.DeleteByNotebookId(ctx, targetNotebook), ShouldBeNil)
+
+		left, err := store.ListByNotebookId(ctx, targetNotebook, 10, 0)
+		So(err, ShouldBeNil)
+		So(left, ShouldBeEmpty)
+
+		kept, err := store.ListByNotebookId(ctx, otherNotebook, 10, 0)
+		So(err, ShouldBeNil)
+		So(kept, ShouldHaveLength, 1)
+		So(kept[0].NotebookId, ShouldEqual, otherNotebook)
+	})
+}

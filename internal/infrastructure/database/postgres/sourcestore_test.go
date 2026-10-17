@@ -775,3 +775,72 @@ func TestSourceStoreUpdateExistingDoesNotResurrectDeletedSource(t *testing.T) {
 		So(count, ShouldEqual, int64(0))
 	})
 }
+
+func TestSourceStoreBatchCountByNotebookIds(t *testing.T) {
+	Convey("SourceStore BatchCountByNotebookIds counts ready sources per notebook", t, func() {
+		store := testSourceStore
+		ctx := t.Context()
+		notebookID := createNotebookForSourceTest(t, testDB)
+		otherNotebookID := createNotebookForSourceTest(t, testDB)
+
+		ready := &schema.Source{
+			Id: database.Id(uuid.NewV7()), NotebookId: notebookID,
+			Kind: "doc", Status: "ready", OwnerId: valobj.NewUid(), UpdatedAt: nowMilli(),
+		}
+		preparing := &schema.Source{
+			Id: database.Id(uuid.NewV7()), NotebookId: notebookID,
+			Kind: "doc", Status: "preparing", OwnerId: valobj.NewUid(), UpdatedAt: nowMilli(),
+		}
+		// inited 的 source 不计入列表页的 source 数
+		inited := &schema.Source{
+			Id: database.Id(uuid.NewV7()), NotebookId: notebookID,
+			Kind: "doc", Status: schema.SourceStatusInited, OwnerId: valobj.NewUid(), UpdatedAt: nowMilli(),
+		}
+		other := &schema.Source{
+			Id: database.Id(uuid.NewV7()), NotebookId: otherNotebookID,
+			Kind: "doc", Status: "ready", OwnerId: valobj.NewUid(), UpdatedAt: nowMilli(),
+		}
+		for _, source := range []*schema.Source{ready, preparing, inited, other} {
+			So(store.Create(ctx, source), ShouldBeNil)
+		}
+		t.Cleanup(func() {
+			_ = testDB.WithContext(ctx).Where("notebook_id IN ?", []database.Id{notebookID, otherNotebookID}).Delete(&schema.Source{}).Error
+		})
+
+		counts, err := store.BatchCountByNotebookIds(ctx, []database.Id{notebookID, otherNotebookID})
+		So(err, ShouldBeNil)
+		So(counts[notebookID], ShouldEqual, int64(2))
+		So(counts[otherNotebookID], ShouldEqual, int64(1))
+	})
+}
+
+func TestSourceStoreUpdateTitle(t *testing.T) {
+	Convey("SourceStore UpdateTitle", t, func() {
+		store := testSourceStore
+		ctx := t.Context()
+		notebookID := createNotebookForSourceTest(t, testDB)
+
+		source := &schema.Source{
+			Id: database.Id(uuid.NewV7()), NotebookId: notebookID,
+			Kind: "doc", Status: "ready", Title: "old title",
+			OwnerId: valobj.NewUid(), UpdatedAt: 1000,
+		}
+		So(store.Create(ctx, source), ShouldBeNil)
+		t.Cleanup(func() {
+			_ = testDB.WithContext(ctx).Where("id = ?", source.Id).Delete(&schema.Source{}).Error
+		})
+
+		title := "new title"
+		updatedAt := int64(2000)
+		So(store.UpdateTitle(ctx, &schema.SourceUpdateTitleParams{
+			Id:        source.Id,
+			Title:     title,
+			UpdatedAt: updatedAt,
+		}), ShouldBeNil)
+
+		got, err := store.GetById(ctx, source.Id)
+		So(err, ShouldBeNil)
+		So(got.Title, ShouldEqual, title)
+		So(got.UpdatedAt, ShouldEqual, updatedAt)
+	})
+}

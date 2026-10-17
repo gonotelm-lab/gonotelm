@@ -29,8 +29,7 @@ func (h *UpdateSourceTitleHandler) Handle(
 	}
 
 	targetSource.UpdateTitle(title)
-	err = h.sourceRepo.Save(ctx, targetSource)
-	if err != nil {
+	if err := h.updateSource(ctx, targetSource); err != nil {
 		return errors.WithMessagef(err, "update source title failed, source_id=%s", id)
 	}
 

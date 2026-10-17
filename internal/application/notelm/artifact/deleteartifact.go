@@ -2,7 +2,9 @@ package artifact
 
 import (
 	"context"
+	"log/slog"
 
+	"github.com/gonotelm-lab/gonotelm/internal/application/shared/cleanup"
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
@@ -14,10 +16,21 @@ type DeleteArtifactHandler struct {
 	*baseHandler
 	flowc   flow.TaskClient
 	storage adapter.ObjectStore
+	cleaner *cleanup.Cleaner
 }
 
-func NewDeleteArtifactHandler(repo artifactrepo.Repository, flowc flow.TaskClient, storage adapter.ObjectStore) *DeleteArtifactHandler {
-	return &DeleteArtifactHandler{baseHandler: newBaseHandler(repo), flowc: flowc, storage: storage}
+func NewDeleteArtifactHandler(
+	repo artifactrepo.Repository,
+	flowc flow.TaskClient,
+	storage adapter.ObjectStore,
+	cleaner *cleanup.Cleaner,
+) *DeleteArtifactHandler {
+	return &DeleteArtifactHandler{
+		baseHandler: newBaseHandler(repo),
+		flowc:       flowc,
+		storage:     storage,
+		cleaner:     cleaner,
+	}
 }
 
 func (h *DeleteArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error {
@@ -30,11 +43,29 @@ func (h *DeleteArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error
 			return errors.WithMessage(err, "cancel flow task failed")
 		}
 	}
-	if a.ResultKind.Storage() && a.Result != nil {
-		storeKey := extractStoreKey(a.Result)
-		if storeKey.Valid() {
-			_ = h.storage.DeleteObject(ctx, storeKey)
-		}
+
+	var storeKey valobj.StoreKey
+	if a.ResultKind.Storage() && len(a.Result) > 0 {
+		storeKey = extractStoreKey(a.Result)
 	}
+
+	// 先注册兜底再删对象
+	if err := h.cleaner.ScheduleArtifactCleanup(
+		ctx,
+		a.NotebookId,
+		a.Id,
+		[]valobj.StoreKey{storeKey},
+	); err != nil {
+		slog.ErrorContext(ctx, "register artifact cleanup checkpoint failed",
+			slog.String("artifact_id", a.Id.String()),
+			slog.String("notebook_id", a.NotebookId.String()),
+			slog.Any("err", err),
+		)
+	}
+
+	if storeKey.Valid() {
+		_ = h.storage.DeleteObject(ctx, storeKey)
+	}
+
 	return h.repo.DeleteById(ctx, a.Id)
 }

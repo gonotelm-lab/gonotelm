@@ -3,20 +3,28 @@ gofmt:
 	go fmt ./...
 
 TEST_PKGS := \
-	./internal/infrastructure/database \
-	./internal/infrastructure/database/postgres/... \
+	./internal/application/notelm/artifact/... \
+	./internal/application/notelm/source/... \
+	./internal/application/shared/cleanup/... \
+	./internal/conf/... \
+	./internal/domain/artifact/... \
+	./internal/infrastructure/database/... \
 	./internal/infrastructure/cache \
 	./internal/infrastructure/cache/redis/... \
+	./internal/infrastructure/flow/... \
 	./internal/infrastructure/olap/... \
 	./internal/infrastructure/repository/... \
+	./internal/interfaces/entrypoint/... \
 	./pkg/initjob/... \
 	./migration/...
 
 TEST_GCFLAGS := all=-l
+# 只在 CI 产出覆盖率文件（GitHub Actions 会设 CI=true），本地跑完不留 coverage.out
+COVER_PROFILE ?= $(if $(CI),coverage.out,)
 
 .PHONY: test
 test:
-	go test -gcflags="$(TEST_GCFLAGS)" -coverprofile=coverage.out $(TEST_PKGS)
+	go test -gcflags="$(TEST_GCFLAGS)" $(if $(COVER_PROFILE),-coverprofile=$(COVER_PROFILE)) $(TEST_PKGS)
 
 .PHONY: test-coverage
 test-coverage:

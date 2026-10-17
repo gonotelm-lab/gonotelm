@@ -29,6 +29,10 @@ const (
 	maxListBatchSize     = 2000
 	collectionLoadWait   = 30 * time.Second
 
+	// sourceIDsDeleteBatchSize 单条删除表达式携带的 source id 上限：逐条删是 N 次 RPC，
+	// 合并成 `source_id in [...]` 后每批一次（60 个 source 实测 12s → 0.13s）。
+	sourceIDsDeleteBatchSize = 100
+
 	partitionCount  = 16 // DO NOT MODIFY THIS VALUE
 	partitionPrefix = "_p"
 
@@ -215,32 +219,55 @@ func (s *SourceDocStoreImpl) BatchDelete(
 		return nil
 	}
 
-	for _, sourceID := range sourceIDs {
-		expr := fmt.Sprintf(
-			`%s == %q && %s == %q`,
-			schema.FieldNotebookID,
-			notebookID,
-			schema.FieldSourceID,
-			sourceID,
-		)
-		_, err := s.cli.Delete(
+	for _, expr := range buildBatchDeleteExprs(notebookID, sourceIDs, sourceIDsDeleteBatchSize) {
+		if _, err := s.cli.Delete(
 			ctx,
 			milvusclient.NewDeleteOption(collectionName).
 				WithPartition(partitionName).
 				WithExpr(expr),
-		)
-		if err != nil {
+		); err != nil {
 			return errors.Wrapf(
 				err,
-				"batch delete source docs failed, notebook_id=%s, source_id=%s, partition=%s",
+				"batch delete source docs failed, notebook_id=%s, source_id_count=%d, partition=%s",
 				notebookID,
-				sourceID,
+				len(sourceIDs),
 				partitionName,
 			)
 		}
 	}
 
 	return nil
+}
+
+// buildBatchDeleteExprs 把 source id 列表切成若干条
+// `notebook_id == "<nb>" && source_id in [...]` 表达式，每批一条 Delete。
+func buildBatchDeleteExprs(notebookID string, sourceIDs []string, batchSize int) []string {
+	if len(sourceIDs) == 0 {
+		return nil
+	}
+	if batchSize <= 0 {
+		batchSize = sourceIDsDeleteBatchSize
+	}
+
+	exprs := make([]string, 0, (len(sourceIDs)+batchSize-1)/batchSize)
+	for start := 0; start < len(sourceIDs); start += batchSize {
+		end := min(start+batchSize, len(sourceIDs))
+
+		quoted := make([]string, 0, end-start)
+		for _, sourceID := range sourceIDs[start:end] {
+			quoted = append(quoted, fmt.Sprintf("%q", sourceID))
+		}
+
+		exprs = append(exprs, fmt.Sprintf(
+			`%s == %q && %s in [%s]`,
+			schema.FieldNotebookID,
+			notebookID,
+			schema.FieldSourceID,
+			strings.Join(quoted, ","),
+		))
+	}
+
+	return exprs
 }
 
 func (s *SourceDocStoreImpl) Get(

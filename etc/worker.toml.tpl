@@ -252,6 +252,7 @@ timeout = "${GONOTELM_TEXT2AUDIO_MINIMAX_TIMEOUT:-10m}"
 [flow]
 addr        = "${GONOTELM_FLOW_ADDR:-localhost:7091}"
 namespace   = "${GONOTELM_FLOW_NAMESPACE:-gonotelm}"
+apiKey      = "${GONOTELM_FLOW_API_KEY:-}"
 maxRetry    = ${GONOTELM_FLOW_MAX_RETRY:-3}
 dialTimeout = "${GONOTELM_FLOW_DIAL_TIMEOUT:-5s}"
 

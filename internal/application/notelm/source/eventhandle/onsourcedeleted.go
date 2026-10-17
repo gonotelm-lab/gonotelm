@@ -4,46 +4,34 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
+	"github.com/gonotelm-lab/gonotelm/internal/application/shared/cleanup"
 	"github.com/gonotelm-lab/gonotelm/internal/core/event"
-	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	sourceevent "github.com/gonotelm-lab/gonotelm/internal/domain/source/event"
-	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
-	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
+// OnSourceDeletedEventHandler 只清 source 自己的资源。
 type OnSourceDeletedEventHandler struct {
-	sourceDocRepo sourcerepo.SourceDocRepository
-	objectStore   adapter.ObjectStore
+	cleaner *cleanup.Cleaner
 }
 
-func NewOnSourceDeletedEventHandler(
-	sourceDocRepo sourcerepo.SourceDocRepository,
-	objectStore adapter.ObjectStore,
-) *OnSourceDeletedEventHandler {
-	return &OnSourceDeletedEventHandler{
-		sourceDocRepo: sourceDocRepo,
-		objectStore:   objectStore,
-	}
+func NewOnSourceDeletedEventHandler(cleaner *cleanup.Cleaner) *OnSourceDeletedEventHandler {
+	return &OnSourceDeletedEventHandler{cleaner: cleaner}
 }
 
 func (h *OnSourceDeletedEventHandler) Handle(ctx context.Context, evt *sourceevent.DeleteEvent) error {
 	sourceId := evt.SourceId()
 	notebookId := evt.NotebookId()
+	objectKeys := cleanup.EncodeKeys(evt.ObjectStoreKeys())
 
-	if err := h.sourceDocRepo.BatchDeleteBySourceId(ctx, notebookId, []valobj.Id{sourceId}); err != nil {
-		return errors.WithMessagef(err, "delete source docs failed, source_id=%s", sourceId)
-	}
+	if err := h.cleaner.SweepSource(ctx, notebookId, sourceId, objectKeys); err != nil {
+		slog.ErrorContext(ctx, "failed to clean up deleted source",
+			slog.String("source_id", sourceId.String()),
+			slog.String("notebook_id", notebookId.String()),
+			slog.Any("err", err),
+		)
 
-	for _, key := range evt.ObjectStoreKeys() {
-		if err := h.objectStore.DeleteObject(ctx, key); err != nil {
-			slog.WarnContext(ctx, "delete source object failed",
-				slog.String("source_id", sourceId.String()),
-				slog.String("store_key", key.String()),
-				slog.Any("err", err),
-			)
-		}
+		return err
 	}
 
 	slog.InfoContext(ctx, "cleaned up deleted source",

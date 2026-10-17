@@ -1,8 +1,8 @@
 package contract
 
-import "github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+import (
+	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
+)
 
-type StorageResult struct {
-	StoreKey    valobj.StoreKey `json:"store_key"`
-	ContentType string          `json:"content_type"`
-}
+// StorageResult 的权威定义在 domain/artifact/entity。
+type StorageResult = artifactentity.StorageResult

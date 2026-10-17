@@ -22,23 +22,23 @@ func NewCancelArtifactHandler(repo artifactrepo.Repository, flowc flow.TaskClien
 }
 
 func (h *CancelArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error {
-	a, err := h.handle(ctx, cmd)
+	artifact, err := h.handle(ctx, cmd)
 	if err != nil {
 		return err
 	}
-	flowTaskId := a.FlowTaskId
-	if err := a.Cancel(); err != nil {
+	flowTaskId := artifact.FlowTaskId
+	if err := artifact.Cancel(); err != nil {
 		return err
 	}
 	if err := h.flowc.Cancel(ctx, flowTaskId); err != nil {
 		return errors.WithMessage(err, "cancel flow task failed")
 	}
-	if err := h.repo.Save(ctx, a); err != nil {
-		return errors.WithMessage(err, "save artifact failed")
+	if err := h.updateArtifact(ctx, artifact); err != nil {
+		return errors.WithMessage(err, "update artifact failed")
 	}
-	for _, evt := range a.PullEvents() {
+	for _, evt := range artifact.PullEvents() {
 		if err := h.eventBus.Publish(ctx, evt); err != nil {
-			slog.ErrorContext(ctx, "publish artifact event failed", "artifact_id", a.Id, "err", err)
+			slog.ErrorContext(ctx, "publish artifact event failed", "artifact_id", artifact.Id, "err", err)
 		}
 	}
 	return nil

@@ -2,6 +2,7 @@ package notebook
 
 import (
 	notebookapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/notebook"
+	"github.com/gonotelm-lab/gonotelm/internal/application/shared/cleanup"
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
@@ -15,6 +16,7 @@ type Deps struct {
 	EventBus     eventbus.Publisher
 	DistLock     adapter.DistributedLock
 	Summarizer   adapter.Summarizer
+	Cleaner      *cleanup.Cleaner
 }
 
 // Server 笔记本接口的处理器集合
@@ -32,7 +34,7 @@ func NewServer(deps Deps) *Server {
 		getNotebookHandler:        notebookapp.NewGetNotebookHandler(deps.NotebookRepo),
 		createNotebookHandler:     notebookapp.NewCreateNotebookHandler(deps.NotebookRepo, deps.EventBus),
 		listNotebooksHandler:      notebookapp.NewListNotebooksHandler(deps.NotebookRepo),
-		deleteNotebookHandler:     notebookapp.NewDeleteNotebookHandler(deps.NotebookRepo, deps.EventBus),
+		deleteNotebookHandler:     notebookapp.NewDeleteNotebookHandler(deps.NotebookRepo, deps.EventBus, deps.Cleaner),
 		updateNotebookNameHandler: notebookapp.NewUpdateNotebookNameHandler(deps.NotebookRepo),
 		generateNotebookDescriptionHandler: notebookapp.NewGenerateDescriptionHandler(
 			deps.NotebookRepo,

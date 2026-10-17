@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	artifactapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/artifact"
+	"github.com/gonotelm-lab/gonotelm/internal/application/shared/cleanup"
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
@@ -28,6 +29,7 @@ type Deps struct {
 	TitleMaker       adapter.TitleMaker
 	ObjectStore      adapter.ObjectStore
 	KeyFactory       adapter.StoreKeyFactory
+	Cleaner          *cleanup.Cleaner
 }
 
 // Server 产物接口的处理器集合
@@ -60,7 +62,7 @@ func NewServer(deps Deps) *Server {
 		getArtifactStatusHandler:     artifactapp.NewGetArtifactStatusHandler(deps.ArtifactRepo, deps.ObjectStore),
 		listNotebookArtifactsHandler: artifactapp.NewListArtifactsHandler(deps.NotebookRepo, deps.ArtifactRepo),
 		cancelArtifactHandler:        artifactapp.NewCancelArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.EventBus),
-		deleteArtifactHandler:        artifactapp.NewDeleteArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.ObjectStore),
+		deleteArtifactHandler:        artifactapp.NewDeleteArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.ObjectStore, deps.Cleaner),
 		retryArtifactHandler:         artifactapp.NewRetryArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.Poller, deps.EventBus),
 		updateArtifactHandler:        artifactapp.NewUpdateArtifactHandler(deps.ArtifactRepo),
 		convertNoteToSourceHandler: artifactapp.NewConvertNoteToSourceHandler(

@@ -6,6 +6,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
+	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	sandboxrepo "github.com/gonotelm-lab/gonotelm/internal/domain/sandbox/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/service/agentize"
 	workerrepo "github.com/gonotelm-lab/gonotelm/internal/domain/worker/repository"
@@ -57,6 +58,7 @@ type WorkerDeps struct {
 	ObjectStorage        adapter.ObjectStore
 	KeyFactory           adapter.StoreKeyFactory
 	CheckpointRepository workerrepo.CheckpointRepository
+	ArtifactRepo         artifactrepo.Repository
 }
 
 type Generator interface {

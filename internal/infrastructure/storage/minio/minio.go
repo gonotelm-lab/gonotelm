@@ -3,6 +3,7 @@ package minio
 import (
 	"bytes"
 	"context"
+	stderrors "errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -296,12 +297,19 @@ func (s *Storage) BatchDeleteObject(
 	}()
 
 	errCh := s.client.RemoveObjects(ctx, s.bucket, objectCh, minio.RemoveObjectsOptions{})
+
+	// 一个 key 失败不影响其余 key：排空整个错误流最后一起返回
+	var errs []error
 	for rmErr := range errCh {
 		if rmErr.Err != nil {
-			err := errors.Wrapf(rmErr.Err, "minio batch delete object failed, key=%s", rmErr.ObjectName)
-			finishSpan(span, err)
-			return err
+			errs = append(errs, errors.Wrapf(rmErr.Err, "minio batch delete object failed, key=%s", rmErr.ObjectName))
 		}
+	}
+	if len(errs) > 0 {
+		err := stderrors.Join(errs...)
+		finishSpan(span, err)
+
+		return err
 	}
 
 	return nil

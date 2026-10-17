@@ -365,3 +365,36 @@ func TestNotebookStoreFillNameAndDescriptionIfEmpty(t *testing.T) {
 		})
 	})
 }
+
+func TestNotebookStoreExists(t *testing.T) {
+	Convey("NotebookStore Exists", t, func() {
+		store := testNotebookStore
+		ctx := t.Context()
+
+		exists, err := store.Exists(ctx, database.Id(uuid.NewV7()))
+		So(err, ShouldBeNil)
+		So(exists, ShouldBeFalse)
+
+		notebook := &schema.Notebook{
+			Id:          database.Id(uuid.NewV7()),
+			Name:        "nb_" + uuid.NewV7().String(),
+			Description: "exists",
+			OwnerId:     valobj.NewUid(),
+			UpdatedAt:   nowMilli(),
+		}
+		So(store.Create(ctx, notebook), ShouldBeNil)
+		t.Cleanup(func() {
+			_ = testDB.WithContext(ctx).Where("id = ?", notebook.Id).Delete(&schema.Notebook{}).Error
+		})
+
+		exists, err = store.Exists(ctx, notebook.Id)
+		So(err, ShouldBeNil)
+		So(exists, ShouldBeTrue)
+
+		So(store.DeleteById(ctx, notebook.Id), ShouldBeNil)
+
+		exists, err = store.Exists(ctx, notebook.Id)
+		So(err, ShouldBeNil)
+		So(exists, ShouldBeFalse)
+	})
+}

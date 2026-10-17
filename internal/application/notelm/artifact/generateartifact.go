@@ -292,8 +292,8 @@ func (h *GenerateArtifactHandler) beginArtifactTask(
 
 	artifact.BindFlowTaskId(flowTaskId)
 
-	if err := h.artifactRepo.Save(ctx, artifact); err != nil {
-		return nil, errors.WithMessage(err, "save artifact failed")
+	if err := h.artifactRepo.Create(ctx, artifact); err != nil {
+		return nil, errors.WithMessage(err, "create artifact failed")
 	}
 
 	for _, evt := range artifact.PullEvents() {
@@ -303,7 +303,7 @@ func (h *GenerateArtifactHandler) beginArtifactTask(
 	}
 
 	if h.poller != nil {
-		go h.poller.PollOne(context.WithoutCancel(ctx), artifact.Id)
+		go h.poller.PollOne(context.WithoutCancel(ctx), artifact.Id, artifact.FlowTaskId)
 	}
 
 	return &GenerateResponse{ArtifactId: artifact.Id}, nil
@@ -384,8 +384,8 @@ func (h *GenerateArtifactHandler) saveAsNote(
 	newArtifact.MarkRunning()
 	// 这里不需要调用flow 所以随便绑定一个值即可
 	newArtifact.BindFlowTaskId(newArtifact.Id.String())
-	if err := h.artifactRepo.Save(ctx, newArtifact); err != nil {
-		return nil, errors.WithMessagef(err, "save artifact failed")
+	if err := h.artifactRepo.Create(ctx, newArtifact); err != nil {
+		return nil, errors.WithMessagef(err, "create artifact failed")
 	}
 
 	taskCtx := context.WithoutCancel(ctx)
@@ -419,10 +419,19 @@ func (h *GenerateArtifactHandler) finalizeNoteTitle(
 		targetArtifact.MarkCompleted(pkgstring.AsBytes(textContent), artifactentity.ResultKindInline, title)
 	}
 
-	if err := h.artifactRepo.Save(ctx, targetArtifact); err != nil {
+	affected, updateErr := h.artifactRepo.UpdateExisting(ctx, targetArtifact)
+	if updateErr != nil {
 		slog.ErrorContext(ctx, "finalize note: save completed failed",
 			slog.String("artifact_id", artifactId.String()),
-			slog.String("err", err.Error()),
+			slog.String("err", updateErr.Error()),
+		)
+
+		return
+	}
+	// 0 行：产物已被删除，放弃回写
+	if affected == 0 {
+		slog.InfoContext(ctx, "finalize note: artifact already deleted, skip writeback",
+			slog.String("artifact_id", artifactId.String()),
 		)
 	}
 }

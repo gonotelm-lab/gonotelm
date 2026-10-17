@@ -11,7 +11,7 @@ import (
 )
 
 type Poller interface {
-	PollOne(ctx context.Context, artifactId valobj.Id)
+	PollOne(ctx context.Context, artifactId valobj.Id, flowTaskId string)
 }
 
 type Deps struct {

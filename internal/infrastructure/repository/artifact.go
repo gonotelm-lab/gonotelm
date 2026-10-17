@@ -20,11 +20,15 @@ func NewArtifactRepository(store database.ArtifactStore) artifactrepo.Repository
 
 var _ artifactrepo.Repository = &ArtifactRepositoryImpl{}
 
-func (r *ArtifactRepositoryImpl) Save(ctx context.Context, a *artifactentity.Artifact) error {
-	if a.IsDeleted() {
-		return r.store.DeleteById(ctx, a.Id)
-	}
-	return r.store.Upsert(ctx, mapper.ArtifactToSchema(a))
+func (r *ArtifactRepositoryImpl) Create(ctx context.Context, a *artifactentity.Artifact) error {
+	return r.store.Create(ctx, mapper.ArtifactToSchema(a))
+}
+
+func (r *ArtifactRepositoryImpl) UpdateExisting(
+	ctx context.Context,
+	a *artifactentity.Artifact,
+) (int64, error) {
+	return r.store.UpdateExisting(ctx, mapper.ArtifactToSchema(a))
 }
 
 func (r *ArtifactRepositoryImpl) FindById(ctx context.Context, id valobj.Id) (*artifactentity.Artifact, error) {

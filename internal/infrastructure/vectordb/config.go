@@ -5,7 +5,7 @@ import "time"
 type Config struct {
 	Type Type `toml:"type"`
 
-	Milvus *MilvusConfig `toml:"milvus"`
+	Milvus *MilvusConfig `toml:"milvus" validate:"required"`
 }
 
 type Type string
@@ -15,7 +15,7 @@ const (
 )
 
 type MilvusConfig struct {
-	Addr        string        `toml:"addr"`
+	Addr        string        `toml:"addr" validate:"required"`
 	Username    string        `toml:"username"`
 	Password    string        `toml:"password"`
 	DBName      string        `toml:"dbName"`

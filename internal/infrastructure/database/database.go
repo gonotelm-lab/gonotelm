@@ -16,6 +16,7 @@ type NotebookStore interface {
 	Create(ctx context.Context, notebook *schema.Notebook) error
 	Upsert(ctx context.Context, notebook *schema.Notebook) error
 	GetById(ctx context.Context, id Id) (*schema.Notebook, error)
+	Exists(ctx context.Context, id Id) (bool, error)
 	GetByNameAndOwnerId(ctx context.Context, name string, ownerId valobj.Uid) (*schema.Notebook, error)
 	// orderBy=0 -> default order, orderBy=1 -> order by updated_at
 	ListByOwnerId(ctx context.Context, ownerId valobj.Uid, limit, offset, orderBy int) ([]*schema.Notebook, error)
@@ -29,7 +30,7 @@ type NotebookStore interface {
 
 type SourceStore interface {
 	Create(ctx context.Context, source *schema.Source) error
-	Upsert(ctx context.Context, source *schema.Source) error
+	UpdateExisting(ctx context.Context, source *schema.Source) (int64, error)
 	GetById(ctx context.Context, id Id) (*schema.Source, error)
 	CountByNotebookId(ctx context.Context, notebookId Id) (int64, error)
 	BatchCountByNotebookIds(ctx context.Context, notebookIds []Id) (map[Id]int64, error)
@@ -70,7 +71,7 @@ type ChatMessageStore interface {
 
 type ArtifactStore interface {
 	Create(ctx context.Context, artifact *schema.Artifact) error
-	Upsert(ctx context.Context, artifact *schema.Artifact) error
+	UpdateExisting(ctx context.Context, artifact *schema.Artifact) (int64, error)
 	GetById(ctx context.Context, id Id) (*schema.Artifact, error)
 	ListByNotebookId(ctx context.Context, notebookId Id, limit, offset int) ([]*schema.Artifact, error)
 	ListByStatus(ctx context.Context, statuses []string, limit int) ([]*schema.Artifact, error)
@@ -96,7 +97,6 @@ type UserStore interface {
 	Create(ctx context.Context, user *schema.User) error
 	GetById(ctx context.Context, id valobj.Uid) (*schema.User, error)
 	GetByEmail(ctx context.Context, email string) (*schema.User, error)
-	// GetPasswordHash 单独读取密码列，避免它混进账号实体/缓存/日志
 	GetPasswordHash(ctx context.Context, id valobj.Uid) (string, error)
 	UpdateProfile(ctx context.Context, params *schema.UserUpdateProfileParams) error
 	UpdateAvatar(ctx context.Context, params *schema.UserUpdateAvatarParams) error
@@ -106,7 +106,7 @@ type UserStore interface {
 type UserIdentityStore interface {
 	Create(ctx context.Context, identity *schema.UserIdentity) error
 	GetByProviderAndSubject(ctx context.Context, provider, subject string) (*schema.UserIdentity, error)
-	// GetByUserIdAndId 按 (账号, 身份 id) 取，归属由查询本身保证，不靠调用方再比对 user_id
+	// GetByUserIdAndId 按 (账号, 身份 id) 查询
 	GetByUserIdAndId(ctx context.Context, userId valobj.Uid, id valobj.Id) (*schema.UserIdentity, error)
 	ListByUserId(ctx context.Context, userId valobj.Uid) ([]*schema.UserIdentity, error)
 	UpdateLastLoginAt(ctx context.Context, id valobj.Id, lastLoginAt int64) error

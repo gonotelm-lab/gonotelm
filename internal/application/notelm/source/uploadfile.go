@@ -73,8 +73,7 @@ func (h *PresignUploadFileHandler) Handle(
 
 	targetSource.UpdateTitle(cmd.Filename)
 	targetSource.MarkUploading()
-	err = h.sourceRepo.Save(ctx, targetSource)
-	if err != nil {
+	if err := h.updateSource(ctx, targetSource); err != nil {
 		return nil, errors.WithMessagef(err, "save source failed, source_id=%s", cmd.SourceId)
 	}
 

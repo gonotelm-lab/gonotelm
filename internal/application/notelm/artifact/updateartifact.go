@@ -41,8 +41,8 @@ func (h *UpdateArtifactHandler) Handle(ctx context.Context, cmd *UpdateCommand) 
 		return errors.ErrParams.Msgf("unsupported update target: %s", cmd.Target)
 	}
 
-	if err := h.repo.Save(ctx, a); err != nil {
-		return errors.WithMessage(err, "save artifact failed")
+	if err := h.updateArtifact(ctx, a); err != nil {
+		return errors.WithMessage(err, "update artifact failed")
 	}
 	return nil
 }

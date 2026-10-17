@@ -273,8 +273,14 @@ text2ImageQwenScript = ""
 [flow]
 addr        = "${GONOTELM_FLOW_ADDR:-localhost:7091}"
 namespace   = "${GONOTELM_FLOW_NAMESPACE:-gonotelm}"
+apiKey      = "${GONOTELM_FLOW_API_KEY:-}"
 maxRetry    = ${GONOTELM_FLOW_MAX_RETRY:-3}
 dialTimeout = "${GONOTELM_FLOW_DIAL_TIMEOUT:-5s}"
+
+[cleanup]
+baseURL = "${GONOTELM_CLEANUP_BASE_URL:-http://127.0.0.1:7099}"
+delay   = "${GONOTELM_CLEANUP_DELAY:-30m}"
+jitter  = "${GONOTELM_CLEANUP_JITTER:-10m}"
 
 [syncer]
 perTaskInterval = "${GONOTELM_SYNCER_PER_TASK_INTERVAL:-2s}"

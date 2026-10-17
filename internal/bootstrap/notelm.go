@@ -7,8 +7,9 @@ import (
 	"log/slog"
 	"sync"
 
-	syncerpkg "github.com/gonotelm-lab/gonotelm/internal/application/notelm/artifact/syncer"
+	artifactsyncer "github.com/gonotelm-lab/gonotelm/internal/application/notelm/artifact/syncer"
 	chatsuggest "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/suggestion"
+	"github.com/gonotelm-lab/gonotelm/internal/application/shared/cleanup"
 	bootshared "github.com/gonotelm-lab/gonotelm/internal/bootstrap/shared"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	coreadapter "github.com/gonotelm-lab/gonotelm/internal/core/adapter"
@@ -156,7 +157,7 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 	)
 
 	// ── 5. Flow task client ──
-	flowClient, err := flowcli.NewTaskClient(
+	flowTaskClient, err := flowcli.NewTaskClient(
 		cfg.Flow.Addr,
 		cfg.Flow.Namespace,
 		cfg.Flow.DialTimeout,
@@ -165,20 +166,42 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 	if err != nil {
 		return nil, err
 	}
-	addCloser(flowClient)
+	addCloser(flowTaskClient)
+
+	flowSchedClient, err := flowcli.NewScheduleClient(cfg.Flow.Addr, cfg.Flow.Namespace, cfg.Flow.APIKey)
+	if err != nil {
+		return nil, err
+	}
+	addCloser(flowSchedClient)
+
+	cleaner := cleanup.New(
+		cleanup.Config{
+			CallbackBaseURL: cfg.Cleanup.BaseURL,
+			Delay:           cfg.Cleanup.Delay,
+			Jitter:          cfg.Cleanup.Jitter,
+		},
+		cleanup.Deps{
+			ScheduleClient: flowSchedClient,
+			SourceRepo:     sourceRepo,
+			NotebookRepo:   notebookRepo,
+			ArtifactRepo:   artifactRepo,
+			SourceDocRepo:  sourceDocRepo,
+			ObjectStore:    infra.ObjectStore,
+		},
+	)
 
 	// ── 7. Syncer ──
-	syncerCfg := syncerpkg.Config{
+	syncerCfg := artifactsyncer.Config{
 		PerTaskInterval: cfg.Syncer.PerTaskInterval,
 		GlobalInterval:  cfg.Syncer.GlobalInterval,
 		GlobalBatchSize: cfg.Syncer.GlobalBatchSize,
 	}
-	syncerInst := syncerpkg.NewSyncer(artifactRepo, flowClient, syncerCfg, eventBus)
-	syncerInst.Start(rootCtx)
-	addCloser(&syncerCloser{syncerInst})
+	syncerInstance := artifactsyncer.New(artifactRepo, flowTaskClient, infra.ObjectStore, syncerCfg, eventBus)
+	syncerInstance.Start(rootCtx)
+	addCloser(&syncerCloser{syncerInstance})
 
 	// ── 8. Event handler registration ──
-	eventnotelm.Init(rootCtx, &eventnotelm.EventDeps{
+	eventnotelm.Init(rootCtx, &eventnotelm.Deps{
 		RootCtx: rootCtx,
 
 		NotebookRepo: notebookRepo,
@@ -197,6 +220,9 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 
 		EventBus:    eventBus,
 		ChatGateway: infra.LLMGateway,
+		FlowClient:  flowTaskClient,
+
+		Cleaner: cleaner,
 	})
 
 	// ── 9. HTTP Server ──
@@ -233,9 +259,11 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 			DistLock:   infra.DistLock,
 			Summarizer: summarizer,
 
-			FlowClient: flowClient,
-			Poller:     syncerInst,
+			FlowClient: flowTaskClient,
+			Poller:     syncerInstance,
 			TitleMaker: titleMaker,
+
+			Cleaner: cleaner,
 		},
 	)
 
@@ -248,7 +276,7 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 }
 
 type syncerCloser struct {
-	syncer *syncerpkg.Syncer
+	syncer *artifactsyncer.Syncer
 }
 
 func (s *syncerCloser) Close() error {

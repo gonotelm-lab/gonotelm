@@ -1,6 +1,3 @@
-// Package notelm 是 HTTP API 的组装入口：拼 hertz、挂全局中间件与 /api/v1 分组，
-// 然后把各功能域子包（auth / notebook / source / chat / studio / user）的路由挂上去。
-// 每个功能域自己持有 Server 与处理器，本包只做装配，不写业务处理。
 package notelm
 
 import (
@@ -11,6 +8,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/common/config"
 	artifactapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/artifact"
 	chatsuggest "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/suggestion"
+	"github.com/gonotelm-lab/gonotelm/internal/application/shared/cleanup"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
@@ -29,6 +27,7 @@ import (
 	sourceapi "github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/source"
 	studioapi "github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/studio"
 	userapi "github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/user"
+	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/webhook"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 	"github.com/gonotelm-lab/gonotelm/pkg/http/middleware"
 )
@@ -69,6 +68,8 @@ type ServerDeps struct {
 	FlowClient flow.TaskClient
 	Poller     artifactapp.Poller
 
+	Cleaner *cleanup.Cleaner
+
 	TitleMaker adapter.TitleMaker
 }
 
@@ -82,6 +83,8 @@ type Server struct {
 	chat     *chatapi.Server
 	studio   *studioapi.Server
 	user     *userapi.Server
+
+	webhook *webhook.Server
 }
 
 func NewServer(
@@ -124,6 +127,7 @@ func NewServer(
 			EventBus:     deps.EventBus,
 			DistLock:     deps.DistLock,
 			Summarizer:   deps.Summarizer,
+			Cleaner:      deps.Cleaner,
 		}),
 
 		source: sourceapi.NewServer(sourceapi.Deps{
@@ -133,6 +137,7 @@ func NewServer(
 			KeyFactory:    deps.KeyFactory,
 			SourceDocRepo: deps.SourceDocRepo,
 			EventBus:      deps.EventBus,
+			Cleaner:       deps.Cleaner,
 		}),
 
 		chat: chatapi.NewServer(chatapi.Deps{
@@ -166,6 +171,7 @@ func NewServer(
 			TitleMaker:       deps.TitleMaker,
 			ObjectStore:      deps.ObjectStore,
 			KeyFactory:       deps.KeyFactory,
+			Cleaner:          deps.Cleaner,
 		}),
 
 		user: userapi.NewServer(userapi.Deps{
@@ -176,12 +182,16 @@ func NewServer(
 		}),
 	}
 
+	s.webhook = webhook.NewServer(deps.Cleaner)
+
 	s.registerRoutes()
 
 	return s
 }
 
 func (s *Server) registerRoutes() {
+	s.webhook.RegisterRoutes(s.h)
+
 	v1Group := s.h.Group("/api/v1", s.csrfMiddleware())
 	{
 		v1AuthedGroup := v1Group.Group("/", s.auth.Authenticate())

@@ -32,6 +32,7 @@ _testmain.go
 /output
 *.local.yml
 gotest
+coverage.out
 .env
 /.cursor
 __debug*

@@ -6,8 +6,8 @@ COMPOSE ?= docker compose
 ENV_FILE ?= ../../.env
 COMPOSE_ENV := --env-file $(ENV_FILE)
 # app 侧 trace.Init 是无条件调用的，endpoint 默认 127.0.0.1:4317（etc/*.toml.tpl），
-# 所以 up 默认就带上 jaeger（profile trace），否则 exporter 会一直重试并刷 otel 报错日志
-COMPOSE_TRACE := $(COMPOSE) $(COMPOSE_ENV) --profile trace
+# 所以 up 默认带 jaeger（trace）；flow-web 是 flow 的运维后台，dev-up 也一并起（ui）
+COMPOSE_UP := $(COMPOSE) $(COMPOSE_ENV) --profile trace --profile ui
 # down/ps/logs 要带 --profile full，否则 flow-web / jaeger 不会被处理
 COMPOSE_ALL := $(COMPOSE) $(COMPOSE_ENV) --profile full
 LOAD_ENV = set -a && . $(ENV_FILE) && set +a
@@ -15,7 +15,7 @@ LOAD_ENV = set -a && . $(ENV_FILE) && set +a
 .PHONY: up up-notrace up-all down down-v ps logs config migrate migrate-postgres migrate-clickhouse migrate-milvus
 
 up:
-	$(COMPOSE_TRACE) up -d
+	$(COMPOSE_UP) up -d
 
 # 只要中间件、不要 jaeger（CI、或者本地不跑 app 时用）
 up-notrace:

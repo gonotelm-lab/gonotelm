@@ -89,7 +89,7 @@ func (h *CreateSourceHandler) Handle(
 	}
 	newSource.UpdateTitle(sourceTitle)
 
-	err = h.sourceRepo.Save(ctx, newSource)
+	err = h.sourceRepo.Create(ctx, newSource)
 	if err != nil {
 		return newId, errors.WithMessage(err, "save source failed")
 	}

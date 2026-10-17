@@ -133,7 +133,7 @@ var (
 )
 
 type RedisCacheConfig struct {
-	Addrs    []string `toml:"addrs"`
+	Addrs    []string `toml:"addrs"    validate:"required"`
 	Username string   `toml:"username"`
 	Password string   `toml:"password"`
 }

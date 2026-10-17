@@ -9,6 +9,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/schema"
+	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 	. "github.com/smartystreets/goconvey/convey"
 	"gorm.io/gorm"
@@ -459,8 +460,8 @@ func TestSourceStoreUpdateParsedContent(t *testing.T) {
 	})
 }
 
-func TestSourceStoreUpsert(t *testing.T) {
-	Convey("SourceStore Upsert", t, func() {
+func TestSourceStoreUpdateExisting(t *testing.T) {
+	Convey("SourceStore UpdateExisting", t, func() {
 		store := testSourceStore
 		ctx := t.Context()
 		notebookID := createNotebookForSourceTest(t, testDB)
@@ -482,8 +483,7 @@ func TestSourceStoreUpsert(t *testing.T) {
 			UpdatedAt:        1000,
 		}
 
-		err := store.Upsert(ctx, source)
-		So(err, ShouldBeNil)
+		So(store.Create(ctx, source), ShouldBeNil)
 		t.Cleanup(func() {
 			_ = testDB.WithContext(ctx).Where("id = ?", sourceID).Delete(&schema.Source{}).Error
 		})
@@ -510,8 +510,9 @@ func TestSourceStoreUpsert(t *testing.T) {
 		source.OwnerId = valobj.NewUid()
 		source.UpdatedAt = 2000
 
-		err = store.Upsert(ctx, source)
-		So(err, ShouldBeNil)
+		affected, updateErr := store.UpdateExisting(ctx, source)
+		So(updateErr, ShouldBeNil)
+		So(affected, ShouldEqual, int64(1))
 
 		gotAfterUpsert, err := store.GetById(ctx, sourceID)
 		So(err, ShouldBeNil)
@@ -728,5 +729,118 @@ func TestSourceGetNotExist(t *testing.T) {
 
 		_, err := store.GetById(ctx, sourceID)
 		t.Log(err)
+	})
+}
+
+// issue #30：notebook 删除后，sourcejob 迟到的写入（UpdateExisting）不得复活 source 行。
+func TestSourceStoreUpdateExistingDoesNotResurrectDeletedSource(t *testing.T) {
+	Convey("UpdateExisting never resurrects a source deleted with its notebook", t, func() {
+		store := testSourceStore
+		ctx := t.Context()
+		notebookID := createNotebookForSourceTest(t, testDB)
+
+		source := &schema.Source{
+			Id:         database.Id(uuid.NewV7()),
+			NotebookId: notebookID,
+			Kind:       "file",
+			Status:     "preparing",
+			Title:      "in flight",
+			OwnerId:    valobj.NewUid(),
+			UpdatedAt:  1000,
+		}
+		So(store.Create(ctx, source), ShouldBeNil)
+
+		// notelm 侧：notebook 删除后的清理
+		So(store.DeleteByNotebookId(ctx, notebookID), ShouldBeNil)
+		_, err := store.GetById(ctx, source.Id)
+		So(errors.Is(err, errors.ErrNoRecord), ShouldBeTrue)
+
+		// sourcejob 侧：解析完成后的迟到写入
+		source.Status = "ready"
+		source.ParsedContentKey = "gonotelm-private|parsed_file/" + notebookID.String() + "/" + source.Id.String()
+		source.UpdatedAt = 2000
+		affected, updateErr := store.UpdateExisting(ctx, source)
+		So(updateErr, ShouldBeNil)
+		So(affected, ShouldEqual, int64(0))
+
+		// 行没有被重新插入
+		_, err = store.GetById(ctx, source.Id)
+		So(errors.Is(err, errors.ErrNoRecord), ShouldBeTrue)
+
+		var count int64
+		So(testDB.WithContext(ctx).
+			Model(&schema.Source{}).
+			Where("id = ?", source.Id).
+			Count(&count).Error, ShouldBeNil)
+		So(count, ShouldEqual, int64(0))
+	})
+}
+
+func TestSourceStoreBatchCountByNotebookIds(t *testing.T) {
+	Convey("SourceStore BatchCountByNotebookIds counts ready sources per notebook", t, func() {
+		store := testSourceStore
+		ctx := t.Context()
+		notebookID := createNotebookForSourceTest(t, testDB)
+		otherNotebookID := createNotebookForSourceTest(t, testDB)
+
+		ready := &schema.Source{
+			Id: database.Id(uuid.NewV7()), NotebookId: notebookID,
+			Kind: "doc", Status: "ready", OwnerId: valobj.NewUid(), UpdatedAt: nowMilli(),
+		}
+		preparing := &schema.Source{
+			Id: database.Id(uuid.NewV7()), NotebookId: notebookID,
+			Kind: "doc", Status: "preparing", OwnerId: valobj.NewUid(), UpdatedAt: nowMilli(),
+		}
+		// inited 的 source 不计入列表页的 source 数
+		inited := &schema.Source{
+			Id: database.Id(uuid.NewV7()), NotebookId: notebookID,
+			Kind: "doc", Status: schema.SourceStatusInited, OwnerId: valobj.NewUid(), UpdatedAt: nowMilli(),
+		}
+		other := &schema.Source{
+			Id: database.Id(uuid.NewV7()), NotebookId: otherNotebookID,
+			Kind: "doc", Status: "ready", OwnerId: valobj.NewUid(), UpdatedAt: nowMilli(),
+		}
+		for _, source := range []*schema.Source{ready, preparing, inited, other} {
+			So(store.Create(ctx, source), ShouldBeNil)
+		}
+		t.Cleanup(func() {
+			_ = testDB.WithContext(ctx).Where("notebook_id IN ?", []database.Id{notebookID, otherNotebookID}).Delete(&schema.Source{}).Error
+		})
+
+		counts, err := store.BatchCountByNotebookIds(ctx, []database.Id{notebookID, otherNotebookID})
+		So(err, ShouldBeNil)
+		So(counts[notebookID], ShouldEqual, int64(2))
+		So(counts[otherNotebookID], ShouldEqual, int64(1))
+	})
+}
+
+func TestSourceStoreUpdateTitle(t *testing.T) {
+	Convey("SourceStore UpdateTitle", t, func() {
+		store := testSourceStore
+		ctx := t.Context()
+		notebookID := createNotebookForSourceTest(t, testDB)
+
+		source := &schema.Source{
+			Id: database.Id(uuid.NewV7()), NotebookId: notebookID,
+			Kind: "doc", Status: "ready", Title: "old title",
+			OwnerId: valobj.NewUid(), UpdatedAt: 1000,
+		}
+		So(store.Create(ctx, source), ShouldBeNil)
+		t.Cleanup(func() {
+			_ = testDB.WithContext(ctx).Where("id = ?", source.Id).Delete(&schema.Source{}).Error
+		})
+
+		title := "new title"
+		updatedAt := int64(2000)
+		So(store.UpdateTitle(ctx, &schema.SourceUpdateTitleParams{
+			Id:        source.Id,
+			Title:     title,
+			UpdatedAt: updatedAt,
+		}), ShouldBeNil)
+
+		got, err := store.GetById(ctx, source.Id)
+		So(err, ShouldBeNil)
+		So(got.Title, ShouldEqual, title)
+		So(got.UpdatedAt, ShouldEqual, updatedAt)
 	})
 }

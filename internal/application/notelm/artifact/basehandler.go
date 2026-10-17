@@ -37,3 +37,15 @@ func (h *baseHandler) handle(ctx context.Context, artifactId valobj.Id) (*artifa
 
 	return artifact, nil
 }
+
+func (h *baseHandler) updateArtifact(ctx context.Context, artifact *artifactentity.Artifact) error {
+	affected, err := h.repo.UpdateExisting(ctx, artifact)
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return artifacterrors.ErrArtifactNotFound
+	}
+
+	return nil
+}

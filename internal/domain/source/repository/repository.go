@@ -8,7 +8,11 @@ import (
 )
 
 type Repository interface {
-	Save(ctx context.Context, s *entity.Source) error
+	// Create 只做插入，主键冲突即报错，不覆盖已有行。
+	Create(ctx context.Context, s *entity.Source) error
+	// UpdateExisting 只更新已存在的记录
+	UpdateExisting(ctx context.Context, s *entity.Source) (int64, error)
+	DeleteById(ctx context.Context, id valobj.Id) error
 	FindById(ctx context.Context, id valobj.Id) (*entity.Source, error)
 	ListByNotebookId(ctx context.Context, notebookId valobj.Id, spec *ListSpec) ([]*entity.Source, error)
 	GetByNotebookIdAndIds(ctx context.Context, notebookId valobj.Id, ids []valobj.Id) ([]*entity.Source, error)

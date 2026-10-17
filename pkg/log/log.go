@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -23,6 +24,27 @@ var (
 		ReplaceAttr: replaceAttr,
 	})
 )
+
+var modulePath = resolveModulePath()
+
+func resolveModulePath() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return ""
+	}
+	return info.Main.Path
+}
+
+func trimModulePrefix(function string) string {
+	if modulePath == "" {
+		return function
+	}
+	prefix := modulePath + "/"
+	if !strings.HasPrefix(function, prefix) {
+		return function
+	}
+	return function[len(prefix):]
+}
 
 func init() {
 	defaultLevelVar.Set(slog.LevelInfo)
@@ -145,6 +167,7 @@ func replaceAttr(_ []string, a slog.Attr) slog.Attr {
 		}
 		copySource := *src
 		copySource.File = filepath.Base(copySource.File)
+		copySource.Function = trimModulePrefix(copySource.Function)
 		return slog.Any(slog.SourceKey, &copySource)
 	default:
 		return a

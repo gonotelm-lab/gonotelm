@@ -5,6 +5,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
+	sourceerr "github.com/gonotelm-lab/gonotelm/internal/domain/source/errors"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -34,4 +35,17 @@ func (h *baseHandler) handle(ctx context.Context, sourceId valobj.Id) (*sourceen
 	}
 
 	return source, nil
+}
+
+func (h *baseHandler) updateSource(ctx context.Context, source *sourceentity.Source) error {
+	affected, err := h.sourceRepo.UpdateExisting(ctx, source)
+	if err != nil {
+		return err
+	}
+	// source记录不存在
+	if affected == 0 {
+		return sourceerr.ErrSourceNotFound
+	}
+
+	return nil
 }

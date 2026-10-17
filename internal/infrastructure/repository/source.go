@@ -24,13 +24,19 @@ func NewSourceRepository(sourceStore database.SourceStore) sourcerepo.Repository
 
 var _ sourcerepo.Repository = &SourceRepositoryImpl{}
 
-func (s *SourceRepositoryImpl) Save(ctx context.Context, source *sourceentity.Source) error {
-	if source.IsDeleted() {
-		return s.sourceStore.DeleteById(ctx, source.Id)
-	}
+func (s *SourceRepositoryImpl) Create(ctx context.Context, source *sourceentity.Source) error {
+	return s.sourceStore.Create(ctx, mapper.SourceToSchema(source))
+}
 
-	sch := mapper.SourceToSchema(source)
-	return s.sourceStore.Upsert(ctx, sch)
+func (s *SourceRepositoryImpl) UpdateExisting(
+	ctx context.Context,
+	source *sourceentity.Source,
+) (int64, error) {
+	return s.sourceStore.UpdateExisting(ctx, mapper.SourceToSchema(source))
+}
+
+func (s *SourceRepositoryImpl) DeleteById(ctx context.Context, id valobj.Id) error {
+	return s.sourceStore.DeleteById(ctx, id)
 }
 
 func (s *SourceRepositoryImpl) FindById(ctx context.Context, id valobj.Id) (*sourceentity.Source, error) {

@@ -47,6 +47,7 @@ internal/
     worker/artifact/      per-artifact generation pipelines (agent + step + prompt + validation)
     initjob/              init task registration
     shared/contract/      notelm ↔ worker cross-process wire contract (WorkerInput / WorkerOutput)
+    shared/cleanup/       cross-domain delete fallback: checkpoints (flow one-shot), sweeper, webhook payload
   infrastructure/         port implementations and external components
     repository/           implements domain repository interfaces: store + mapper (persistence model ↔ entity)
     database/             GORM stores and schema/ (Postgres table models)
@@ -120,9 +121,9 @@ Type and field names stay English (`Password`); this section governs the Chinese
 ## Conventions when changing code
 
 - **New persistence capability**: define the interface in `domain/<domain>/repository` → implement in `infrastructure/repository` → convert models in `mapper` → add the GORM model in `infrastructure/database/schema` → wire it up in `bootstrap`.
-- **Every DAO file ships with a test file.** A data-access implementation gets a paired `<file>_test.go` in the same package — `postgres/notebookstore.go` → `notebookstore_test.go`, `cache/redis/suggestion.go` → `suggestion_test.go`, `olap/clickhouse/llmlogstore.go` → `llmlogstore_test.go`. The package's `main_test.go` holds a `TestMain` that builds a throwaway database from the `TEST_GONOTELM_*` env vars through `pkg/testsuite/{sql,redis,clickhouse}`, applies the same goose migrations as `cmd/migrate`, and exposes `testXxxStore` values to the tests; `open_test.go` covers the wiring. Assertions use goconvey (`Convey` / `So`).
+- **Every DAO file ships with a test file.** A data-access implementation gets a paired `<file>_test.go` in the same package — `postgres/notebookstore.go` → `notebookstore_test.go`, `cache/redis/suggestion.go` → `suggestion_test.go`, `olap/clickhouse/llmlogstore.go` → `llmlogstore_test.go`. The package's `main_test.go` holds a `TestMain` that builds a throwaway database from the `TEST_GONOTELM_*` env vars through `pkg/testsuite/{sql,redis,clickhouse}`, applies the same goose migrations as `cmd/migrate`, and exposes `testXxxStore` values to the tests; `open_test.go` covers the wiring. Assertions use goconvey (`Convey` / `So`); `Convey` descriptions are written in English, comments stay Chinese.
 - **New external component**: register a `Component` constructor in `bootstrap/shared`, then have each `bootstrap/<binary>.go` request only what it needs. Wiring belongs in code, not in config.
-- **New config field**: add it to `internal/conf/<binary>.go` and `etc/<binary>.toml.tpl`, with defaults in the `Init()` method; use a goose migration under `migration/db/postgres18` for schema changes.
+- **New config field**: add it to `internal/conf/<binary>.go` and `etc/<binary>.toml.tpl`, with defaults in the `Init()` method; tag must-have fields with `validate:"required"` (checked after decode by `shared.LoadTOML`, format in `internal/conf/shared/validate.go`) and mark sections a binary may leave unconfigured with `validate:"omitempty"`; use a goose migration under `migration/db/postgres18` for schema changes.
 - **New artifact kind**: add the Kind and payload in `domain/artifact/entity` → add the pipeline in `application/worker/artifact/<kind>` → register it in `interfaces/entrypoint/worker` → list it in `buildinTaskTypes` in `bootstrap/worker.go`.
 - Match the surrounding file's comment language (many files carry Chinese comments); for which Chinese word to use, see the Terminology section above.
 

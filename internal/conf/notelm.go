@@ -34,6 +34,7 @@ type NotelmConfig struct {
 	Chunking  ChunkingConfig       `toml:"chunking"`
 	Flow      shared.FlowConfig    `toml:"flow"`
 	Syncer    SyncerConfig         `toml:"syncer"`
+	Cleanup   CleanupConfig        `toml:"cleanup"`
 	OtelTrace trace.Config         `toml:"otelTrace"`
 	IDP       map[string]IDPConfig `toml:"idp"`
 }
@@ -106,6 +107,22 @@ type SyncerConfig struct {
 	GlobalBatchSize int           `toml:"globalBatchSize"`
 }
 
+// 删除后的清理逻辑配置
+type CleanupConfig struct {
+	BaseURL string        `toml:"baseURL" validate:"required"`
+	Delay   time.Duration `toml:"delay"`
+	Jitter  time.Duration `toml:"jitter"`
+}
+
+func (c *CleanupConfig) Init() {
+	if c.Delay <= 0 {
+		c.Delay = 30 * time.Minute
+	}
+	if c.Jitter <= 0 {
+		c.Jitter = 10 * time.Minute
+	}
+}
+
 func (c *NotelmConfig) IsDev() bool {
 	return shared.IsDevEnv(c.DeployEnv)
 }
@@ -126,7 +143,7 @@ func (c *NotelmConfig) ToIDPConfig() map[string]idp.Config {
 }
 
 type ApiConfig struct {
-	Port            int           `toml:"port"`
+	Port            int           `toml:"port"            validate:"required"`
 	ExitWaitTimeout time.Duration `toml:"exitWaitTimeout"`
 }
 
@@ -252,6 +269,7 @@ func (c *NotelmConfig) init() {
 	c.InitInfra()
 	c.Logging.Init()
 	c.Flow.Init()
+	c.Cleanup.Init()
 	c.Cors.Init()
 	c.Auth.Init()
 	c.Mailer.Init()

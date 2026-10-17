@@ -60,7 +60,7 @@ type Config struct {
 }
 
 type KafkaConfig struct {
-	Brokers                []string      `toml:"brokers"`
+	Brokers                []string      `toml:"brokers" validate:"required"`
 	Username               string        `toml:"username"`
 	Password               string        `toml:"password"`
 	ConsumerQueueCapacity  int           `toml:"consumerQueueCapacity"`

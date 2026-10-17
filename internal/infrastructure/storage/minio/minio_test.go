@@ -277,6 +277,25 @@ func TestBatchDeleteObjectSpanRecordsError(t *testing.T) {
 	}
 }
 
+func TestBatchDeleteObjectReportsEveryFailedKey(t *testing.T) {
+	s, _ := newTestStorage(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `<DeleteResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Error><Key>a</Key><Code>AccessDenied</Code><Message>denied</Message></Error><Error><Key>b</Key><Code>AccessDenied</Code><Message>denied</Message></Error><Deleted><Key>c</Key></Deleted></DeleteResult>`)
+	})
+
+	err := s.BatchDeleteObject(context.Background(),
+		&storage.BatchDeleteObjectRequest{Keys: []string{"a", "b", "c"}})
+	if err == nil {
+		t.Fatal("want error")
+	}
+	for _, key := range []string{"key=a", "key=b"} {
+		if !strings.Contains(err.Error(), key) {
+			t.Fatalf("error should mention %s, got %q", key, err.Error())
+		}
+	}
+}
+
 func TestPresignedGetObjectSpan(t *testing.T) {
 	s, exporter := newTestStorage(t, func(w http.ResponseWriter, r *http.Request) {
 		t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)

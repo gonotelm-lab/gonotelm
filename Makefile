@@ -3,7 +3,9 @@ gofmt:
 	go fmt ./...
 
 TEST_PKGS := \
+	./internal/application/notelm/artifact/... \
 	./internal/application/notelm/source/... \
+	./internal/application/shared/cleanup/... \
 	./internal/infrastructure/database \
 	./internal/infrastructure/database/postgres/... \
 	./internal/infrastructure/cache \
@@ -11,6 +13,7 @@ TEST_PKGS := \
 	./internal/infrastructure/flow/... \
 	./internal/infrastructure/olap/... \
 	./internal/infrastructure/repository/... \
+	./internal/interfaces/entrypoint/... \
 	./pkg/initjob/... \
 	./migration/...
 

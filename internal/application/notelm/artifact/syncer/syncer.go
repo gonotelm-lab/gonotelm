@@ -7,6 +7,7 @@ import (
 	"time"
 
 	flowschema "github.com/gonotelm-lab/flow/api/schema/v1"
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
@@ -35,17 +36,25 @@ func ConfigWithDefaults(cfg Config) Config {
 type Syncer struct {
 	repo     artifactrepo.Repository
 	flow     flow.TaskClient
+	storage  adapter.ObjectStore
 	cfg      Config
 	wg       sync.WaitGroup
 	stop     chan struct{}
 	eventBus eventbus.Publisher
 }
 
-func NewSyncer(repo artifactrepo.Repository, flowc flow.TaskClient, cfg Config, eventBus eventbus.Publisher) *Syncer {
+func NewSyncer(
+	repo artifactrepo.Repository,
+	flowc flow.TaskClient,
+	storage adapter.ObjectStore,
+	cfg Config,
+	eventBus eventbus.Publisher,
+) *Syncer {
 	cfg = ConfigWithDefaults(cfg)
 	return &Syncer{
 		repo:     repo,
 		flow:     flowc,
+		storage:  storage,
 		cfg:      cfg,
 		stop:     make(chan struct{}),
 		eventBus: eventBus,

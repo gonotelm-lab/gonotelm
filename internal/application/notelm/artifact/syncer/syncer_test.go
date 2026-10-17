@@ -2,6 +2,7 @@ package syncer
 
 import (
 	"context"
+	"io"
 	"sync"
 	"testing"
 	"time"
@@ -9,9 +10,11 @@ import (
 	"github.com/bytedance/sonic"
 	flowschema "github.com/gonotelm-lab/flow/api/schema/v1"
 	"github.com/gonotelm-lab/gonotelm/internal/application/shared/contract"
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/event"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
+	artifacterrors "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/errors"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
@@ -45,7 +48,7 @@ func (s *syncTestRepo) FindById(ctx context.Context, id valobj.Id) (*artifactent
 	defer s.mu.Unlock()
 	a, ok := s.byId[id]
 	if !ok {
-		return nil, nil
+		return nil, artifacterrors.ErrArtifactNotFound
 	}
 	copy := *a
 	return &copy, nil
@@ -87,6 +90,44 @@ type stubEventBus struct{}
 func (s *stubEventBus) Publish(ctx context.Context, evt event.Event) error { return nil }
 
 var _ eventbus.Publisher = &stubEventBus{}
+
+type syncTestStorage struct {
+	mu          sync.Mutex
+	deletedKeys []valobj.StoreKey
+	calls       int
+}
+
+func (s *syncTestStorage) GetObject(context.Context, valobj.StoreKey) ([]byte, *adapter.ObjectInfo, error) {
+	return nil, nil, nil
+}
+func (s *syncTestStorage) GetPartialObject(context.Context, valobj.StoreKey, int64, int64) ([]byte, *adapter.ObjectInfo, error) {
+	return nil, nil, nil
+}
+func (s *syncTestStorage) Upload(context.Context, valobj.StoreKey, []byte, string) error { return nil }
+func (s *syncTestStorage) UploadReader(context.Context, valobj.StoreKey, string, io.Reader) error {
+	return nil
+}
+func (s *syncTestStorage) PresignUpload(context.Context, valobj.StoreKey, *adapter.UploadOptions) (*adapter.PresignUploadResult, error) {
+	return nil, nil
+}
+func (s *syncTestStorage) DeleteObject(context.Context, valobj.StoreKey) error { return nil }
+func (s *syncTestStorage) BatchDeleteObject(_ context.Context, keys []valobj.StoreKey) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.calls++
+	s.deletedKeys = append(s.deletedKeys, keys...)
+
+	return nil
+}
+func (s *syncTestStorage) PublicURL(context.Context, valobj.StoreKey) (string, error) { return "", nil }
+func (s *syncTestStorage) PresignGet(context.Context, valobj.StoreKey) (string, error) {
+	return "", nil
+}
+func (s *syncTestStorage) CheckExist(context.Context, valobj.StoreKey) (bool, error) {
+	return false, nil
+}
+
+var _ adapter.ObjectStore = &syncTestStorage{}
 
 type syncTestFlow struct {
 	mu     sync.Mutex
@@ -144,7 +185,7 @@ func TestSyncer_PollOne_ReachesTerminalAndStops(t *testing.T) {
 	require.NoError(t, err)
 	flowc := newSyncTestFlow([]flowschema.TaskState{flowschema.TaskState_RUNNING, flowschema.TaskState_DONE}, workerOutputBytes)
 
-	s := NewSyncer(repo, flowc, Config{
+	s := NewSyncer(repo, flowc, &syncTestStorage{}, Config{
 		PerTaskInterval: 10 * time.Millisecond,
 		GlobalInterval:  10 * time.Millisecond,
 		GlobalBatchSize: 100,
@@ -153,7 +194,7 @@ func TestSyncer_PollOne_ReachesTerminalAndStops(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go s.PollOne(ctx, a.Id)
+	go s.PollOne(ctx, a.Id, a.FlowTaskId)
 
 	require.Eventually(t, func() bool {
 		got, _ := repo.FindById(ctx, a.Id)
@@ -182,7 +223,7 @@ func TestSyncer_GlobalScan_CatchesPendingArtifacts(t *testing.T) {
 	repo := newSyncTestRepo(a1, a2)
 	flowc := newSyncTestFlow([]flowschema.TaskState{flowschema.TaskState_DONE}, outBytes)
 
-	s := NewSyncer(repo, flowc, Config{
+	s := NewSyncer(repo, flowc, &syncTestStorage{}, Config{
 		PerTaskInterval: 10 * time.Millisecond,
 		GlobalInterval:  10 * time.Millisecond,
 		GlobalBatchSize: 100,
@@ -204,7 +245,7 @@ func TestSyncer_Shutdown_StopsLoops(t *testing.T) {
 	repo := newSyncTestRepo(a)
 	flowc := newSyncTestFlow([]flowschema.TaskState{flowschema.TaskState_RUNNING}, nil)
 
-	s := NewSyncer(repo, flowc, Config{
+	s := NewSyncer(repo, flowc, &syncTestStorage{}, Config{
 		PerTaskInterval: 10 * time.Millisecond,
 		GlobalInterval:  10 * time.Millisecond,
 		GlobalBatchSize: 100,
@@ -225,4 +266,102 @@ func TestSyncer_Shutdown_StopsLoops(t *testing.T) {
 	elapsed := time.Since(start)
 
 	assert.Less(t, elapsed, 500*time.Millisecond, "shutdown should complete quickly")
+}
+
+func makeStorageWorkerOutput(t *testing.T, key valobj.StoreKey) []byte {
+	t.Helper()
+
+	storageResult, err := sonic.Marshal(contract.StorageResult{StoreKey: key, ContentType: "application/pdf"})
+	require.NoError(t, err)
+
+	out, err := sonic.Marshal(contract.WorkerOutput{
+		Title:      "slides",
+		Result:     storageResult,
+		ResultKind: string(artifactentity.ResultKindStorage),
+	})
+	require.NoError(t, err)
+
+	return out
+}
+
+func newOrphanSyncer(t *testing.T, states []flowschema.TaskState, result []byte) (*Syncer, *syncTestStorage) {
+	t.Helper()
+
+	storage := &syncTestStorage{}
+	flowc := newSyncTestFlow(states, result)
+	s := NewSyncer(newSyncTestRepo(), flowc, storage, Config{
+		PerTaskInterval: 10 * time.Millisecond,
+		GlobalInterval:  10 * time.Millisecond,
+		GlobalBatchSize: 100,
+	}, &stubEventBus{})
+
+	return s, storage
+}
+
+func TestSyncer_ReapOrphanDeletesStorageObjectOnDone(t *testing.T) {
+	key, err := valobj.NewStoreKey("gonotelm-private", "artifact/nb/art.pptx", false)
+	require.NoError(t, err)
+
+	s, storage := newOrphanSyncer(t, []flowschema.TaskState{flowschema.TaskState_DONE}, makeStorageWorkerOutput(t, key))
+
+	done, err := s.pollOnce(t.Context(), valobj.NewId(), "ft-orphan")
+	require.NoError(t, err)
+	assert.True(t, done)
+	assert.Equal(t, []valobj.StoreKey{key}, storage.deletedKeys)
+}
+
+func TestSyncer_ReapOrphanKeepsPollingWhileTaskRuns(t *testing.T) {
+	key, err := valobj.NewStoreKey("gonotelm-private", "artifact/nb/art.pptx", false)
+	require.NoError(t, err)
+
+	s, storage := newOrphanSyncer(t, []flowschema.TaskState{flowschema.TaskState_RUNNING, flowschema.TaskState_DONE}, makeStorageWorkerOutput(t, key))
+	artifactId := valobj.NewId()
+
+	done, err := s.pollOnce(t.Context(), artifactId, "ft-orphan")
+	require.NoError(t, err)
+	assert.False(t, done)
+	assert.Empty(t, storage.deletedKeys)
+
+	done, err = s.pollOnce(t.Context(), artifactId, "ft-orphan")
+	require.NoError(t, err)
+	assert.True(t, done)
+	assert.Equal(t, []valobj.StoreKey{key}, storage.deletedKeys)
+}
+
+func TestSyncer_ReapOrphanDeletesStorageObjectOnCancelled(t *testing.T) {
+	key, err := valobj.NewStoreKey("gonotelm-private", "artifact/nb/art.pptx", false)
+	require.NoError(t, err)
+
+	s, storage := newOrphanSyncer(t, []flowschema.TaskState{flowschema.TaskState_CANCELLED}, makeStorageWorkerOutput(t, key))
+
+	done, err := s.pollOnce(t.Context(), valobj.NewId(), "ft-orphan")
+	require.NoError(t, err)
+	assert.True(t, done)
+	assert.Equal(t, []valobj.StoreKey{key}, storage.deletedKeys)
+}
+
+func TestSyncer_ReapOrphanSkipsInlineResult(t *testing.T) {
+	out, err := sonic.Marshal(contract.WorkerOutput{
+		Title:      "note",
+		Result:     []byte("inline content"),
+		ResultKind: string(artifactentity.ResultKindInline),
+	})
+	require.NoError(t, err)
+
+	s, storage := newOrphanSyncer(t, []flowschema.TaskState{flowschema.TaskState_DONE}, out)
+
+	done, err := s.pollOnce(t.Context(), valobj.NewId(), "ft-orphan")
+	require.NoError(t, err)
+	assert.True(t, done)
+	assert.Zero(t, storage.calls)
+}
+
+func TestSyncer_ReapOrphanWithoutFlowTaskId(t *testing.T) {
+	// flowTaskId 为空就不该碰 flow：newSyncTestFlow 空状态列表一旦被 Get 会 panic
+	s, storage := newOrphanSyncer(t, nil, nil)
+
+	done, err := s.pollOnce(t.Context(), valobj.NewId(), "")
+	require.NoError(t, err)
+	assert.True(t, done)
+	assert.Zero(t, storage.calls)
 }

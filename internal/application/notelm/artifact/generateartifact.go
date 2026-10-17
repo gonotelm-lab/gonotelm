@@ -303,7 +303,7 @@ func (h *GenerateArtifactHandler) beginArtifactTask(
 	}
 
 	if h.poller != nil {
-		go h.poller.PollOne(context.WithoutCancel(ctx), artifact.Id)
+		go h.poller.PollOne(context.WithoutCancel(ctx), artifact.Id, artifact.FlowTaskId)
 	}
 
 	return &GenerateResponse{ArtifactId: artifact.Id}, nil

@@ -2,7 +2,9 @@ package artifact
 
 import (
 	"context"
+	"log/slog"
 
+	"github.com/gonotelm-lab/gonotelm/internal/application/shared/cleanup"
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
@@ -12,12 +14,23 @@ import (
 
 type DeleteArtifactHandler struct {
 	*baseHandler
-	flowc   flow.TaskClient
-	storage adapter.ObjectStore
+	flowc            flow.TaskClient
+	storage          adapter.ObjectStore
+	cleanupScheduler *cleanup.CheckpointScheduler
 }
 
-func NewDeleteArtifactHandler(repo artifactrepo.Repository, flowc flow.TaskClient, storage adapter.ObjectStore) *DeleteArtifactHandler {
-	return &DeleteArtifactHandler{baseHandler: newBaseHandler(repo), flowc: flowc, storage: storage}
+func NewDeleteArtifactHandler(
+	repo artifactrepo.Repository,
+	flowc flow.TaskClient,
+	storage adapter.ObjectStore,
+	cleanupScheduler *cleanup.CheckpointScheduler,
+) *DeleteArtifactHandler {
+	return &DeleteArtifactHandler{
+		baseHandler:      newBaseHandler(repo),
+		flowc:            flowc,
+		storage:          storage,
+		cleanupScheduler: cleanupScheduler,
+	}
 }
 
 func (h *DeleteArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error {
@@ -30,11 +43,26 @@ func (h *DeleteArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error
 			return errors.WithMessage(err, "cancel flow task failed")
 		}
 	}
+
+	var storeKeys []valobj.StoreKey
 	if a.ResultKind.Storage() && a.Result != nil {
-		storeKey := extractStoreKey(a.Result)
-		if storeKey.Valid() {
-			_ = h.storage.DeleteObject(ctx, storeKey)
+		if storeKey := extractStoreKey(a.Result); storeKey.Valid() {
+			storeKeys = append(storeKeys, storeKey)
 		}
 	}
+
+	// 先注册兜底再删对象，删失败还能由回调重删
+	if err := h.cleanupScheduler.ScheduleArtifactCleanup(ctx, a.NotebookId, a.Id, storeKeys); err != nil {
+		slog.ErrorContext(ctx, "register artifact cleanup checkpoint failed",
+			slog.String("artifact_id", a.Id.String()),
+			slog.String("notebook_id", a.NotebookId.String()),
+			slog.Any("err", err),
+		)
+	}
+
+	if len(storeKeys) > 0 {
+		_ = h.storage.DeleteObject(ctx, storeKeys[0])
+	}
+
 	return h.repo.DeleteById(ctx, a.Id)
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/gonotelm-lab/gonotelm/internal/application/shared/cleanup"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	domainerr "github.com/gonotelm-lab/gonotelm/internal/domain/source/errors"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
@@ -13,13 +14,19 @@ import (
 
 type DeleteSourceHandler struct {
 	*baseHandler
-	eventBus eventbus.Publisher
+	eventBus         eventbus.Publisher
+	cleanupScheduler *cleanup.CheckpointScheduler
 }
 
-func NewDeleteSourceHandler(sourceRepo sourcerepo.Repository, eventBus eventbus.Publisher) *DeleteSourceHandler {
+func NewDeleteSourceHandler(
+	sourceRepo sourcerepo.Repository,
+	eventBus eventbus.Publisher,
+	cleanupScheduler *cleanup.CheckpointScheduler,
+) *DeleteSourceHandler {
 	return &DeleteSourceHandler{
-		baseHandler: newBaseHandler(sourceRepo),
-		eventBus:    eventBus,
+		baseHandler:      newBaseHandler(sourceRepo),
+		eventBus:         eventBus,
+		cleanupScheduler: cleanupScheduler,
 	}
 }
 
@@ -35,6 +42,18 @@ func (h *DeleteSourceHandler) Handle(ctx context.Context, id valobj.Id) error {
 	targetSource.Delete()
 	if err := h.sourceRepo.DeleteById(ctx, targetSource.Id); err != nil {
 		return errors.WithMessagef(err, "delete source failed, source_id=%s", id)
+	}
+
+	if err := h.cleanupScheduler.ScheduleSourceCleanup(
+		ctx,
+		targetSource.NotebookId,
+		targetSource.Id,
+		targetSource.ObjectStoreKeys(),
+	); err != nil {
+		slog.ErrorContext(ctx, "register source cleanup checkpoint failed",
+			slog.String("source_id", id.String()),
+			slog.Any("err", err),
+		)
 	}
 
 	for _, event := range targetSource.PullEvents() {

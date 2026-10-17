@@ -1,6 +1,3 @@
-// Package notelm 是 HTTP API 的组装入口：拼 hertz、挂全局中间件与 /api/v1 分组，
-// 然后把各功能域子包（auth / notebook / source / chat / studio / user）的路由挂上去。
-// 每个功能域自己持有 Server 与处理器，本包只做装配，不写业务处理。
 package notelm
 
 import (
@@ -11,7 +8,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/common/config"
 	artifactapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/artifact"
 	chatsuggest "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/suggestion"
-	"github.com/gonotelm-lab/gonotelm/internal/application/notelm/source/cleanup"
+	"github.com/gonotelm-lab/gonotelm/internal/application/shared/cleanup"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
@@ -73,7 +70,10 @@ type ServerDeps struct {
 
 	// 两者都为空时不挂 flow 回调端点。
 	CleanupFlowClient flow.ScheduleClient
+	CleanupScheduler  *cleanup.CheckpointScheduler
 	CleanupSweeper    *cleanup.Sweeper
+	// 删除接口里注册唯一一条 notebook 兜底清理检查点。
+	CleanupRegistrar *cleanup.NotebookCleanupRegistrar
 
 	TitleMaker adapter.TitleMaker
 }
@@ -127,20 +127,22 @@ func NewServer(
 		}),
 
 		notebook: notebookapi.NewServer(notebookapi.Deps{
-			NotebookRepo: deps.NotebookRepo,
-			SourceRepo:   deps.SourceRepo,
-			EventBus:     deps.EventBus,
-			DistLock:     deps.DistLock,
-			Summarizer:   deps.Summarizer,
+			NotebookRepo:     deps.NotebookRepo,
+			SourceRepo:       deps.SourceRepo,
+			EventBus:         deps.EventBus,
+			DistLock:         deps.DistLock,
+			Summarizer:       deps.Summarizer,
+			CleanupRegistrar: deps.CleanupRegistrar,
 		}),
 
 		source: sourceapi.NewServer(sourceapi.Deps{
-			SourceRepo:    deps.SourceRepo,
-			NotebookRepo:  deps.NotebookRepo,
-			ObjectStore:   deps.ObjectStore,
-			KeyFactory:    deps.KeyFactory,
-			SourceDocRepo: deps.SourceDocRepo,
-			EventBus:      deps.EventBus,
+			SourceRepo:       deps.SourceRepo,
+			NotebookRepo:     deps.NotebookRepo,
+			ObjectStore:      deps.ObjectStore,
+			KeyFactory:       deps.KeyFactory,
+			SourceDocRepo:    deps.SourceDocRepo,
+			EventBus:         deps.EventBus,
+			CleanupScheduler: deps.CleanupScheduler,
 		}),
 
 		chat: chatapi.NewServer(chatapi.Deps{
@@ -174,6 +176,7 @@ func NewServer(
 			TitleMaker:       deps.TitleMaker,
 			ObjectStore:      deps.ObjectStore,
 			KeyFactory:       deps.KeyFactory,
+			CleanupScheduler: deps.CleanupScheduler,
 		}),
 
 		user: userapi.NewServer(userapi.Deps{

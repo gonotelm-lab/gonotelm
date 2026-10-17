@@ -9,7 +9,7 @@ import (
 
 	syncerpkg "github.com/gonotelm-lab/gonotelm/internal/application/notelm/artifact/syncer"
 	chatsuggest "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/suggestion"
-	"github.com/gonotelm-lab/gonotelm/internal/application/notelm/source/cleanup"
+	"github.com/gonotelm-lab/gonotelm/internal/application/shared/cleanup"
 	bootshared "github.com/gonotelm-lab/gonotelm/internal/bootstrap/shared"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	coreadapter "github.com/gonotelm-lab/gonotelm/internal/core/adapter"
@@ -172,6 +172,7 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 	cleanupSweeper := cleanup.NewSweeper(
 		sourceRepo,
 		notebookRepo,
+		artifactRepo,
 		sourceDocRepo,
 		infra.ObjectStore,
 	)
@@ -198,6 +199,7 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 		cfg.Cleanup.Delay,
 		cfg.Cleanup.Jitter,
 	)
+	cleanupRegistrar := cleanup.NewNotebookCleanupRegistrar(cleanupSweeper, cleanupScheduler)
 
 	// ── 7. Syncer ──
 	syncerCfg := syncerpkg.Config{
@@ -205,7 +207,7 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 		GlobalInterval:  cfg.Syncer.GlobalInterval,
 		GlobalBatchSize: cfg.Syncer.GlobalBatchSize,
 	}
-	syncerInst := syncerpkg.NewSyncer(artifactRepo, flowClient, syncerCfg, eventBus)
+	syncerInst := syncerpkg.NewSyncer(artifactRepo, flowClient, infra.ObjectStore, syncerCfg, eventBus)
 	syncerInst.Start(rootCtx)
 	addCloser(&syncerCloser{syncerInst})
 
@@ -229,9 +231,9 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 
 		EventBus:    eventBus,
 		ChatGateway: infra.LLMGateway,
+		FlowClient:  flowClient,
 
-		CleanupScheduler: cleanupScheduler,
-		CleanupSweeper:   cleanupSweeper,
+		CleanupSweeper: cleanupSweeper,
 	})
 
 	// ── 9. HTTP Server ──
@@ -273,7 +275,9 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 			TitleMaker: titleMaker,
 
 			CleanupFlowClient: cleanupFlowClient,
+			CleanupScheduler:  cleanupScheduler,
 			CleanupSweeper:    cleanupSweeper,
+			CleanupRegistrar:  cleanupRegistrar,
 		},
 	)
 

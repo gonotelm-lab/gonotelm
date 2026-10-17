@@ -63,6 +63,16 @@ func workerFn(deps *types.WorkerDeps) func(ctx context.Context, in contract.Work
 
 		ctx = trace.RestoreReqIdFromTrace(ctx)
 		ctx = pkgcontext.WithUserId(ctx, userId)
+
+		if artifactGone(ctx, deps, artifactId) {
+			slog.InfoContext(ctx, "artifact already deleted, skip generation",
+				slog.String("kind", string(kind)),
+				slog.String("artifact_id", artifactId.String()),
+			)
+
+			return artifactDeletedResult(), nil
+		}
+
 		resp, err := run(ctx, deps, req)
 		if err != nil {
 			errMsg := err.Error()
@@ -78,6 +88,16 @@ func workerFn(deps *types.WorkerDeps) func(ctx context.Context, in contract.Work
 				Data:      []byte(errMsg),
 				SkipRetry: shouldSkipRetry(err),
 			}, nil
+		}
+
+		if artifactGone(ctx, deps, artifactId) {
+			discardStorageResult(ctx, deps, resp)
+			slog.InfoContext(ctx, "artifact deleted during generation, rolled back objects",
+				slog.String("kind", string(kind)),
+				slog.String("artifact_id", artifactId.String()),
+			)
+
+			return artifactDeletedResult(), nil
 		}
 
 		data, err := sonic.Marshal(contract.WorkerOutput{
@@ -99,6 +119,13 @@ func paramErrorResult(format string, args ...any) flow.Result {
 	err := errors.ErrParams.Msgf(format, args...)
 	return flow.ErrorResult{
 		Data:      []byte(err.Error()),
+		SkipRetry: true,
+	}
+}
+
+func artifactDeletedResult() flow.Result {
+	return flow.ErrorResult{
+		Data:      []byte("artifact deleted"),
 		SkipRetry: true,
 	}
 }

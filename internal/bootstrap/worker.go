@@ -83,6 +83,7 @@ func NewWorker(ctx context.Context, cfg *conf.WorkerConfig) (*Worker, error) {
 		ObjectStorage:        shared.ObjectStore,
 		KeyFactory:           shared.KeyFactory,
 		CheckpointRepository: repository.NewCheckpointRepository(shared.Database.WorkerCheckpointStore),
+		ArtifactRepo:         repository.NewArtifactRepository(shared.Database.ArtifactStore),
 	}
 
 	app := &Worker{shared: shared}

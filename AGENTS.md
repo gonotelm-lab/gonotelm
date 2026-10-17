@@ -47,6 +47,7 @@ internal/
     worker/artifact/      per-artifact generation pipelines (agent + step + prompt + validation)
     initjob/              init task registration
     shared/contract/      notelm ↔ worker cross-process wire contract (WorkerInput / WorkerOutput)
+    shared/cleanup/       cross-domain delete fallback: checkpoints (flow one-shot), sweeper, webhook payload
   infrastructure/         port implementations and external components
     repository/           implements domain repository interfaces: store + mapper (persistence model ↔ entity)
     database/             GORM stores and schema/ (Postgres table models)

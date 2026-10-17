@@ -10,28 +10,38 @@ import (
 const (
 	KindSource   = "source-cleanup"
 	KindNotebook = "notebook-cleanup"
+	KindArtifact = "artifact-cleanup"
 )
 
 // 回调路径写死；host 由配置提供。
 const (
 	SourceCallbackPath   = "/inner-api/v1/flow/webhook/source-cleanup"
 	NotebookCallbackPath = "/inner-api/v1/flow/webhook/notebook-cleanup"
+	ArtifactCallbackPath = "/inner-api/v1/flow/webhook/artifact-cleanup"
 )
 
 // Payload 是清理检查点的线协议载荷
 type Payload struct {
 	Kind       string    `json:"kind"`
 	NotebookId valobj.Id `json:"notebook_id"`
-	SourceId   valobj.Id `json:"source_id,omitzero"` // 这里不能用omitempty
+	SourceId   valobj.Id `json:"source_id,omitzero"`   // 这里不能用omitempty
+	ArtifactId valobj.Id `json:"artifact_id,omitzero"` // 这里不能用omitempty
 	// 对象存储的一些key 必须带入 否则如果记录本身删掉了key就没办法复原去清除脏object
-	Keys    []string    `json:"keys,omitempty"`
-	Sources []SourceRef `json:"sources,omitempty"`
+	Keys      []string      `json:"keys,omitempty"`
+	Sources   []SourceRef   `json:"sources,omitempty"`
+	Artifacts []ArtifactRef `json:"artifacts,omitempty"`
 }
 
 // SourceRef 是 notebook 清理需要的每个 source 及其对象 key（encoded StoreKey）。
 type SourceRef struct {
 	SourceId valobj.Id `json:"source_id"`
 	Keys     []string  `json:"keys,omitempty"`
+}
+
+// ArtifactRef 是 notebook 清理需要的每个 artifact 及其对象 key（encoded StoreKey）。
+type ArtifactRef struct {
+	ArtifactId valobj.Id `json:"artifact_id"`
+	Keys       []string  `json:"keys,omitempty"`
 }
 
 func (p *Payload) Marshal() ([]byte, error) {
@@ -53,6 +63,10 @@ func Unmarshal(data []byte) (*Payload, error) {
 	case KindSource:
 		if p.SourceId.IsZero() {
 			return nil, errors.ErrParams.Msg("source id is empty in cleanup payload")
+		}
+	case KindArtifact:
+		if p.ArtifactId.IsZero() {
+			return nil, errors.ErrParams.Msg("artifact id is empty in cleanup payload")
 		}
 	case KindNotebook:
 	default:

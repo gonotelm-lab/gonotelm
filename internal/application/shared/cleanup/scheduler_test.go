@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/requestid"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -17,6 +19,7 @@ type fakeScheduleClient struct {
 	callbackURL    string
 	payload        []byte
 	idempotencyKey string
+	name           string
 	err            error
 }
 
@@ -26,12 +29,14 @@ func (f *fakeScheduleClient) RegisterOneShot(
 	callbackURL string,
 	payload []byte,
 	idempotencyKey string,
+	name string,
 ) (string, error) {
 	f.calls++
 	f.fireAt = fireAt
 	f.callbackURL = callbackURL
 	f.payload = payload
 	f.idempotencyKey = idempotencyKey
+	f.name = name
 
 	return "schedule-1", f.err
 }
@@ -48,6 +53,13 @@ func newTestScheduler(client *fakeScheduleClient, baseURL string) *CheckpointSch
 	return s
 }
 
+func newTestCtx() (context.Context, valobj.Uid, requestid.ID) {
+	userId := valobj.NewUid()
+	reqId := requestid.Gen()
+
+	return pkgcontext.WithUserId(pkgcontext.WithReqId(context.Background(), reqId), userId), userId, reqId
+}
+
 func TestSchedulerDisabledWithoutBaseURL(t *testing.T) {
 	Convey("does not register without a base URL", t, func() {
 		client := &fakeScheduleClient{}
@@ -60,7 +72,7 @@ func TestSchedulerDisabledWithoutBaseURL(t *testing.T) {
 }
 
 func TestScheduleSourceCleanup(t *testing.T) {
-	Convey("source checkpoint URL, idempotency key and payload", t, func() {
+	Convey("source checkpoint URL, key, name and payload", t, func() {
 		client := &fakeScheduleClient{}
 		scheduler := newTestScheduler(client, "http://127.0.0.1:7099/")
 
@@ -68,11 +80,13 @@ func TestScheduleSourceCleanup(t *testing.T) {
 		key, err := valobj.NewStoreKey(testBucket, "file/x/y.pdf", false)
 		So(err, ShouldBeNil)
 
-		So(scheduler.ScheduleSourceCleanup(t.Context(), notebookId, sourceId, []valobj.StoreKey{key}), ShouldBeNil)
+		ctx, userId, reqId := newTestCtx()
+		So(scheduler.ScheduleSourceCleanup(ctx, notebookId, sourceId, []valobj.StoreKey{key}), ShouldBeNil)
 
 		So(client.calls, ShouldEqual, 1)
 		So(client.callbackURL, ShouldEqual, "http://127.0.0.1:7099"+SourceCallbackPath)
 		So(client.idempotencyKey, ShouldEqual, KindSource+":"+notebookId.String()+":"+sourceId.String())
+		So(client.name, ShouldEqual, userId.String()+"+"+actionDeleteSource+"+"+sourceId.String()+"@"+reqId.String()[:scheduleNameReqIdLen])
 
 		// fireAt = now + delay + [0, jitter)
 		So(client.fireAt, ShouldEqual, time.Unix(0, 0).Add(30*time.Minute))
@@ -87,22 +101,68 @@ func TestScheduleSourceCleanup(t *testing.T) {
 }
 
 func TestScheduleNotebookCleanup(t *testing.T) {
-	Convey("notebook checkpoint path and payload", t, func() {
+	Convey("one notebook checkpoint carries sources and artifacts", t, func() {
 		client := &fakeScheduleClient{}
 		scheduler := newTestScheduler(client, "http://notelm:7099")
 
-		notebookId, sourceId := valobj.NewId(), valobj.NewId()
-		refs := []SourceRef{{SourceId: sourceId, Keys: []string{"k"}}}
+		notebookId, sourceId, artifactId := valobj.NewId(), valobj.NewId(), valobj.NewId()
+		key, err := valobj.NewStoreKey(testBucket, "artifact/x/y.pptx", false)
+		So(err, ShouldBeNil)
 
-		So(scheduler.ScheduleNotebookCleanup(t.Context(), notebookId, refs), ShouldBeNil)
+		ctx, userId, reqId := newTestCtx()
+		scheduler.ScheduleNotebookCleanup(ctx, notebookId,
+			[]SourceRef{{SourceId: sourceId, Keys: []string{"k"}}},
+			[]ArtifactRef{{ArtifactId: artifactId, Keys: []string{key.Encode()}}},
+		)
+
+		So(client.calls, ShouldEqual, 1)
 		So(client.callbackURL, ShouldEqual, "http://notelm:7099"+NotebookCallbackPath)
 		So(client.idempotencyKey, ShouldEqual, KindNotebook+":"+notebookId.String())
+		So(client.name, ShouldEqual, userId.String()+"+"+actionDeleteNotebook+"+"+notebookId.String()+"@"+reqId.String()[:scheduleNameReqIdLen])
 
 		payload, err := Unmarshal(client.payload)
 		So(err, ShouldBeNil)
 		So(payload.Kind, ShouldEqual, KindNotebook)
 		So(payload.Sources, ShouldHaveLength, 1)
 		So(payload.Sources[0].SourceId, ShouldEqual, sourceId)
+		So(payload.Artifacts, ShouldHaveLength, 1)
+		So(payload.Artifacts[0].ArtifactId, ShouldEqual, artifactId)
+	})
+}
+
+func TestScheduleArtifactCleanup(t *testing.T) {
+	Convey("single artifact checkpoint URL, key, name and payload", t, func() {
+		client := &fakeScheduleClient{}
+		scheduler := newTestScheduler(client, "http://notelm:7099")
+
+		notebookId, artifactId := valobj.NewId(), valobj.NewId()
+		key, err := valobj.NewStoreKey(testBucket, "artifact/nb/art.pptx", false)
+		So(err, ShouldBeNil)
+
+		ctx, userId, reqId := newTestCtx()
+		So(scheduler.ScheduleArtifactCleanup(ctx, notebookId, artifactId, []valobj.StoreKey{key}), ShouldBeNil)
+
+		So(client.callbackURL, ShouldEqual, "http://notelm:7099"+ArtifactCallbackPath)
+		So(client.idempotencyKey, ShouldEqual, KindArtifact+":"+notebookId.String()+":"+artifactId.String())
+		So(client.name, ShouldEqual, userId.String()+"+"+actionDeleteArtifact+"+"+artifactId.String()+"@"+reqId.String()[:scheduleNameReqIdLen])
+
+		payload, err := Unmarshal(client.payload)
+		So(err, ShouldBeNil)
+		So(payload.Kind, ShouldEqual, KindArtifact)
+		So(payload.ArtifactId, ShouldEqual, artifactId)
+		So(payload.Keys, ShouldResemble, []string{key.Encode()})
+	})
+}
+
+func TestScheduleNameWithoutRequestContext(t *testing.T) {
+	Convey("the name omits @reqid when the context has none", t, func() {
+		client := &fakeScheduleClient{}
+		scheduler := newTestScheduler(client, "http://notelm:7099")
+
+		sourceId := valobj.NewId()
+		So(scheduler.ScheduleSourceCleanup(t.Context(), valobj.NewId(), sourceId, nil), ShouldBeNil)
+		So(client.name, ShouldEndWith, "+"+actionDeleteSource+"+"+sourceId.String())
+		So(client.name, ShouldNotContainSubstring, "@")
 	})
 }
 
@@ -126,7 +186,7 @@ func TestScheduleRegistrationErrorIsReturned(t *testing.T) {
 		client := &fakeScheduleClient{err: errors.ErrInner.Msg("flow down")}
 		scheduler := newTestScheduler(client, "http://notelm:7099")
 
-		err := scheduler.ScheduleNotebookCleanup(t.Context(), valobj.NewId(), nil)
+		err := scheduler.ScheduleNotebookCleanup(t.Context(), valobj.NewId(), nil, nil)
 		So(err, ShouldNotBeNil)
 		So(client.calls, ShouldEqual, 1)
 	})

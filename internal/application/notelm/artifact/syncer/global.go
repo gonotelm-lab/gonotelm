@@ -37,7 +37,7 @@ func (s *Syncer) scanOnce(ctx context.Context) error {
 		return err
 	}
 	for _, a := range rows {
-		_, _ = s.pollOnce(ctx, a.Id)
+		_, _ = s.pollOnce(ctx, a.Id, a.FlowTaskId)
 	}
 	return nil
 }

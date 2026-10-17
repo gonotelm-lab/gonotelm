@@ -3,7 +3,7 @@ package webhook
 
 import (
 	"github.com/cloudwego/hertz/pkg/app/server"
-	"github.com/gonotelm-lab/gonotelm/internal/application/notelm/source/cleanup"
+	"github.com/gonotelm-lab/gonotelm/internal/application/shared/cleanup"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
 )
 

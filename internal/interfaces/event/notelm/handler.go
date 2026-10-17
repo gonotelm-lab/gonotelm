@@ -6,14 +6,15 @@ import (
 	artifact "github.com/gonotelm-lab/gonotelm/internal/application/notelm/artifact/eventhandle"
 	chat "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/eventhandle"
 	"github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/suggestion"
-	"github.com/gonotelm-lab/gonotelm/internal/application/notelm/source/cleanup"
 	source "github.com/gonotelm-lab/gonotelm/internal/application/notelm/source/eventhandle"
+	"github.com/gonotelm-lab/gonotelm/internal/application/shared/cleanup"
 	adapterdefine "github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 )
 
@@ -36,9 +37,9 @@ type EventDeps struct {
 
 	EventBus    *eventbus.CompositeEventBus
 	ChatGateway *llmchat.Gateway
+	FlowClient  flow.TaskClient
 
-	CleanupScheduler *cleanup.CheckpointScheduler
-	CleanupSweeper   *cleanup.Sweeper
+	CleanupSweeper *cleanup.Sweeper
 }
 
 func Init(ctx context.Context, deps *EventDeps) {
@@ -58,10 +59,7 @@ func Init(ctx context.Context, deps *EventDeps) {
 func initSourceEventConsumers(deps *EventDeps) error {
 	if err := source.RegisterSourceDeletedConsumer(
 		deps.EventBus.InProcess,
-		source.NewOnSourceDeletedEventHandler(
-			deps.CleanupScheduler,
-			deps.CleanupSweeper,
-		),
+		source.NewOnSourceDeletedEventHandler(deps.CleanupSweeper),
 	); err != nil {
 		return err
 	}
@@ -83,18 +81,14 @@ func initNotebookEventConsumers(deps *EventDeps) error {
 
 	if err := source.RegisterNotebookEventConsumer(
 		deps.EventBus.InProcess,
-		source.NewOnNotebookEventHandler(
-			deps.SourceRepo,
-			deps.CleanupScheduler,
-			deps.CleanupSweeper,
-		),
+		source.NewOnNotebookEventHandler(deps.SourceRepo, deps.CleanupSweeper),
 	); err != nil {
 		return err
 	}
 
 	return artifact.RegisterNotebookEventConsumer(
 		deps.EventBus.InProcess,
-		artifact.NewOnNotebookEventHandler(deps.ArtifactTaskRepo),
+		artifact.NewOnNotebookEventHandler(deps.ArtifactTaskRepo, deps.FlowClient, deps.CleanupSweeper),
 	)
 }
 

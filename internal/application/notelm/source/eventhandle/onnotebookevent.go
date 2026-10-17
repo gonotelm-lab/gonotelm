@@ -4,10 +4,11 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/gonotelm-lab/gonotelm/internal/application/notelm/source/cleanup"
+	"github.com/gonotelm-lab/gonotelm/internal/application/shared/cleanup"
 	"github.com/gonotelm-lab/gonotelm/internal/core/event"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	notebookevent "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/event"
+	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -15,22 +16,17 @@ import (
 
 const notebookSourcesPageSize = 50
 
+// OnNotebookEventHandler 只清 source 自己的资源。
 type OnNotebookEventHandler struct {
-	sourceRepo       sourcerepo.Repository
-	cleanupScheduler *cleanup.CheckpointScheduler
-	cleanupSweeper   *cleanup.Sweeper
+	sourceRepo     sourcerepo.Repository
+	cleanupSweeper *cleanup.Sweeper
 }
 
 func NewOnNotebookEventHandler(
 	sourceRepo sourcerepo.Repository,
-	cleanupScheduler *cleanup.CheckpointScheduler,
 	cleanupSweeper *cleanup.Sweeper,
 ) *OnNotebookEventHandler {
-	return &OnNotebookEventHandler{
-		sourceRepo:       sourceRepo,
-		cleanupScheduler: cleanupScheduler,
-		cleanupSweeper:   cleanupSweeper,
-	}
+	return &OnNotebookEventHandler{sourceRepo: sourceRepo, cleanupSweeper: cleanupSweeper}
 }
 
 func (h *OnNotebookEventHandler) Handle(
@@ -42,29 +38,26 @@ func (h *OnNotebookEventHandler) Handle(
 	}
 
 	notebookId := evt.NotebookId()
-	refs, err := h.collectNotebookSources(ctx, notebookId)
+	sources, err := h.collectNotebookSources(ctx, notebookId)
 	if err != nil {
 		return errors.WithStack(err)
 	}
-
-	// 先注册一个定时任务兜底清理流程
-	if err := h.cleanupScheduler.ScheduleNotebookCleanup(ctx, notebookId, refs); err != nil {
-		slog.ErrorContext(ctx, "register notebook cleanup checkpoint failed",
-			slog.String("notebook_id", notebookId.String()),
-			slog.Any("err", err),
-		)
+	if len(sources) == 0 {
+		return nil
 	}
 
-	if err := h.cleanupSweeper.SweepNotebook(ctx, notebookId, refs); err != nil {
+	if err := h.cleanupSweeper.SweepDeletedNotebookSources(ctx, notebookId, sources); err != nil {
 		slog.ErrorContext(ctx, "failed to clean up sources for deleted notebook",
 			slog.String("notebook_id", notebookId.String()),
 			slog.Any("err", err),
 		)
+
+		return nil
 	}
 
 	slog.InfoContext(ctx, "cleaned up sources for deleted notebook",
 		slog.String("notebook_id", notebookId.String()),
-		slog.Int("source_count", len(refs)),
+		slog.Int("source_count", len(sources)),
 	)
 
 	return nil
@@ -73,34 +66,29 @@ func (h *OnNotebookEventHandler) Handle(
 func (h *OnNotebookEventHandler) collectNotebookSources(
 	ctx context.Context,
 	notebookId valobj.Id,
-) ([]cleanup.SourceRef, error) {
-	refs := make([]cleanup.SourceRef, 0, notebookSourcesPageSize)
+) ([]*sourceentity.Source, error) {
+	sources := make([]*sourceentity.Source, 0, notebookSourcesPageSize)
 
 	for offset := 0; ; offset += notebookSourcesPageSize {
-		sources, err := h.sourceRepo.ListByNotebookId(ctx, notebookId, &sourcerepo.ListSpec{
+		page, err := h.sourceRepo.ListByNotebookId(ctx, notebookId, &sourcerepo.ListSpec{
 			Limit:  notebookSourcesPageSize,
 			Offset: offset,
 		})
 		if err != nil {
 			return nil, errors.WithMessagef(err, "list sources failed, notebook_id=%s", notebookId)
 		}
-		if len(sources) == 0 {
+		if len(page) == 0 {
 			break
 		}
 
-		for _, source := range sources {
-			refs = append(refs, cleanup.SourceRef{
-				SourceId: source.Id,
-				Keys:     cleanup.EncodeKeys(source.ObjectStoreKeys()),
-			})
-		}
+		sources = append(sources, page...)
 
-		if len(sources) < notebookSourcesPageSize {
+		if len(page) < notebookSourcesPageSize {
 			break
 		}
 	}
 
-	return refs, nil
+	return sources, nil
 }
 
 func RegisterNotebookEventConsumer(

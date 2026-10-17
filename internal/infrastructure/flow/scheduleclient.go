@@ -17,8 +17,8 @@ type ScheduleClient interface {
 		callbackURL string,
 		payload []byte,
 		idempotencyKey string,
+		name string,
 	) (scheduleId string, err error)
-	// Verify 校验 FLOW-HMAC-SHA256 签名；req 的 Body 必须是可读的完整 body。
 	Verify(req *http.Request) error
 	Close() error
 }
@@ -44,9 +44,11 @@ func (s *ScheduleClientImpl) RegisterOneShot(
 	callbackURL string,
 	payload []byte,
 	idempotencyKey string,
+	name string,
 ) (string, error) {
 	spec := flowschedule.OneShot(fireAt, callbackURL, payload,
 		flowschedule.WithIdempotencyKey(idempotencyKey),
+		flowschedule.WithName(name),
 		flowschedule.WithContentType("application/json"),
 	)
 

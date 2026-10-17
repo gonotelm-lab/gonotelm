@@ -8,7 +8,7 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/app/server"
-	"github.com/gonotelm-lab/gonotelm/internal/application/notelm/source/cleanup"
+	"github.com/gonotelm-lab/gonotelm/internal/application/shared/cleanup"
 	httpadapter "github.com/gonotelm-lab/gonotelm/pkg/http/adapter"
 )
 
@@ -16,6 +16,7 @@ import (
 func (s *Server) registerFlowRoutes(h *server.Hertz) {
 	h.POST(cleanup.SourceCallbackPath, s.flowCleanupHandler(cleanup.KindSource))
 	h.POST(cleanup.NotebookCallbackPath, s.flowCleanupHandler(cleanup.KindNotebook))
+	h.POST(cleanup.ArtifactCallbackPath, s.flowCleanupHandler(cleanup.KindArtifact))
 }
 
 // flowCleanupHandler 的 2xx 表示投递成功（含无需处理），5xx 让 flow 重投；清扫本身可重复执行。

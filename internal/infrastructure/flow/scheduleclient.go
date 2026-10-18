@@ -29,8 +29,8 @@ type ScheduleClientImpl struct {
 
 var _ ScheduleClient = &ScheduleClientImpl{}
 
-func NewScheduleClient(addr, namespace, apiKey string) (*ScheduleClientImpl, error) {
-	c, err := flowschedule.New(addr, flowschedule.Config{Namespace: namespace, APIKey: apiKey})
+func NewScheduleClient(cfg Config) (*ScheduleClientImpl, error) {
+	c, err := flowschedule.New(cfg.Addr, flowschedule.Config{Namespace: cfg.Namespace, APIKey: cfg.APIKey})
 	if err != nil {
 		return nil, errors.Wrap(err, "create flow schedule client failed")
 	}

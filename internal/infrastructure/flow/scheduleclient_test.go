@@ -57,7 +57,7 @@ func verifyRequest(method, path string, header http.Header, body string) *http.R
 
 func TestScheduleClientVerify(t *testing.T) {
 	Convey("verifies a signature produced with the same derived key", t, func() {
-		client, err := NewScheduleClient("", testNamespace, testSecret)
+		client, err := NewScheduleClient(Config{Namespace: testNamespace, APIKey: testSecret})
 		So(err, ShouldBeNil)
 		defer client.Close()
 
@@ -68,7 +68,7 @@ func TestScheduleClientVerify(t *testing.T) {
 
 func TestScheduleClientVerifyRejectsTamperedRequest(t *testing.T) {
 	Convey("rejects tampered requests", t, func() {
-		client, err := NewScheduleClient("", testNamespace, testSecret)
+		client, err := NewScheduleClient(Config{Namespace: testNamespace, APIKey: testSecret})
 		So(err, ShouldBeNil)
 		defer client.Close()
 
@@ -87,7 +87,7 @@ func TestScheduleClientVerifyRejectsTamperedRequest(t *testing.T) {
 		})
 
 		Convey("wrong secret", func() {
-			wrong, err := NewScheduleClient("", testNamespace, "sk-other-secret")
+			wrong, err := NewScheduleClient(Config{Namespace: testNamespace, APIKey: "sk-other-secret"})
 			So(err, ShouldBeNil)
 			defer wrong.Close()
 

@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/bytedance/sonic"
-	flowschema "github.com/gonotelm-lab/flow/api/schema/v1"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	artifacterrors "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/errors"
@@ -21,9 +20,9 @@ const (
 	retryCancelPollInterval = 500 * time.Millisecond
 )
 
-func isTaskTerminal(state flowschema.TaskState) bool {
+func isTaskTerminal(state flow.TaskState) bool {
 	switch state {
-	case flowschema.TaskState_DONE, flowschema.TaskState_FAILED, flowschema.TaskState_CANCELLED:
+	case flow.TaskStateDone, flow.TaskStateFailed, flow.TaskStateCancelled:
 		return true
 	}
 	return false

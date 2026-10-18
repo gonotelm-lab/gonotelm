@@ -157,18 +157,21 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 	)
 
 	// ── 5. Flow task client ──
-	flowTaskClient, err := flowcli.NewTaskClient(
-		cfg.Flow.Addr,
-		cfg.Flow.Namespace,
-		cfg.Flow.DialTimeout,
-		cfg.Flow.MaxRetry,
-	)
+	flowCfg := flowcli.Config{
+		Addr:        cfg.Flow.Addr,
+		Namespace:   cfg.Flow.Namespace,
+		APIKey:      cfg.Flow.APIKey,
+		MaxRetry:    cfg.Flow.MaxRetry,
+		DialTimeout: cfg.Flow.DialTimeout,
+	}
+
+	flowTaskClient, err := flowcli.NewTaskClient(flowCfg)
 	if err != nil {
 		return nil, err
 	}
 	addCloser(flowTaskClient)
 
-	flowSchedClient, err := flowcli.NewScheduleClient(cfg.Flow.Addr, cfg.Flow.Namespace, cfg.Flow.APIKey)
+	flowSchedClient, err := flowcli.NewScheduleClient(flowCfg)
 	if err != nil {
 		return nil, err
 	}

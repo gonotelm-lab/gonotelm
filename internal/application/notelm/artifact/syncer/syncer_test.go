@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/bytedance/sonic"
-	flowschema "github.com/gonotelm-lab/flow/api/schema/v1"
 	"github.com/gonotelm-lab/gonotelm/internal/application/shared/contract"
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/event"
@@ -141,12 +140,12 @@ var _ adapter.ObjectStore = &syncTestStorage{}
 
 type syncTestFlow struct {
 	mu     sync.Mutex
-	states []flowschema.TaskState
+	states []flow.TaskState
 	result []byte
 	index  int
 }
 
-func newSyncTestFlow(states []flowschema.TaskState, result []byte) *syncTestFlow {
+func newSyncTestFlow(states []flow.TaskState, result []byte) *syncTestFlow {
 	return &syncTestFlow{states: states, result: result}
 }
 
@@ -193,7 +192,7 @@ func TestSyncer_PollOne_ReachesTerminalAndStops(t *testing.T) {
 	}
 	workerOutputBytes, err := sonic.Marshal(out)
 	require.NoError(t, err)
-	flowc := newSyncTestFlow([]flowschema.TaskState{flowschema.TaskState_RUNNING, flowschema.TaskState_DONE}, workerOutputBytes)
+	flowc := newSyncTestFlow([]flow.TaskState{flow.TaskStateRunning, flow.TaskStateDone}, workerOutputBytes)
 
 	s := New(repo, flowc, &syncTestStorage{}, Config{
 		PerTaskInterval: 10 * time.Millisecond,
@@ -231,7 +230,7 @@ func TestSyncer_GlobalScan_CatchesPendingArtifacts(t *testing.T) {
 	a1 := makeSyncArtifact(artifactentity.StatusPending, "ft-a")
 	a2 := makeSyncArtifact(artifactentity.StatusPending, "ft-b")
 	repo := newSyncTestRepo(a1, a2)
-	flowc := newSyncTestFlow([]flowschema.TaskState{flowschema.TaskState_DONE}, outBytes)
+	flowc := newSyncTestFlow([]flow.TaskState{flow.TaskStateDone}, outBytes)
 
 	s := New(repo, flowc, &syncTestStorage{}, Config{
 		PerTaskInterval: 10 * time.Millisecond,
@@ -253,7 +252,7 @@ func TestSyncer_GlobalScan_CatchesPendingArtifacts(t *testing.T) {
 func TestSyncer_Shutdown_StopsLoops(t *testing.T) {
 	a := makeSyncArtifact(artifactentity.StatusPending, "ft-s")
 	repo := newSyncTestRepo(a)
-	flowc := newSyncTestFlow([]flowschema.TaskState{flowschema.TaskState_RUNNING}, nil)
+	flowc := newSyncTestFlow([]flow.TaskState{flow.TaskStateRunning}, nil)
 
 	s := New(repo, flowc, &syncTestStorage{}, Config{
 		PerTaskInterval: 10 * time.Millisecond,
@@ -294,7 +293,7 @@ func makeStorageWorkerOutput(t *testing.T, key valobj.StoreKey) []byte {
 	return out
 }
 
-func newOrphanSyncer(t *testing.T, states []flowschema.TaskState, result []byte) (*Syncer, *syncTestStorage) {
+func newOrphanSyncer(t *testing.T, states []flow.TaskState, result []byte) (*Syncer, *syncTestStorage) {
 	t.Helper()
 
 	storage := &syncTestStorage{}
@@ -312,7 +311,7 @@ func TestSyncer_ReapOrphanDeletesStorageObjectOnDone(t *testing.T) {
 	key, err := valobj.NewStoreKey("gonotelm-private", "artifact/nb/art.pptx", false)
 	require.NoError(t, err)
 
-	s, storage := newOrphanSyncer(t, []flowschema.TaskState{flowschema.TaskState_DONE}, makeStorageWorkerOutput(t, key))
+	s, storage := newOrphanSyncer(t, []flow.TaskState{flow.TaskStateDone}, makeStorageWorkerOutput(t, key))
 
 	done, err := s.pollOnce(t.Context(), valobj.NewId(), "ft-orphan")
 	require.NoError(t, err)
@@ -324,7 +323,7 @@ func TestSyncer_ReapOrphanKeepsPollingWhileTaskRuns(t *testing.T) {
 	key, err := valobj.NewStoreKey("gonotelm-private", "artifact/nb/art.pptx", false)
 	require.NoError(t, err)
 
-	s, storage := newOrphanSyncer(t, []flowschema.TaskState{flowschema.TaskState_RUNNING, flowschema.TaskState_DONE}, makeStorageWorkerOutput(t, key))
+	s, storage := newOrphanSyncer(t, []flow.TaskState{flow.TaskStateRunning, flow.TaskStateDone}, makeStorageWorkerOutput(t, key))
 	artifactId := valobj.NewId()
 
 	done, err := s.pollOnce(t.Context(), artifactId, "ft-orphan")
@@ -342,7 +341,7 @@ func TestSyncer_ReapOrphanDeletesStorageObjectOnCancelled(t *testing.T) {
 	key, err := valobj.NewStoreKey("gonotelm-private", "artifact/nb/art.pptx", false)
 	require.NoError(t, err)
 
-	s, storage := newOrphanSyncer(t, []flowschema.TaskState{flowschema.TaskState_CANCELLED}, makeStorageWorkerOutput(t, key))
+	s, storage := newOrphanSyncer(t, []flow.TaskState{flow.TaskStateCancelled}, makeStorageWorkerOutput(t, key))
 
 	done, err := s.pollOnce(t.Context(), valobj.NewId(), "ft-orphan")
 	require.NoError(t, err)
@@ -358,7 +357,7 @@ func TestSyncer_ReapOrphanSkipsInlineResult(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	s, storage := newOrphanSyncer(t, []flowschema.TaskState{flowschema.TaskState_DONE}, out)
+	s, storage := newOrphanSyncer(t, []flow.TaskState{flow.TaskStateDone}, out)
 
 	done, err := s.pollOnce(t.Context(), valobj.NewId(), "ft-orphan")
 	require.NoError(t, err)

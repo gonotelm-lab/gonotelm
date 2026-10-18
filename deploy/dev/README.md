@@ -84,6 +84,35 @@ mc admin user svcacct rm <alias> <旧 AK>   # 之后重跑脚本即可
 milvus 不共用 app 的桶凭据：那份凭据只授权 `gonotelm`，milvus 用它读不了 `a-bucket`。
 所以 compose 里 milvus 直接走 root；生产环境应换成 milvus 专属用户 + `a-bucket` 策略。
 
+### Flow 的 namespace 与 api_key
+
+compose 里 `FLOW_API_AUTH_ENABLED=true`：客户端面（gRPC 7091 的 task / worker / schedule）的
+api_key 鉴权和线上一致地开着，运维面 HTTP（7090，flow-web 走它）没有鉴权，不用配。
+
+app 侧对应两个变量：`GONOTELM_FLOW_NAMESPACE`（默认 `gonotelm`）和 `GONOTELM_FLOW_API_KEY`。
+flow-server **不会自动建 namespace**，提交任务时会回 `NamespaceNotFound`；而 namespace 的明文
+api_key 只在创建响应里出现一次，之后接口只回打码值（`api_key_preview`）。所以在一套新的 flowdb 上：
+
+```bash
+set -a && . ./.env && set +a
+curl -sS -X POST http://127.0.0.1:7090/api/admin/v1/namespaces \
+  -H 'Content-Type: application/json' \
+  -d "{\"namespace\":{\"name\":\"${GONOTELM_FLOW_NAMESPACE:-gonotelm}\"}}"
+# => {"name":"gonotelm","apiKey":"sk-...", ...} 把 apiKey 填进 .env 的 GONOTELM_FLOW_API_KEY
+```
+
+也可以在 flow-web（`make dev-up-all` 后 <http://localhost:7089>）的 namespace 页面点建，同样只展示一次。
+同名 namespace 建第二次会回 `NamespaceExists`，且没有删 namespace 的接口、`UpdateNamespace` 也改不了 key，
+所以 key 一定要落在 `.env` 里；万一丢了，本地可以直接从库里捞（key 唯一，和 namespace 一对一）：
+
+```bash
+docker compose -f deploy/dev/docker-compose.yaml exec -T postgres \
+  psql -U postgres -d flowdb -c "select api_key from namespaces where name='gonotelm'"
+```
+
+key 为空或不对时，gRPC 一律回 `UNAUTHENTICATED`（`api key is missing or invalid`），
+app 日志里表现为提交任务失败，而不是启动失败。
+
 ## 首次在新数据卷上初始化
 
 `up` 起来的是一套空中间件，schema 还要跑一次项目自带的迁移：
@@ -134,6 +163,10 @@ app 侧的 `.env` 也要跟着改（或用同一批变量启动 app）。
 
 ## 说明
 
+* kafka / etcd 用上游官方镜像：`apache/kafka` 与 `quay.io/coreos/etcd`，数据目录就是挂载卷本身（容器内
+  `/var/lib/kafka/data`、`/var/lib/etcd`）。kafka 官方镜像默认以 appuser(1000) 运行、写不了宿主目录，dev 下用
+  root 跑；etcd 仍按 `GONOTELM_DEV_ETCD_USER` 的属主运行，它没有 shell，chown 由 alpine 的 etcd-init 完成。
+  kafka 的 EXTERNAL 监听保持 SASL_PLAINTEXT/PLAIN，凭据取 `GONOTELM_KAFKA_USERNAME` / `GONOTELM_KAFKA_PASSWORD`。
 * 不含 opensandbox：它是宿主机进程（`opensandbox-server`，配置见 `etc/worker.toml.tpl` 的
   `[sandbox.opensandbox]`），需要 docker socket 和宿主路径挂载，不属于常驻中间件。
 * `imgproxy` / `s1-gate` / `elasticsearch` / `mysql` 项目里没有引用，没有放进来。

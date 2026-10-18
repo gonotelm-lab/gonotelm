@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	flowschema "github.com/gonotelm-lab/flow/api/schema/v1"
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
@@ -77,17 +76,17 @@ func (s *Syncer) Shutdown(ctx context.Context) {
 	}
 }
 
-func mapFlowState(state flowschema.TaskState) artifactentity.Status {
+func mapFlowState(state flow.TaskState) artifactentity.Status {
 	switch state {
-	case flowschema.TaskState_INITED:
+	case flow.TaskStateInited:
 		return artifactentity.StatusPending
-	case flowschema.TaskState_RUNNING:
+	case flow.TaskStateRunning:
 		return artifactentity.StatusRunning
-	case flowschema.TaskState_DONE:
+	case flow.TaskStateDone:
 		return artifactentity.StatusCompleted
-	case flowschema.TaskState_FAILED:
+	case flow.TaskStateFailed:
 		return artifactentity.StatusFailed
-	case flowschema.TaskState_CANCELLED:
+	case flow.TaskStateCancelled:
 		return artifactentity.StatusCancelled
 	}
 	return artifactentity.StatusPending

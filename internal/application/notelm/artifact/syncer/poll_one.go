@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/bytedance/sonic"
-	flowschema "github.com/gonotelm-lab/flow/api/schema/v1"
 	"github.com/gonotelm-lab/gonotelm/internal/application/shared/contract"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
@@ -128,12 +127,12 @@ func (s *Syncer) reapOrphan(ctx context.Context, flowTaskId string) (bool, error
 	}
 
 	switch info.State {
-	case flowschema.TaskState_DONE, flowschema.TaskState_CANCELLED:
+	case flow.TaskStateDone, flow.TaskStateCancelled:
 		// 被取消的任务也可能已上传完：有 result 就删，没有就是 no-op
 		s.deleteOrphanStorage(ctx, flowTaskId, info.Result)
 
 		return true, nil
-	case flowschema.TaskState_FAILED:
+	case flow.TaskStateFailed:
 		return true, nil
 	}
 

@@ -2,15 +2,22 @@ package flow
 
 import (
 	"context"
-	"time"
 
-	flowschema "github.com/gonotelm-lab/flow/api/schema/v1"
-	flowtask "github.com/gonotelm-lab/flow/client/task"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	flowtask "github.com/gonotelm-lab/flow/client/task/v2"
 )
 
-type TaskState = flowschema.TaskState
+// TaskState 是 flow 任务的状态。直接沿用 SDK 的枚举：v2 起 SDK 不再对外暴露 proto 类型，
+// 上层也只需要「跑到哪一步了」，不需要关心协议里的编号。
+type TaskState = flowtask.State
+
+const (
+	TaskStateUnspecified = flowtask.StateUnspecified
+	TaskStateInited      = flowtask.StateInited
+	TaskStateRunning     = flowtask.StateRunning
+	TaskStateDone        = flowtask.StateDone
+	TaskStateFailed      = flowtask.StateFailed
+	TaskStateCancelled   = flowtask.StateCancelled
+)
 
 type TaskInfo struct {
 	ID        string
@@ -29,18 +36,18 @@ type TaskClient interface {
 }
 
 type TaskClientImpl struct {
-	client    *flowtask.Client
-	namespace string
-	maxRetry  int
+	client   *flowtask.Client
+	maxRetry int
 }
 
-func NewTaskClient(addr, namespace string, dialTimeout time.Duration, maxRetry int) (*TaskClientImpl, error) {
-	_ = dialTimeout
-	c, err := flowtask.New(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+// NewTaskClient 建立任务客户端：namespace 与 apiKey 在构造时由 Config 绑定，
+// 之后的 Submit / Get / Cancel 都不再传。
+func NewTaskClient(cfg Config) (*TaskClientImpl, error) {
+	c, err := flowtask.New(cfg.Addr, flowtask.Config{Namespace: cfg.Namespace, APIKey: cfg.APIKey})
 	if err != nil {
 		return nil, err
 	}
-	return &TaskClientImpl{client: c, namespace: namespace, maxRetry: maxRetry}, nil
+	return &TaskClientImpl{client: c, maxRetry: cfg.MaxRetry}, nil
 }
 
 func (t *TaskClientImpl) Submit(ctx context.Context, taskType string, payload []byte) (string, error) {
@@ -48,11 +55,11 @@ func (t *TaskClientImpl) Submit(ctx context.Context, taskType string, payload []
 	if t.maxRetry > 0 {
 		opts = append(opts, flowtask.WithMaxRetry(t.maxRetry))
 	}
-	task, err := t.client.Submit(ctx, t.namespace, taskType, payload, opts...)
+	task, err := t.client.Submit(ctx, taskType, payload, opts...)
 	if err != nil {
 		return "", err
 	}
-	return task.Id, nil
+	return task.ID, nil
 }
 
 func (t *TaskClientImpl) Get(ctx context.Context, flowTaskId string) (*TaskInfo, error) {
@@ -60,7 +67,7 @@ func (t *TaskClientImpl) Get(ctx context.Context, flowTaskId string) (*TaskInfo,
 	if err != nil {
 		return nil, err
 	}
-	return &TaskInfo{ID: tk.Id, State: tk.State, Result: tk.Result, Error: tk.Error, MaxRetry: int(tk.MaxRetry), AttemptNo: int(tk.AttemptNo)}, nil
+	return &TaskInfo{ID: tk.ID, State: tk.State, Result: tk.Result, Error: tk.Error, MaxRetry: int(tk.MaxRetry), AttemptNo: int(tk.AttemptNo)}, nil
 }
 
 func (t *TaskClientImpl) Cancel(ctx context.Context, flowTaskId string) error {

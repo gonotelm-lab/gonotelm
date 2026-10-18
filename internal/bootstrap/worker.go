@@ -90,6 +90,7 @@ func NewWorker(ctx context.Context, cfg *conf.WorkerConfig) (*Worker, error) {
 	for _, taskType := range buildinTaskTypes {
 		wcfg := flowworker.ConfigWithDefaults(flowworker.Config{
 			Namespace:         cfg.Flow.Namespace,
+			APIKey:            cfg.Flow.APIKey,
 			TaskType:          taskType,
 			Name:              "gnw-" + strings.TrimPrefix(taskType, taskTypePrefix),
 			MaxConcurrency:    cfg.Worker.MaxConcurrency,

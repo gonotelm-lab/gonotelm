@@ -86,34 +86,41 @@ services:
 
   # 容器内互访用 PLAINTEXT:9092；宿主机 app 用 EXTERNAL:${GONOTELM_KAFKA_EXTERNAL_PORT}（SASL）
   kafka:
-    image: ${GONOTELM_DEV_KAFKA_IMAGE:-bitnami/kafka:latest}
+    image: ${GONOTELM_DEV_KAFKA_IMAGE:-apache/kafka:3.7.0}
     container_name: gonotelm-kafka-dev
     restart: unless-stopped
     stop_grace_period: 1m
+    # 官方镜像默认 appuser(1000)，写不了挂载进来的卷目录，dev 下用 root 跑
+    user: "0:0"
     ports:
       - "${GONOTELM_KAFKA_PORT:-9092}:9092"
       - "${GONOTELM_KAFKA_EXTERNAL_PORT:-9094}:9094"
     environment:
       # 必须是 22 字符 base64 UUID，否则新数据卷格式化成败（kafka-storage.sh random-uuid 生成）
-      KAFKA_KRAFT_CLUSTER_ID: ${GONOTELM_KAFKA_CLUSTER_ID:-al6tIt4uS8q1M76IljffhQ}
-      KAFKA_CFG_NODE_ID: "0"
-      KAFKA_CFG_PROCESS_ROLES: controller,broker
-      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
-      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://${GONOTELM_KAFKA_ADVERTISED_HOST:-127.0.0.1}:${GONOTELM_KAFKA_EXTERNAL_PORT:-9094}
-      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,EXTERNAL:SASL_PLAINTEXT,PLAINTEXT:PLAINTEXT
-      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 0@kafka:9093
-      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
-      KAFKA_CLIENT_USERS: ${GONOTELM_KAFKA_USERNAME:-kafka}
-      KAFKA_CLIENT_PASSWORDS: ${GONOTELM_KAFKA_PASSWORD:?GONOTELM_KAFKA_PASSWORD 未设置，请用 --env-file 指向仓库根目录的 .env}
-      ALLOW_PLAINTEXT_LISTENER: "yes"
+      CLUSTER_ID: ${GONOTELM_KAFKA_CLUSTER_ID:-al6tIt4uS8q1M76IljffhQ}
+      KAFKA_NODE_ID: "0"
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://${GONOTELM_KAFKA_ADVERTISED_HOST:-127.0.0.1}:${GONOTELM_KAFKA_EXTERNAL_PORT:-9094}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,EXTERNAL:SASL_PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 0@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      # 单节点：内部 topic 必须 1 副本，否则 __consumer_offsets 建不出来，消费者组不可用
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      # EXTERNAL 上的 SASL/PLAIN 账号，app 侧用同名的 GONOTELM_KAFKA_USERNAME/PASSWORD 连接
+      KAFKA_LISTENER_NAME_EXTERNAL_SASL_ENABLED_MECHANISMS: PLAIN
+      KAFKA_LISTENER_NAME_EXTERNAL_PLAIN_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required user_${GONOTELM_KAFKA_USERNAME:-kafka}="${GONOTELM_KAFKA_PASSWORD:?GONOTELM_KAFKA_PASSWORD 未设置，请用 --env-file 指向仓库根目录的 .env}";'
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
     volumes:
-      - ${GONOTELM_DEV_KAFKA_DATA:-gonotelm_kafka_data_dev}:/bitnami
+      - ${GONOTELM_DEV_KAFKA_DATA:-gonotelm_kafka_data_dev}:/var/lib/kafka/data
     networks:
       - gonotelm-dev
 
   kafka-init:
-    image: ${GONOTELM_DEV_KAFKA_IMAGE:-bitnami/kafka:latest}
+    image: ${GONOTELM_DEV_KAFKA_IMAGE:-apache/kafka:3.7.0}
     container_name: gonotelm-kafka-init-dev
     depends_on:
       kafka:
@@ -126,14 +133,14 @@ services:
       - |
         set -e
         for i in $$(seq 1 30); do
-          if kafka-topics.sh --bootstrap-server kafka:9092 --list >/dev/null 2>&1; then
+          if /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list >/dev/null 2>&1; then
             break
           fi
           echo "[kafka-init] waiting for kafka ($$i/30)"
           sleep 2
         done
         for topic in $$KAFKA_TOPICS; do
-          kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists \
+          /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists \
             --topic "$$topic" --partitions 1 --replication-factor 1
           echo "[kafka-init] topic $$topic ready"
         done
@@ -142,7 +149,7 @@ services:
       - gonotelm-dev
 
   minio:
-    image: ${GONOTELM_DEV_MINIO_IMAGE:-quay.io/minio/minio:latest}
+    image: ${GONOTELM_DEV_MINIO_IMAGE:-quay.io/minio/minio:RELEASE.2024-12-18T13-15-44Z}
     container_name: gonotelm-minio-dev
     restart: unless-stopped
     ports:
@@ -169,7 +176,7 @@ services:
   # gonotelm 桶用 GONOTELM_MINIO_ACCESS_KEY（私有读写），gonotelm-public 桶用
   # GONOTELM_PUBLIC_MINIO_ACCESS_KEY（公开读、私有写），两份凭据各自只授权自己的桶。
   minio-init:
-    image: ${GONOTELM_DEV_MINIO_MC_IMAGE:-quay.io/minio/minio:latest}
+    image: ${GONOTELM_DEV_MINIO_MC_IMAGE:-quay.io/minio/minio:RELEASE.2024-12-18T13-15-44Z}
     container_name: gonotelm-minio-init-dev
     depends_on:
       minio:
@@ -194,45 +201,50 @@ services:
     networks:
       - gonotelm-dev
 
-  # 具名卷初始属主是 root，etcd 以非 root 跑会 permission denied，所以先 chown；属主非 root 时跳过
+  # 具名卷初始属主是 root，etcd 以非 root 跑会 permission denied，所以先 chown；属主非 root 时跳过。
+  # 官方 etcd 镜像是 distroless（没有 sh），所以这里借一个带 shell 的基础镜像跑脚本。
   etcd-init:
-    image: ${GONOTELM_DEV_ETCD_IMAGE:-bitnami/etcd:latest}
+    image: ${GONOTELM_DEV_ETCD_INIT_IMAGE:-alpine:3.23.5}
     container_name: gonotelm-etcd-init-dev
     user: "0:0"
     entrypoint: ["sh", "-c"]
     command:
       - |
         set -e
-        owner=$$(stat -c %u /bitnami/etcd)
+        owner=$$(stat -c %u /var/lib/etcd)
         if [ "$$owner" = "0" ]; then
-          echo "[etcd-init] chown /bitnami/etcd -> $$ETCD_USER"
-          chown -R "$$ETCD_USER" /bitnami/etcd
+          echo "[etcd-init] chown /var/lib/etcd -> $$ETCD_USER"
+          chown -R "$$ETCD_USER" /var/lib/etcd
         else
-          echo "[etcd-init] /bitnami/etcd already owned by uid $$owner, skip"
+          echo "[etcd-init] /var/lib/etcd already owned by uid $$owner, skip"
         fi
     environment:
       ETCD_USER: ${GONOTELM_DEV_ETCD_USER:-1001:1001}
     volumes:
-      - ${GONOTELM_DEV_ETCD_DATA:-gonotelm_etcd_data_dev}:/bitnami/etcd
+      - ${GONOTELM_DEV_ETCD_DATA:-gonotelm_etcd_data_dev}:/var/lib/etcd
     restart: "no"
     networks:
       - gonotelm-dev
 
   etcd:
-    image: ${GONOTELM_DEV_ETCD_IMAGE:-bitnami/etcd:latest}
+    image: ${GONOTELM_DEV_ETCD_IMAGE:-quay.io/coreos/etcd:v3.5.15}
     container_name: gonotelm-etcd-dev
     restart: unless-stopped
     # 必须和数据目录属主一致（复用宿主目录时通常是 1000:1000）
     user: "${GONOTELM_DEV_ETCD_USER:-1001:1001}"
     environment:
       ETCD_NAME: ${GONOTELM_DEV_ETCD_NAME:-etcd-01}
-      ALLOW_NONE_AUTHENTICATION: "yes"
+      ETCD_DATA_DIR: /var/lib/etcd
       ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
       ETCD_ADVERTISE_CLIENT_URLS: http://etcd:2379
+      ETCD_LISTEN_PEER_URLS: http://0.0.0.0:2380
+      ETCD_INITIAL_ADVERTISE_PEER_URLS: http://localhost:2380
+      ETCD_INITIAL_CLUSTER: ${GONOTELM_DEV_ETCD_NAME:-etcd-01}=http://localhost:2380
+      ETCD_INITIAL_CLUSTER_STATE: new
     volumes:
-      - ${GONOTELM_DEV_ETCD_DATA:-gonotelm_etcd_data_dev}:/bitnami/etcd
+      - ${GONOTELM_DEV_ETCD_DATA:-gonotelm_etcd_data_dev}:/var/lib/etcd
     healthcheck:
-      test: ["CMD", "etcdctl", "--endpoints=127.0.0.1:2379", "endpoint", "health"]
+      test: ["CMD", "/usr/local/bin/etcdctl", "--endpoints=127.0.0.1:2379", "endpoint", "health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -281,7 +293,7 @@ services:
       - gonotelm-dev
 
   flow-server:
-    image: ${GONOTELM_DEV_FLOW_SERVER_IMAGE:-ghcr.io/gonotelm-lab/flow/server:0.4.0-beta.1}
+    image: ${GONOTELM_DEV_FLOW_SERVER_IMAGE:-ghcr.io/gonotelm-lab/flow/server:0.4.0-beta.2}
     container_name: gonotelm-flow-server-dev
     restart: unless-stopped
     ports:
@@ -295,6 +307,7 @@ services:
       FLOW_DB_PASS: ${GONOTELM_DB_PASSWORD:?GONOTELM_DB_PASSWORD 未设置，请用 --env-file 指向仓库根目录的 .env}
       FLOW_DB_NAME: ${GONOTELM_FLOW_DB_NAME:-flowdb}
       FLOW_DB_AUTO_INIT: "true"
+      FLOW_API_AUTH_ENABLED: "true"
     depends_on:
       postgres:
         condition: service_healthy
@@ -302,7 +315,7 @@ services:
       - gonotelm-dev
 
   flow-web:
-    image: ${GONOTELM_DEV_FLOW_WEB_IMAGE:-ghcr.io/gonotelm-lab/flow/web:0.4.0-beta.1}
+    image: ${GONOTELM_DEV_FLOW_WEB_IMAGE:-ghcr.io/gonotelm-lab/flow/web:0.4.0-beta.2}
     container_name: gonotelm-flow-web-dev
     restart: unless-stopped
     profiles:

@@ -65,7 +65,7 @@ func (h *ConvertNoteToSourceHandler) Handle(
 ) (*ConvertNoteToSourceResult, error) {
 	userId := pkgcontext.GetUserId(ctx)
 
-	artifact, err := h.handleManage(ctx, cmd.ArtifactId)
+	artifact, err := h.checkManageAccess(ctx, cmd.ArtifactId)
 	if err != nil {
 		return nil, err
 	}

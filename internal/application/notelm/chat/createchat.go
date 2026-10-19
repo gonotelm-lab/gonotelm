@@ -37,8 +37,8 @@ func (h *CreateChatHandler) Handle(ctx context.Context, cmd *CreateChatCommand) 
 	if err != nil {
 		return nil, errors.WithMessagef(err, "get notebook failed, notebook_id=%s", cmd.NotebookId)
 	}
-	if !access.CanView() {
-		return nil, errors.ErrNoRecord.Msgf("notebook not found, notebook_id=%s", cmd.NotebookId)
+	if err := access.CanViewReturnErr(); err != nil {
+		return nil, err
 	}
 
 	chat, err := h.chatRepo.FindByNotebookIdAndOwnerId(ctx, cmd.NotebookId, userId)

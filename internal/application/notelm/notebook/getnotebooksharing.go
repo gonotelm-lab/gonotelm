@@ -15,7 +15,7 @@ import (
 	pkgslices "github.com/gonotelm-lab/gonotelm/pkg/slices"
 )
 
-type SharingMemberResult struct {
+type SharingMember struct {
 	UserId    valobj.Uid
 	Email     string
 	Nickname  string
@@ -24,8 +24,8 @@ type SharingMemberResult struct {
 }
 
 type GetNotebookSharingResult struct {
-	Visibility vo.Visibility
-	Members    []*SharingMemberResult
+	Visibility vo.Visibility    // notebook的可见性
+	Members    []*SharingMember // 被显式授权notebook访问的member详情
 }
 
 type GetNotebookSharingHandler struct {
@@ -43,18 +43,19 @@ func NewGetNotebookSharingHandler(
 	objectStore adapter.ObjectPublicURLer,
 ) *GetNotebookSharingHandler {
 	return &GetNotebookSharingHandler{
-		baseHandler: newBaseHandler(notebookRepo, notebookAccessService),
+		baseHandler: newBaseHandler(notebookRepo, notebookAccessService, userRepo),
 		memberRepo:  memberRepo,
 		userRepo:    userRepo,
 		objectStore: objectStore,
 	}
 }
 
+// 查询notebook的分享情况
 func (h *GetNotebookSharingHandler) Handle(
 	ctx context.Context,
 	notebookId valobj.Id,
 ) (*GetNotebookSharingResult, error) {
-	access, err := h.handleSharing(ctx, notebookId)
+	access, err := h.checkManageSharingAccess(ctx, notebookId)
 	if err != nil {
 		return nil, err
 	}
@@ -80,11 +81,11 @@ func (h *GetNotebookSharingHandler) Handle(
 		userMap[user.Id] = user
 	}
 
-	results := make([]*SharingMemberResult, 0, len(members))
+	results := make([]*SharingMember, 0, len(members))
 	for _, member := range members {
-		result := &SharingMemberResult{
+		result := &SharingMember{
 			UserId: member.UserId,
-			Role:   vo.NormalizeRole(member.Role),
+			Role:   member.Role,
 		}
 		if user, ok := userMap[member.UserId]; ok {
 			result.Email = user.Email

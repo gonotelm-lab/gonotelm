@@ -28,8 +28,8 @@ func (h *GetNotebookAccessHandler) Handle(
 	if err != nil {
 		return nil, errors.WithMessagef(err, "get notebook access failed, notebook_id=%s", notebookId)
 	}
-	if !access.CanView() {
-		return nil, errors.ErrNoRecord.Msgf("notebook not found, notebook_id=%s", notebookId)
+	if err := access.CanViewReturnErr(); err != nil {
+		return nil, err
 	}
 
 	return access, nil

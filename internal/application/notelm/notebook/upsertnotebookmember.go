@@ -33,7 +33,7 @@ func NewUpsertNotebookMemberHandler(
 	userRepo identityrepo.UserRepository,
 ) *UpsertNotebookMemberHandler {
 	return &UpsertNotebookMemberHandler{
-		baseHandler: newBaseHandler(notebookRepo, notebookAccessService),
+		baseHandler: newBaseHandler(notebookRepo, notebookAccessService, userRepo),
 		memberRepo:  memberRepo,
 		userRepo:    userRepo,
 	}
@@ -44,7 +44,7 @@ func (h *UpsertNotebookMemberHandler) Handle(
 	notebookId valobj.Id,
 	cmd *UpsertNotebookMemberCommand,
 ) (*notebookentity.NotebookMember, error) {
-	access, err := h.handleSharing(ctx, notebookId)
+	access, err := h.checkManageSharingAccess(ctx, notebookId)
 	if err != nil {
 		return nil, err
 	}

@@ -5,12 +5,9 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	notebookapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/notebook"
-	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/schema"
 	pkgctx "github.com/gonotelm-lab/gonotelm/pkg/context"
-	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
-	pkgslices "github.com/gonotelm-lab/gonotelm/pkg/slices"
 )
 
 // Create new notebook
@@ -50,8 +47,7 @@ func (s *Server) GetNotebook(ctx context.Context, c *app.RequestContext) {
 		http.ErrResp(c, err)
 		return
 	}
-
-	http.OkResp(c, schema.GetNotebookResponse{
+	result := schema.GetNotebookResponse{
 		Id:          notebook.Id.String(),
 		Name:        notebook.Name,
 		Desc:        notebook.Description,
@@ -59,7 +55,12 @@ func (s *Server) GetNotebook(ctx context.Context, c *app.RequestContext) {
 		Visibility:  string(notebook.Visibility),
 		UpdatedAt:   notebook.UpdateTime.Value(),
 		CreatedAt:   notebook.CreateTime.Value(),
-	})
+	}
+
+	result.Owner = schema.NewNotebookOwnerResponse(notebook.Owner)
+	result.Owner.AvatarURL = s.avatarURL(ctx, notebook.Owner.Avatar)
+
+	http.OkResp(c, result)
 }
 
 // ListNotebooks 返回当前用户可见的 notebook 列表：
@@ -91,33 +92,12 @@ func (s *Server) ListNotebooks(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	// 所有列表项统一返回 owner 概要
-	ownerIds := make([]valobj.Uid, 0, len(result.Notebooks))
-	for _, notebook := range result.Notebooks {
-		ownerIds = append(ownerIds, notebook.OwnerId)
-	}
-	ownerIds = pkgslices.Unique(ownerIds)
-
-	ownerMap := make(map[valobj.Uid]*schema.NotebookOwnerResponse, len(ownerIds))
-	// 去重后一次性批量取 owner 用户信息，避免逐条查询。
-	if len(ownerIds) > 0 {
-		users, err := s.userRepo.BatchGetById(ctx, ownerIds)
-		if err != nil {
-			http.ErrResp(c, errors.WithMessage(err, "get notebook owners failed"))
-			return
-		}
-		for _, user := range users {
-			ownerMap[user.Id] = &schema.NotebookOwnerResponse{
-				UserId:    user.Id.String(),
-				Nickname:  user.Nickname,
-				AvatarURL: s.avatarURL(ctx, user.Avatar),
-			}
-		}
-	}
-
+	// // 所有列表项统一返回 owner 概要
 	notebooks := make([]*schema.ListNotebookItemResponse, 0, len(result.Notebooks))
 	for _, notebook := range result.Notebooks {
-		notebooks = append(notebooks, schema.NewListNotebookItemResponse(notebook, ownerMap[notebook.OwnerId]))
+		n := schema.NewListNotebookItemResponse(notebook)
+		n.Owner.AvatarURL = s.avatarURL(ctx, notebook.Owner.Avatar)
+		notebooks = append(notebooks, n)
 	}
 
 	http.OkResp(c, schema.ListNotebooksResponse{

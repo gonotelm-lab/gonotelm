@@ -37,6 +37,7 @@ const (
 	CodePermission   = 2001
 	CodeNotLogin     = 2002
 	CodeCSRF         = 2003
+	CodeNotFound     = 2004
 )
 
 const (
@@ -44,6 +45,7 @@ const (
 	MsgPermission   = "PERMISSION_DENIED"
 	MsgNotLogin     = "NOT_LOGIN"
 	MsgCSRF         = "CSRF_TOKEN_INVALID"
+	MsgNotFound     = "NOT_FOUND"
 )
 
 var (
@@ -51,6 +53,7 @@ var (
 	ErrPermission   = NewInnerError(http.StatusForbidden, CodePermission, MsgPermission)
 	ErrNotLogin     = NewInnerError(http.StatusUnauthorized, CodeNotLogin, MsgNotLogin)
 	ErrCSRF         = NewInnerError(http.StatusForbidden, CodeCSRF, MsgCSRF)
+	ErrNotFound     = NewInnerError(http.StatusNotFound, CodeNotFound, MsgNotFound)
 )
 
 const (

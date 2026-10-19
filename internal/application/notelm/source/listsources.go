@@ -49,8 +49,8 @@ func (h *ListSourcesHandler) Handle(ctx context.Context, query *ListSourcesQuery
 	if err != nil {
 		return nil, errors.WithMessagef(err, "get notebook failed, notebook_id=%s", query.NotebookId)
 	}
-	if !access.CanView() {
-		return nil, errors.ErrNoRecord.Msgf("notebook not found, notebook_id=%s", query.NotebookId)
+	if err := access.CanViewReturnErr(); err != nil {
+		return nil, err
 	}
 
 	sources, err := h.sourceRepo.ListByNotebookId(ctx, query.NotebookId,

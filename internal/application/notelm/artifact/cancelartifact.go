@@ -28,7 +28,7 @@ func NewCancelArtifactHandler(
 }
 
 func (h *CancelArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error {
-	artifact, err := h.handleManage(ctx, cmd)
+	artifact, err := h.checkManageAccess(ctx, cmd)
 	if err != nil {
 		return err
 	}

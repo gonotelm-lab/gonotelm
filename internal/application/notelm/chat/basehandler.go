@@ -8,6 +8,7 @@ import (
 	chatentity "github.com/gonotelm-lab/gonotelm/internal/domain/chat/entity"
 	chaterrors "github.com/gonotelm-lab/gonotelm/internal/domain/chat/errors"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
+	notebookerrors "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/errors"
 	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
@@ -45,8 +46,12 @@ func (h *baseHandler) commonHandle(ctx context.Context, chatId valobj.Id) (*chat
 		return nil, errors.WithMessagef(err, "resolve notebook access failed, chat_id=%s", chatId)
 	}
 
-	if !access.CanView() || chat.OwnerId != userId {
-		return nil, chaterrors.ErrChatNotFound
+	if err := access.CanViewReturnErr(); err != nil {
+		return nil, err
+	}
+
+	if chat.OwnerId != userId {
+		return nil, notebookerrors.ErrNotebookNotFound // notebook的权限不足统一返回NOT_FOUND
 	}
 
 	return chat, nil
@@ -78,7 +83,10 @@ func (h *baseHandler) ensureStreamAccess(
 		return errors.WithMessagef(err, "resolve notebook access failed, chat_id=%s", chatId)
 	}
 
-	if !access.CanView() || chat.OwnerId != userId {
+	if err := access.CanViewReturnErr(); err != nil {
+		return err
+	}
+	if chat.OwnerId != userId {
 		return chaterrors.ErrStreamTaskNotFound
 	}
 

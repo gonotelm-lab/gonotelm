@@ -14,7 +14,7 @@ func NotebookToSchema(notebook *notebookentity.Notebook) *schema.Notebook {
 		Name:        notebook.Name,
 		Description: notebook.Description,
 		OwnerId:     notebook.OwnerId,
-		Visibility:  string(vo.NormalizeVisibility(notebook.Visibility)),
+		Visibility:  notebook.Visibility.String(),
 		UpdatedAt:   notebook.UpdateTime.Value(),
 	}
 }
@@ -29,7 +29,7 @@ func NotebookFromSchema(notebook *schema.Notebook) *notebookentity.Notebook {
 		Name:        notebook.Name,
 		Description: notebook.Description,
 		OwnerId:     notebook.OwnerId,
-		Visibility:  vo.NormalizeVisibility(vo.Visibility(notebook.Visibility)),
+		Visibility:  vo.NewVisibility(notebook.Visibility),
 	}
 }
 

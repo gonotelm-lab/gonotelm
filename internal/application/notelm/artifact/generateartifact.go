@@ -88,8 +88,8 @@ func (h *GenerateArtifactHandler) Handle(ctx context.Context, cmd *GenerateReque
 	if err != nil {
 		return nil, errors.WithMessagef(err, "get notebook failed, notebook_id=%s", cmd.NotebookId)
 	}
-	if !access.CanView() {
-		return nil, errors.ErrNoRecord.Msgf("notebook not found, notebook_id=%s", cmd.NotebookId)
+	if err := access.CanViewReturnErr(); err != nil {
+		return nil, err
 	}
 	if !access.CanManageContent() {
 		return nil, errors.ErrPermission.Msgf("notebook write denied, notebook_id=%s", cmd.NotebookId)

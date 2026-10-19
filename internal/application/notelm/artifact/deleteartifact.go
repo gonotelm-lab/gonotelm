@@ -36,7 +36,7 @@ func NewDeleteArtifactHandler(
 }
 
 func (h *DeleteArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error {
-	a, err := h.handleManage(ctx, cmd)
+	a, err := h.checkManageAccess(ctx, cmd)
 	if err != nil {
 		return err
 	}

@@ -28,7 +28,7 @@ func newBaseHandler(
 	}
 }
 
-func (h *baseHandler) handleView(
+func (h *baseHandler) checkViewAccess(
 	ctx context.Context,
 	artifactId valobj.Id,
 ) (*artifactentity.Artifact, error) {
@@ -37,14 +37,14 @@ func (h *baseHandler) handleView(
 		return nil, err
 	}
 
-	if !access.CanView() {
-		return nil, artifacterrors.ErrArtifactNotFound
+	if err := access.CanViewReturnErr(); err != nil {
+		return nil, err
 	}
 
 	return artifact, nil
 }
 
-func (h *baseHandler) handleManage(
+func (h *baseHandler) checkManageAccess(
 	ctx context.Context,
 	artifactId valobj.Id,
 ) (*artifactentity.Artifact, error) {
@@ -53,8 +53,8 @@ func (h *baseHandler) handleManage(
 		return nil, err
 	}
 
-	if !access.CanView() {
-		return nil, artifacterrors.ErrArtifactNotFound
+	if err := access.CanViewReturnErr(); err != nil {
+		return nil, err
 	}
 
 	if !access.CanManageContent() {

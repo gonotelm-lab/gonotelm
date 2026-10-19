@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/notebook/vo"
@@ -17,9 +18,10 @@ type UpdateNotebookVisibilityHandler struct {
 func NewUpdateNotebookVisibilityHandler(
 	notebookRepo notebookrepo.Repository,
 	notebookAccessService *notebookservice.AccessService,
+	userRepo identrepo.UserRepository,
 ) *UpdateNotebookVisibilityHandler {
 	return &UpdateNotebookVisibilityHandler{
-		baseHandler: newBaseHandler(notebookRepo, notebookAccessService),
+		baseHandler: newBaseHandler(notebookRepo, notebookAccessService, userRepo),
 	}
 }
 
@@ -28,7 +30,7 @@ func (h *UpdateNotebookVisibilityHandler) Handle(
 	notebookId valobj.Id,
 	visibility vo.Visibility,
 ) error {
-	access, err := h.handleSharing(ctx, notebookId)
+	access, err := h.checkManageSharingAccess(ctx, notebookId)
 	if err != nil {
 		return err
 	}

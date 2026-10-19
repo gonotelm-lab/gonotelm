@@ -37,8 +37,8 @@ func (h *baseHandler) handleView(
 		return nil, err
 	}
 
-	if !access.CanView() {
-		return nil, errors.ErrNoRecord.Msgf("source not found, source_id=%s", sourceId)
+	if err := access.CanViewReturnErr(); err != nil {
+		return nil, err
 	}
 
 	return source, nil
@@ -53,8 +53,8 @@ func (h *baseHandler) handleManage(
 		return nil, err
 	}
 
-	if !access.CanView() {
-		return nil, errors.ErrNoRecord.Msgf("source not found, source_id=%s", sourceId)
+	if err := access.CanViewReturnErr(); err != nil {
+		return nil, err
 	}
 
 	if !access.CanManageContent() {

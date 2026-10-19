@@ -31,13 +31,13 @@ ALTER TABLE sources RENAME COLUMN owner_id TO creator_id;
 ALTER TABLE sources RENAME CONSTRAINT chk_sources_owner_id_len TO chk_sources_creator_id_len;
 COMMENT ON COLUMN sources.creator_id IS 'source creator id (audit only)';
 
-ALTER TABLE artifacts RENAME COLUMN user_id TO created_by;
-ALTER TABLE artifacts RENAME CONSTRAINT chk_artifacts_user_id_len TO chk_artifacts_created_by_len;
-COMMENT ON COLUMN artifacts.created_by IS 'artifact creator id (audit/usage only)';
+ALTER TABLE artifacts RENAME COLUMN user_id TO creator_id;
+ALTER TABLE artifacts RENAME CONSTRAINT chk_artifacts_user_id_len TO chk_artifacts_creator_id_len;
+COMMENT ON COLUMN artifacts.creator_id IS 'artifact creator id (audit/usage only)';
 
 -- +goose Down
-ALTER TABLE artifacts RENAME CONSTRAINT chk_artifacts_created_by_len TO chk_artifacts_user_id_len;
-ALTER TABLE artifacts RENAME COLUMN created_by TO user_id;
+ALTER TABLE artifacts RENAME CONSTRAINT chk_artifacts_creator_id_len TO chk_artifacts_user_id_len;
+ALTER TABLE artifacts RENAME COLUMN creator_id TO user_id;
 COMMENT ON COLUMN artifacts.user_id IS 'artifact user id (ulid 16 bytes)';
 
 ALTER TABLE sources RENAME CONSTRAINT chk_sources_creator_id_len TO chk_sources_owner_id_len;

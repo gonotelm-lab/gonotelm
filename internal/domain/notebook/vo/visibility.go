@@ -8,6 +8,10 @@ const (
 	VisibilityPublic     Visibility = "public"
 )
 
+func (v Visibility) String() string {
+	return string(v)
+}
+
 func (v Visibility) IsValid() bool {
 	return v.IsRestricted() || v.IsPublic()
 }
@@ -24,5 +28,14 @@ func NormalizeVisibility(v Visibility) Visibility {
 	if v == "" {
 		return VisibilityRestricted
 	}
+	if !v.IsValid() {
+		return VisibilityRestricted
+	}
+
 	return v
+}
+
+func NewVisibility(v string) Visibility {
+	vv := Visibility(v)
+	return NormalizeVisibility(vv)
 }

@@ -28,8 +28,8 @@ func (s *Server) RegisterRoutes(g *route.RouterGroup) {
 
 		// GET /api/v1/notebooks/:id/sharing
 		notebookIdGroup.GET("/sharing", s.GetNotebookSharing)
-		// PATCH /api/v1/notebooks/:id/sharing
-		notebookIdGroup.PATCH("/sharing", s.UpdateNotebookSharing)
+		// PATCH /api/v1/notebooks/:id/visibility
+		notebookIdGroup.PATCH("/visibility", s.UpdateNotebookVisibility)
 		// PUT /api/v1/notebooks/:id/sharing/members
 		notebookIdGroup.PUT("/sharing/members", s.UpsertNotebookMember)
 		// DELETE /api/v1/notebooks/:id/sharing/members/:user_id

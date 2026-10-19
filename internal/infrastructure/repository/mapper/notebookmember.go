@@ -13,7 +13,7 @@ func NotebookMemberToSchema(member *notebookentity.NotebookMember) *schema.Noteb
 		Id:         member.Id,
 		NotebookId: member.NotebookId,
 		UserId:     member.UserId,
-		Role:       string(member.Role),
+		Role:       member.Role.String(),
 		CreatedAt:  member.CreateTime.Value(),
 		UpdatedAt:  member.UpdateTime.Value(),
 	}
@@ -28,7 +28,7 @@ func NotebookMemberFromSchema(member *schema.NotebookMember) *notebookentity.Not
 		},
 		NotebookId: valobj.Id(member.NotebookId),
 		UserId:     member.UserId,
-		Role:       vo.Role(member.Role),
+		Role:       vo.NewRole(member.Role),
 	}
 }
 

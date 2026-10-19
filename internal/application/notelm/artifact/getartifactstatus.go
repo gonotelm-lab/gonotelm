@@ -37,7 +37,7 @@ func NewGetArtifactStatusHandler(
 }
 
 func (h *GetArtifactStatusHandler) Handle(ctx context.Context, cmd *StatusRequest) (*StatusResponse, error) {
-	artifact, err := h.handleView(ctx, cmd.ArtifactId)
+	artifact, err := h.checkViewAccess(ctx, cmd.ArtifactId)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func (h *GetArtifactStatusHandler) Handle(ctx context.Context, cmd *StatusReques
 }
 
 func (h *GetArtifactStatusHandler) FindById(ctx context.Context, artifactId valobj.Id) (*artifactentity.Artifact, error) {
-	return h.handleView(ctx, artifactId)
+	return h.checkViewAccess(ctx, artifactId)
 }
 
 func (h *GetArtifactStatusHandler) AttachStorageURL(ctx context.Context, a *artifactentity.Artifact) (url string, mime string) {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/shared/cleanup"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 	notebookerrors "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/errors"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
@@ -24,11 +25,12 @@ func NewDeleteNotebookHandler(
 	notebookRepo notebookrepo.Repository,
 	notebookAccessService *notebookservice.AccessService,
 	memberRepo notebookrepo.MemberRepository,
+	userRepo identrepo.UserRepository,
 	eventBus eventbus.Publisher,
 	cleaner *cleanup.Cleaner,
 ) *DeleteNotebookHandler {
 	return &DeleteNotebookHandler{
-		baseHandler: newBaseHandler(notebookRepo, notebookAccessService),
+		baseHandler: newBaseHandler(notebookRepo, notebookAccessService, userRepo),
 		eventBus:    eventBus,
 		cleaner:     cleaner,
 		memberRepo:  memberRepo,
@@ -36,7 +38,7 @@ func NewDeleteNotebookHandler(
 }
 
 func (h *DeleteNotebookHandler) Handle(ctx context.Context, id valobj.Id) error {
-	access, err := h.handleOwner(ctx, id)
+	access, err := h.checkManageNotebookAccess(ctx, id)
 	if err != nil {
 		if errors.Is(err, notebookerrors.ErrNotebookNotFound) {
 			return nil

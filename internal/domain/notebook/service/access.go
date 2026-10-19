@@ -11,6 +11,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
+// 笔记本的权限访问控制
 type AccessService struct {
 	notebookRepo notebookrepo.Repository
 	memberRepo   notebookrepo.MemberRepository
@@ -35,7 +36,7 @@ func (s *AccessService) Resolve(
 ) (*notebookentity.Access, error) {
 	notebook, err := s.notebookRepo.FindById(ctx, notebookId)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithMessagef(err, "notebook repo find by id failed, notebook_id=%s", notebookId)
 	}
 
 	if notebook.OwnerId == userId {
@@ -44,9 +45,8 @@ func (s *AccessService) Resolve(
 
 	member, err := s.memberRepo.FindByNotebookIdAndUserId(ctx, notebookId, userId)
 	if err == nil {
-		role := vo.NormalizeRole(member.Role)
-		if role.IsMemberRole() {
-			return &notebookentity.Access{Notebook: notebook, Role: role}, nil
+		if member.Role.IsMemberRole() {
+			return &notebookentity.Access{Notebook: notebook, Role: member.Role}, nil
 		}
 
 		slog.WarnContext(ctx, "ignore notebook member with invalid role",
@@ -55,10 +55,10 @@ func (s *AccessService) Resolve(
 			slog.String("role", string(member.Role)),
 		)
 	} else if !errors.Is(err, errors.ErrNoRecord) {
-		return nil, err
+		return nil, errors.WithMessagef(err, "member repo find failed, notebook_id=%s, user_id=%s", notebookId, userId)
 	}
 
-	if vo.NormalizeVisibility(notebook.Visibility).IsPublic() {
+	if notebook.IsPublic() {
 		return &notebookentity.Access{Notebook: notebook, Role: vo.RoleViewer}, nil
 	}
 

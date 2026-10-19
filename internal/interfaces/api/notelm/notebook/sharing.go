@@ -2,17 +2,16 @@ package notebook
 
 import (
 	"context"
-	"log/slog"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	notebookapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/notebook"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	notebookvo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/vo"
 	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/schema"
-	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 )
 
+// 获取某个用户对notebook的操作权限
 func (s *Server) GetNotebookAccess(ctx context.Context, c *app.RequestContext) {
 	var req schema.GetNotebookRequest
 	if err := c.BindAndValidate(&req); err != nil {
@@ -27,7 +26,7 @@ func (s *Server) GetNotebookAccess(ctx context.Context, c *app.RequestContext) {
 	}
 
 	http.OkResp(c, schema.GetNotebookAccessResponse{
-		Role:              string(access.Role),
+		Role:              access.Role.String(),
 		CanView:           access.CanView(),
 		CanManageContent:  access.CanManageContent(),
 		CanManageNotebook: access.CanManageNotebook(),
@@ -35,6 +34,7 @@ func (s *Server) GetNotebookAccess(ctx context.Context, c *app.RequestContext) {
 	})
 }
 
+// 获取notebook的分享情况
 func (s *Server) GetNotebookSharing(ctx context.Context, c *app.RequestContext) {
 	var req schema.GetNotebookSharingRequest
 	if err := c.BindAndValidate(&req); err != nil {
@@ -55,17 +55,18 @@ func (s *Server) GetNotebookSharing(ctx context.Context, c *app.RequestContext) 
 			Email:     member.Email,
 			Nickname:  member.Nickname,
 			AvatarURL: member.AvatarURL,
-			Role:      string(member.Role),
+			Role:      member.Role.String(),
 		})
 	}
 
 	http.OkResp(c, schema.GetNotebookSharingResponse{
-		Visibility: string(result.Visibility),
+		Visibility: result.Visibility.String(),
 		Members:    members,
 	})
 }
 
-func (s *Server) UpdateNotebookSharing(ctx context.Context, c *app.RequestContext) {
+// 修改notebook的visibility
+func (s *Server) UpdateNotebookVisibility(ctx context.Context, c *app.RequestContext) {
 	var req schema.UpdateNotebookSharingRequest
 	if err := c.BindAndValidate(&req); err != nil {
 		http.ErrResp(c, err)
@@ -81,6 +82,7 @@ func (s *Server) UpdateNotebookSharing(ctx context.Context, c *app.RequestContex
 	http.OkRespNoContent(c)
 }
 
+// 添加某个用户访问notebook的权限
 func (s *Server) UpsertNotebookMember(ctx context.Context, c *app.RequestContext) {
 	var req schema.UpsertNotebookMemberRequest
 	if err := c.BindAndValidate(&req); err != nil {
@@ -88,10 +90,11 @@ func (s *Server) UpsertNotebookMember(ctx context.Context, c *app.RequestContext
 		return
 	}
 
-	member, err := s.upsertNotebookMemberHandler.Handle(ctx, req.Id, &notebookapp.UpsertNotebookMemberCommand{
-		Email: req.Email,
-		Role:  req.Role,
-	})
+	member, err := s.upsertNotebookMemberHandler.Handle(ctx, req.Id,
+		&notebookapp.UpsertNotebookMemberCommand{
+			Email: req.Email,
+			Role:  req.Role,
+		})
 	if err != nil {
 		http.ErrResp(c, err)
 		return
@@ -103,6 +106,7 @@ func (s *Server) UpsertNotebookMember(ctx context.Context, c *app.RequestContext
 	})
 }
 
+// 移除某个用户对notebook的访问权限
 func (s *Server) DeleteNotebookMember(ctx context.Context, c *app.RequestContext) {
 	var req schema.DeleteNotebookMemberRequest
 	if err := c.BindAndValidate(&req); err != nil {
@@ -110,13 +114,7 @@ func (s *Server) DeleteNotebookMember(ctx context.Context, c *app.RequestContext
 		return
 	}
 
-	userId, err := valobj.NewUidFromString(req.UserId)
-	if err != nil {
-		http.ErrResp(c, errors.ErrParams.Msgf("invalid user id: %s", req.UserId))
-		return
-	}
-
-	if err := s.deleteNotebookMemberHandler.Handle(ctx, req.Id, userId); err != nil {
+	if err := s.deleteNotebookMemberHandler.Handle(ctx, req.Id, req.UserId); err != nil {
 		http.ErrResp(c, err)
 		return
 	}
@@ -129,14 +127,5 @@ func (s *Server) avatarURL(ctx context.Context, avatar valobj.StoreKey) string {
 		return ""
 	}
 
-	url, err := s.objectStore.PublicURL(ctx, avatar)
-	if err != nil {
-		slog.WarnContext(ctx, "resolve avatar public url failed",
-			slog.String("avatar", avatar.String()),
-			slog.Any("err", err),
-		)
-		return ""
-	}
-
-	return url
+	return s.storeKeyURLExchanger.Exchange(ctx, avatar)
 }

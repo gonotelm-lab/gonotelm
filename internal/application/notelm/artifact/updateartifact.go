@@ -31,7 +31,7 @@ func NewUpdateArtifactHandler(
 }
 
 func (h *UpdateArtifactHandler) Handle(ctx context.Context, cmd *UpdateCommand) error {
-	a, err := h.handleManage(ctx, cmd.ArtifactId)
+	a, err := h.checkManageAccess(ctx, cmd.ArtifactId)
 	if err != nil {
 		return err
 	}

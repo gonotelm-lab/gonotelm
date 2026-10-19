@@ -2,7 +2,9 @@ package schema
 
 import (
 	notebookapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/notebook"
-	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	idententity "github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
+	"github.com/gonotelm-lab/gonotelm/internal/domain/notebook/vo"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
@@ -25,13 +27,14 @@ func (r *GetNotebookRequest) Validate() error {
 }
 
 type GetNotebookResponse struct {
-	Id          string `json:"id"`
-	Name        string `json:"name"`
-	Desc        string `json:"desc"`
-	SourceCount int64  `json:"source_count"`
-	Visibility  string `json:"visibility"`
-	UpdatedAt   int64  `json:"updated_at"` // unix ms
-	CreatedAt   int64  `json:"created_at"` // unix ms
+	Id          string                 `json:"id"`
+	Name        string                 `json:"name"`
+	Desc        string                 `json:"desc"`
+	SourceCount int64                  `json:"source_count"`
+	Visibility  string                 `json:"visibility"`
+	UpdatedAt   int64                  `json:"updated_at"`      // unix ms
+	CreatedAt   int64                  `json:"created_at"`      // unix ms
+	Owner       *NotebookOwnerResponse `json:"owner,omitempty"` // notebook owner
 }
 
 type GetNotebookAccessResponse struct {
@@ -129,6 +132,13 @@ type NotebookOwnerResponse struct {
 	AvatarURL string `json:"avatar_url"`
 }
 
+func NewNotebookOwnerResponse(owner *idententity.User) *NotebookOwnerResponse {
+	return &NotebookOwnerResponse{
+		UserId:   owner.Id.String(),
+		Nickname: owner.Nickname,
+	}
+}
+
 type ListNotebookItemResponse struct {
 	Id          string                 `json:"id"`
 	Name        string                 `json:"name"`
@@ -141,8 +151,7 @@ type ListNotebookItemResponse struct {
 }
 
 func NewListNotebookItemResponse(
-	notebook *notebookentity.Notebook,
-	owner *NotebookOwnerResponse,
+	notebook *notebookapp.Notebook,
 ) *ListNotebookItemResponse {
 	return &ListNotebookItemResponse{
 		Id:          notebook.Id.String(),
@@ -150,7 +159,7 @@ func NewListNotebookItemResponse(
 		Desc:        notebook.Description,
 		SourceCount: notebook.SourceCount,
 		Visibility:  string(notebook.Visibility),
-		Owner:       owner,
+		Owner:       NewNotebookOwnerResponse(notebook.Owner),
 		UpdatedAt:   notebook.UpdateTime.Value(),
 		CreatedAt:   notebook.CreateTime.Value(),
 	}
@@ -233,10 +242,25 @@ type UpdateNotebookSharingRequest struct {
 	Visibility string    `json:"visibility" validate:"required"`
 }
 
+func (r *UpdateNotebookSharingRequest) Validate() error {
+	if vo.Visibility(r.Visibility).IsValid() {
+		return errors.ErrParams.Msgf("invalid visibility %s", r.Visibility)
+	}
+
+	return nil
+}
+
 type UpsertNotebookMemberRequest struct {
 	Id    uuid.UUID `path:"id,required"`
 	Email string    `json:"email" validate:"required,email"`
 	Role  string    `json:"role"  validate:"required"`
+}
+
+func (r *UpsertNotebookMemberRequest) Validate() error {
+	if !vo.Role(r.Role).IsValid() {
+		return errors.ErrParams.Msgf("invalid role %s", r.Role)
+	}
+	return nil
 }
 
 type UpsertNotebookMemberResponse struct {
@@ -245,6 +269,6 @@ type UpsertNotebookMemberResponse struct {
 }
 
 type DeleteNotebookMemberRequest struct {
-	Id     uuid.UUID `path:"id,required"`
-	UserId string    `path:"user_id,required"`
+	Id     uuid.UUID  `path:"id,required"` // notebook id
+	UserId valobj.Uid `path:"user_id,required"`
 }

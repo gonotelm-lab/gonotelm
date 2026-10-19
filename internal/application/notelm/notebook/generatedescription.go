@@ -7,6 +7,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookerrors "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/errors"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
@@ -34,11 +35,12 @@ func NewGenerateDescriptionHandler(
 	notebookRepo notebookrepo.Repository,
 	notebookAccessService *notebookservice.AccessService,
 	sourceRepo sourcerepo.Repository,
+	userRepo identrepo.UserRepository,
 	distLock adapter.DistributedLock,
 	summarizer adapter.Summarizer,
 ) *GenerateDescriptionHandler {
 	return &GenerateDescriptionHandler{
-		baseHandler: newBaseHandler(notebookRepo, notebookAccessService),
+		baseHandler: newBaseHandler(notebookRepo, notebookAccessService, userRepo),
 		sourceRepo:  sourceRepo,
 		distLock:    distLock,
 		summarizer:  summarizer,
@@ -51,7 +53,7 @@ func (h *GenerateDescriptionHandler) Handle(
 ) (string, error) {
 	ctx = pkgcontext.WithScene(ctx, pkgcontext.NotebookDescGenScene, notebookId.String())
 	ctx = pkgcontext.WithNotebookId(ctx, notebookId)
-	access, err := h.handleOwner(ctx, notebookId)
+	access, err := h.checkManageNotebookAccess(ctx, notebookId)
 	if err != nil {
 		return "", err
 	}

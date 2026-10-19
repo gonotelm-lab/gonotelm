@@ -8,6 +8,8 @@ import (
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+
+	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 )
 
 type DeleteNotebookMemberHandler struct {
@@ -19,9 +21,10 @@ func NewDeleteNotebookMemberHandler(
 	notebookRepo notebookrepo.Repository,
 	notebookAccessService *notebookservice.AccessService,
 	memberRepo notebookrepo.MemberRepository,
+	userRepo identrepo.UserRepository,
 ) *DeleteNotebookMemberHandler {
 	return &DeleteNotebookMemberHandler{
-		baseHandler: newBaseHandler(notebookRepo, notebookAccessService),
+		baseHandler: newBaseHandler(notebookRepo, notebookAccessService, userRepo),
 		memberRepo:  memberRepo,
 	}
 }
@@ -31,7 +34,7 @@ func (h *DeleteNotebookMemberHandler) Handle(
 	notebookId valobj.Id,
 	userId valobj.Uid,
 ) error {
-	if _, err := h.handleSharing(ctx, notebookId); err != nil {
+	if _, err := h.checkManageSharingAccess(ctx, notebookId); err != nil {
 		return err
 	}
 

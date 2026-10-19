@@ -22,7 +22,7 @@ const (
 )
 
 var (
-	ErrNotebookNotFound = errors.ErrNoRecord.ErrCode(CodeNotebookNotFound).Msg("notebook not found")
+	ErrNotebookNotFound = errors.ErrNotFound.ErrCode(CodeNotebookNotFound).Msg("notebook not found")
 
 	ErrInvalidName         = errors.ErrParams.ErrCode(CodeInvalidName).Msg("invalid name")
 	ErrInvalidDescription  = errors.ErrParams.ErrCode(CodeInvalidDescription).Msg("invalid description")

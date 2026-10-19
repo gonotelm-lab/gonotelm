@@ -58,8 +58,8 @@ func (h *CreateSourceHandler) Handle(
 	if err != nil {
 		return newId, errors.WithMessagef(err, "get notebook failed, notebook_id=%s", cmd.NotebookId)
 	}
-	if !access.CanView() {
-		return newId, errors.ErrNoRecord.Msgf("notebook not found, notebook_id=%s", cmd.NotebookId)
+	if err := access.CanViewReturnErr(); err != nil {
+		return newId, err
 	}
 	if !access.CanManageContent() {
 		return newId, errors.ErrPermission.Msgf("notebook write denied, notebook_id=%s", cmd.NotebookId)

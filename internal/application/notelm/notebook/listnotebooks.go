@@ -5,6 +5,8 @@ import (
 	"sort"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	idententity "github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
+	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -27,6 +29,7 @@ const (
 )
 
 type ListNotebooksHandler struct {
+	*baseHandler
 	notebookRepo notebookrepo.Repository
 	memberRepo   notebookrepo.MemberRepository
 }
@@ -34,8 +37,10 @@ type ListNotebooksHandler struct {
 func NewListNotebooksHandler(
 	notebookRepo notebookrepo.Repository,
 	memberRepo notebookrepo.MemberRepository,
+	userRepo identrepo.UserRepository,
 ) *ListNotebooksHandler {
 	return &ListNotebooksHandler{
+		baseHandler:  newBaseHandler(notebookRepo, nil, userRepo),
 		notebookRepo: notebookRepo,
 		memberRepo:   memberRepo,
 	}
@@ -49,8 +54,14 @@ type ListNotebooksHandleQuery struct {
 	SortBy SortBy
 }
 
+type Notebook struct {
+	*notebookentity.Notebook
+	Owner *idententity.User
+}
+
 type ListNotebooksHandleResult struct {
-	Notebooks []*notebookentity.Notebook
+	// Notebooks []*notebookentity.Notebook
+	Notebooks []*Notebook
 	Limit     int
 	Offset    int
 	HasMore   bool
@@ -81,8 +92,19 @@ func (h *ListNotebooksHandler) Handle(
 	start := min(query.Offset, total)
 	end := min(start+query.Limit, total)
 
+	targetNotebooks := make([]*Notebook, 0, len(notebooks[start:end]))
+	// 给notebook挂上owner
+	for _, notebook := range notebooks[start:end] {
+		targetNotebooks = append(targetNotebooks, &Notebook{
+			Notebook: notebook,
+		})
+	}
+	if err := h.attachNotebookOwners(ctx, targetNotebooks); err != nil {
+		return nil, errors.WithMessage(err, "list attach notebook owners failed")
+	}
+
 	return &ListNotebooksHandleResult{
-		Notebooks: notebooks[start:end],
+		Notebooks: targetNotebooks,
 		Limit:     query.Limit,
 		Offset:    query.Offset,
 		HasMore:   end < total,

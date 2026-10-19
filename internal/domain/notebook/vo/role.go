@@ -9,6 +9,10 @@ const (
 	RoleViewer       Role = "viewer"
 )
 
+func (r Role) String() string {
+	return string(r)
+}
+
 func (r Role) IsValid() bool {
 	return r.IsMemberRole() || r == RoleOwner
 }
@@ -18,11 +22,14 @@ func (r Role) IsMemberRole() bool {
 	return r == RoleCollaborator || r == RoleViewer
 }
 
-// NormalizeRole 把 DB 中的空字符串按最小权限处理为 viewer。
 func NormalizeRole(r Role) Role {
 	if r == "" {
 		return RoleViewer
 	}
+	if !r.IsValid() {
+		return RoleViewer
+	}
+
 	return r
 }
 
@@ -40,4 +47,10 @@ func (r Role) CanManageNotebook() bool {
 
 func (r Role) CanManageSharing() bool {
 	return r == RoleOwner
+}
+
+func NewRole(s string) Role {
+	ss := Role(s)
+
+	return NormalizeRole(ss)
 }

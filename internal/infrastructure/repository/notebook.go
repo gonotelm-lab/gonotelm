@@ -8,6 +8,7 @@ import (
 	notebookerrors "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/errors"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/schema"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository/mapper"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
@@ -66,24 +67,31 @@ func (s *NotebookRepositoryImpl) FindById(ctx context.Context, id valobj.Id) (*n
 func (s *NotebookRepositoryImpl) ListByOwner(
 	ctx context.Context,
 	ownerId valobj.Uid,
-	spec *notebookrepo.ListSpec,
 ) ([]*notebookentity.Notebook, error) {
-	if err := spec.Validate(); err != nil {
-		return nil, err
-	}
-
-	orderBy := 0
-	if spec.Order == notebookrepo.ListSpecOrderUpdateTime {
-		orderBy = 1
-	}
-
-	rows, err := s.notebookStore.ListByOwnerId(
-		ctx, ownerId, spec.Limit, spec.Offset, orderBy,
-	)
+	rows, err := s.notebookStore.ListByOwnerId(ctx, ownerId)
 	if err != nil {
 		return nil, err
 	}
 
+	return s.withSourceCounts(ctx, rows)
+}
+
+func (s *NotebookRepositoryImpl) FindByIds(
+	ctx context.Context,
+	ids []valobj.Id,
+) ([]*notebookentity.Notebook, error) {
+	rows, err := s.notebookStore.ListByIds(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.withSourceCounts(ctx, rows)
+}
+
+func (s *NotebookRepositoryImpl) withSourceCounts(
+	ctx context.Context,
+	rows []*schema.Notebook,
+) ([]*notebookentity.Notebook, error) {
 	notebookIds := make([]valobj.Id, 0, len(rows))
 	for _, row := range rows {
 		notebookIds = append(notebookIds, row.Id)

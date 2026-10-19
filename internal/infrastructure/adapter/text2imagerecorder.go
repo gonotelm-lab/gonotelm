@@ -83,6 +83,7 @@ func (a *Text2ImageRecorderAdapter) Record(ctx context.Context, record *text2ima
 		}
 		log.Metadata = metadatas
 	}
+	log.Metadata = withNotebookMetadata(ctx, log.Metadata)
 	if record.Error != nil {
 		log.Error = ptr(record.Error.Error())
 	}

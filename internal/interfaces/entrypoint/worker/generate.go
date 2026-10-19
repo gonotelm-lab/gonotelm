@@ -25,6 +25,7 @@ func run(ctx context.Context, deps *types.WorkerDeps, req *types.Request) (*type
 	}
 
 	ctx = pkgcontext.WithScene(ctx, scene, req.ArtifactId.String())
+	ctx = pkgcontext.WithNotebookId(ctx, req.NotebookId)
 
 	return g.Generate(ctx, req)
 }

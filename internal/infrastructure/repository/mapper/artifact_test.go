@@ -21,7 +21,7 @@ func TestArtifactRoundTrip(t *testing.T) {
 	a.BindFlowTaskId("ft-1")
 
 	sch := ArtifactToSchema(a)
-	assert.Equal(t, a.UserId, sch.UserId)
+	assert.Equal(t, a.CreatorId, sch.CreatedBy)
 	assert.Equal(t, "mindmap", sch.Kind)
 	assert.Equal(t, "ft-1", sch.FlowTaskId)
 

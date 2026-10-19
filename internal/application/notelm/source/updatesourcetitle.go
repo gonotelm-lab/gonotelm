@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
@@ -12,9 +13,12 @@ type UpdateSourceTitleHandler struct {
 	*baseHandler
 }
 
-func NewUpdateSourceTitleHandler(sourceRepo sourcerepo.Repository) *UpdateSourceTitleHandler {
+func NewUpdateSourceTitleHandler(
+	sourceRepo sourcerepo.Repository,
+	notebookAccessService *notebookservice.AccessService,
+) *UpdateSourceTitleHandler {
 	return &UpdateSourceTitleHandler{
-		baseHandler: newBaseHandler(sourceRepo),
+		baseHandler: newBaseHandler(sourceRepo, notebookAccessService),
 	}
 }
 
@@ -23,7 +27,7 @@ func (h *UpdateSourceTitleHandler) Handle(
 	id valobj.Id,
 	title string,
 ) error {
-	targetSource, err := h.handle(ctx, id)
+	targetSource, err := h.handleManage(ctx, id)
 	if err != nil {
 		return err
 	}

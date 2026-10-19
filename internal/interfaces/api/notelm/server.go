@@ -16,6 +16,7 @@ import (
 	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 	identityservice "github.com/gonotelm-lab/gonotelm/internal/domain/identity/service"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
@@ -37,6 +38,8 @@ type ServerDeps struct {
 	RootCtx stdcontext.Context
 
 	NotebookRepo           notebookrepo.Repository
+	NotebookMemberRepo     notebookrepo.MemberRepository
+	NotebookAccessService  *notebookservice.AccessService
 	SourceRepo             sourcerepo.Repository
 	ObjectStore            adapter.ObjectStore
 	KeyFactory             adapter.StoreKeyFactory
@@ -122,28 +125,33 @@ func NewServer(
 		}),
 
 		notebook: notebookapi.NewServer(notebookapi.Deps{
-			NotebookRepo: deps.NotebookRepo,
-			SourceRepo:   deps.SourceRepo,
-			EventBus:     deps.EventBus,
-			DistLock:     deps.DistLock,
-			Summarizer:   deps.Summarizer,
-			Cleaner:      deps.Cleaner,
+			NotebookRepo:          deps.NotebookRepo,
+			MemberRepo:            deps.NotebookMemberRepo,
+			NotebookAccessService: deps.NotebookAccessService,
+			SourceRepo:            deps.SourceRepo,
+			EventBus:              deps.EventBus,
+			DistLock:              deps.DistLock,
+			Summarizer:            deps.Summarizer,
+			Cleaner:               deps.Cleaner,
+			UserRepo:              deps.UserRepo,
+			ObjectStore:           deps.ObjectStore,
 		}),
 
 		source: sourceapi.NewServer(sourceapi.Deps{
-			SourceRepo:    deps.SourceRepo,
-			NotebookRepo:  deps.NotebookRepo,
-			ObjectStore:   deps.ObjectStore,
-			KeyFactory:    deps.KeyFactory,
-			SourceDocRepo: deps.SourceDocRepo,
-			EventBus:      deps.EventBus,
-			Cleaner:       deps.Cleaner,
+			SourceRepo:            deps.SourceRepo,
+			NotebookAccessService: deps.NotebookAccessService,
+			ObjectStore:           deps.ObjectStore,
+			KeyFactory:            deps.KeyFactory,
+			SourceDocRepo:         deps.SourceDocRepo,
+			EventBus:              deps.EventBus,
+			Cleaner:               deps.Cleaner,
 		}),
 
 		chat: chatapi.NewServer(chatapi.Deps{
 			WaitGroup:              deps.WaitGroup,
 			DistLock:               deps.DistLock,
 			NotebookRepo:           deps.NotebookRepo,
+			NotebookAccessService:  deps.NotebookAccessService,
 			ChatRepo:               deps.ChatRepo,
 			ChatMessageRepo:        deps.ChatMessageRepo,
 			ChatContextMessageRepo: deps.ChatContextMessageRepo,
@@ -158,20 +166,21 @@ func NewServer(
 		}),
 
 		studio: studioapi.NewServer(studioapi.Deps{
-			WaitGroup:        deps.WaitGroup,
-			ArtifactRepo:     deps.ArtifactRepo,
-			StylePreviewRepo: deps.StylePreviewRepo,
-			NotebookRepo:     deps.NotebookRepo,
-			SourceRepo:       deps.SourceRepo,
-			ChatRepo:         deps.ChatRepo,
-			ChatMessageRepo:  deps.ChatMessageRepo,
-			FlowClient:       deps.FlowClient,
-			Poller:           deps.Poller,
-			EventBus:         deps.EventBus,
-			TitleMaker:       deps.TitleMaker,
-			ObjectStore:      deps.ObjectStore,
-			KeyFactory:       deps.KeyFactory,
-			Cleaner:          deps.Cleaner,
+			WaitGroup:             deps.WaitGroup,
+			ArtifactRepo:          deps.ArtifactRepo,
+			StylePreviewRepo:      deps.StylePreviewRepo,
+			NotebookRepo:          deps.NotebookRepo,
+			NotebookAccessService: deps.NotebookAccessService,
+			SourceRepo:            deps.SourceRepo,
+			ChatRepo:              deps.ChatRepo,
+			ChatMessageRepo:       deps.ChatMessageRepo,
+			FlowClient:            deps.FlowClient,
+			Poller:                deps.Poller,
+			EventBus:              deps.EventBus,
+			TitleMaker:            deps.TitleMaker,
+			ObjectStore:           deps.ObjectStore,
+			KeyFactory:            deps.KeyFactory,
+			Cleaner:               deps.Cleaner,
 		}),
 
 		user: userapi.NewServer(userapi.Deps{

@@ -6,7 +6,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
-	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
@@ -23,22 +23,24 @@ type ListResponse struct {
 }
 
 type ListArtifactsHandler struct {
-	notebookRepo notebookrepo.Repository
-	repo         artifactrepo.Repository
+	repo                  artifactrepo.Repository
+	notebookAccessService *notebookservice.AccessService
 }
 
-func NewListArtifactsHandler(notebookRepo notebookrepo.Repository, repo artifactrepo.Repository) *ListArtifactsHandler {
-	return &ListArtifactsHandler{notebookRepo: notebookRepo, repo: repo}
+func NewListArtifactsHandler(
+	repo artifactrepo.Repository,
+	notebookAccessService *notebookservice.AccessService,
+) *ListArtifactsHandler {
+	return &ListArtifactsHandler{repo: repo, notebookAccessService: notebookAccessService}
 }
 
 func (h *ListArtifactsHandler) Handle(ctx context.Context, cmd *ListRequest) (*ListResponse, error) {
-	userId := pkgcontext.GetUserId(ctx)
-	notebook, err := h.notebookRepo.FindById(ctx, cmd.NotebookId)
+	access, err := h.notebookAccessService.Resolve(ctx, cmd.NotebookId, pkgcontext.GetUserId(ctx))
 	if err != nil {
 		return nil, errors.WithMessagef(err, "get notebook failed, notebook_id=%s", cmd.NotebookId)
 	}
-	if notebook.OwnerId != userId {
-		return nil, errors.ErrPermission.Msgf("notebook access denied, notebook_id=%s", cmd.NotebookId)
+	if !access.CanView() {
+		return nil, errors.ErrNoRecord.Msgf("notebook not found, notebook_id=%s", cmd.NotebookId)
 	}
 
 	fetchLimit := cmd.Limit + 1

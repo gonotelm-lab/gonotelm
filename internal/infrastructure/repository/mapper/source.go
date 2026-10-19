@@ -19,7 +19,7 @@ func SourceToSchema(source *sourceentity.Source) *schema.Source {
 		Content:          source.Content.Bytes(),
 		ParsedContentKey: source.ParsedContentKey.Encode(),
 		Abstract:         source.Abstract,
-		OwnerId:          source.OwnerId,
+		CreatorId:        source.CreatorId,
 		UpdatedAt:        source.UpdateTime.Value(),
 	}
 }
@@ -43,7 +43,7 @@ func SourceFromSchema(source *schema.Source) (*sourceentity.Source, error) {
 		// Content: source.Content, // TODO
 		ParsedContentKey: parsedContentKey,
 		Abstract:         source.Abstract,
-		OwnerId:          source.OwnerId,
+		CreatorId:        source.CreatorId,
 	}
 	content, err := sourceentity.NewSourceContent(sourcevo.SourceKind(source.Kind), source.Content)
 	if err != nil {

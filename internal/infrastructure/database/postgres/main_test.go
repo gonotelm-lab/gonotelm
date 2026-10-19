@@ -16,6 +16,7 @@ import (
 var (
 	testDB                        *gorm.DB
 	testNotebookStore             *NotebookStoreImpl
+	testNotebookMemberStore       *NotebookMemberStoreImpl
 	testSourceStore               *SourceStoreImpl
 	testChatStore                 *ChatStoreImpl
 	testChatMessageStore          *ChatMessageStoreImpl
@@ -41,6 +42,7 @@ func TestMain(m *testing.M) {
 	}
 	testDB = testDatabase.GetDB()
 	testNotebookStore = NewNotebookStoreImpl(testDB)
+	testNotebookMemberStore = NewNotebookMemberStoreImpl(testDB)
 	testSourceStore = NewSourceStoreImpl(testDB)
 	testChatStore = NewChatStoreImpl(testDB)
 	testChatMessageStore = NewChatMessageStoreImpl(testDB)

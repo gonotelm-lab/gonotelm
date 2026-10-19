@@ -8,6 +8,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
@@ -21,12 +22,13 @@ type DeleteArtifactHandler struct {
 
 func NewDeleteArtifactHandler(
 	repo artifactrepo.Repository,
+	notebookAccessService *notebookservice.AccessService,
 	flowc flow.TaskClient,
 	storage adapter.ObjectStore,
 	cleaner *cleanup.Cleaner,
 ) *DeleteArtifactHandler {
 	return &DeleteArtifactHandler{
-		baseHandler: newBaseHandler(repo),
+		baseHandler: newBaseHandler(repo, notebookAccessService),
 		flowc:       flowc,
 		storage:     storage,
 		cleaner:     cleaner,
@@ -34,7 +36,7 @@ func NewDeleteArtifactHandler(
 }
 
 func (h *DeleteArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error {
-	a, err := h.handle(ctx, cmd)
+	a, err := h.handleManage(ctx, cmd)
 	if err != nil {
 		return err
 	}

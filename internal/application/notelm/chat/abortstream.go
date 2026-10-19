@@ -7,6 +7,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	chaterrors "github.com/gonotelm-lab/gonotelm/internal/domain/chat/errors"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -15,15 +16,19 @@ import (
 const defaultStreamTaskTTL = 100 * time.Minute
 
 type AbortStreamHandler struct {
+	*baseHandler
 	streamTaskRepo chatrepo.StreamTaskRepository
 	eventBus       eventbus.Publisher
 }
 
 func NewAbortStreamHandler(
+	chatRepo chatrepo.ChatRepository,
+	notebookAccessService *notebookservice.AccessService,
 	streamTaskRepo chatrepo.StreamTaskRepository,
 	eventBus eventbus.Publisher,
 ) *AbortStreamHandler {
 	return &AbortStreamHandler{
+		baseHandler:    newBaseHandler(chatRepo, notebookAccessService),
 		streamTaskRepo: streamTaskRepo,
 		eventBus:       eventBus,
 	}
@@ -45,7 +50,7 @@ func (h *AbortStreamHandler) Handle(ctx context.Context, cmd *AbortStreamCommand
 	}
 
 	userId := pkgcontext.GetUserId(ctx)
-	if err := canAccessStreamTask(task, cmd.ChatId, userId); err != nil {
+	if err := h.ensureStreamAccess(ctx, task, cmd.ChatId, userId); err != nil {
 		return err
 	}
 

@@ -6,38 +6,83 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	chatentity "github.com/gonotelm-lab/gonotelm/internal/domain/chat/entity"
+	chaterrors "github.com/gonotelm-lab/gonotelm/internal/domain/chat/errors"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type baseHandler struct {
-	chatRepo chatrepo.ChatRepository
+	chatRepo              chatrepo.ChatRepository
+	notebookAccessService *notebookservice.AccessService
 }
 
-func newBaseHandler(chatRepo chatrepo.ChatRepository) *baseHandler {
+func newBaseHandler(
+	chatRepo chatrepo.ChatRepository,
+	notebookAccessService *notebookservice.AccessService,
+) *baseHandler {
 	return &baseHandler{
-		chatRepo: chatRepo,
+		chatRepo:              chatRepo,
+		notebookAccessService: notebookAccessService,
 	}
 }
 
-// 所有handler都要先处理这个公共的操作
-// 1. 检查chat是否存在
-// 2. 检查用户是否是chat的owner
+// commonHandle 校验：
+// 1. chat 存在；
+// 2. 当前用户对所属 notebook 有 view 权限；
+// 3. chat 属于当前用户（chat 每人私有）。
 func (h *baseHandler) commonHandle(ctx context.Context, chatId valobj.Id) (*chatentity.Chat, error) {
 	chat, err := h.chatRepo.FindById(ctx, chatId)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "get chat failed, chat_id=%s", chatId)
 	}
 
-	// check owner id
 	userId := pkgcontext.GetUserId(ctx)
-	if chat.OwnerId != userId {
-		return nil, errors.WithMessagef(errors.ErrPermission, "chat access denied, chat_id=%s", chatId)
+	access, err := h.notebookAccessService.Resolve(ctx, chat.NotebookId, userId)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "resolve notebook access failed, chat_id=%s", chatId)
+	}
+
+	if !access.CanView() || chat.OwnerId != userId {
+		return nil, chaterrors.ErrChatNotFound
 	}
 
 	return chat, nil
+}
+
+// ensureStreamAccess 校验流式任务属于当前用户的 chat，且当前用户仍有 notebook view 权限。
+func (h *baseHandler) ensureStreamAccess(
+	ctx context.Context,
+	task *chatentity.StreamTask,
+	chatId valobj.Id,
+	userId valobj.Uid,
+) error {
+	if task.ChatId != chatId {
+		return errors.ErrParams.Msgf("task chat_id mismatch, task_id=%s, chat_id=%s",
+			task.Id, chatId)
+	}
+
+	if task.UserId != userId {
+		return chaterrors.ErrStreamTaskNotFound
+	}
+
+	chat, err := h.chatRepo.FindById(ctx, chatId)
+	if err != nil {
+		return errors.WithMessagef(err, "get chat failed, chat_id=%s", chatId)
+	}
+
+	access, err := h.notebookAccessService.Resolve(ctx, chat.NotebookId, userId)
+	if err != nil {
+		return errors.WithMessagef(err, "resolve notebook access failed, chat_id=%s", chatId)
+	}
+
+	if !access.CanView() || chat.OwnerId != userId {
+		return chaterrors.ErrStreamTaskNotFound
+	}
+
+	return nil
 }
 
 func publishStreamTaskDomainEvents(ctx context.Context, bus eventbus.Publisher, task *chatentity.StreamTask) {

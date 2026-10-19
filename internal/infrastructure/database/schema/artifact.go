@@ -8,7 +8,7 @@ import (
 type Artifact struct {
 	Id         uuid.UUID  `gorm:"column:id;primaryKey"`
 	NotebookId uuid.UUID  `gorm:"column:notebook_id"`
-	UserId     valobj.Uid `gorm:"column:user_id"`
+	CreatedBy  valobj.Uid `gorm:"column:created_by"`
 	Kind       string     `gorm:"column:kind"`
 	Status     string     `gorm:"column:status"`
 	FlowTaskId string     `gorm:"column:flow_task_id"`

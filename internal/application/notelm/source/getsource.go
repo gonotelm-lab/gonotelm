@@ -5,6 +5,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	sourceservice "github.com/gonotelm-lab/gonotelm/internal/domain/source/service/source"
@@ -18,10 +19,11 @@ type GetSourceHandler struct {
 
 func NewGetSourceHandler(
 	sourceRepo sourcerepo.Repository,
+	notebookAccessService *notebookservice.AccessService,
 	objectStore adapter.ObjectStore,
 ) *GetSourceHandler {
 	return &GetSourceHandler{
-		baseHandler:   newBaseHandler(sourceRepo),
+		baseHandler:   newBaseHandler(sourceRepo, notebookAccessService),
 		sourceService: sourceservice.New(objectStore),
 	}
 }
@@ -30,7 +32,7 @@ func (h *GetSourceHandler) Handle(
 	ctx context.Context,
 	sourceId valobj.Id,
 ) (*sourceentity.SourceDetail, error) {
-	targetSource, err := h.handle(ctx, sourceId)
+	targetSource, err := h.handleView(ctx, sourceId)
 	if err != nil {
 		return nil, err
 	}

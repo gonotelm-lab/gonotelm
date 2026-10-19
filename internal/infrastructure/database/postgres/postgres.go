@@ -36,6 +36,7 @@ func Open(cfg *sql.Config) (*database.Dao, error) {
 	return database.NewDao(
 		closer,
 		NewNotebookStoreImpl(db),
+		NewNotebookMemberStoreImpl(db),
 		NewSourceStoreImpl(db),
 		NewChatStoreImpl(db),
 		NewChatMessageStoreImpl(db),

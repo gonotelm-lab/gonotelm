@@ -11,7 +11,6 @@ import (
 	artifacterrors "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/errors"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
-	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourceerr "github.com/gonotelm-lab/gonotelm/internal/domain/source/errors"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
@@ -80,7 +79,10 @@ func (f *fakeNotebookRepo) FindById(context.Context, valobj.Id) (*notebookentity
 func (f *fakeNotebookRepo) Exists(context.Context, valobj.Id) (bool, error) {
 	return f.exists, f.err
 }
-func (f *fakeNotebookRepo) ListByOwner(context.Context, valobj.Uid, *notebookrepo.ListSpec) ([]*notebookentity.Notebook, error) {
+func (f *fakeNotebookRepo) ListByOwner(context.Context, valobj.Uid) ([]*notebookentity.Notebook, error) {
+	return nil, nil
+}
+func (f *fakeNotebookRepo) FindByIds(context.Context, []valobj.Id) ([]*notebookentity.Notebook, error) {
 	return nil, nil
 }
 

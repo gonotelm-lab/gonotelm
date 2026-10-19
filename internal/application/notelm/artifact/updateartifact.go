@@ -5,6 +5,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
@@ -22,12 +23,15 @@ type UpdateArtifactHandler struct {
 	*baseHandler
 }
 
-func NewUpdateArtifactHandler(repo artifactrepo.Repository) *UpdateArtifactHandler {
-	return &UpdateArtifactHandler{baseHandler: newBaseHandler(repo)}
+func NewUpdateArtifactHandler(
+	repo artifactrepo.Repository,
+	notebookAccessService *notebookservice.AccessService,
+) *UpdateArtifactHandler {
+	return &UpdateArtifactHandler{baseHandler: newBaseHandler(repo, notebookAccessService)}
 }
 
 func (h *UpdateArtifactHandler) Handle(ctx context.Context, cmd *UpdateCommand) error {
-	a, err := h.handle(ctx, cmd.ArtifactId)
+	a, err := h.handleManage(ctx, cmd.ArtifactId)
 	if err != nil {
 		return err
 	}

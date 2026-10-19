@@ -6,6 +6,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -17,12 +18,17 @@ type CancelArtifactHandler struct {
 	eventBus eventbus.Publisher
 }
 
-func NewCancelArtifactHandler(repo artifactrepo.Repository, flowc flow.TaskClient, eventBus eventbus.Publisher) *CancelArtifactHandler {
-	return &CancelArtifactHandler{baseHandler: newBaseHandler(repo), flowc: flowc, eventBus: eventBus}
+func NewCancelArtifactHandler(
+	repo artifactrepo.Repository,
+	notebookAccessService *notebookservice.AccessService,
+	flowc flow.TaskClient,
+	eventBus eventbus.Publisher,
+) *CancelArtifactHandler {
+	return &CancelArtifactHandler{baseHandler: newBaseHandler(repo, notebookAccessService), flowc: flowc, eventBus: eventBus}
 }
 
 func (h *CancelArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error {
-	artifact, err := h.handle(ctx, cmd)
+	artifact, err := h.handleManage(ctx, cmd)
 	if err != nil {
 		return err
 	}

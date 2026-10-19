@@ -29,7 +29,7 @@ func TestSourceStoreCRUD(t *testing.T) {
 			Kind:       "doc",
 			Status:     "new",
 			Abstract:   "initial abstract",
-			OwnerId:    valobj.NewUid(),
+			CreatorId:  valobj.NewUid(),
 			Content:    []byte(content),
 			UpdatedAt:  time.Now().UnixMilli(),
 		}
@@ -47,7 +47,7 @@ func TestSourceStoreCRUD(t *testing.T) {
 		So(got.NotebookId, ShouldEqual, source.NotebookId)
 		So(strings.TrimSpace(got.Status), ShouldEqual, source.Status)
 		So(got.Abstract, ShouldEqual, source.Abstract)
-		So(got.OwnerId, ShouldEqual, source.OwnerId)
+		So(got.CreatorId, ShouldEqual, source.CreatorId)
 		So(got.Content, ShouldNotBeNil)
 		So(string(got.Content), ShouldEqual, content)
 
@@ -300,7 +300,7 @@ func TestSourceStoreUpdate(t *testing.T) {
 			Kind:       "doc",
 			Status:     "new",
 			Content:    []byte("before update"),
-			OwnerId:    valobj.NewUid(),
+			CreatorId:  valobj.NewUid(),
 			UpdatedAt:  1000,
 		}
 
@@ -342,7 +342,7 @@ func TestSourceStoreParsedContentCompatibility(t *testing.T) {
 			Content:          []byte("raw-content"),
 			ParsedContentKey: "converted-content",
 			Abstract:         "initial abstract",
-			OwnerId:          valobj.NewUid(),
+			CreatorId:        valobj.NewUid(),
 			UpdatedAt:        1000,
 		}
 
@@ -357,7 +357,7 @@ func TestSourceStoreParsedContentCompatibility(t *testing.T) {
 		So(created, ShouldNotBeNil)
 		So(string(created.ParsedContentKey), ShouldEqual, "converted-content")
 		So(created.Abstract, ShouldEqual, source.Abstract)
-		So(created.OwnerId, ShouldEqual, source.OwnerId)
+		So(created.CreatorId, ShouldEqual, source.CreatorId)
 
 		err = store.Update(ctx, &schema.SourceUpdateParams{
 			Id:        source.Id,
@@ -374,7 +374,7 @@ func TestSourceStoreParsedContentCompatibility(t *testing.T) {
 		// update path does not touch parsed_content/abstract/owner_id, they should remain stable.
 		So(string(updated.ParsedContentKey), ShouldEqual, "converted-content")
 		So(updated.Abstract, ShouldEqual, source.Abstract)
-		So(updated.OwnerId, ShouldEqual, source.OwnerId)
+		So(updated.CreatorId, ShouldEqual, source.CreatorId)
 	})
 }
 
@@ -392,7 +392,7 @@ func TestSourceStoreUpdateAbstract(t *testing.T) {
 			Title:      "source-update-abstract",
 			Content:    []byte("raw-content"),
 			Abstract:   "abstract-old",
-			OwnerId:    valobj.NewUid(),
+			CreatorId:  valobj.NewUid(),
 			UpdatedAt:  1000,
 		}
 		So(store.Create(ctx, source), ShouldBeNil)
@@ -414,7 +414,7 @@ func TestSourceStoreUpdateAbstract(t *testing.T) {
 		So(got.Abstract, ShouldEqual, "abstract-new")
 		// ensure unrelated fields are not overwritten.
 		So(string(got.Content), ShouldEqual, "raw-content")
-		So(got.OwnerId, ShouldEqual, source.OwnerId)
+		So(got.CreatorId, ShouldEqual, source.CreatorId)
 		So(got.UpdatedAt, ShouldEqual, newUpdatedAt)
 	})
 }
@@ -433,7 +433,7 @@ func TestSourceStoreUpdateParsedContent(t *testing.T) {
 			Title:            "source-update-converted",
 			Content:          []byte("raw-content"),
 			ParsedContentKey: "converted-old",
-			OwnerId:          valobj.NewUid(),
+			CreatorId:        valobj.NewUid(),
 			UpdatedAt:        1000,
 		}
 		So(store.Create(ctx, source), ShouldBeNil)
@@ -455,7 +455,7 @@ func TestSourceStoreUpdateParsedContent(t *testing.T) {
 		So(string(got.ParsedContentKey), ShouldEqual, "converted-new")
 		// ensure unrelated field is not overwritten.
 		So(string(got.Content), ShouldEqual, "raw-content")
-		So(got.OwnerId, ShouldEqual, source.OwnerId)
+		So(got.CreatorId, ShouldEqual, source.CreatorId)
 		So(got.UpdatedAt, ShouldEqual, newUpdatedAt)
 	})
 }
@@ -479,7 +479,7 @@ func TestSourceStoreUpdateExisting(t *testing.T) {
 			Content:          initialContent,
 			ParsedContentKey: "parsed/old",
 			Abstract:         "initial abstract",
-			OwnerId:          ownerID,
+			CreatorId:        ownerID,
 			UpdatedAt:        1000,
 		}
 
@@ -497,7 +497,7 @@ func TestSourceStoreUpdateExisting(t *testing.T) {
 		So(string(got.Content), ShouldEqual, string(initialContent))
 		So(string(got.ParsedContentKey), ShouldEqual, "parsed/old")
 		So(got.Abstract, ShouldEqual, "initial abstract")
-		So(got.OwnerId, ShouldEqual, ownerID)
+		So(got.CreatorId, ShouldEqual, ownerID)
 		So(got.UpdatedAt, ShouldEqual, int64(1000))
 
 		source.NotebookId = database.Id(uuid.NewV7())
@@ -507,7 +507,7 @@ func TestSourceStoreUpdateExisting(t *testing.T) {
 		source.Content = []byte("updated content")
 		source.ParsedContentKey = "parsed/new"
 		source.Abstract = "updated abstract"
-		source.OwnerId = valobj.NewUid()
+		source.CreatorId = valobj.NewUid()
 		source.UpdatedAt = 2000
 
 		affected, updateErr := store.UpdateExisting(ctx, source)
@@ -524,7 +524,7 @@ func TestSourceStoreUpdateExisting(t *testing.T) {
 		So(string(gotAfterUpsert.Content), ShouldEqual, "updated content")
 		So(string(gotAfterUpsert.ParsedContentKey), ShouldEqual, "parsed/new")
 		So(gotAfterUpsert.Abstract, ShouldEqual, "updated abstract")
-		So(gotAfterUpsert.OwnerId, ShouldEqual, ownerID)
+		So(gotAfterUpsert.CreatorId, ShouldEqual, ownerID)
 		So(gotAfterUpsert.UpdatedAt, ShouldEqual, int64(2000))
 	})
 }
@@ -745,7 +745,7 @@ func TestSourceStoreUpdateExistingDoesNotResurrectDeletedSource(t *testing.T) {
 			Kind:       "file",
 			Status:     "preparing",
 			Title:      "in flight",
-			OwnerId:    valobj.NewUid(),
+			CreatorId:  valobj.NewUid(),
 			UpdatedAt:  1000,
 		}
 		So(store.Create(ctx, source), ShouldBeNil)
@@ -785,20 +785,20 @@ func TestSourceStoreBatchCountByNotebookIds(t *testing.T) {
 
 		ready := &schema.Source{
 			Id: database.Id(uuid.NewV7()), NotebookId: notebookID,
-			Kind: "doc", Status: "ready", OwnerId: valobj.NewUid(), UpdatedAt: nowMilli(),
+			Kind: "doc", Status: "ready", CreatorId: valobj.NewUid(), UpdatedAt: nowMilli(),
 		}
 		preparing := &schema.Source{
 			Id: database.Id(uuid.NewV7()), NotebookId: notebookID,
-			Kind: "doc", Status: "preparing", OwnerId: valobj.NewUid(), UpdatedAt: nowMilli(),
+			Kind: "doc", Status: "preparing", CreatorId: valobj.NewUid(), UpdatedAt: nowMilli(),
 		}
 		// inited 的 source 不计入列表页的 source 数
 		inited := &schema.Source{
 			Id: database.Id(uuid.NewV7()), NotebookId: notebookID,
-			Kind: "doc", Status: schema.SourceStatusInited, OwnerId: valobj.NewUid(), UpdatedAt: nowMilli(),
+			Kind: "doc", Status: schema.SourceStatusInited, CreatorId: valobj.NewUid(), UpdatedAt: nowMilli(),
 		}
 		other := &schema.Source{
 			Id: database.Id(uuid.NewV7()), NotebookId: otherNotebookID,
-			Kind: "doc", Status: "ready", OwnerId: valobj.NewUid(), UpdatedAt: nowMilli(),
+			Kind: "doc", Status: "ready", CreatorId: valobj.NewUid(), UpdatedAt: nowMilli(),
 		}
 		for _, source := range []*schema.Source{ready, preparing, inited, other} {
 			So(store.Create(ctx, source), ShouldBeNil)
@@ -823,7 +823,7 @@ func TestSourceStoreUpdateTitle(t *testing.T) {
 		source := &schema.Source{
 			Id: database.Id(uuid.NewV7()), NotebookId: notebookID,
 			Kind: "doc", Status: "ready", Title: "old title",
-			OwnerId: valobj.NewUid(), UpdatedAt: 1000,
+			CreatorId: valobj.NewUid(), UpdatedAt: 1000,
 		}
 		So(store.Create(ctx, source), ShouldBeNil)
 		t.Cleanup(func() {

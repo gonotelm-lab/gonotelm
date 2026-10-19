@@ -7,6 +7,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 )
 
 type StatusRequest struct{ ArtifactId valobj.Id }
@@ -27,12 +28,16 @@ type GetArtifactStatusHandler struct {
 	storage adapter.ObjectStore
 }
 
-func NewGetArtifactStatusHandler(repo artifactrepo.Repository, storage adapter.ObjectStore) *GetArtifactStatusHandler {
-	return &GetArtifactStatusHandler{baseHandler: newBaseHandler(repo), storage: storage}
+func NewGetArtifactStatusHandler(
+	repo artifactrepo.Repository,
+	notebookAccessService *notebookservice.AccessService,
+	storage adapter.ObjectStore,
+) *GetArtifactStatusHandler {
+	return &GetArtifactStatusHandler{baseHandler: newBaseHandler(repo, notebookAccessService), storage: storage}
 }
 
 func (h *GetArtifactStatusHandler) Handle(ctx context.Context, cmd *StatusRequest) (*StatusResponse, error) {
-	artifact, err := h.handle(ctx, cmd.ArtifactId)
+	artifact, err := h.handleView(ctx, cmd.ArtifactId)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +57,7 @@ func (h *GetArtifactStatusHandler) Handle(ctx context.Context, cmd *StatusReques
 }
 
 func (h *GetArtifactStatusHandler) FindById(ctx context.Context, artifactId valobj.Id) (*artifactentity.Artifact, error) {
-	return h.handle(ctx, artifactId)
+	return h.handleView(ctx, artifactId)
 }
 
 func (h *GetArtifactStatusHandler) AttachStorageURL(ctx context.Context, a *artifactentity.Artifact) (url string, mime string) {

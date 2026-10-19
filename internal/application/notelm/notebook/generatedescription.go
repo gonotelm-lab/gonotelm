@@ -10,6 +10,7 @@ import (
 	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookerrors "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/errors"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
@@ -31,12 +32,13 @@ type GenerateDescriptionHandler struct {
 
 func NewGenerateDescriptionHandler(
 	notebookRepo notebookrepo.Repository,
+	notebookAccessService *notebookservice.AccessService,
 	sourceRepo sourcerepo.Repository,
 	distLock adapter.DistributedLock,
 	summarizer adapter.Summarizer,
 ) *GenerateDescriptionHandler {
 	return &GenerateDescriptionHandler{
-		baseHandler: newBaseHandler(notebookRepo),
+		baseHandler: newBaseHandler(notebookRepo, notebookAccessService),
 		sourceRepo:  sourceRepo,
 		distLock:    distLock,
 		summarizer:  summarizer,
@@ -48,10 +50,12 @@ func (h *GenerateDescriptionHandler) Handle(
 	notebookId valobj.Id,
 ) (string, error) {
 	ctx = pkgcontext.WithScene(ctx, pkgcontext.NotebookDescGenScene, notebookId.String())
-	notebook, err := h.handle(ctx, notebookId)
+	ctx = pkgcontext.WithNotebookId(ctx, notebookId)
+	access, err := h.handleOwner(ctx, notebookId)
 	if err != nil {
 		return "", err
 	}
+	notebook := access.Notebook
 
 	if strings.TrimSpace(notebook.Description) != "" {
 		return notebook.Description, nil

@@ -12,7 +12,7 @@ func buildWorkerInput(artifact *artifactentity.Artifact, payload json.RawMessage
 	return contract.WorkerInput{
 		ArtifactId: artifact.Id.String(),
 		NotebookId: artifact.NotebookId.String(),
-		UserId:     artifact.UserId.String(),
+		UserId:     artifact.CreatorId.String(),
 		SourceIds:  valobj.IdsToStrings(artifact.Payload.GetSourceIds()),
 		Kind:       string(artifact.Kind),
 		Payload:    payload,

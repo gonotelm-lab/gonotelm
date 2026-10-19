@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -16,10 +17,11 @@ type BatchGetSourceDocsHandler struct {
 
 func NewBatchGetSourceDocsHandler(
 	sourceRepo sourcerepo.Repository,
+	notebookAccessService *notebookservice.AccessService,
 	sourceDocRepo sourcerepo.SourceDocRepository,
 ) *BatchGetSourceDocsHandler {
 	return &BatchGetSourceDocsHandler{
-		baseHandler:   newBaseHandler(sourceRepo),
+		baseHandler:   newBaseHandler(sourceRepo, notebookAccessService),
 		sourceDocRepo: sourceDocRepo,
 	}
 }
@@ -39,7 +41,7 @@ func (h *BatchGetSourceDocsHandler) Handle(
 	ctx context.Context,
 	cmd *BatchGetSourceDocsHandleQuery,
 ) (*BatchGetSourceDocsHandleResult, error) {
-	source, err := h.handle(ctx, cmd.SourceId)
+	source, err := h.handleView(ctx, cmd.SourceId)
 	if err != nil {
 		return nil, err
 	}

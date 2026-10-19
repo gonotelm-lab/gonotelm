@@ -6,6 +6,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/shared/cleanup"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	domainerr "github.com/gonotelm-lab/gonotelm/internal/domain/source/errors"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
@@ -20,18 +21,19 @@ type DeleteSourceHandler struct {
 
 func NewDeleteSourceHandler(
 	sourceRepo sourcerepo.Repository,
+	notebookAccessService *notebookservice.AccessService,
 	eventBus eventbus.Publisher,
 	cleaner *cleanup.Cleaner,
 ) *DeleteSourceHandler {
 	return &DeleteSourceHandler{
-		baseHandler: newBaseHandler(sourceRepo),
+		baseHandler: newBaseHandler(sourceRepo, notebookAccessService),
 		eventBus:    eventBus,
 		cleaner:     cleaner,
 	}
 }
 
 func (h *DeleteSourceHandler) Handle(ctx context.Context, id valobj.Id) error {
-	targetSource, err := h.handle(ctx, id)
+	targetSource, err := h.handleManage(ctx, id)
 	if err != nil {
 		if errors.Is(err, domainerr.ErrSourceNotFound) {
 			return nil

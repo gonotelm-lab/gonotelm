@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -18,11 +19,12 @@ type PresignUploadFileHandler struct {
 
 func NewPresignUploadFileHandler(
 	sourceRepo sourcerepo.Repository,
+	notebookAccessService *notebookservice.AccessService,
 	objectStore adapter.ObjectStore,
 	keyFactory adapter.StoreKeyFactory,
 ) *PresignUploadFileHandler {
 	return &PresignUploadFileHandler{
-		baseHandler: newBaseHandler(sourceRepo),
+		baseHandler: newBaseHandler(sourceRepo, notebookAccessService),
 		objectStore: objectStore,
 		keyFactory:  keyFactory,
 	}
@@ -40,7 +42,7 @@ func (h *PresignUploadFileHandler) Handle(
 	ctx context.Context,
 	cmd *PresignUploadFileHandleCommand,
 ) (*adapter.PresignUploadResult, error) {
-	targetSource, err := h.handle(ctx, cmd.SourceId)
+	targetSource, err := h.handleManage(ctx, cmd.SourceId)
 	if err != nil {
 		return nil, err
 	}

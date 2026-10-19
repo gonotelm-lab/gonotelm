@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -16,16 +17,17 @@ type RetrySourcePreparationHandler struct {
 
 func NewRetrySourcePreparationHandler(
 	sourceRepo sourcerepo.Repository,
+	notebookAccessService *notebookservice.AccessService,
 	eventBus eventbus.Publisher,
 ) *RetrySourcePreparationHandler {
 	return &RetrySourcePreparationHandler{
-		baseHandler: newBaseHandler(sourceRepo),
+		baseHandler: newBaseHandler(sourceRepo, notebookAccessService),
 		eventBus:    eventBus,
 	}
 }
 
 func (h *RetrySourcePreparationHandler) Handle(ctx context.Context, sourceId valobj.Id) error {
-	targetSource, err := h.handle(ctx, sourceId)
+	targetSource, err := h.handleManage(ctx, sourceId)
 	if err != nil {
 		return err
 	}

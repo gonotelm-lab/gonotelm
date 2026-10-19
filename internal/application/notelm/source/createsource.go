@@ -7,7 +7,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourcevo "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity/vo"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
@@ -18,26 +18,25 @@ import (
 )
 
 type CreateSourceHandler struct {
-	notebookRepo notebookrepo.Repository
-	sourceRepo   sourcerepo.Repository
-	eventBus     eventbus.Publisher
+	sourceRepo            sourcerepo.Repository
+	notebookAccessService *notebookservice.AccessService
+	eventBus              eventbus.Publisher
 }
 
 func NewCreateSourceHandler(
 	sourceRepo sourcerepo.Repository,
-	notebookRepo notebookrepo.Repository,
+	notebookAccessService *notebookservice.AccessService,
 	eventBus eventbus.Publisher,
 ) *CreateSourceHandler {
 	return &CreateSourceHandler{
-		notebookRepo: notebookRepo,
-		sourceRepo:   sourceRepo,
-		eventBus:     eventBus,
+		sourceRepo:            sourceRepo,
+		notebookAccessService: notebookAccessService,
+		eventBus:              eventBus,
 	}
 }
 
 type CreateSourceHandleCommand struct {
 	NotebookId valobj.Id
-	OwnerId    valobj.Uid
 	Kind       sourcevo.SourceKind
 	Text       string
 	Url        *url.URL
@@ -55,22 +54,25 @@ func (h *CreateSourceHandler) Handle(
 	}
 
 	userId := pkgcontext.GetUserId(ctx)
-	curNotebook, err := h.notebookRepo.FindById(ctx, cmd.NotebookId)
+	access, err := h.notebookAccessService.Resolve(ctx, cmd.NotebookId, userId)
 	if err != nil {
 		return newId, errors.WithMessagef(err, "get notebook failed, notebook_id=%s", cmd.NotebookId)
 	}
-	if curNotebook.OwnerId != userId {
-		return newId, errors.ErrPermission.Msgf("notebook access denied, notebook_id=%s", cmd.NotebookId)
+	if !access.CanView() {
+		return newId, errors.ErrNoRecord.Msgf("notebook not found, notebook_id=%s", cmd.NotebookId)
+	}
+	if !access.CanManageContent() {
+		return newId, errors.ErrPermission.Msgf("notebook write denied, notebook_id=%s", cmd.NotebookId)
 	}
 
-	if err := curNotebook.AllowedToCreateSource(); err != nil {
+	if err := access.Notebook.AllowedToCreateSource(); err != nil {
 		return newId, errors.WithMessage(err, "notebook not allowed to create source")
 	}
 
 	newSource, err := sourceentity.NewSource(
 		cmd.NotebookId,
 		cmd.Kind,
-		cmd.OwnerId,
+		userId,
 		&sourceentity.ContentUnion{
 			Kind: cmd.Kind,
 			Text: cmd.Text,

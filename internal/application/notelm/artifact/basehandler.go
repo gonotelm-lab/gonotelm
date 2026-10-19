@@ -7,35 +7,78 @@ import (
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	artifacterrors "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/errors"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
+	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type baseHandler struct {
-	repo artifactrepo.Repository
+	repo                  artifactrepo.Repository
+	notebookAccessService *notebookservice.AccessService
 }
 
-func newBaseHandler(repo artifactrepo.Repository) *baseHandler {
+func newBaseHandler(
+	repo artifactrepo.Repository,
+	notebookAccessService *notebookservice.AccessService,
+) *baseHandler {
 	return &baseHandler{
-		repo: repo,
+		repo:                  repo,
+		notebookAccessService: notebookAccessService,
 	}
 }
 
-// 所有handler都要先处理这个公共的操作
-func (h *baseHandler) handle(ctx context.Context, artifactId valobj.Id) (*artifactentity.Artifact, error) {
-	artifact, err := h.repo.FindById(ctx, artifactId)
+func (h *baseHandler) handleView(
+	ctx context.Context,
+	artifactId valobj.Id,
+) (*artifactentity.Artifact, error) {
+	artifact, access, err := h.resolve(ctx, artifactId)
 	if err != nil {
-		return nil, errors.WithMessagef(err, "get artifact failed, artifact_id=%s", artifactId)
+		return nil, err
 	}
 
-	// check owner id
-	userId := pkgcontext.GetUserId(ctx)
-	if !artifact.IsOwner(userId) {
-		return nil, errors.WithMessagef(artifacterrors.ErrArtifactNotOwnedByUser,
-			"artifact access denied, artifact_id=%s", artifactId)
+	if !access.CanView() {
+		return nil, artifacterrors.ErrArtifactNotFound
 	}
 
 	return artifact, nil
+}
+
+func (h *baseHandler) handleManage(
+	ctx context.Context,
+	artifactId valobj.Id,
+) (*artifactentity.Artifact, error) {
+	artifact, access, err := h.resolve(ctx, artifactId)
+	if err != nil {
+		return nil, err
+	}
+
+	if !access.CanView() {
+		return nil, artifacterrors.ErrArtifactNotFound
+	}
+
+	if !access.CanManageContent() {
+		return nil, errors.ErrPermission.Msgf("artifact write denied, artifact_id=%s", artifactId)
+	}
+
+	return artifact, nil
+}
+
+func (h *baseHandler) resolve(
+	ctx context.Context,
+	artifactId valobj.Id,
+) (*artifactentity.Artifact, *notebookentity.Access, error) {
+	artifact, err := h.repo.FindById(ctx, artifactId)
+	if err != nil {
+		return nil, nil, errors.WithMessagef(err, "get artifact failed, artifact_id=%s", artifactId)
+	}
+
+	access, err := h.notebookAccessService.Resolve(ctx, artifact.NotebookId, pkgcontext.GetUserId(ctx))
+	if err != nil {
+		return nil, nil, errors.WithMessagef(err, "resolve notebook access failed, artifact_id=%s", artifactId)
+	}
+
+	return artifact, access, nil
 }
 
 func (h *baseHandler) updateArtifact(ctx context.Context, artifact *artifactentity.Artifact) error {

@@ -84,7 +84,7 @@ type Source struct {
 	Status           vo.SourceStatus
 	Title            string
 	Abstract         string
-	OwnerId          valobj.Uid
+	CreatorId        valobj.Uid
 	Content          SourceContent
 	ParsedContentKey valobj.StoreKey
 }
@@ -92,7 +92,7 @@ type Source struct {
 func NewSource(
 	notebookId valobj.Id,
 	kind vo.SourceKind,
-	ownerId valobj.Uid,
+	creatorId valobj.Uid,
 	content *ContentUnion,
 ) (*Source, error) {
 	s := &Source{
@@ -100,7 +100,7 @@ func NewSource(
 		NotebookId: notebookId,
 		Kind:       kind,
 		Status:     vo.SourceStatusInited,
-		OwnerId:    ownerId,
+		CreatorId:  creatorId,
 	}
 	sourceContent, err := content.toSourceContent()
 	if err != nil {
@@ -122,8 +122,8 @@ func NewSource(
 }
 
 func (s *Source) validate() error {
-	if s.OwnerId.IsZero() {
-		return errors.ErrParams.Msgf("owner id is required")
+	if s.CreatorId.IsZero() {
+		return errors.ErrParams.Msgf("creator id is required")
 	}
 
 	if s.NotebookId.IsZero() {
@@ -411,7 +411,7 @@ func (s *Source) addPreparationEvent(isRetry bool) {
 			s.NotebookId,
 			s.Kind,
 			s.Status,
-			s.OwnerId,
+			s.CreatorId,
 			isRetry,
 		),
 	)

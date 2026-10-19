@@ -24,7 +24,7 @@ func TestNewArtifact(t *testing.T) {
 
 	assert.NotEqual(t, valobj.Id{}, got.Id)
 	assert.Equal(t, notebookId, got.NotebookId)
-	assert.Equal(t, userId, got.UserId)
+	assert.Equal(t, userId, got.CreatorId)
 	assert.Equal(t, KindMindmap, got.Kind)
 	assert.Equal(t, StatusPending, got.Status)
 	assert.Equal(t, payload, got.Payload)
@@ -142,12 +142,6 @@ func TestArtifactRetry_NotFailedOrCancelled(t *testing.T) {
 	a := newTestArtifact(t)
 	err := a.Retry("ft-2")
 	assert.ErrorIs(t, err, artifacterrors.ErrCannotRetryInState)
-}
-
-func TestArtifactIsOwner(t *testing.T) {
-	a := newTestArtifact(t)
-	assert.True(t, a.IsOwner(a.UserId))
-	assert.False(t, a.IsOwner(valobj.NewUid()))
 }
 
 func TestArtifactMarkCompleted_EmitsEvent(t *testing.T) {

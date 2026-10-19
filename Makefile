@@ -4,10 +4,12 @@ gofmt:
 
 TEST_PKGS := \
 	./internal/application/notelm/artifact/... \
+	./internal/application/notelm/notebook/... \
 	./internal/application/notelm/source/... \
 	./internal/application/shared/cleanup/... \
 	./internal/conf/... \
 	./internal/domain/artifact/... \
+	./internal/domain/notebook/... \
 	./internal/infrastructure/database/... \
 	./internal/infrastructure/cache \
 	./internal/infrastructure/cache/redis/... \

@@ -5,7 +5,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	sourceservice "github.com/gonotelm-lab/gonotelm/internal/domain/source/service/source"
@@ -14,20 +14,20 @@ import (
 )
 
 type ListSourcesHandler struct {
-	notebookRepo  notebookrepo.Repository
-	sourceRepo    sourcerepo.Repository
-	sourceService sourceservice.Service
+	sourceRepo            sourcerepo.Repository
+	notebookAccessService *notebookservice.AccessService
+	sourceService         sourceservice.Service
 }
 
 func NewListSourcesHandler(
-	notebookRepo notebookrepo.Repository,
 	sourceRepo sourcerepo.Repository,
+	notebookAccessService *notebookservice.AccessService,
 	objectStore adapter.ObjectStore,
 ) *ListSourcesHandler {
 	return &ListSourcesHandler{
-		notebookRepo:  notebookRepo,
-		sourceRepo:    sourceRepo,
-		sourceService: sourceservice.New(objectStore),
+		sourceRepo:            sourceRepo,
+		notebookAccessService: notebookAccessService,
+		sourceService:         sourceservice.New(objectStore),
 	}
 }
 
@@ -45,13 +45,12 @@ type ListSourcesResult struct {
 }
 
 func (h *ListSourcesHandler) Handle(ctx context.Context, query *ListSourcesQuery) (*ListSourcesResult, error) {
-	userId := pkgcontext.GetUserId(ctx)
-	notebook, err := h.notebookRepo.FindById(ctx, query.NotebookId)
+	access, err := h.notebookAccessService.Resolve(ctx, query.NotebookId, pkgcontext.GetUserId(ctx))
 	if err != nil {
 		return nil, errors.WithMessagef(err, "get notebook failed, notebook_id=%s", query.NotebookId)
 	}
-	if notebook.OwnerId != userId {
-		return nil, errors.ErrPermission.Msgf("notebook access denied, notebook_id=%s", query.NotebookId)
+	if !access.CanView() {
+		return nil, errors.ErrNoRecord.Msgf("notebook not found, notebook_id=%s", query.NotebookId)
 	}
 
 	sources, err := h.sourceRepo.ListByNotebookId(ctx, query.NotebookId,
@@ -68,15 +67,19 @@ func (h *ListSourcesHandler) Handle(ctx context.Context, query *ListSourcesQuery
 		sources = sources[:query.Limit]
 	}
 
-	result, err := h.sourceService.ListSourcesDetail(ctx, sources)
-	if err != nil {
-		return nil, errors.WithMessage(err, "list sources detail failed")
+	details := make([]*sourceentity.SourceDetail, 0, len(sources))
+	for _, source := range sources {
+		detail, err := h.sourceService.GetSourceDetail(ctx, source)
+		if err != nil {
+			return nil, errors.WithMessagef(err, "get source detail failed, source_id=%s", source.Id)
+		}
+		details = append(details, detail)
 	}
 
 	return &ListSourcesResult{
-		Sources: result,
+		Sources: details,
 		Limit:   query.Limit,
 		Offset:  query.Offset,
-		HasMore: len(sources) > query.Limit,
+		HasMore: hasMore,
 	}, nil
 }

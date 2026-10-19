@@ -1,10 +1,10 @@
 package postgres
 
 import (
-	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	"strings"
 	"testing"
 	"time"
+
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/schema"
@@ -65,7 +65,7 @@ func TestNotebookStoreCRUD(t *testing.T) {
 }
 
 func TestNotebookStoreListByOwnerId(t *testing.T) {
-	Convey("NotebookStore ListByOwnerId", t, func() {
+	Convey("NotebookStore ListByOwnerId returns all owner notebooks", t, func() {
 		store := testNotebookStore
 		ctx := t.Context()
 		ownerID := valobj.NewUid()
@@ -93,31 +93,44 @@ func TestNotebookStoreListByOwnerId(t *testing.T) {
 			_ = testDB.WithContext(ctx).Where("owner_id = ?", ownerID).Delete(&schema.Notebook{}).Error
 		})
 
-		firstPage, err := store.ListByOwnerId(ctx, ownerID, 1, 0, 1)
+		rows, err := store.ListByOwnerId(ctx, ownerID)
 		So(err, ShouldBeNil)
-		So(len(firstPage), ShouldEqual, 1)
-		So(firstPage[0].Id, ShouldEqual, nbNew.Id)
+		So(len(rows), ShouldEqual, 2)
 
-		secondPage, err := store.ListByOwnerId(ctx, ownerID, 1, 1, 1)
-		So(err, ShouldBeNil)
-		So(len(secondPage), ShouldEqual, 1)
-		So(secondPage[0].Id, ShouldEqual, nbOld.Id)
+		ids := map[database.Id]bool{}
+		for _, row := range rows {
+			ids[row.Id] = true
+		}
+		So(ids[nbOld.Id], ShouldBeTrue)
+		So(ids[nbNew.Id], ShouldBeTrue)
 	})
 }
 
-func TestNotebookStoreListByOwnerIdInvalidPagination(t *testing.T) {
-	Convey("NotebookStore ListByOwnerId invalid pagination", t, func() {
+func TestNotebookStoreListByIds(t *testing.T) {
+	Convey("NotebookStore ListByIds returns matched rows only", t, func() {
 		store := testNotebookStore
 		ctx := t.Context()
-		ownerID := valobj.NewUid()
 
-		_, err := store.ListByOwnerId(ctx, ownerID, 0, 0, 1)
-		So(err, ShouldNotBeNil)
-		So(strings.Contains(err.Error(), "invalid pagination params"), ShouldBeTrue)
+		nb := &schema.Notebook{
+			Id:          database.Id(uuid.NewV7()),
+			Name:        "nb_by_ids_" + uuid.NewV7().String(),
+			Description: "by ids",
+			OwnerId:     valobj.NewUid(),
+			UpdatedAt:   nowMilli(),
+		}
+		So(store.Create(ctx, nb), ShouldBeNil)
+		t.Cleanup(func() {
+			_ = testDB.WithContext(ctx).Where("id = ?", nb.Id).Delete(&schema.Notebook{}).Error
+		})
 
-		_, err = store.ListByOwnerId(ctx, ownerID, 1, -1, 1)
-		So(err, ShouldNotBeNil)
-		So(strings.Contains(err.Error(), "invalid pagination params"), ShouldBeTrue)
+		rows, err := store.ListByIds(ctx, []database.Id{nb.Id, database.Id(uuid.NewV7())})
+		So(err, ShouldBeNil)
+		So(len(rows), ShouldEqual, 1)
+		So(rows[0].Id, ShouldEqual, nb.Id)
+
+		rows, err = store.ListByIds(ctx, nil)
+		So(err, ShouldBeNil)
+		So(len(rows), ShouldEqual, 0)
 	})
 }
 

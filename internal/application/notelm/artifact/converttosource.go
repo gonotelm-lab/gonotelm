@@ -12,6 +12,7 @@ import (
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourcevo "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity/vo"
 	domainerr "github.com/gonotelm-lab/gonotelm/internal/domain/source/errors"
@@ -41,6 +42,7 @@ type ConvertNoteToSourceHandler struct {
 
 func NewConvertNoteToSourceHandler(
 	artifactRepo artifactrepo.Repository,
+	notebookAccessService *notebookservice.AccessService,
 	sourceRepo sourcerepo.Repository,
 	notebookRepo notebookrepo.Repository,
 	objectStore adapter.ObjectStore,
@@ -48,7 +50,7 @@ func NewConvertNoteToSourceHandler(
 	eventBus eventbus.Publisher,
 ) *ConvertNoteToSourceHandler {
 	return &ConvertNoteToSourceHandler{
-		baseHandler:  newBaseHandler(artifactRepo),
+		baseHandler:  newBaseHandler(artifactRepo, notebookAccessService),
 		notebookRepo: notebookRepo,
 		sourceRepo:   sourceRepo,
 		objectStore:  objectStore,
@@ -63,7 +65,7 @@ func (h *ConvertNoteToSourceHandler) Handle(
 ) (*ConvertNoteToSourceResult, error) {
 	userId := pkgcontext.GetUserId(ctx)
 
-	artifact, err := h.handle(ctx, cmd.ArtifactId)
+	artifact, err := h.handleManage(ctx, cmd.ArtifactId)
 	if err != nil {
 		return nil, err
 	}
@@ -85,10 +87,6 @@ func (h *ConvertNoteToSourceHandler) Handle(
 	if err != nil {
 		return nil, errors.WithMessagef(err, "get notebook failed, notebook_id=%s", artifact.NotebookId)
 	}
-	if nb.OwnerId != userId {
-		return nil, errors.ErrPermission.Msgf("notebook access denied, notebook_id=%s", artifact.NotebookId)
-	}
-
 	if err := nb.AllowedToCreateSource(); err != nil {
 		return nil, errors.WithMessage(err, "notebook not allowed to create source")
 	}

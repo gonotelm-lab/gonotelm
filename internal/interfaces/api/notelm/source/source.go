@@ -7,7 +7,6 @@ import (
 	sourceapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/source"
 	sourcevo "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity/vo"
 	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/schema"
-	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 )
 
@@ -19,10 +18,8 @@ func (s *Server) CreateSource(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	userId := pkgcontext.GetUserId(ctx)
 	result, err := s.createSourceHandler.Handle(ctx, &sourceapp.CreateSourceHandleCommand{
 		NotebookId: req.NotebookId,
-		OwnerId:    userId,
 		Kind:       sourcevo.SourceKind(req.Kind),
 		Text:       req.Text,
 		Url:        req.ParsedURL(),

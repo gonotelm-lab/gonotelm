@@ -18,14 +18,24 @@ type NotebookStore interface {
 	GetById(ctx context.Context, id Id) (*schema.Notebook, error)
 	Exists(ctx context.Context, id Id) (bool, error)
 	GetByNameAndOwnerId(ctx context.Context, name string, ownerId valobj.Uid) (*schema.Notebook, error)
-	// orderBy=0 -> default order, orderBy=1 -> order by updated_at
-	ListByOwnerId(ctx context.Context, ownerId valobj.Uid, limit, offset, orderBy int) ([]*schema.Notebook, error)
+	// ListByOwnerId 返回 owner 的全部 notebook，不分页。
+	ListByOwnerId(ctx context.Context, ownerId valobj.Uid) ([]*schema.Notebook, error)
+	ListByIds(ctx context.Context, ids []Id) ([]*schema.Notebook, error)
 	Update(ctx context.Context, notebook *schema.Notebook) error
 	DeleteById(ctx context.Context, id Id) error
 	UpdateName(ctx context.Context, params *schema.NotebookUpdateNameParams) error
 	UpdateDescription(ctx context.Context, params *schema.NotebookUpdateDescriptionParams) error
 	// 仅填充空的name/description，非空字段保持不变
 	FillNameAndDescriptionIfEmpty(ctx context.Context, params *schema.NotebookFillNameAndDescriptionParams) error
+}
+
+type NotebookMemberStore interface {
+	Upsert(ctx context.Context, member *schema.NotebookMember) error
+	GetByNotebookIdAndUserId(ctx context.Context, notebookId Id, userId valobj.Uid) (*schema.NotebookMember, error)
+	ListByNotebookId(ctx context.Context, notebookId Id) ([]*schema.NotebookMember, error)
+	ListByUserId(ctx context.Context, userId valobj.Uid) ([]*schema.NotebookMember, error)
+	Delete(ctx context.Context, notebookId Id, userId valobj.Uid) error
+	DeleteByNotebookId(ctx context.Context, notebookId Id) error
 }
 
 type SourceStore interface {
@@ -96,6 +106,7 @@ type WorkerCheckpointStore interface {
 type UserStore interface {
 	Create(ctx context.Context, user *schema.User) error
 	GetById(ctx context.Context, id valobj.Uid) (*schema.User, error)
+	BatchGetById(ctx context.Context, ids []valobj.Uid) ([]*schema.User, error)
 	GetByEmail(ctx context.Context, email string) (*schema.User, error)
 	GetPasswordHash(ctx context.Context, id valobj.Uid) (string, error)
 	UpdateProfile(ctx context.Context, params *schema.UserUpdateProfileParams) error
@@ -131,6 +142,7 @@ type Dao struct {
 	Closer misc.Closer
 
 	NotebookStore             NotebookStore
+	NotebookMemberStore       NotebookMemberStore
 	SourceStore               SourceStore
 	ChatStore                 ChatStore
 	ChatMessageStore          ChatMessageStore
@@ -146,6 +158,7 @@ type Dao struct {
 func NewDao(
 	closer misc.Closer,
 	notebookStore NotebookStore,
+	notebookMemberStore NotebookMemberStore,
 	sourceStore SourceStore,
 	chatStore ChatStore,
 	chatMessageStore ChatMessageStore,
@@ -160,6 +173,7 @@ func NewDao(
 	return &Dao{
 		Closer:                    closer,
 		NotebookStore:             notebookStore,
+		NotebookMemberStore:       notebookMemberStore,
 		SourceStore:               sourceStore,
 		ChatStore:                 chatStore,
 		ChatMessageStore:          chatMessageStore,

@@ -86,6 +86,7 @@ func (a *EmbeddingRecorderAdapter) Record(ctx context.Context, record *embedding
 		}
 		log.Metadata = metadatas
 	}
+	log.Metadata = withNotebookMetadata(ctx, log.Metadata)
 	if record.Error != nil {
 		log.Error = ptr(record.Error.Error())
 	}

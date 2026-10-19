@@ -6,7 +6,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/schema"
-	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/sql"
 
 	"gorm.io/gorm"
@@ -44,6 +43,7 @@ func (s *NotebookStoreImpl) Upsert(
 		DoUpdates: clause.Assignments(map[string]any{
 			"name":        notebook.Name,
 			"description": notebook.Description,
+			"visibility":  notebook.Visibility,
 			"updated_at":  notebook.UpdatedAt,
 		}),
 	}
@@ -102,22 +102,30 @@ func (s *NotebookStoreImpl) GetByNameAndOwnerId(
 func (s *NotebookStoreImpl) ListByOwnerId(
 	ctx context.Context,
 	ownerId valobj.Uid,
-	limit, offset, orderBy int,
 ) ([]*schema.Notebook, error) {
-	if limit <= 0 || offset < 0 {
-		return nil, errors.ErrParams.Msgf("invalid pagination params: limit=%d offset=%d", limit, offset)
+	var rows []*schema.Notebook
+	err := s.db.WithContext(ctx).
+		Where("owner_id = ?", ownerId).
+		Find(&rows).Error
+	if err != nil {
+		return nil, sql.WrapErr(err)
 	}
 
-	query := s.db.WithContext(ctx).
-		Where("owner_id = ?", ownerId)
-	if orderBy == 0 {
-		query = query.Order("id ASC")
-	} else {
-		query = query.Order("updated_at DESC")
+	return rows, nil
+}
+
+func (s *NotebookStoreImpl) ListByIds(
+	ctx context.Context,
+	ids []database.Id,
+) ([]*schema.Notebook, error) {
+	if len(ids) == 0 {
+		return []*schema.Notebook{}, nil
 	}
 
 	var rows []*schema.Notebook
-	err := query.Limit(limit).Offset(offset).Find(&rows).Error
+	err := s.db.WithContext(ctx).
+		Where("id IN ?", ids).
+		Find(&rows).Error
 	if err != nil {
 		return nil, sql.WrapErr(err)
 	}
@@ -133,6 +141,7 @@ func (s *NotebookStoreImpl) Update(ctx context.Context, notebook *schema.Noteboo
 			"name":        notebook.Name,
 			"description": notebook.Description,
 			"owner_id":    notebook.OwnerId,
+			"visibility":  notebook.Visibility,
 			"updated_at":  notebook.UpdatedAt,
 		}).Error
 	if err != nil {

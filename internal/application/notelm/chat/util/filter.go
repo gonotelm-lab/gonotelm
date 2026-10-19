@@ -14,7 +14,6 @@ func FilterReadySources(
 	sourceRepo sourcerepo.Repository,
 	notebookId valobj.Id,
 	sourceIds []valobj.Id,
-	userId valobj.Uid,
 ) ([]*sourceentity.Source, error) {
 	if len(sourceIds) == 0 {
 		return nil, nil
@@ -28,7 +27,7 @@ func FilterReadySources(
 	// filter status
 	readySources := make([]*sourceentity.Source, 0, len(sources))
 	for _, source := range sources {
-		if source.Status.IsReady() && source.OwnerId == userId {
+		if source.Status.IsReady() {
 			readySources = append(readySources, source)
 		}
 	}

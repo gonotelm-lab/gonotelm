@@ -41,6 +41,22 @@ func (s *UserStoreImpl) GetById(ctx context.Context, id valobj.Uid) (*schema.Use
 	return &user, nil
 }
 
+func (s *UserStoreImpl) BatchGetById(ctx context.Context, ids []valobj.Uid) ([]*schema.User, error) {
+	if len(ids) == 0 {
+		return []*schema.User{}, nil
+	}
+
+	var users []*schema.User
+	err := dbFromContext(ctx, s.db).
+		Where("id IN ?", ids).
+		Find(&users).Error
+	if err != nil {
+		return nil, sql.WrapErr(err)
+	}
+
+	return users, nil
+}
+
 func (s *UserStoreImpl) GetByEmail(ctx context.Context, email string) (*schema.User, error) {
 	var user schema.User
 	err := dbFromContext(ctx, s.db).

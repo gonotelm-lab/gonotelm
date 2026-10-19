@@ -8,6 +8,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
@@ -18,6 +19,7 @@ type Deps struct {
 	WaitGroup              *sync.WaitGroup
 	DistLock               adapter.DistributedLock
 	NotebookRepo           notebookrepo.Repository
+	NotebookAccessService  *notebookservice.AccessService
 	ChatRepo               chatrepo.ChatRepository
 	ChatMessageRepo        chatrepo.MessageRepository
 	ChatContextMessageRepo chatrepo.ContextMessageRepository
@@ -46,12 +48,13 @@ type Server struct {
 
 func NewServer(deps Deps) *Server {
 	return &Server{
-		createChatHandler: chatapp.NewCreateChatHandler(deps.NotebookRepo, deps.ChatRepo),
+		createChatHandler: chatapp.NewCreateChatHandler(deps.NotebookAccessService, deps.ChatRepo),
 
 		createChatMessageHandler: chatapp.NewCreateMessageHandler(
 			deps.WaitGroup,
 			deps.DistLock,
 			deps.NotebookRepo,
+			deps.NotebookAccessService,
 			deps.ChatRepo,
 			deps.ChatMessageRepo,
 			deps.ChatContextMessageRepo,
@@ -64,21 +67,25 @@ func NewServer(deps Deps) *Server {
 		),
 		listChatMessagesHandler: chatapp.NewListMessagesHandler(
 			deps.ChatRepo,
+			deps.NotebookAccessService,
 			deps.ChatMessageRepo,
 		),
-		getChatStreamHandler: chatapp.NewGetStreamHandler(deps.ChatStreamTaskRepo),
+		getChatStreamHandler: chatapp.NewGetStreamHandler(deps.ChatRepo, deps.NotebookAccessService, deps.ChatStreamTaskRepo),
 		getChatRunningTaskHandler: chatapp.NewGetRunningTaskHandler(
 			deps.ChatRepo,
+			deps.NotebookAccessService,
 			deps.ChatStreamTaskRepo,
 		),
-		abortChatStreamHandler: chatapp.NewAbortStreamHandler(deps.ChatStreamTaskRepo, deps.EventBus),
+		abortChatStreamHandler: chatapp.NewAbortStreamHandler(deps.ChatRepo, deps.NotebookAccessService, deps.ChatStreamTaskRepo, deps.EventBus),
 		deleteChatContextHandler: chatapp.NewDeleteChatContextHandler(
 			deps.ChatRepo,
+			deps.NotebookAccessService,
 			deps.ChatContextMessageRepo,
 			deps.ChatSuggestionRepo,
 		),
 		getChatSuggestionsHandler: chatapp.NewChatSuggestHandler(
 			deps.ChatRepo,
+			deps.NotebookAccessService,
 			deps.ChatSuggestService,
 		),
 	}

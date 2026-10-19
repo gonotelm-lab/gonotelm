@@ -83,6 +83,7 @@ func (a *Text2AudioRecorderAdapter) Record(ctx context.Context, record *text2aud
 		}
 		log.Metadata = metadatas
 	}
+	log.Metadata = withNotebookMetadata(ctx, log.Metadata)
 	if record.Error != nil {
 		log.Error = ptr(record.Error.Error())
 	}

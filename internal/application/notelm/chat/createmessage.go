@@ -17,6 +17,7 @@ import (
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
 	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/service/agentize"
@@ -57,6 +58,7 @@ func NewCreateMessageHandler(
 	wg *sync.WaitGroup,
 	distLock adapter.DistributedLock,
 	notebookRepo notebookrepo.Repository,
+	notebookAccessService *notebookservice.AccessService,
 	chatRepo chatrepo.ChatRepository,
 	chatMessageRepo chatrepo.MessageRepository,
 	chatContextMessageRepo chatrepo.ContextMessageRepository,
@@ -74,7 +76,7 @@ func NewCreateMessageHandler(
 		sourceDocRepo,
 	)
 	return &CreateMessageHandler{
-		baseHandler:            newBaseHandler(chatRepo),
+		baseHandler:            newBaseHandler(chatRepo, notebookAccessService),
 		wg:                     wg,
 		distLock:               distLock,
 		notebookRepo:           notebookRepo,
@@ -115,8 +117,9 @@ func (h *CreateMessageHandler) Handle(
 	}
 
 	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.ChatScene)
+	ctx = pkgcontext.WithNotebookId(ctx, targetChat.NotebookId)
 	userId := pkgcontext.GetUserId(ctx)
-	targetSources, err := util.FilterReadySources(ctx, h.sourceRepo, targetChat.NotebookId, cmd.SourceIds, userId)
+	targetSources, err := util.FilterReadySources(ctx, h.sourceRepo, targetChat.NotebookId, cmd.SourceIds)
 	if err != nil {
 		return nil, errors.WithMessagef(err,
 			"failed to filter ready sources, chat_id=%s, source_ids=%v",

@@ -10,6 +10,7 @@ import (
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	artifacterrors "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/errors"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -35,9 +36,15 @@ type RetryArtifactHandler struct {
 	eventBus eventbus.Publisher
 }
 
-func NewRetryArtifactHandler(repo artifactrepo.Repository, flowc flow.TaskClient, poller Poller, eventBus eventbus.Publisher) *RetryArtifactHandler {
+func NewRetryArtifactHandler(
+	repo artifactrepo.Repository,
+	notebookAccessService *notebookservice.AccessService,
+	flowc flow.TaskClient,
+	poller Poller,
+	eventBus eventbus.Publisher,
+) *RetryArtifactHandler {
 	return &RetryArtifactHandler{
-		baseHandler: newBaseHandler(repo),
+		baseHandler: newBaseHandler(repo, notebookAccessService),
 		flowc:       flowc,
 		poller:      poller,
 		eventBus:    eventBus,
@@ -45,7 +52,7 @@ func NewRetryArtifactHandler(repo artifactrepo.Repository, flowc flow.TaskClient
 }
 
 func (h *RetryArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error {
-	artifact, err := h.handle(ctx, cmd)
+	artifact, err := h.handleManage(ctx, cmd)
 	if err != nil {
 		return err
 	}

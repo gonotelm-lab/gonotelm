@@ -6,6 +6,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	chaterrors "github.com/gonotelm-lab/gonotelm/internal/domain/chat/errors"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
@@ -17,10 +18,11 @@ type GetRunningTaskHandler struct {
 
 func NewGetRunningTaskHandler(
 	chatRepo chatrepo.ChatRepository,
+	notebookAccessService *notebookservice.AccessService,
 	streamTaskRepo chatrepo.StreamTaskRepository,
 ) *GetRunningTaskHandler {
 	return &GetRunningTaskHandler{
-		baseHandler:    newBaseHandler(chatRepo),
+		baseHandler:    newBaseHandler(chatRepo, notebookAccessService),
 		streamTaskRepo: streamTaskRepo,
 	}
 }

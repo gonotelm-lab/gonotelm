@@ -11,7 +11,7 @@ import (
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	chatentity "github.com/gonotelm-lab/gonotelm/internal/domain/chat/entity"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
-	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
@@ -43,22 +43,22 @@ type GenerateResponse struct {
 }
 
 type GenerateArtifactHandler struct {
-	notebookRepo notebookrepo.Repository
-	wg           *sync.WaitGroup
-	artifactRepo artifactrepo.Repository
-	chatMsgRepo  chatrepo.MessageRepository
-	chatRepo     chatrepo.ChatRepository
-	sourceRepo   sourcerepo.Repository
-	flow         flow.TaskClient
-	poller       Poller
-	eventBus     eventbus.Publisher
-	titleMaker   adapter.TitleMaker
+	notebookAccessService *notebookservice.AccessService
+	wg                    *sync.WaitGroup
+	artifactRepo          artifactrepo.Repository
+	chatMsgRepo           chatrepo.MessageRepository
+	chatRepo              chatrepo.ChatRepository
+	sourceRepo            sourcerepo.Repository
+	flow                  flow.TaskClient
+	poller                Poller
+	eventBus              eventbus.Publisher
+	titleMaker            adapter.TitleMaker
 }
 
 func NewGenerateArtifactHandler(
 	wg *sync.WaitGroup,
 	artifactRepo artifactrepo.Repository,
-	notebookRepo notebookrepo.Repository,
+	notebookAccessService *notebookservice.AccessService,
 	sourceRepo sourcerepo.Repository,
 	chatRepo chatrepo.ChatRepository,
 	chatMsgRepo chatrepo.MessageRepository,
@@ -68,28 +68,31 @@ func NewGenerateArtifactHandler(
 	titleMaker adapter.TitleMaker,
 ) *GenerateArtifactHandler {
 	return &GenerateArtifactHandler{
-		notebookRepo: notebookRepo,
-		wg:           wg,
-		artifactRepo: artifactRepo,
-		sourceRepo:   sourceRepo,
-		chatRepo:     chatRepo,
-		chatMsgRepo:  chatMsgRepo,
-		flow:         flowc,
-		poller:       poller,
-		eventBus:     eventBus,
-		titleMaker:   titleMaker,
+		notebookAccessService: notebookAccessService,
+		wg:                    wg,
+		artifactRepo:          artifactRepo,
+		sourceRepo:            sourceRepo,
+		chatRepo:              chatRepo,
+		chatMsgRepo:           chatMsgRepo,
+		flow:                  flowc,
+		poller:                poller,
+		eventBus:              eventBus,
+		titleMaker:            titleMaker,
 	}
 }
 
 func (h *GenerateArtifactHandler) Handle(ctx context.Context, cmd *GenerateRequest) (*GenerateResponse, error) {
 	userId := pkgcontext.GetUserId(ctx)
 
-	notebook, err := h.notebookRepo.FindById(ctx, cmd.NotebookId)
+	access, err := h.notebookAccessService.Resolve(ctx, cmd.NotebookId, userId)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "get notebook failed, notebook_id=%s", cmd.NotebookId)
 	}
-	if notebook.OwnerId != userId {
-		return nil, errors.ErrPermission.Msgf("notebook access denied, notebook_id=%s", cmd.NotebookId)
+	if !access.CanView() {
+		return nil, errors.ErrNoRecord.Msgf("notebook not found, notebook_id=%s", cmd.NotebookId)
+	}
+	if !access.CanManageContent() {
+		return nil, errors.ErrPermission.Msgf("notebook write denied, notebook_id=%s", cmd.NotebookId)
 	}
 
 	// 保存为笔记单独处理 不需要worker处理 直接本地处理即可

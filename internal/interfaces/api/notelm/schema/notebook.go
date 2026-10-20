@@ -243,7 +243,7 @@ type UpdateNotebookSharingRequest struct {
 }
 
 func (r *UpdateNotebookSharingRequest) Validate() error {
-	if vo.Visibility(r.Visibility).IsValid() {
+	if vo.Visibility(r.Visibility).IsInvalid() {
 		return errors.ErrParams.Msgf("invalid visibility %s", r.Visibility)
 	}
 
@@ -257,7 +257,7 @@ type UpsertNotebookMemberRequest struct {
 }
 
 func (r *UpsertNotebookMemberRequest) Validate() error {
-	if !vo.Role(r.Role).IsValid() {
+	if vo.Role(r.Role).IsInvalid() {
 		return errors.ErrParams.Msgf("invalid role %s", r.Role)
 	}
 	return nil

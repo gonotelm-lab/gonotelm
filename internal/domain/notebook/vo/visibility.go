@@ -16,6 +16,10 @@ func (v Visibility) IsValid() bool {
 	return v.IsRestricted() || v.IsPublic()
 }
 
+func (v Visibility) IsInvalid() bool {
+	return !v.IsValid()
+}
+
 func (v Visibility) IsRestricted() bool {
 	return v == VisibilityRestricted
 }

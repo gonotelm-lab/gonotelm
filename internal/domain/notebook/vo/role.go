@@ -17,6 +17,10 @@ func (r Role) IsValid() bool {
 	return r.IsMemberRole() || r == RoleOwner
 }
 
+func (r Role) IsInvalid() bool {
+	return !r.IsValid()
+}
+
 // IsMemberRole 成员表只允许 collaborator / viewer。
 func (r Role) IsMemberRole() bool {
 	return r == RoleCollaborator || r == RoleViewer

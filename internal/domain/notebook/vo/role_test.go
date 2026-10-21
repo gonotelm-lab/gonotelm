@@ -35,5 +35,5 @@ func TestRoleCapabilities(t *testing.T) {
 func TestNormalizeRole(t *testing.T) {
 	assert.Equal(t, RoleViewer, NormalizeRole(""))
 	assert.Equal(t, RoleCollaborator, NormalizeRole(RoleCollaborator))
-	assert.Equal(t, Role("invalid"), NormalizeRole(Role("invalid")))
+	assert.Equal(t, RoleViewer, NormalizeRole(Role("invalid")))
 }

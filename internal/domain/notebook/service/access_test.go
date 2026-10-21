@@ -90,7 +90,7 @@ func TestAccessServiceResolve(t *testing.T) {
 		{"public viewer", vo.VisibilityPublic, nil, otherId, vo.RoleViewer},
 		{"restricted none", vo.VisibilityRestricted, nil, otherId, vo.RoleNone},
 		{"empty visibility none", "", nil, otherId, vo.RoleNone},
-		{"empty role is viewer", vo.VisibilityRestricted, rolePtr(""), otherId, vo.RoleViewer},
+		{"empty role falls through", vo.VisibilityRestricted, rolePtr(""), otherId, vo.RoleNone},
 		{"invalid role falls through", vo.VisibilityPublic, rolePtr("invalid"), otherId, vo.RoleViewer},
 	}
 

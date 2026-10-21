@@ -12,15 +12,39 @@ import (
 
 type Id = uuid.UUID
 
+// NotebookListOrder 控制 notebook 列表查询的排序；具体 SQL 由 store 决定。
+type NotebookListOrder int
+
+const (
+	// NotebookListOrderLastActive 按最后活跃时间倒序（updated_at DESC，id DESC 兜底）。
+	NotebookListOrderLastActive NotebookListOrder = iota
+	// NotebookListOrderCreateTime 按创建时间正序（uuidv7 id ASC）。
+	NotebookListOrderCreateTime
+)
+
 type NotebookStore interface {
 	Create(ctx context.Context, notebook *schema.Notebook) error
 	Upsert(ctx context.Context, notebook *schema.Notebook) error
 	GetById(ctx context.Context, id Id) (*schema.Notebook, error)
 	Exists(ctx context.Context, id Id) (bool, error)
 	GetByNameAndOwnerId(ctx context.Context, name string, ownerId valobj.Uid) (*schema.Notebook, error)
-	// ListByOwnerId 返回 owner 的全部 notebook，不分页。
-	ListByOwnerId(ctx context.Context, ownerId valobj.Uid) ([]*schema.Notebook, error)
+	// ListByOwnerId 分页返回 owner 的 notebook。
+	ListByOwnerId(
+		ctx context.Context,
+		ownerId valobj.Uid,
+		limit, offset int,
+		order NotebookListOrder,
+	) ([]*schema.Notebook, error)
+	// ListByIds 按 id 批量查询；ids 为空时返回空切片。
 	ListByIds(ctx context.Context, ids []Id) ([]*schema.Notebook, error)
+	// ListByIdsExcludingOwner 分页返回 ids 中 owner_id != excludeOwnerId 的 notebook；ids 为空时返回空切片。
+	ListByIdsExcludingOwner(
+		ctx context.Context,
+		ids []Id,
+		excludeOwnerId valobj.Uid,
+		limit, offset int,
+		order NotebookListOrder,
+	) ([]*schema.Notebook, error)
 	Update(ctx context.Context, notebook *schema.Notebook) error
 	DeleteById(ctx context.Context, id Id) error
 	UpdateName(ctx context.Context, params *schema.NotebookUpdateNameParams) error

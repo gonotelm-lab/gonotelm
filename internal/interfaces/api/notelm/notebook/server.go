@@ -46,7 +46,7 @@ func NewServer(deps Deps) *Server {
 	return &Server{
 		getNotebookHandler:    notebookapp.NewGetNotebookHandler(deps.NotebookRepo, deps.NotebookAccessService, deps.UserRepo),
 		createNotebookHandler: notebookapp.NewCreateNotebookHandler(deps.NotebookRepo, deps.EventBus),
-		listNotebooksHandler:  notebookapp.NewListNotebooksHandler(deps.NotebookRepo, deps.MemberRepo, deps.UserRepo),
+		listNotebooksHandler:  notebookapp.NewListNotebooksHandler(deps.NotebookRepo, deps.UserRepo),
 		deleteNotebookHandler: notebookapp.NewDeleteNotebookHandler(
 			deps.NotebookRepo,
 			deps.NotebookAccessService,

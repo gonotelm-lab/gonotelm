@@ -78,7 +78,7 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 	}
 
 	// ── 2. Repositories ──
-	notebookRepo := repository.NewNotebookRepository(infra.Database.NotebookStore, infra.Database.SourceStore)
+	notebookRepo := repository.NewNotebookRepository(infra.Database.NotebookStore, infra.Database.NotebookMemberStore, infra.Database.SourceStore)
 	notebookMemberRepo := repository.NewNotebookMemberRepository(infra.Database.NotebookMemberStore)
 	notebookAccessService := notebookservice.NewAccessService(notebookRepo, notebookMemberRepo)
 	sourceRepo := repository.NewSourceRepository(infra.Database.SourceStore)

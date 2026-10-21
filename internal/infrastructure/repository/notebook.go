@@ -11,19 +11,23 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/schema"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository/mapper"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	pkgslices "github.com/gonotelm-lab/gonotelm/pkg/slices"
 )
 
 type NotebookRepositoryImpl struct {
 	notebookStore database.NotebookStore
+	memberStore   database.NotebookMemberStore
 	sourceStore   database.SourceStore
 }
 
 func NewNotebookRepository(
 	notebookStore database.NotebookStore,
+	memberStore database.NotebookMemberStore,
 	sourceStore database.SourceStore,
 ) notebookrepo.Repository {
 	return &NotebookRepositoryImpl{
 		notebookStore: notebookStore,
+		memberStore:   memberStore,
 		sourceStore:   sourceStore,
 	}
 }
@@ -67,8 +71,19 @@ func (s *NotebookRepositoryImpl) FindById(ctx context.Context, id valobj.Id) (*n
 func (s *NotebookRepositoryImpl) ListByOwner(
 	ctx context.Context,
 	ownerId valobj.Uid,
+	spec *notebookrepo.ListSpec,
 ) ([]*notebookentity.Notebook, error) {
-	rows, err := s.notebookStore.ListByOwnerId(ctx, ownerId)
+	if err := spec.Validate(); err != nil {
+		return nil, err
+	}
+
+	rows, err := s.notebookStore.ListByOwnerId(
+		ctx,
+		ownerId,
+		spec.Limit,
+		spec.Offset,
+		notebookListOrder(spec.Order),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -76,22 +91,62 @@ func (s *NotebookRepositoryImpl) ListByOwner(
 	return s.withSourceCounts(ctx, rows)
 }
 
-func (s *NotebookRepositoryImpl) FindByIds(
+func (s *NotebookRepositoryImpl) ListShared(
 	ctx context.Context,
-	ids []valobj.Id,
+	userId valobj.Uid,
+	spec *notebookrepo.ListSpec,
 ) ([]*notebookentity.Notebook, error) {
-	rows, err := s.notebookStore.ListByIds(ctx, ids)
+	if err := spec.Validate(); err != nil {
+		return nil, err
+	}
+
+	members, err := s.memberStore.ListByUserId(ctx, userId)
+	if err != nil {
+		return nil, err
+	}
+
+	notebookIds := make([]valobj.Id, 0, len(members))
+	for _, member := range members {
+		notebookIds = append(notebookIds, member.NotebookId)
+	}
+	notebookIds = pkgslices.Unique(notebookIds)
+	if len(notebookIds) == 0 {
+		return []*notebookentity.Notebook{}, nil
+	}
+
+	// 只取 member 关联到的 notebook
+	rows, err := s.notebookStore.ListByIdsExcludingOwner(
+		ctx,
+		notebookIds,
+		userId,
+		spec.Limit,
+		spec.Offset,
+		notebookListOrder(spec.Order),
+	)
 	if err != nil {
 		return nil, err
 	}
 
 	return s.withSourceCounts(ctx, rows)
+}
+
+// notebookListOrder 把领域排序枚举翻译成 store 的排序参数。
+func notebookListOrder(order notebookrepo.ListOrder) database.NotebookListOrder {
+	if order == notebookrepo.ListOrderCreateTime {
+		return database.NotebookListOrderCreateTime
+	}
+
+	return database.NotebookListOrderLastActive
 }
 
 func (s *NotebookRepositoryImpl) withSourceCounts(
 	ctx context.Context,
 	rows []*schema.Notebook,
 ) ([]*notebookentity.Notebook, error) {
+	if len(rows) == 0 {
+		return []*notebookentity.Notebook{}, nil
+	}
+
 	notebookIds := make([]valobj.Id, 0, len(rows))
 	for _, row := range rows {
 		notebookIds = append(notebookIds, row.Id)

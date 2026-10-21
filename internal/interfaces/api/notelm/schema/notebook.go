@@ -67,27 +67,24 @@ func (s ListNotebooksSortBy) ToSortBy() notebookapp.SortBy {
 	return notebookapp.SortByCreateTime
 }
 
+// 首页列出笔记本时 可指定筛选的scope；owned 与 shared 互斥。
 type ListNotebooksScope string
 
 const (
-	ListNotebooksScopeAll    ListNotebooksScope = "all"
 	ListNotebooksScopeOwned  ListNotebooksScope = "owned"
 	ListNotebooksScopeShared ListNotebooksScope = "shared"
 )
 
 func (s ListNotebooksScope) IsValid() bool {
-	return s == ListNotebooksScopeAll || s == ListNotebooksScopeOwned || s == ListNotebooksScopeShared
+	return s == ListNotebooksScopeOwned || s == ListNotebooksScopeShared
 }
 
 func (s ListNotebooksScope) ToScope() notebookapp.AccessScope {
-	switch s {
-	case ListNotebooksScopeOwned:
-		return notebookapp.AccessScopeOwned
-	case ListNotebooksScopeShared:
+	if s == ListNotebooksScopeShared {
 		return notebookapp.AccessScopeShared
 	}
 
-	return notebookapp.AccessScopeAll
+	return notebookapp.AccessScopeOwned
 }
 
 type ListNotebooksRequest struct {
@@ -111,7 +108,7 @@ func (r *ListNotebooksRequest) Validate() error {
 	}
 
 	if r.Scope == "" {
-		r.Scope = ListNotebooksScopeAll
+		r.Scope = ListNotebooksScopeOwned
 	} else if !r.Scope.IsValid() {
 		return errors.ErrParams.Msgf("invalid scope: %s", r.Scope)
 	}

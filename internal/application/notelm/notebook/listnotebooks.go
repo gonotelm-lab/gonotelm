@@ -2,7 +2,6 @@ package notebook
 
 import (
 	"context"
-	"sort"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	idententity "github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
@@ -10,7 +9,6 @@ import (
 	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
-	pkgslices "github.com/gonotelm-lab/gonotelm/pkg/slices"
 )
 
 type SortBy int
@@ -20,29 +18,37 @@ const (
 	SortByLastActive SortBy = 1
 )
 
+// toListOrder 把接口层的排序映射成 repository 的排序枚举。
+func (s SortBy) toListOrder() notebookrepo.ListOrder {
+	if s == SortByLastActive {
+		return notebookrepo.ListOrderLastActive
+	}
+
+	return notebookrepo.ListOrderCreateTime
+}
+
+// AccessScope 决定列表查哪一边：owned 与 shared 互斥，不再合并。
 type AccessScope int
 
 const (
-	AccessScopeAll AccessScope = iota
-	AccessScopeOwned
+	// AccessScopeOwned 只返回当前用户作为 owner 的 notebook。
+	AccessScopeOwned AccessScope = iota
+	// AccessScopeShared 只返回显式分享给当前用户、且 owner 不是本人的 notebook。
 	AccessScopeShared
 )
 
 type ListNotebooksHandler struct {
 	*baseHandler
 	notebookRepo notebookrepo.Repository
-	memberRepo   notebookrepo.MemberRepository
 }
 
 func NewListNotebooksHandler(
 	notebookRepo notebookrepo.Repository,
-	memberRepo notebookrepo.MemberRepository,
 	userRepo identrepo.UserRepository,
 ) *ListNotebooksHandler {
 	return &ListNotebooksHandler{
 		baseHandler:  newBaseHandler(notebookRepo, nil, userRepo),
 		notebookRepo: notebookRepo,
-		memberRepo:   memberRepo,
 	}
 }
 
@@ -71,30 +77,37 @@ func (h *ListNotebooksHandler) Handle(
 	ctx context.Context,
 	query *ListNotebooksHandleQuery,
 ) (*ListNotebooksHandleResult, error) {
-	owned, err := h.notebookRepo.ListByOwner(ctx, query.UserId)
+	// 多取一条用于判断 has_more，分页本身由数据库完成。
+	spec := &notebookrepo.ListSpec{
+		Limit:  query.Limit + 1,
+		Offset: query.Offset,
+		Order:  query.SortBy.toListOrder(),
+	}
+
+	var (
+		notebooks []*notebookentity.Notebook
+		err       error
+	)
+	switch query.Scope {
+	case AccessScopeOwned:
+		notebooks, err = h.notebookRepo.ListByOwner(ctx, query.UserId, spec)
+	case AccessScopeShared:
+		notebooks, err = h.notebookRepo.ListShared(ctx, query.UserId, spec)
+	default:
+		return nil, errors.ErrParams.Msgf("invalid scope: %d", query.Scope)
+	}
 	if err != nil {
-		return nil, errors.WithMessage(err, "list owned notebooks failed")
+		return nil, errors.WithMessage(err, "list notebooks failed")
 	}
 
-	shared, err := h.listShared(ctx, query, owned)
-	if err != nil {
-		return nil, err
+	hasMore := len(notebooks) > query.Limit
+	if hasMore {
+		notebooks = notebooks[:query.Limit]
 	}
 
-	resultOwned := owned
-	if query.Scope == AccessScopeShared {
-		resultOwned = nil
-	}
-	notebooks := mergeNotebooks(resultOwned, shared)
-	sortNotebooks(notebooks, query.SortBy)
-
-	total := len(notebooks)
-	start := min(query.Offset, total)
-	end := min(start+query.Limit, total)
-
-	targetNotebooks := make([]*Notebook, 0, len(notebooks[start:end]))
+	targetNotebooks := make([]*Notebook, 0, len(notebooks))
 	// 给notebook挂上owner
-	for _, notebook := range notebooks[start:end] {
+	for _, notebook := range notebooks {
 		targetNotebooks = append(targetNotebooks, &Notebook{
 			Notebook: notebook,
 		})
@@ -107,80 +120,6 @@ func (h *ListNotebooksHandler) Handle(
 		Notebooks: targetNotebooks,
 		Limit:     query.Limit,
 		Offset:    query.Offset,
-		HasMore:   end < total,
+		HasMore:   hasMore,
 	}, nil
-}
-
-func (h *ListNotebooksHandler) listShared(
-	ctx context.Context,
-	query *ListNotebooksHandleQuery,
-	owned []*notebookentity.Notebook,
-) ([]*notebookentity.Notebook, error) {
-	if query.Scope == AccessScopeOwned {
-		return nil, nil
-	}
-
-	members, err := h.memberRepo.ListByUserId(ctx, query.UserId)
-	if err != nil {
-		return nil, errors.WithMessage(err, "list notebook memberships failed")
-	}
-
-	ownedIds := make(map[valobj.Id]struct{}, len(owned))
-	for _, notebook := range owned {
-		ownedIds[notebook.Id] = struct{}{}
-	}
-
-	sharedIds := make([]valobj.Id, 0, len(members))
-	for _, member := range members {
-		if _, ok := ownedIds[member.NotebookId]; ok {
-			continue
-		}
-		sharedIds = append(sharedIds, member.NotebookId)
-	}
-	sharedIds = pkgslices.Unique(sharedIds)
-
-	if len(sharedIds) == 0 {
-		return nil, nil
-	}
-
-	return h.notebookRepo.FindByIds(ctx, sharedIds)
-}
-
-func mergeNotebooks(
-	owned []*notebookentity.Notebook,
-	shared []*notebookentity.Notebook,
-) []*notebookentity.Notebook {
-	result := make([]*notebookentity.Notebook, 0, len(owned)+len(shared))
-	seen := make(map[valobj.Id]struct{}, len(owned)+len(shared))
-
-	for _, notebook := range owned {
-		if _, ok := seen[notebook.Id]; ok {
-			continue
-		}
-		seen[notebook.Id] = struct{}{}
-		result = append(result, notebook)
-	}
-
-	for _, notebook := range shared {
-		if _, ok := seen[notebook.Id]; ok {
-			continue
-		}
-		seen[notebook.Id] = struct{}{}
-		result = append(result, notebook)
-	}
-
-	return result
-}
-
-func sortNotebooks(notebooks []*notebookentity.Notebook, sortBy SortBy) {
-	if sortBy == SortByLastActive {
-		sort.SliceStable(notebooks, func(i, j int) bool {
-			return notebooks[i].UpdateTime.Value() > notebooks[j].UpdateTime.Value()
-		})
-		return
-	}
-
-	sort.SliceStable(notebooks, func(i, j int) bool {
-		return notebooks[i].CreateTime.Value() < notebooks[j].CreateTime.Value()
-	})
 }

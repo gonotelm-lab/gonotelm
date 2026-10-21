@@ -8,6 +8,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookerrors "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/errors"
+	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/notebook/vo"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -33,11 +34,11 @@ func (f *fakeNotebookRepo) Exists(_ context.Context, id valobj.Id) (bool, error)
 	return ok, nil
 }
 
-func (f *fakeNotebookRepo) ListByOwner(context.Context, valobj.Uid) ([]*notebookentity.Notebook, error) {
+func (f *fakeNotebookRepo) ListByOwner(context.Context, valobj.Uid, *notebookrepo.ListSpec) ([]*notebookentity.Notebook, error) {
 	return nil, nil
 }
 
-func (f *fakeNotebookRepo) FindByIds(context.Context, []valobj.Id) ([]*notebookentity.Notebook, error) {
+func (f *fakeNotebookRepo) ListShared(context.Context, valobj.Uid, *notebookrepo.ListSpec) ([]*notebookentity.Notebook, error) {
 	return nil, nil
 }
 

@@ -6,6 +6,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/schema"
+	xerror "github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/sql"
 
 	"gorm.io/gorm"
@@ -102,18 +103,30 @@ func (s *NotebookStoreImpl) GetByNameAndOwnerId(
 func (s *NotebookStoreImpl) ListByOwnerId(
 	ctx context.Context,
 	ownerId valobj.Uid,
+	limit, offset int,
+	order database.NotebookListOrder,
 ) ([]*schema.Notebook, error) {
-	var rows []*schema.Notebook
-	err := s.db.WithContext(ctx).
-		Where("owner_id = ?", ownerId).
-		Find(&rows).Error
+	if limit <= 0 || offset < 0 {
+		return nil, xerror.ErrParams.Msgf("invalid pagination params: limit=%d offset=%d", limit, offset)
+	}
+
+	query, err := applyNotebookListOrder(
+		s.db.WithContext(ctx).Where("owner_id = ?", ownerId),
+		order,
+	)
 	if err != nil {
+		return nil, err
+	}
+
+	var rows []*schema.Notebook
+	if err := query.Limit(limit).Offset(offset).Find(&rows).Error; err != nil {
 		return nil, sql.WrapErr(err)
 	}
 
 	return rows, nil
 }
 
+// ListByIds 按 id 批量查询；ids 为空时返回空切片。
 func (s *NotebookStoreImpl) ListByIds(
 	ctx context.Context,
 	ids []database.Id,
@@ -131,6 +144,55 @@ func (s *NotebookStoreImpl) ListByIds(
 	}
 
 	return rows, nil
+}
+
+// ListByIdsExcludingOwner 返回 ids 中 owner 不是 excludeOwnerId 的 notebook，用于 shared 列表。
+func (s *NotebookStoreImpl) ListByIdsExcludingOwner(
+	ctx context.Context,
+	ids []database.Id,
+	excludeOwnerId valobj.Uid,
+	limit, offset int,
+	order database.NotebookListOrder,
+) ([]*schema.Notebook, error) {
+	if len(ids) == 0 {
+		return []*schema.Notebook{}, nil
+	}
+	if limit <= 0 || offset < 0 {
+		return nil, xerror.ErrParams.Msgf("invalid pagination params: limit=%d offset=%d", limit, offset)
+	}
+
+	query, err := applyNotebookListOrder(
+		s.db.WithContext(ctx).
+			Where("id IN ?", ids).
+			Where("owner_id <> ?", excludeOwnerId),
+		order,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	var rows []*schema.Notebook
+	if err := query.Limit(limit).Offset(offset).Find(&rows).Error; err != nil {
+		return nil, sql.WrapErr(err)
+	}
+
+	return rows, nil
+}
+
+// applyNotebookListOrder 只接受 database 层定义的两档排序，避免把参数拼进 SQL。
+func applyNotebookListOrder(
+	query *gorm.DB,
+	order database.NotebookListOrder,
+) (*gorm.DB, error) {
+	switch order {
+	case database.NotebookListOrderLastActive:
+		// updated_at 同毫秒时用 id 兜底，保证翻页顺序稳定。
+		return query.Order("notebooks.updated_at DESC").Order("notebooks.id DESC"), nil
+	case database.NotebookListOrderCreateTime:
+		return query.Order("notebooks.id ASC"), nil
+	default:
+		return nil, xerror.ErrParams.Msgf("invalid notebook list order: %d", order)
+	}
 }
 
 func (s *NotebookStoreImpl) Update(ctx context.Context, notebook *schema.Notebook) error {

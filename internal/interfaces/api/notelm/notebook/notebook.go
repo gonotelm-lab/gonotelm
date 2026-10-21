@@ -63,13 +63,13 @@ func (s *Server) GetNotebook(ctx context.Context, c *app.RequestContext) {
 	http.OkResp(c, result)
 }
 
-// ListNotebooks 返回当前用户可见的 notebook 列表：
-//   - scope=all（默认）：owner 的 + 被显式授权的（viewer/collaborator）；
-//   - scope=owned / shared：只返回对应部分。
+// ListNotebooks 按 scope 返回当前用户的 notebook 列表，owned 与 shared 互斥：
+//   - scope=owned（默认）：当前用户作为 owner 的 notebook；
+//   - scope=shared：显式授权给当前用户的 notebook（不包含本人拥有的）。
 //
 // 仅通过 public 获得访问的 notebook 不进入列表；
 // 需要当前用户的角色时调用 GET /notebooks/:id/access。
-// 所有列表项都会附带 owner 概要。
+// 列表在数据库侧分页，所有列表项都会附带 owner 概要。
 func (s *Server) ListNotebooks(ctx context.Context, c *app.RequestContext) {
 	var req schema.ListNotebooksRequest
 	err := c.BindAndValidate(&req)

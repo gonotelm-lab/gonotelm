@@ -70,7 +70,6 @@ func (h *PrepareSourceHandler) Handle(
 	sourceId := evt.Id
 
 	ctx = pkgcontext.WithScene(ctx, pkgcontext.SourcePrepareScene, sourceId.String())
-	ctx = pkgcontext.WithNotebookId(ctx, evt.NotebookId)
 
 	var targetSource *entity.Source
 

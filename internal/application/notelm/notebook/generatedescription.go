@@ -52,7 +52,6 @@ func (h *GenerateDescriptionHandler) Handle(
 	notebookId valobj.Id,
 ) (string, error) {
 	ctx = pkgcontext.WithScene(ctx, pkgcontext.NotebookDescGenScene, notebookId.String())
-	ctx = pkgcontext.WithNotebookId(ctx, notebookId)
 	access, err := h.checkManageNotebookAccess(ctx, notebookId)
 	if err != nil {
 		return "", err

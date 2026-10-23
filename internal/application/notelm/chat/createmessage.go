@@ -117,7 +117,6 @@ func (h *CreateMessageHandler) Handle(
 	}
 
 	ctx = pkgcontext.WithSceneType(ctx, pkgcontext.ChatScene)
-	ctx = pkgcontext.WithNotebookId(ctx, targetChat.NotebookId)
 	userId := pkgcontext.GetUserId(ctx)
 	targetSources, err := util.FilterReadySources(ctx, h.sourceRepo, targetChat.NotebookId, cmd.SourceIds)
 	if err != nil {

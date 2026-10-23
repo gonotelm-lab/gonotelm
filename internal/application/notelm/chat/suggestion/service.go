@@ -20,7 +20,6 @@ import (
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
-	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	pkgjson "github.com/gonotelm-lab/gonotelm/pkg/encoding/json"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/safe"
@@ -146,7 +145,6 @@ func (h *Service) Generate(ctx context.Context, cmd *GenerateSuggestionsCommand)
 		notebookId = cmd.Chat.NotebookId
 		sourceIds  = cmd.SourceIds
 	)
-	ctx = pkgcontext.WithNotebookId(ctx, notebookId)
 
 	// 先锁住 可能此时客户端请求上来 可能导致同一段上下文被重复生成
 	err := h.distLock.Lock(ctx, suggestionLockKey(cmd.Chat.Id))

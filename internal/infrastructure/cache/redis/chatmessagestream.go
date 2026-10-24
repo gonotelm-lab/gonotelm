@@ -246,12 +246,12 @@ func (c *ChatMessageStreamCacheImpl) PullEventStream(
 		Count:   int64(args.Count),
 	}).Result()
 	if err != nil {
-		if errors.Is(err, goredis.Nil) {
-			return nil, cacheerrors.ErrStreamNoData
-		}
-
+		// ctx 已结束时优先返回 context 错误，避免被 redis.Nil / 其它错误盖住。
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return nil, ctxErr
+		}
+		if errors.Is(err, goredis.Nil) {
+			return nil, cacheerrors.ErrStreamNoData
 		}
 
 		return nil, errors.Wrap(errors.ErrCache, err.Error())

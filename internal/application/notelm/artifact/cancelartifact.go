@@ -19,13 +19,19 @@ type CancelArtifactHandler struct {
 	eventBus eventbus.Publisher
 }
 
+type cancelArtifactResult struct{}
+
 func NewCancelArtifactHandler(
 	repo artifactrepo.Repository,
 	notebookAccessService *notebookservice.AccessService,
 	flowc flow.TaskClient,
 	eventBus eventbus.Publisher,
 ) *CancelArtifactHandler {
-	return &CancelArtifactHandler{baseHandler: newBaseHandler(repo, notebookAccessService), flowc: flowc, eventBus: eventBus}
+	return &CancelArtifactHandler{
+		baseHandler: newBaseHandler(repo, notebookAccessService),
+		flowc:       flowc,
+		eventBus:    eventBus,
+	}
 }
 
 func (h *CancelArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error {
@@ -36,21 +42,21 @@ func (h *CancelArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error
 func (h *CancelArtifactHandler) cancelArtifact(
 	ctx context.Context,
 	artifact *artifactentity.Artifact,
-) (struct{}, error) {
+) (*cancelArtifactResult, error) {
 	flowTaskId := artifact.FlowTaskId
 	if err := artifact.Cancel(); err != nil {
-		return struct{}{}, err
+		return nil, err
 	}
 	if err := h.flowc.Cancel(ctx, flowTaskId); err != nil {
-		return struct{}{}, errors.WithMessage(err, "cancel flow task failed")
+		return nil, errors.WithMessage(err, "cancel flow task failed")
 	}
 	if err := h.updateArtifact(ctx, artifact); err != nil {
-		return struct{}{}, errors.WithMessage(err, "update artifact failed")
+		return nil, errors.WithMessage(err, "update artifact failed")
 	}
 	for _, evt := range artifact.PullEvents() {
 		if err := h.eventBus.Publish(ctx, evt); err != nil {
 			slog.ErrorContext(ctx, "publish artifact event failed", "artifact_id", artifact.Id, "err", err)
 		}
 	}
-	return struct{}{}, nil
+	return &cancelArtifactResult{}, nil
 }

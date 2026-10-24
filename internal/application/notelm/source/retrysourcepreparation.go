@@ -16,6 +16,8 @@ type RetrySourcePreparationHandler struct {
 	eventBus eventbus.Publisher
 }
 
+type retrySourcePreparationResult struct{}
+
 func NewRetrySourcePreparationHandler(
 	sourceRepo sourcerepo.Repository,
 	notebookAccessService *notebookservice.AccessService,
@@ -35,20 +37,20 @@ func (h *RetrySourcePreparationHandler) Handle(ctx context.Context, sourceId val
 func (h *RetrySourcePreparationHandler) retryPreparation(
 	ctx context.Context,
 	targetSource *sourceentity.Source,
-) (struct{}, error) {
+) (*retrySourcePreparationResult, error) {
 	if err := targetSource.RetryPreparation(); err != nil {
-		return struct{}{}, errors.WithMessagef(err, "retry source preparation failed, source_id=%s", targetSource.Id)
+		return nil, errors.WithMessagef(err, "retry source preparation failed, source_id=%s", targetSource.Id)
 	}
 
 	for _, event := range targetSource.PullEvents() {
 		if err := h.eventBus.Publish(ctx, event); err != nil {
-			return struct{}{}, errors.WithMessagef(err, "notify source preparing failed, source_id=%s", targetSource.Id)
+			return nil, errors.WithMessagef(err, "notify source preparing failed, source_id=%s", targetSource.Id)
 		}
 	}
 
 	if err := h.updateSource(ctx, targetSource); err != nil {
-		return struct{}{}, errors.WithMessagef(err, "save source failed, source_id=%s", targetSource.Id)
+		return nil, errors.WithMessagef(err, "save source failed, source_id=%s", targetSource.Id)
 	}
 
-	return struct{}{}, nil
+	return &retrySourcePreparationResult{}, nil
 }

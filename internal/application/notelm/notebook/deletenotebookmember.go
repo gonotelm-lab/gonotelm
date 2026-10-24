@@ -18,6 +18,8 @@ type DeleteNotebookMemberHandler struct {
 	memberRepo notebookrepo.MemberRepository
 }
 
+type deleteNotebookMemberResult struct{}
+
 func NewDeleteNotebookMemberHandler(
 	notebookRepo notebookrepo.Repository,
 	notebookAccessService *notebookservice.AccessService,
@@ -36,7 +38,7 @@ func (h *DeleteNotebookMemberHandler) Handle(
 	userId valobj.Uid,
 ) error {
 	_, err := withNotebookAccess(h.baseHandler, ctx, notebookId, accessManageSharing,
-		func(ctx context.Context, access *notebookentity.Access) (struct{}, error) {
+		func(ctx context.Context, access *notebookentity.Access) (*deleteNotebookMemberResult, error) {
 			return h.deleteMember(ctx, access, userId)
 		},
 	)
@@ -47,19 +49,19 @@ func (h *DeleteNotebookMemberHandler) deleteMember(
 	ctx context.Context,
 	access *notebookentity.Access,
 	userId valobj.Uid,
-) (struct{}, error) {
+) (*deleteNotebookMemberResult, error) {
 	notebookId := access.Notebook.Id
 
 	if _, err := h.memberRepo.FindByNotebookIdAndUserId(ctx, notebookId, userId); err != nil {
 		if errors.Is(err, errors.ErrNoRecord) {
-			return struct{}{}, notebookerrors.ErrMemberNotFound
+			return nil, notebookerrors.ErrMemberNotFound
 		}
-		return struct{}{}, errors.WithMessage(err, "get notebook member failed")
+		return nil, errors.WithMessage(err, "get notebook member failed")
 	}
 
 	if err := h.memberRepo.Delete(ctx, notebookId, userId); err != nil {
-		return struct{}{}, errors.WithMessage(err, "delete notebook member failed")
+		return nil, errors.WithMessage(err, "delete notebook member failed")
 	}
 
-	return struct{}{}, nil
+	return &deleteNotebookMemberResult{}, nil
 }

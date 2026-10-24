@@ -21,6 +21,8 @@ type DeleteArtifactHandler struct {
 	cleaner *cleanup.Cleaner
 }
 
+type deleteArtifactResult struct{}
+
 func NewDeleteArtifactHandler(
 	repo artifactrepo.Repository,
 	notebookAccessService *notebookservice.AccessService,
@@ -44,10 +46,10 @@ func (h *DeleteArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error
 func (h *DeleteArtifactHandler) deleteArtifact(
 	ctx context.Context,
 	a *artifactentity.Artifact,
-) (struct{}, error) {
+) (*deleteArtifactResult, error) {
 	if !a.IsTerminal() && a.FlowTaskId != "" {
 		if err := h.flowc.Cancel(ctx, a.FlowTaskId); err != nil {
-			return struct{}{}, errors.WithMessage(err, "cancel flow task failed")
+			return nil, errors.WithMessage(err, "cancel flow task failed")
 		}
 	}
 
@@ -75,7 +77,7 @@ func (h *DeleteArtifactHandler) deleteArtifact(
 	}
 
 	if err := h.repo.DeleteById(ctx, a.Id); err != nil {
-		return struct{}{}, err
+		return nil, err
 	}
-	return struct{}{}, nil
+	return &deleteArtifactResult{}, nil
 }

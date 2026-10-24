@@ -15,6 +15,8 @@ type UpdateNotebookNameHandler struct {
 	*baseHandler
 }
 
+type updateNotebookNameResult struct{}
+
 func NewUpdateNotebookNameHandler(
 	notebookRepo notebookrepo.Repository,
 	notebookAccessService *notebookservice.AccessService,
@@ -31,7 +33,7 @@ func (h *UpdateNotebookNameHandler) Handle(
 	name string,
 ) error {
 	_, err := withNotebookAccess(h.baseHandler, ctx, id, accessManageNotebook,
-		func(ctx context.Context, access *notebookentity.Access) (struct{}, error) {
+		func(ctx context.Context, access *notebookentity.Access) (*updateNotebookNameResult, error) {
 			return h.updateName(ctx, access, name)
 		},
 	)
@@ -42,15 +44,15 @@ func (h *UpdateNotebookNameHandler) updateName(
 	ctx context.Context,
 	access *notebookentity.Access,
 	name string,
-) (struct{}, error) {
+) (*updateNotebookNameResult, error) {
 	n := access.Notebook
 	if err := n.UpdateName(name); err != nil {
-		return struct{}{}, errors.WithMessage(err, "update notebook name failed")
+		return nil, errors.WithMessage(err, "update notebook name failed")
 	}
 
 	if err := h.notebookRepo.Save(ctx, n); err != nil {
-		return struct{}{}, errors.WithMessage(err, "update notebook name failed")
+		return nil, errors.WithMessage(err, "update notebook name failed")
 	}
 
-	return struct{}{}, nil
+	return &updateNotebookNameResult{}, nil
 }

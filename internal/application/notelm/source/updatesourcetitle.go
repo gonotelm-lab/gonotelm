@@ -14,6 +14,8 @@ type UpdateSourceTitleHandler struct {
 	*baseHandler
 }
 
+type updateSourceTitleResult struct{}
+
 func NewUpdateSourceTitleHandler(
 	sourceRepo sourcerepo.Repository,
 	notebookAccessService *notebookservice.AccessService,
@@ -29,7 +31,7 @@ func (h *UpdateSourceTitleHandler) Handle(
 	title string,
 ) error {
 	_, err := withSourceAccess(h.baseHandler, ctx, id, accessManage,
-		func(ctx context.Context, source *sourceentity.Source) (struct{}, error) {
+		func(ctx context.Context, source *sourceentity.Source) (*updateSourceTitleResult, error) {
 			return h.updateTitle(ctx, source, title)
 		},
 	)
@@ -40,11 +42,11 @@ func (h *UpdateSourceTitleHandler) updateTitle(
 	ctx context.Context,
 	targetSource *sourceentity.Source,
 	title string,
-) (struct{}, error) {
+) (*updateSourceTitleResult, error) {
 	targetSource.UpdateTitle(title)
 	if err := h.updateSource(ctx, targetSource); err != nil {
-		return struct{}{}, errors.WithMessagef(err, "update source title failed, source_id=%s", targetSource.Id)
+		return nil, errors.WithMessagef(err, "update source title failed, source_id=%s", targetSource.Id)
 	}
 
-	return struct{}{}, nil
+	return &updateSourceTitleResult{}, nil
 }

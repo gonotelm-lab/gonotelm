@@ -16,6 +16,8 @@ type UpdateNotebookVisibilityHandler struct {
 	*baseHandler
 }
 
+type updateNotebookVisibilityResult struct{}
+
 func NewUpdateNotebookVisibilityHandler(
 	notebookRepo notebookrepo.Repository,
 	notebookAccessService *notebookservice.AccessService,
@@ -32,7 +34,7 @@ func (h *UpdateNotebookVisibilityHandler) Handle(
 	visibility vo.Visibility,
 ) error {
 	_, err := withNotebookAccess(h.baseHandler, ctx, notebookId, accessManageSharing,
-		func(ctx context.Context, access *notebookentity.Access) (struct{}, error) {
+		func(ctx context.Context, access *notebookentity.Access) (*updateNotebookVisibilityResult, error) {
 			return h.updateVisibility(ctx, access, visibility)
 		},
 	)
@@ -43,14 +45,14 @@ func (h *UpdateNotebookVisibilityHandler) updateVisibility(
 	ctx context.Context,
 	access *notebookentity.Access,
 	visibility vo.Visibility,
-) (struct{}, error) {
+) (*updateNotebookVisibilityResult, error) {
 	if err := access.Notebook.SetVisibility(visibility); err != nil {
-		return struct{}{}, err
+		return nil, err
 	}
 
 	if err := h.notebookRepo.Save(ctx, access.Notebook); err != nil {
-		return struct{}{}, errors.WithMessage(err, "save notebook visibility failed")
+		return nil, errors.WithMessage(err, "save notebook visibility failed")
 	}
 
-	return struct{}{}, nil
+	return &updateNotebookVisibilityResult{}, nil
 }

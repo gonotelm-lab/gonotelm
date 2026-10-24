@@ -20,6 +20,8 @@ type DeleteSourceHandler struct {
 	cleaner  *cleanup.Cleaner
 }
 
+type deleteSourceResult struct{}
+
 func NewDeleteSourceHandler(
 	sourceRepo sourcerepo.Repository,
 	notebookAccessService *notebookservice.AccessService,
@@ -44,12 +46,12 @@ func (h *DeleteSourceHandler) Handle(ctx context.Context, id valobj.Id) error {
 func (h *DeleteSourceHandler) deleteSource(
 	ctx context.Context,
 	targetSource *sourceentity.Source,
-) (struct{}, error) {
+) (*deleteSourceResult, error) {
 	id := targetSource.Id
 
 	targetSource.Delete()
 	if err := h.sourceRepo.DeleteById(ctx, targetSource.Id); err != nil {
-		return struct{}{}, errors.WithMessagef(err, "delete source failed, source_id=%s", id)
+		return nil, errors.WithMessagef(err, "delete source failed, source_id=%s", id)
 	}
 
 	if err := h.cleaner.ScheduleSourceCleanup(
@@ -73,5 +75,5 @@ func (h *DeleteSourceHandler) deleteSource(
 		}
 	}
 
-	return struct{}{}, nil
+	return &deleteSourceResult{}, nil
 }

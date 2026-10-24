@@ -22,6 +22,8 @@ type DeleteNotebookHandler struct {
 	memberRepo notebookrepo.MemberRepository
 }
 
+type deleteNotebookResult struct{}
+
 func NewDeleteNotebookHandler(
 	notebookRepo notebookrepo.Repository,
 	notebookAccessService *notebookservice.AccessService,
@@ -49,13 +51,13 @@ func (h *DeleteNotebookHandler) Handle(ctx context.Context, id valobj.Id) error 
 func (h *DeleteNotebookHandler) deleteNotebook(
 	ctx context.Context,
 	access *notebookentity.Access,
-) (struct{}, error) {
+) (*deleteNotebookResult, error) {
 	n := access.Notebook
 	id := n.Id
 
 	n.Delete()
 	if err := h.notebookRepo.Save(ctx, n); err != nil {
-		return struct{}{}, errors.WithMessage(err, "delete notebook failed")
+		return nil, errors.WithMessage(err, "delete notebook failed")
 	}
 
 	if err := h.memberRepo.DeleteByNotebookId(ctx, id); err != nil {
@@ -79,5 +81,5 @@ func (h *DeleteNotebookHandler) deleteNotebook(
 		}
 	}
 
-	return struct{}{}, nil
+	return &deleteNotebookResult{}, nil
 }

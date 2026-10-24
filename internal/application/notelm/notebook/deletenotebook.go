@@ -8,7 +8,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
-	notebookerrors "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/errors"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
@@ -42,9 +41,6 @@ func NewDeleteNotebookHandler(
 
 func (h *DeleteNotebookHandler) Handle(ctx context.Context, id valobj.Id) error {
 	_, err := withNotebookAccess(h.baseHandler, ctx, id, accessManageNotebook, h.deleteNotebook)
-	if errors.Is(err, notebookerrors.ErrNotebookNotFound) {
-		return nil
-	}
 	return err
 }
 

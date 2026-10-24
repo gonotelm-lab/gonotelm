@@ -19,6 +19,7 @@ type Deps struct {
 	EventBus              eventbus.Publisher
 	DistLock              adapter.DistributedLock
 	Summarizer            adapter.Summarizer
+	AIDescriptionRepo     notebookrepo.AIDescriptionRepository
 	Cleaner               *cleanup.Cleaner
 	UserRepo              identityrepo.UserRepository
 	// ObjectStore 仅注入 app handler；API handler 本身不解析 StoreKey。
@@ -30,7 +31,7 @@ type Server struct {
 	createNotebookHandler              *notebookapp.CreateNotebookHandler
 	listNotebooksHandler               *notebookapp.ListNotebooksHandler
 	deleteNotebookHandler              *notebookapp.DeleteNotebookHandler
-	updateNotebookNameHandler          *notebookapp.UpdateNotebookNameHandler
+	updateNotebookHandler              *notebookapp.UpdateNotebookHandler
 	generateNotebookDescriptionHandler *notebookapp.GenerateDescriptionHandler
 
 	getNotebookAccessHandler        *notebookapp.GetNotebookAccessHandler
@@ -57,7 +58,7 @@ func NewServer(deps Deps) *Server {
 			deps.EventBus,
 			deps.Cleaner,
 		),
-		updateNotebookNameHandler: notebookapp.NewUpdateNotebookNameHandler(deps.NotebookRepo, deps.NotebookAccessService, deps.UserRepo),
+		updateNotebookHandler: notebookapp.NewUpdateNotebookHandler(deps.NotebookRepo, deps.NotebookAccessService, deps.UserRepo),
 		generateNotebookDescriptionHandler: notebookapp.NewGenerateDescriptionHandler(
 			deps.NotebookRepo,
 			deps.NotebookAccessService,
@@ -65,6 +66,7 @@ func NewServer(deps Deps) *Server {
 			deps.UserRepo,
 			deps.DistLock,
 			deps.Summarizer,
+			deps.AIDescriptionRepo,
 		),
 
 		getNotebookAccessHandler: notebookapp.NewGetNotebookAccessHandler(deps.NotebookAccessService),

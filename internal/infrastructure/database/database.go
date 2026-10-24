@@ -53,6 +53,12 @@ type NotebookStore interface {
 	FillNameAndDescriptionIfEmpty(ctx context.Context, params *schema.NotebookFillNameAndDescriptionParams) error
 }
 
+// NotebookMaintenanceStore notebook 维护写操作（如 initjob 存量清洗），与主 Store 分离。
+type NotebookMaintenanceStore interface {
+	CountNonEmptyDescriptions(ctx context.Context) (int64, error)
+	ClearNonEmptyDescriptions(ctx context.Context, params *schema.NotebookClearDescriptionsParams) error
+}
+
 type NotebookMemberStore interface {
 	Upsert(ctx context.Context, member *schema.NotebookMember) error
 	GetByNotebookIdAndUserId(ctx context.Context, notebookId Id, userId valobj.Uid) (*schema.NotebookMember, error)
@@ -166,6 +172,7 @@ type Dao struct {
 	Closer misc.Closer
 
 	NotebookStore             NotebookStore
+	NotebookMaintenanceStore  NotebookMaintenanceStore
 	NotebookMemberStore       NotebookMemberStore
 	SourceStore               SourceStore
 	ChatStore                 ChatStore
@@ -182,6 +189,7 @@ type Dao struct {
 func NewDao(
 	closer misc.Closer,
 	notebookStore NotebookStore,
+	notebookMaintenanceStore NotebookMaintenanceStore,
 	notebookMemberStore NotebookMemberStore,
 	sourceStore SourceStore,
 	chatStore ChatStore,
@@ -197,6 +205,7 @@ func NewDao(
 	return &Dao{
 		Closer:                    closer,
 		NotebookStore:             notebookStore,
+		NotebookMaintenanceStore:  notebookMaintenanceStore,
 		NotebookMemberStore:       notebookMemberStore,
 		SourceStore:               sourceStore,
 		ChatStore:                 chatStore,

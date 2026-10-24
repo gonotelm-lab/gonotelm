@@ -26,6 +26,7 @@ func TestNewDaoWiresStores(t *testing.T) {
 		dao := NewDao(
 			closer,
 			nil, // NotebookStore
+			nil, // NotebookMaintenanceStore
 			nil, // NotebookMemberStore
 			nil, // SourceStore
 			nil, // ChatStore
@@ -45,6 +46,7 @@ func TestNewDaoWiresStores(t *testing.T) {
 		So(dao.UserIdentityStore, ShouldEqual, identityStore)
 		So(dao.Transactor, ShouldEqual, transactor)
 		So(dao.NotebookStore, ShouldBeNil)
+		So(dao.NotebookMaintenanceStore, ShouldBeNil)
 	})
 }
 
@@ -75,6 +77,7 @@ func newDaoForCloseTest(closer misc.Closer) *Dao {
 	return NewDao(
 		closer,
 		nil, // NotebookStore
+		nil, // NotebookMaintenanceStore
 		nil, // NotebookMemberStore
 		nil, // SourceStore
 		nil, // ChatStore

@@ -2,6 +2,7 @@ package entity
 
 import (
 	"fmt"
+	"strings"
 	"unicode/utf8"
 
 	coreentity "github.com/gonotelm-lab/gonotelm/internal/core/entity"
@@ -24,7 +25,8 @@ type Notebook struct {
 	coreentity.Base
 
 	Name        string
-	Description string
+	Description string // 用户自定义摘要
+	Flags       vo.Flags
 	OwnerId     valobj.Uid
 	Visibility  vo.Visibility
 
@@ -33,13 +35,13 @@ type Notebook struct {
 
 func NewNotebook(
 	name string,
-	description string,
 	ownerId valobj.Uid,
 ) (*Notebook, error) {
 	n := Notebook{
 		Base:        coreentity.NewBase(),
 		Name:        name,
-		Description: description,
+		Description: "",
+		Flags:       0,
 		OwnerId:     ownerId,
 		Visibility:  vo.VisibilityRestricted,
 	}
@@ -74,6 +76,10 @@ func (n *Notebook) validate() error {
 	return nil
 }
 
+func (n *Notebook) CustomizeDescription() bool {
+	return n.Flags.CustomizeDescription()
+}
+
 func (n *Notebook) SetVisibility(visibility vo.Visibility) error {
 	if !visibility.IsValid() {
 		return notebookerrors.ErrInvalidVisibility
@@ -104,8 +110,14 @@ func (n *Notebook) UpdateName(name string) error {
 	return nil
 }
 
-func (n *Notebook) UpdateDescription(description string) error {
+func (n *Notebook) SetCustomizeDescription(description string) error {
+	description = strings.TrimSpace(description)
+	if description == "" {
+		return notebookerrors.ErrInvalidDescription
+	}
+
 	n.Description = description
+	n.Flags = n.Flags.WithCustomizeDescription(true)
 
 	if err := n.validate(); err != nil {
 		return err
@@ -113,6 +125,12 @@ func (n *Notebook) UpdateDescription(description string) error {
 
 	n.UpdateTime = valobj.NewTime()
 	return nil
+}
+
+func (n *Notebook) ClearCustomizeDescription() {
+	n.Description = ""
+	n.Flags = n.Flags.WithCustomizeDescription(false)
+	n.UpdateTime = valobj.NewTime()
 }
 
 func (n *Notebook) AllowedToCreateSource() error {

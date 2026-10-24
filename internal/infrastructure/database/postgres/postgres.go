@@ -33,9 +33,11 @@ func Open(cfg *sql.Config) (*database.Dao, error) {
 		return nil
 	})
 
+	notebookStore := NewNotebookStoreImpl(db)
 	return database.NewDao(
 		closer,
-		NewNotebookStoreImpl(db),
+		notebookStore,
+		notebookStore,
 		NewNotebookMemberStoreImpl(db),
 		NewSourceStoreImpl(db),
 		NewChatStoreImpl(db),

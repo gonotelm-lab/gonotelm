@@ -61,12 +61,13 @@ type ServerDeps struct {
 	VerifyMailer           identrepo.EmailVerificationMailer
 	ResetMailer            identrepo.PasswordResetMailer
 
-	ChatSuggestService *chatsuggest.Service
-	EventBus           eventbus.Publisher
-	WaitGroup          *sync.WaitGroup
-	LLMGateway         *llmchat.Gateway
-	DistLock           adapter.DistributedLock
-	Summarizer         adapter.Summarizer
+	ChatSuggestService        *chatsuggest.Service
+	EventBus                  eventbus.Publisher
+	WaitGroup                 *sync.WaitGroup
+	LLMGateway                *llmchat.Gateway
+	DistLock                  adapter.DistributedLock
+	Summarizer                adapter.Summarizer
+	NotebookAIDescriptionRepo notebookrepo.AIDescriptionRepository
 
 	FlowClient flow.TaskClient
 	Poller     artifactapp.Poller
@@ -132,6 +133,7 @@ func NewServer(
 			EventBus:              deps.EventBus,
 			DistLock:              deps.DistLock,
 			Summarizer:            deps.Summarizer,
+			AIDescriptionRepo:     deps.NotebookAIDescriptionRepo,
 			Cleaner:               deps.Cleaner,
 			UserRepo:              deps.UserRepo,
 			ObjectStore:           deps.ObjectStore,

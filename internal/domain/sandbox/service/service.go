@@ -100,8 +100,8 @@ func (s *Service) GetOrCreateSandbox(
 	return sb, nil
 }
 
-// touchSandbox 复用沙箱时刷新沙箱过期时间，成功后再刷新 Redis 绑定 TTL（best-effort，失败只告警）。
-// 沙箱续期失败时不刷新 Redis TTL，避免沙箱已失效但绑定被无限续期。
+// touchSandbox 复用沙箱时刷新沙箱过期时间，成功后再刷新绑定 TTL（best-effort，失败只告警）。
+// 沙箱续期失败时不刷新绑定 TTL，避免沙箱已失效但绑定被无限续期。
 func (s *Service) touchSandbox(ctx context.Context, key entity.SandboxKey, sb entity.Sandbox, ttl time.Duration) {
 	if err := s.mgr.RenewSandbox(ctx, sb.Id(), ttl); err != nil {
 		slog.WarnContext(ctx, "renew sandbox expiration failed, skip refreshing binding ttl",

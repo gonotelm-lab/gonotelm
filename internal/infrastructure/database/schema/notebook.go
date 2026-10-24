@@ -9,6 +9,7 @@ type Notebook struct {
 	Id          uuid.UUID  `gorm:"column:id"`
 	Name        string     `gorm:"column:name"`
 	Description string     `gorm:"column:description"`
+	Flags       int32      `gorm:"column:flags"`
 	OwnerId     valobj.Uid `gorm:"column:owner_id"`
 	Visibility  string     `gorm:"column:visibility"`
 	UpdatedAt   int64      `gorm:"column:updated_at"`
@@ -37,4 +38,8 @@ type NotebookFillNameAndDescriptionParams struct {
 	Name        string
 	Description string
 	UpdatedAt   int64
+}
+
+type NotebookClearDescriptionsParams struct {
+	UpdatedAt int64
 }

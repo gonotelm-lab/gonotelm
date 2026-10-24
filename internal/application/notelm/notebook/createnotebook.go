@@ -26,14 +26,13 @@ func NewCreateNotebookHandler(notebookRepo notebookrepo.Repository, eventBus eve
 
 type CreateNotebookHandleCommand struct {
 	Name string
-	Desc string
 }
 
 func (h *CreateNotebookHandler) Handle(
 	ctx context.Context,
 	cmd *CreateNotebookHandleCommand,
 ) (valobj.Id, error) {
-	notebook, err := notebookentity.NewNotebook(cmd.Name, cmd.Desc, pkgcontext.GetUserId(ctx))
+	notebook, err := notebookentity.NewNotebook(cmd.Name, pkgcontext.GetUserId(ctx))
 	if err != nil {
 		return valobj.Id{}, errors.WithMessage(err, "create notebook failed")
 	}

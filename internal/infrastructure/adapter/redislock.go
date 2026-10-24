@@ -80,3 +80,62 @@ func (l *redisDistributedLock) Check(ctx context.Context, key string) (bool, err
 
 	return n > 0, nil
 }
+
+func (l *redisDistributedLock) WithLock(
+	ctx context.Context,
+	key string,
+	fn func(ctx context.Context) error,
+) (err error) {
+	if err := l.Lock(ctx, key); err != nil {
+		return err
+	}
+	defer func() {
+		unlockErr := l.Unlock(ctx, key)
+		if err == nil {
+			err = unlockErr
+		}
+	}()
+	return fn(ctx)
+}
+
+func (l *redisDistributedLock) WithLockWithRetry(
+	ctx context.Context,
+	key string,
+	spec adapter.RetrySpec,
+	fn func(ctx context.Context) error,
+) error {
+	tries := spec.Tries
+	if tries <= 0 {
+		tries = 1
+	}
+
+	var lastErr error
+	for i := 0; i < tries; i++ {
+		if i > 0 && spec.Interval > 0 {
+			if err := sleepOrDone(ctx, spec.Interval); err != nil {
+				return err
+			}
+		}
+
+		err := l.WithLock(ctx, key, fn)
+		if err == nil {
+			return nil
+		}
+		if !errors.Is(err, errors.ErrLockNotAcquired) {
+			return err
+		}
+		lastErr = err
+	}
+	return lastErr
+}
+
+func sleepOrDone(ctx context.Context, d time.Duration) error {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}

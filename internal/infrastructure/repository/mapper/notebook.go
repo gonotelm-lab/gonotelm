@@ -13,6 +13,7 @@ func NotebookToSchema(notebook *notebookentity.Notebook) *schema.Notebook {
 		Id:          notebook.Id,
 		Name:        notebook.Name,
 		Description: notebook.Description,
+		Flags:       notebook.Flags.Int32(),
 		OwnerId:     notebook.OwnerId,
 		Visibility:  notebook.Visibility.String(),
 		UpdatedAt:   notebook.UpdateTime.Value(),
@@ -20,6 +21,11 @@ func NotebookToSchema(notebook *notebookentity.Notebook) *schema.Notebook {
 }
 
 func NotebookFromSchema(notebook *schema.Notebook) *notebookentity.Notebook {
+	flags := vo.NewFlags(notebook.Flags)
+	desc := ""
+	if flags.CustomizeDescription() {
+		desc = notebook.Description
+	}
 	return &notebookentity.Notebook{
 		Base: entity.Base{
 			Id:         notebook.Id,
@@ -27,7 +33,8 @@ func NotebookFromSchema(notebook *schema.Notebook) *notebookentity.Notebook {
 			UpdateTime: valobj.NewTimeFrom(notebook.UpdatedAt),
 		},
 		Name:        notebook.Name,
-		Description: notebook.Description,
+		Description: desc,
+		Flags:       flags,
 		OwnerId:     notebook.OwnerId,
 		Visibility:  vo.NewVisibility(notebook.Visibility),
 	}

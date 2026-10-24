@@ -45,12 +45,17 @@ type NotebookResponse struct {
 }
 
 func NewNotebookResponse(notebook *notebookapp.Notebook) *NotebookResponse {
+	customize := notebook.CustomizeDescription()
+	desc := ""
+	if customize {
+		desc = notebook.Description
+	}
 	return &NotebookResponse{
 		Id:   notebook.Id.String(),
 		Name: notebook.Name,
-		Desc: notebook.Description,
+		Desc: desc,
 		Flags: NotebookFlagsResponse{
-			CustomizeDescription: notebook.CustomizeDescription(),
+			CustomizeDescription: customize,
 		},
 		SourceCount: notebook.SourceCount,
 		Visibility:  notebook.Visibility.String(),

@@ -80,7 +80,7 @@ func (r ResultKind) String() string { return string(r) }
 type Artifact struct {
 	entity.Base
 	NotebookId valobj.Id
-	UserId     valobj.Uid
+	CreatorId  valobj.Uid
 	Kind       Kind
 	Status     Status
 	FlowTaskId string
@@ -90,10 +90,10 @@ type Artifact struct {
 	Payload    Payload
 }
 
-func NewArtifact(notebookId valobj.Id, userId valobj.Uid, kind Kind, payload Payload) (*Artifact, error) {
+func NewArtifact(notebookId valobj.Id, creatorId valobj.Uid, kind Kind, payload Payload) (*Artifact, error) {
 	a := &Artifact{
 		NotebookId: notebookId,
-		UserId:     userId,
+		CreatorId:  creatorId,
 		Kind:       kind,
 		Status:     StatusPending,
 		Payload:    payload,
@@ -111,7 +111,7 @@ func (a *Artifact) validate() error {
 	if a.NotebookId.IsZero() {
 		return artifacterrors.ErrInvalidNotebookId
 	}
-	if a.UserId.IsZero() {
+	if a.CreatorId.IsZero() {
 		return artifacterrors.ErrInvalidUserId
 	}
 	if !a.Kind.Supported() {
@@ -126,8 +126,6 @@ func (a *Artifact) validate() error {
 
 	return nil
 }
-
-func (a *Artifact) IsOwner(userId valobj.Uid) bool { return a.UserId == userId }
 
 func (a *Artifact) ObjectStoreKeys() []valobj.StoreKey {
 	if a == nil || !a.ResultKind.Storage() || len(a.Result) == 0 {

@@ -6,6 +6,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
 	identityservice "github.com/gonotelm-lab/gonotelm/internal/domain/identity/service"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 )
 
 // UnbindIdentityHandler 解绑三方身份：bind_id 必须属于当前账号，provider 与记录一致
@@ -20,11 +21,10 @@ func NewUnbindIdentityHandler(userService *identityservice.UserService) *UnbindI
 type UnbindIdentityCommand struct {
 	BindId       valobj.Id
 	ProviderType entity.ProviderType
-	UserId       valobj.Uid
 }
 
 func (h *UnbindIdentityHandler) Handle(ctx context.Context, cmd *UnbindIdentityCommand) error {
-	agg, err := h.userService.GetAccount(ctx, cmd.UserId)
+	agg, err := h.userService.GetAccount(ctx, pkgcontext.GetUserId(ctx))
 	if err != nil {
 		return err
 	}

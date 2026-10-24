@@ -6,6 +6,7 @@ import (
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/entity/vo"
 	repo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
@@ -21,11 +22,12 @@ type PollSourceStatusHandler struct {
 
 func NewPollSourceStatusHandler(
 	sourceRepo repo.Repository,
+	notebookAccessService *notebookservice.AccessService,
 	objectStore adapter.ObjectStore,
 	eventBus eventbus.Publisher,
 ) *PollSourceStatusHandler {
 	return &PollSourceStatusHandler{
-		baseHandler: newBaseHandler(sourceRepo),
+		baseHandler: newBaseHandler(sourceRepo, notebookAccessService),
 		objectStore: objectStore,
 		eventBus:    eventBus,
 	}
@@ -35,21 +37,23 @@ func (h *PollSourceStatusHandler) Handle(
 	ctx context.Context,
 	sourceId valobj.Id,
 ) (vo.SourceStatus, error) {
-	targetSource, err := h.handle(ctx, sourceId)
-	if err != nil {
-		return "", err
-	}
+	return withSourceAccess(h.baseHandler, ctx, sourceId, accessView, h.pollStatus)
+}
 
+func (h *PollSourceStatusHandler) pollStatus(
+	ctx context.Context,
+	targetSource *entity.Source,
+) (vo.SourceStatus, error) {
 	if targetSource.Status.IsReady() {
 		return targetSource.Status, nil
 	}
 
 	status := targetSource.Status
 	if targetSource.Kind.IsFile() {
-		// trigger file source preparation
+		var err error
 		status, err = h.pollFileSourceStatus(ctx, targetSource)
 		if err != nil {
-			return "", errors.WithMessagef(err, "poll file source status failed, source_id=%s", sourceId)
+			return "", errors.WithMessagef(err, "poll file source status failed, source_id=%s", targetSource.Id)
 		}
 	}
 

@@ -14,6 +14,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	coreadapter "github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	identityservice "github.com/gonotelm-lab/gonotelm/internal/domain/identity/service"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	flowcli "github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
@@ -77,7 +78,9 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 	}
 
 	// ── 2. Repositories ──
-	notebookRepo := repository.NewNotebookRepository(infra.Database.NotebookStore, infra.Database.SourceStore)
+	notebookRepo := repository.NewNotebookRepository(infra.Database.NotebookStore, infra.Database.NotebookMemberStore, infra.Database.SourceStore)
+	notebookMemberRepo := repository.NewNotebookMemberRepository(infra.Database.NotebookMemberStore)
+	notebookAccessService := notebookservice.NewAccessService(notebookRepo, notebookMemberRepo)
 	sourceRepo := repository.NewSourceRepository(infra.Database.SourceStore)
 	sourceDocRepo := repository.NewSourceDocRepository(
 		infra.Embedder,
@@ -234,6 +237,8 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 		notelmapi.ServerDeps{
 			RootCtx:                rootCtx,
 			NotebookRepo:           notebookRepo,
+			NotebookMemberRepo:     notebookMemberRepo,
+			NotebookAccessService:  notebookAccessService,
 			SourceRepo:             sourceRepo,
 			ObjectStore:            infra.ObjectStore,
 			KeyFactory:             infra.KeyFactory,

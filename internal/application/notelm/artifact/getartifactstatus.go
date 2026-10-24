@@ -7,6 +7,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 )
 
 type StatusRequest struct{ ArtifactId valobj.Id }
@@ -27,16 +28,22 @@ type GetArtifactStatusHandler struct {
 	storage adapter.ObjectStore
 }
 
-func NewGetArtifactStatusHandler(repo artifactrepo.Repository, storage adapter.ObjectStore) *GetArtifactStatusHandler {
-	return &GetArtifactStatusHandler{baseHandler: newBaseHandler(repo), storage: storage}
+func NewGetArtifactStatusHandler(
+	repo artifactrepo.Repository,
+	notebookAccessService *notebookservice.AccessService,
+	storage adapter.ObjectStore,
+) *GetArtifactStatusHandler {
+	return &GetArtifactStatusHandler{baseHandler: newBaseHandler(repo, notebookAccessService), storage: storage}
 }
 
 func (h *GetArtifactStatusHandler) Handle(ctx context.Context, cmd *StatusRequest) (*StatusResponse, error) {
-	artifact, err := h.handle(ctx, cmd.ArtifactId)
-	if err != nil {
-		return nil, err
-	}
+	return withArtifactAccess(h.baseHandler, ctx, cmd.ArtifactId, accessView, h.getStatus)
+}
 
+func (h *GetArtifactStatusHandler) getStatus(
+	ctx context.Context,
+	artifact *artifactentity.Artifact,
+) (*StatusResponse, error) {
 	resp := &StatusResponse{
 		Status:     artifact.Status,
 		Title:      artifact.Title,
@@ -51,14 +58,9 @@ func (h *GetArtifactStatusHandler) Handle(ctx context.Context, cmd *StatusReques
 	return resp, nil
 }
 
-func (h *GetArtifactStatusHandler) FindById(ctx context.Context, artifactId valobj.Id) (*artifactentity.Artifact, error) {
-	return h.handle(ctx, artifactId)
-}
-
-func (h *GetArtifactStatusHandler) AttachStorageURL(ctx context.Context, a *artifactentity.Artifact) (url string, mime string) {
-	if a == nil || !a.ResultKind.Storage() || len(a.Result) == 0 {
-		return "", ""
-	}
-
-	return materializeStorageResult(ctx, h.storage, a.Result)
+// GetView 返回带 ContentUrl 的产物视图，供详情接口直接透传。
+func (h *GetArtifactStatusHandler) GetView(ctx context.Context, artifactId valobj.Id) (*ArtifactView, error) {
+	return withArtifactAccess(h.baseHandler, ctx, artifactId, accessView, func(ctx context.Context, a *artifactentity.Artifact) (*ArtifactView, error) {
+		return toArtifactView(ctx, h.storage, a), nil
+	})
 }

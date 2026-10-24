@@ -1,10 +1,10 @@
 package postgres
 
 import (
-	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	"strings"
 	"testing"
 	"time"
+
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/schema"
@@ -65,20 +65,20 @@ func TestNotebookStoreCRUD(t *testing.T) {
 }
 
 func TestNotebookStoreListByOwnerId(t *testing.T) {
-	Convey("NotebookStore ListByOwnerId", t, func() {
+	Convey("NotebookStore ListByOwnerId pages and orders owner notebooks", t, func() {
 		store := testNotebookStore
 		ctx := t.Context()
 		ownerID := valobj.NewUid()
 
 		nbOld := &schema.Notebook{
-			Id:          database.Id(uuid.NewV7()),
+			Id:          uuid.MustParseString("01900000-0000-7000-8000-000000000001"),
 			Name:        "nb_old_" + uuid.NewV7().String(),
 			Description: "old",
 			OwnerId:     ownerID,
 			UpdatedAt:   1000,
 		}
 		nbNew := &schema.Notebook{
-			Id:          database.Id(uuid.NewV7()),
+			Id:          uuid.MustParseString("01900000-0000-7000-8000-000000000002"),
 			Name:        "nb_new_" + uuid.NewV7().String(),
 			Description: "new",
 			OwnerId:     ownerID,
@@ -93,31 +93,143 @@ func TestNotebookStoreListByOwnerId(t *testing.T) {
 			_ = testDB.WithContext(ctx).Where("owner_id = ?", ownerID).Delete(&schema.Notebook{}).Error
 		})
 
-		firstPage, err := store.ListByOwnerId(ctx, ownerID, 1, 0, 1)
+		// updated_at DESC: nbNew 在前，nbOld 在后；同毫秒由 id DESC 兜底。
+		rows, err := store.ListByOwnerId(ctx, ownerID, 10, 0, database.NotebookListOrderLastActive)
 		So(err, ShouldBeNil)
-		So(len(firstPage), ShouldEqual, 1)
-		So(firstPage[0].Id, ShouldEqual, nbNew.Id)
+		So(len(rows), ShouldEqual, 2)
+		So(rows[0].Id, ShouldEqual, nbNew.Id)
+		So(rows[1].Id, ShouldEqual, nbOld.Id)
 
-		secondPage, err := store.ListByOwnerId(ctx, ownerID, 1, 1, 1)
+		rows, err = store.ListByOwnerId(ctx, ownerID, 1, 0, database.NotebookListOrderLastActive)
 		So(err, ShouldBeNil)
-		So(len(secondPage), ShouldEqual, 1)
-		So(secondPage[0].Id, ShouldEqual, nbOld.Id)
+		So(len(rows), ShouldEqual, 1)
+		So(rows[0].Id, ShouldEqual, nbNew.Id)
+
+		rows, err = store.ListByOwnerId(ctx, ownerID, 1, 1, database.NotebookListOrderLastActive)
+		So(err, ShouldBeNil)
+		So(len(rows), ShouldEqual, 1)
+		So(rows[0].Id, ShouldEqual, nbOld.Id)
+
+		rows, err = store.ListByOwnerId(ctx, ownerID, 1, 2, database.NotebookListOrderLastActive)
+		So(err, ShouldBeNil)
+		So(len(rows), ShouldEqual, 0)
+
+		// id ASC 等价于创建时间正序（uuidv7 内嵌时间戳）。
+		rows, err = store.ListByOwnerId(ctx, ownerID, 10, 0, database.NotebookListOrderCreateTime)
+		So(err, ShouldBeNil)
+		So(len(rows), ShouldEqual, 2)
+		So(rows[0].Id, ShouldEqual, nbOld.Id)
+		So(rows[1].Id, ShouldEqual, nbNew.Id)
+
+		_, err = store.ListByOwnerId(ctx, ownerID, 0, 0, database.NotebookListOrderLastActive)
+		So(err, ShouldNotBeNil)
+
+		_, err = store.ListByOwnerId(ctx, ownerID, 1, -1, database.NotebookListOrderLastActive)
+		So(err, ShouldNotBeNil)
+
+		_, err = store.ListByOwnerId(ctx, ownerID, 1, 0, database.NotebookListOrder(99))
+		So(err, ShouldNotBeNil)
 	})
 }
 
-func TestNotebookStoreListByOwnerIdInvalidPagination(t *testing.T) {
-	Convey("NotebookStore ListByOwnerId invalid pagination", t, func() {
+func TestNotebookStoreListByIds(t *testing.T) {
+	Convey("NotebookStore ListByIds returns matched rows only", t, func() {
+		store := testNotebookStore
+		ctx := t.Context()
+
+		nb := &schema.Notebook{
+			Id:          database.Id(uuid.NewV7()),
+			Name:        "nb_by_ids_" + uuid.NewV7().String(),
+			Description: "by ids",
+			OwnerId:     valobj.NewUid(),
+			UpdatedAt:   nowMilli(),
+		}
+		So(store.Create(ctx, nb), ShouldBeNil)
+		t.Cleanup(func() {
+			_ = testDB.WithContext(ctx).Where("id = ?", nb.Id).Delete(&schema.Notebook{}).Error
+		})
+
+		rows, err := store.ListByIds(ctx, []database.Id{nb.Id, database.Id(uuid.NewV7())})
+		So(err, ShouldBeNil)
+		So(len(rows), ShouldEqual, 1)
+		So(rows[0].Id, ShouldEqual, nb.Id)
+
+		rows, err = store.ListByIds(ctx, nil)
+		So(err, ShouldBeNil)
+		So(len(rows), ShouldEqual, 0)
+	})
+}
+
+func TestNotebookStoreListByIdsExcludingOwner(t *testing.T) {
+	Convey("NotebookStore ListByIdsExcludingOwner pages, orders and excludes the owner", t, func() {
 		store := testNotebookStore
 		ctx := t.Context()
 		ownerID := valobj.NewUid()
+		memberID := valobj.NewUid()
 
-		_, err := store.ListByOwnerId(ctx, ownerID, 0, 0, 1)
-		So(err, ShouldNotBeNil)
-		So(strings.Contains(err.Error(), "invalid pagination params"), ShouldBeTrue)
+		sharedOlder := &schema.Notebook{
+			Id:          uuid.MustParseString("01900000-0000-7000-8000-000000000011"),
+			Name:        "nb_shared_older_" + uuid.NewV7().String(),
+			Description: "shared older",
+			OwnerId:     ownerID,
+			UpdatedAt:   1000,
+		}
+		sharedNewer := &schema.Notebook{
+			Id:          uuid.MustParseString("01900000-0000-7000-8000-000000000012"),
+			Name:        "nb_shared_newer_" + uuid.NewV7().String(),
+			Description: "shared newer",
+			OwnerId:     ownerID,
+			UpdatedAt:   2000,
+		}
+		ownNotebook := &schema.Notebook{
+			Id:          uuid.MustParseString("01900000-0000-7000-8000-000000000013"),
+			Name:        "nb_own_" + uuid.NewV7().String(),
+			Description: "owned by member",
+			OwnerId:     memberID,
+			UpdatedAt:   3000,
+		}
 
-		_, err = store.ListByOwnerId(ctx, ownerID, 1, -1, 1)
+		for _, nb := range []*schema.Notebook{sharedOlder, sharedNewer, ownNotebook} {
+			So(store.Create(ctx, nb), ShouldBeNil)
+		}
+		t.Cleanup(func() {
+			_ = testDB.WithContext(ctx).Where("owner_id IN ?", []valobj.Uid{ownerID, memberID}).
+				Delete(&schema.Notebook{}).Error
+		})
+
+		ids := []database.Id{sharedOlder.Id, sharedNewer.Id, ownNotebook.Id}
+
+		// 本人拥有的 notebook 即使出现在 ids 里也要排除。
+		rows, err := store.ListByIdsExcludingOwner(ctx, ids, memberID, 10, 0, database.NotebookListOrderLastActive)
+		So(err, ShouldBeNil)
+		So(len(rows), ShouldEqual, 2)
+		So(rows[0].Id, ShouldEqual, sharedNewer.Id)
+		So(rows[1].Id, ShouldEqual, sharedOlder.Id)
+
+		rows, err = store.ListByIdsExcludingOwner(ctx, ids, memberID, 1, 1, database.NotebookListOrderLastActive)
+		So(err, ShouldBeNil)
+		So(len(rows), ShouldEqual, 1)
+		So(rows[0].Id, ShouldEqual, sharedOlder.Id)
+
+		rows, err = store.ListByIdsExcludingOwner(ctx, ids, memberID, 1, 2, database.NotebookListOrderLastActive)
+		So(err, ShouldBeNil)
+		So(len(rows), ShouldEqual, 0)
+
+		rows, err = store.ListByIdsExcludingOwner(ctx, ids, memberID, 10, 0, database.NotebookListOrderCreateTime)
+		So(err, ShouldBeNil)
+		So(len(rows), ShouldEqual, 2)
+		So(rows[0].Id, ShouldEqual, sharedOlder.Id)
+		So(rows[1].Id, ShouldEqual, sharedNewer.Id)
+
+		rows, err = store.ListByIdsExcludingOwner(ctx, nil, memberID, 10, 0, database.NotebookListOrderLastActive)
+		So(err, ShouldBeNil)
+		So(len(rows), ShouldEqual, 0)
+
+		_, err = store.ListByIdsExcludingOwner(ctx, ids, memberID, 0, 0, database.NotebookListOrderLastActive)
 		So(err, ShouldNotBeNil)
-		So(strings.Contains(err.Error(), "invalid pagination params"), ShouldBeTrue)
+
+		_, err = store.ListByIdsExcludingOwner(ctx, ids, memberID, 10, 0, database.NotebookListOrder(99))
+		So(err, ShouldNotBeNil)
 	})
 }
 

@@ -7,9 +7,11 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookerrors "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/errors"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
@@ -31,12 +33,14 @@ type GenerateDescriptionHandler struct {
 
 func NewGenerateDescriptionHandler(
 	notebookRepo notebookrepo.Repository,
+	notebookAccessService *notebookservice.AccessService,
 	sourceRepo sourcerepo.Repository,
+	userRepo identrepo.UserRepository,
 	distLock adapter.DistributedLock,
 	summarizer adapter.Summarizer,
 ) *GenerateDescriptionHandler {
 	return &GenerateDescriptionHandler{
-		baseHandler: newBaseHandler(notebookRepo),
+		baseHandler: newBaseHandler(notebookRepo, notebookAccessService, userRepo, nil),
 		sourceRepo:  sourceRepo,
 		distLock:    distLock,
 		summarizer:  summarizer,
@@ -48,30 +52,27 @@ func (h *GenerateDescriptionHandler) Handle(
 	notebookId valobj.Id,
 ) (string, error) {
 	ctx = pkgcontext.WithScene(ctx, pkgcontext.NotebookDescGenScene, notebookId.String())
-	notebook, err := h.handle(ctx, notebookId)
-	if err != nil {
-		return "", err
-	}
+	return withNotebookAccess(h.baseHandler, ctx, notebookId, accessManageNotebook, h.generateDescription)
+}
+
+func (h *GenerateDescriptionHandler) generateDescription(
+	ctx context.Context,
+	access *notebookentity.Access,
+) (string, error) {
+	notebook := access.Notebook
 
 	if strings.TrimSpace(notebook.Description) != "" {
 		return notebook.Description, nil
 	}
 
 	userId := pkgcontext.GetUserId(ctx)
-	lockKey := notebookDescGenerateLockKey(userId, notebookId)
+	lockKey := notebookDescGenerateLockKey(userId, notebook.Id)
 	if err := h.distLock.Lock(ctx, lockKey); err != nil {
-		return "", errors.WithMessagef(err, "lock notebook description generation failed, notebook_id=%s", notebookId)
+		return "", errors.WithMessagef(err, "lock notebook description generation failed, notebook_id=%s", notebook.Id)
 	}
-	defer func() {
-		_ = h.distLock.Unlock(ctx, lockKey)
-	}()
+	defer func() { _ = h.distLock.Unlock(ctx, lockKey) }()
 
-	desc, err := h.generateAndSave(ctx, notebook)
-	if err != nil {
-		return "", err
-	}
-
-	return desc, nil
+	return h.generateAndSave(ctx, notebook)
 }
 
 func (h *GenerateDescriptionHandler) generateAndSave(

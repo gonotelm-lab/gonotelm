@@ -26,6 +26,7 @@ func TestNewDaoWiresStores(t *testing.T) {
 		dao := NewDao(
 			closer,
 			nil, // NotebookStore
+			nil, // NotebookMemberStore
 			nil, // SourceStore
 			nil, // ChatStore
 			nil, // ChatMessageStore
@@ -74,6 +75,7 @@ func newDaoForCloseTest(closer misc.Closer) *Dao {
 	return NewDao(
 		closer,
 		nil, // NotebookStore
+		nil, // NotebookMemberStore
 		nil, // SourceStore
 		nil, // ChatStore
 		nil, // ChatMessageStore

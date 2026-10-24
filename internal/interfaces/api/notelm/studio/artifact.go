@@ -5,7 +5,6 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	artifactapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/artifact"
-	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 )
@@ -68,30 +67,23 @@ func (s *Server) GetStudioArtifact(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	a, err := s.getArtifactStatusHandler.FindById(ctx, req.TaskId)
+	view, err := s.getArtifactStatusHandler.GetView(ctx, req.TaskId)
 	if err != nil {
 		http.ErrResp(c, err)
 		return
 	}
 
-	if a.IsTerminal() {
-		http.OkResp(c, s.toArtifactItem(ctx, a))
+	if view.Artifact.IsTerminal() {
+		http.OkResp(c, schema.ToArtifactItem(view))
 		return
 	}
 
-	info, err := s.getArtifactStatusHandler.Handle(ctx, &artifactapp.StatusRequest{ArtifactId: req.TaskId})
-	if err != nil {
-		http.ErrResp(c, err)
-		return
-	}
-
-	result := schema.ArtifactItem{
+	http.OkResp(c, &schema.ArtifactItem{
 		TaskId:      req.TaskId.String(),
-		ContentKind: string(info.ResultKind),
-		Status:      string(info.Status),
-		Timestamp:   info.CreatedAt.Value(),
-	}
-	http.OkResp(c, &result)
+		ContentKind: string(view.Artifact.ResultKind),
+		Status:      string(view.Artifact.Status),
+		Timestamp:   view.Artifact.CreateTime.Value(),
+	})
 }
 
 func (s *Server) ListNotebookStudioArtifacts(ctx context.Context, c *app.RequestContext) {
@@ -117,28 +109,9 @@ func (s *Server) ListNotebookStudioArtifacts(ctx context.Context, c *app.Request
 	}
 
 	http.OkResp(c, schema.ListNotebookArtifactsResponse{
-		Artifacts: s.toArtifactItems(ctx, resp.Artifacts),
+		Artifacts: schema.ToArtifactItems(resp.Artifacts),
 		Limit:     req.Limit,
 		Offset:    req.Offset,
 		HasMore:   resp.HasMore,
 	})
-}
-
-func (s *Server) toArtifactItem(ctx context.Context, a *artifactentity.Artifact) *schema.ArtifactItem {
-	result := schema.ToArtifactItem(a)
-	if contentURL, mime := s.getArtifactStatusHandler.AttachStorageURL(ctx, a); contentURL != "" {
-		result.ContentUrl = contentURL
-		if result.MimeType == "" {
-			result.MimeType = mime
-		}
-	}
-	return result
-}
-
-func (s *Server) toArtifactItems(ctx context.Context, artifacts []*artifactentity.Artifact) []*schema.ArtifactItem {
-	results := make([]*schema.ArtifactItem, 0, len(artifacts))
-	for _, a := range artifacts {
-		results = append(results, s.toArtifactItem(ctx, a))
-	}
-	return results
 }

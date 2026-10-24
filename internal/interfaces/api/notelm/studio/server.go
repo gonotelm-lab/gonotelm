@@ -9,6 +9,7 @@ import (
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
@@ -16,20 +17,21 @@ import (
 
 // Deps 产物接口所需依赖，由外层 notelm.ServerDeps 裁剪后传入
 type Deps struct {
-	WaitGroup        *sync.WaitGroup
-	ArtifactRepo     artifactrepo.Repository
-	StylePreviewRepo artifactrepo.StylePreviewRepository
-	NotebookRepo     notebookrepo.Repository
-	SourceRepo       sourcerepo.Repository
-	ChatRepo         chatrepo.ChatRepository
-	ChatMessageRepo  chatrepo.MessageRepository
-	FlowClient       flow.TaskClient
-	Poller           artifactapp.Poller
-	EventBus         eventbus.Publisher
-	TitleMaker       adapter.TitleMaker
-	ObjectStore      adapter.ObjectStore
-	KeyFactory       adapter.StoreKeyFactory
-	Cleaner          *cleanup.Cleaner
+	WaitGroup             *sync.WaitGroup
+	ArtifactRepo          artifactrepo.Repository
+	StylePreviewRepo      artifactrepo.StylePreviewRepository
+	NotebookRepo          notebookrepo.Repository
+	NotebookAccessService *notebookservice.AccessService
+	SourceRepo            sourcerepo.Repository
+	ChatRepo              chatrepo.ChatRepository
+	ChatMessageRepo       chatrepo.MessageRepository
+	FlowClient            flow.TaskClient
+	Poller                artifactapp.Poller
+	EventBus              eventbus.Publisher
+	TitleMaker            adapter.TitleMaker
+	ObjectStore           adapter.ObjectStore
+	KeyFactory            adapter.StoreKeyFactory
+	Cleaner               *cleanup.Cleaner
 }
 
 // Server 产物接口的处理器集合
@@ -50,7 +52,7 @@ func NewServer(deps Deps) *Server {
 		generateArtifactHandler: artifactapp.NewGenerateArtifactHandler(
 			deps.WaitGroup,
 			deps.ArtifactRepo,
-			deps.NotebookRepo,
+			deps.NotebookAccessService,
 			deps.SourceRepo,
 			deps.ChatRepo,
 			deps.ChatMessageRepo,
@@ -59,14 +61,40 @@ func NewServer(deps Deps) *Server {
 			deps.EventBus,
 			deps.TitleMaker,
 		),
-		getArtifactStatusHandler:     artifactapp.NewGetArtifactStatusHandler(deps.ArtifactRepo, deps.ObjectStore),
-		listNotebookArtifactsHandler: artifactapp.NewListArtifactsHandler(deps.NotebookRepo, deps.ArtifactRepo),
-		cancelArtifactHandler:        artifactapp.NewCancelArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.EventBus),
-		deleteArtifactHandler:        artifactapp.NewDeleteArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.ObjectStore, deps.Cleaner),
-		retryArtifactHandler:         artifactapp.NewRetryArtifactHandler(deps.ArtifactRepo, deps.FlowClient, deps.Poller, deps.EventBus),
-		updateArtifactHandler:        artifactapp.NewUpdateArtifactHandler(deps.ArtifactRepo),
+		getArtifactStatusHandler: artifactapp.NewGetArtifactStatusHandler(
+			deps.ArtifactRepo,
+			deps.NotebookAccessService,
+			deps.ObjectStore,
+		),
+		listNotebookArtifactsHandler: artifactapp.NewListArtifactsHandler(
+			deps.ArtifactRepo,
+			deps.NotebookAccessService,
+			deps.ObjectStore,
+		),
+		cancelArtifactHandler: artifactapp.NewCancelArtifactHandler(
+			deps.ArtifactRepo,
+			deps.NotebookAccessService,
+			deps.FlowClient,
+			deps.EventBus,
+		),
+		deleteArtifactHandler: artifactapp.NewDeleteArtifactHandler(
+			deps.ArtifactRepo,
+			deps.NotebookAccessService,
+			deps.FlowClient,
+			deps.ObjectStore,
+			deps.Cleaner,
+		),
+		retryArtifactHandler: artifactapp.NewRetryArtifactHandler(
+			deps.ArtifactRepo,
+			deps.NotebookAccessService,
+			deps.FlowClient,
+			deps.Poller,
+			deps.EventBus,
+		),
+		updateArtifactHandler: artifactapp.NewUpdateArtifactHandler(deps.ArtifactRepo, deps.NotebookAccessService),
 		convertNoteToSourceHandler: artifactapp.NewConvertNoteToSourceHandler(
 			deps.ArtifactRepo,
+			deps.NotebookAccessService,
 			deps.SourceRepo,
 			deps.NotebookRepo,
 			deps.ObjectStore,

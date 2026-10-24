@@ -4,6 +4,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
+	"github.com/gonotelm-lab/gonotelm/internal/domain/notebook/vo"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/schema"
 )
 
@@ -13,6 +14,7 @@ func NotebookToSchema(notebook *notebookentity.Notebook) *schema.Notebook {
 		Name:        notebook.Name,
 		Description: notebook.Description,
 		OwnerId:     notebook.OwnerId,
+		Visibility:  notebook.Visibility.String(),
 		UpdatedAt:   notebook.UpdateTime.Value(),
 	}
 }
@@ -27,6 +29,7 @@ func NotebookFromSchema(notebook *schema.Notebook) *notebookentity.Notebook {
 		Name:        notebook.Name,
 		Description: notebook.Description,
 		OwnerId:     notebook.OwnerId,
+		Visibility:  vo.NewVisibility(notebook.Visibility),
 	}
 }
 

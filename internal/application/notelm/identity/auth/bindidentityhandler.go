@@ -3,11 +3,11 @@ package auth
 import (
 	"context"
 
-	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
 	identerr "github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
 	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 	identityservice "github.com/gonotelm-lab/gonotelm/internal/domain/identity/service"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
@@ -32,7 +32,6 @@ func NewBindIdentityHandler(
 
 type BindIdentityCommand struct {
 	ProviderType entity.ProviderType
-	UserId       valobj.Uid
 	SessionId    string
 	ReturnTo     string
 }
@@ -44,7 +43,7 @@ type BindIdentityResult struct {
 }
 
 func (h *BindIdentityHandler) Handle(ctx context.Context, cmd *BindIdentityCommand) (*BindIdentityResult, error) {
-	agg, err := h.userService.GetAccount(ctx, cmd.UserId)
+	agg, err := h.userService.GetAccount(ctx, pkgcontext.GetUserId(ctx))
 	if err != nil {
 		return nil, err
 	}

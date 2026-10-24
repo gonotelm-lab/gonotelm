@@ -5,6 +5,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
@@ -16,11 +17,12 @@ type DeleteChatContextHandler struct {
 
 func NewDeleteChatContextHandler(
 	chatRepo chatrepo.ChatRepository,
+	notebookAccessService *notebookservice.AccessService,
 	chatContextMessageRepo chatrepo.ContextMessageRepository,
 	suggestionRepo chatrepo.SuggestionRepository,
 ) *DeleteChatContextHandler {
 	return &DeleteChatContextHandler{
-		baseHandler:            newBaseHandler(chatRepo),
+		baseHandler:            newBaseHandler(chatRepo, notebookAccessService),
 		chatContextMessageRepo: chatContextMessageRepo,
 		suggestionRepo:         suggestionRepo,
 	}

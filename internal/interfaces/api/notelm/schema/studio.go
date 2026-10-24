@@ -3,6 +3,7 @@ package schema
 import (
 	"unicode/utf8"
 
+	artifactapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/artifact"
 	audiooverview "github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/audiooverview"
 	infographic "github.com/gonotelm-lab/gonotelm/internal/application/worker/artifact/infographic"
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
@@ -377,7 +378,12 @@ type NoteExtras struct {
 	MsgId  uuid.UUID `json:"msg_id"`
 }
 
-func ToArtifactItem(a *artifactentity.Artifact) *ArtifactItem {
+func ToArtifactItem(view *artifactapp.ArtifactView) *ArtifactItem {
+	if view == nil || view.Artifact == nil {
+		return nil
+	}
+
+	a := view.Artifact
 	r := &ArtifactItem{
 		NotebookId:  a.NotebookId.String(),
 		TaskId:      a.Id.String(),
@@ -491,13 +497,20 @@ func ToArtifactItem(a *artifactentity.Artifact) *ArtifactItem {
 		}
 	}
 
+	if view.ContentUrl != "" {
+		r.ContentUrl = view.ContentUrl
+		if r.MimeType == "" {
+			r.MimeType = view.MimeType
+		}
+	}
+
 	return r
 }
 
-func ToArtifactItems(artifacts []*artifactentity.Artifact) []*ArtifactItem {
-	results := make([]*ArtifactItem, 0, len(artifacts))
-	for _, a := range artifacts {
-		results = append(results, ToArtifactItem(a))
+func ToArtifactItems(views []*artifactapp.ArtifactView) []*ArtifactItem {
+	results := make([]*ArtifactItem, 0, len(views))
+	for _, view := range views {
+		results = append(results, ToArtifactItem(view))
 	}
 	return results
 }

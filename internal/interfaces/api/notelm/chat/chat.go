@@ -6,7 +6,6 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 	chatapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat"
 	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/schema"
-	pkgctx "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 )
 
@@ -22,7 +21,6 @@ func (s *Server) GetOrCreateNotebookChat(ctx context.Context, c *app.RequestCont
 	chat, err := s.createChatHandler.Handle(ctx,
 		&chatapp.CreateChatCommand{
 			NotebookId: req.Id,
-			OwnerId:    pkgctx.GetUserId(ctx),
 		})
 	if err != nil {
 		http.ErrResp(c, err)

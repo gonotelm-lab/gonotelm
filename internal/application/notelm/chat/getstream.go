@@ -10,16 +10,23 @@ import (
 	chatentity "github.com/gonotelm-lab/gonotelm/internal/domain/chat/entity"
 	chaterrors "github.com/gonotelm-lab/gonotelm/internal/domain/chat/errors"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type GetStreamHandler struct {
+	*baseHandler
 	streamTaskRepo chatrepo.StreamTaskRepository
 }
 
-func NewGetStreamHandler(streamTaskRepo chatrepo.StreamTaskRepository) *GetStreamHandler {
+func NewGetStreamHandler(
+	chatRepo chatrepo.ChatRepository,
+	notebookAccessService *notebookservice.AccessService,
+	streamTaskRepo chatrepo.StreamTaskRepository,
+) *GetStreamHandler {
 	return &GetStreamHandler{
+		baseHandler:    newBaseHandler(chatRepo, notebookAccessService),
 		streamTaskRepo: streamTaskRepo,
 	}
 }
@@ -54,7 +61,7 @@ func (h *GetStreamHandler) Handle(
 	}
 
 	userId := pkgcontext.GetUserId(ctx)
-	if err := canAccessStreamTask(task, query.ChatId, userId); err != nil {
+	if err := h.ensureStreamAccess(ctx, task, query.ChatId, userId); err != nil {
 		return nil, err
 	}
 
@@ -136,22 +143,4 @@ func (h *GetStreamHandler) Handle(
 	}()
 
 	return result, nil
-}
-
-func canAccessStreamTask(
-	task *chatentity.StreamTask,
-	chatId valobj.Id,
-	userId valobj.Uid,
-) error {
-	if task.ChatId != chatId {
-		return errors.ErrParams.Msgf("task chat_id mismatch, task_id=%s, chat_id=%s",
-			task.Id, chatId)
-	}
-
-	if task.UserId != userId {
-		return errors.ErrPermission.Msgf("task user_id mismatch, task_id=%s, user_id=%s",
-			task.Id, userId)
-	}
-
-	return nil
 }

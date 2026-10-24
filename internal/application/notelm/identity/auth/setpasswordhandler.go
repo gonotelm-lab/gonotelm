@@ -4,9 +4,9 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 	identityservice "github.com/gonotelm-lab/gonotelm/internal/domain/identity/service"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 )
 
 type SetPasswordHandler struct {
@@ -22,7 +22,6 @@ func NewSetPasswordHandler(
 }
 
 type SetPasswordCommand struct {
-	UserId      valobj.Uid
 	OldPassword string
 	NewPassword string
 }
@@ -37,14 +36,15 @@ func (h *SetPasswordHandler) Handle(ctx context.Context, cmd *SetPasswordCommand
 		return nil, err
 	}
 
-	if err := h.userService.SetPassword(ctx, cmd.UserId, cmd.OldPassword, cmd.NewPassword); err != nil {
+	userId := pkgcontext.GetUserId(ctx)
+	if err := h.userService.SetPassword(ctx, userId, cmd.OldPassword, cmd.NewPassword); err != nil {
 		return nil, err
 	}
 
 	// 作废全部会话（含当前），失败不回滚密码，按 relogin_required 引导重新登录
-	if err := h.sessionRepo.DeleteByUserId(ctx, cmd.UserId); err != nil {
+	if err := h.sessionRepo.DeleteByUserId(ctx, userId); err != nil {
 		slog.ErrorContext(ctx, "revoke sessions after password change failed",
-			slog.String("user_id", cmd.UserId.String()),
+			slog.String("user_id", userId.String()),
 			slog.Any("err", err),
 		)
 	}

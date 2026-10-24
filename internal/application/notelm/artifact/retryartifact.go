@@ -10,6 +10,7 @@ import (
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	artifacterrors "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/errors"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -35,9 +36,17 @@ type RetryArtifactHandler struct {
 	eventBus eventbus.Publisher
 }
 
-func NewRetryArtifactHandler(repo artifactrepo.Repository, flowc flow.TaskClient, poller Poller, eventBus eventbus.Publisher) *RetryArtifactHandler {
+type retryArtifactResult struct{}
+
+func NewRetryArtifactHandler(
+	repo artifactrepo.Repository,
+	notebookAccessService *notebookservice.AccessService,
+	flowc flow.TaskClient,
+	poller Poller,
+	eventBus eventbus.Publisher,
+) *RetryArtifactHandler {
 	return &RetryArtifactHandler{
-		baseHandler: newBaseHandler(repo),
+		baseHandler: newBaseHandler(repo, notebookAccessService),
 		flowc:       flowc,
 		poller:      poller,
 		eventBus:    eventBus,
@@ -45,18 +54,21 @@ func NewRetryArtifactHandler(repo artifactrepo.Repository, flowc flow.TaskClient
 }
 
 func (h *RetryArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error {
-	artifact, err := h.handle(ctx, cmd)
-	if err != nil {
-		return err
-	}
+	_, err := withArtifactAccess(h.baseHandler, ctx, cmd, accessManage, h.retryArtifact)
+	return err
+}
 
+func (h *RetryArtifactHandler) retryArtifact(
+	ctx context.Context,
+	artifact *artifactentity.Artifact,
+) (*retryArtifactResult, error) {
 	if artifact.Status.Completed() {
-		return artifacterrors.ErrCannotRetryCompleted
+		return nil, artifacterrors.ErrCannotRetryCompleted
 	}
 
 	// 保存为笔记的 artifact 不需要重试
 	if artifact.Kind == artifactentity.KindNote {
-		return artifacterrors.ErrCannotRetryNote
+		return nil, artifacterrors.ErrCannotRetryNote
 	}
 
 	oldFlowTaskId := artifact.FlowTaskId
@@ -64,7 +76,7 @@ func (h *RetryArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error 
 	if oldFlowTaskId != "" {
 		if err := h.cancelAndWait(ctx, oldFlowTaskId); err != nil {
 			slog.WarnContext(ctx, "cancel old flow task on retry failed, proceeding anyway",
-				"artifact_id", cmd,
+				"artifact_id", artifact.Id,
 				"old_flow_task_id", oldFlowTaskId,
 				slog.Any("err", err),
 			)
@@ -73,25 +85,25 @@ func (h *RetryArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error 
 
 	payloadBytes, err := sonic.Marshal(artifact.Payload)
 	if err != nil {
-		return errors.Wrapf(errors.ErrSerde, "marshal payload on retry err=%v", err)
+		return nil, errors.Wrapf(errors.ErrSerde, "marshal payload on retry err=%v", err)
 	}
 
 	workerInput := buildWorkerInput(artifact, payloadBytes)
 	workerInputBytes, err := sonic.Marshal(workerInput)
 	if err != nil {
-		return errors.Wrapf(errors.ErrSerde, "marshal worker input on retry err=%v", err)
+		return nil, errors.Wrapf(errors.ErrSerde, "marshal worker input on retry err=%v", err)
 	}
 
 	newFlowTaskId, err := h.flowc.Submit(ctx, taskTypeFor(artifact.Kind), workerInputBytes)
 	if err != nil {
-		return errors.WithMessage(err, "submit retry task to flow failed")
+		return nil, errors.WithMessage(err, "submit retry task to flow failed")
 	}
 
 	if err := artifact.Retry(newFlowTaskId); err != nil {
-		return err
+		return nil, err
 	}
 	if err := h.updateArtifact(ctx, artifact); err != nil {
-		return errors.WithMessage(err, "update retried artifact failed")
+		return nil, errors.WithMessage(err, "update retried artifact failed")
 	}
 
 	for _, evt := range artifact.PullEvents() {
@@ -104,7 +116,7 @@ func (h *RetryArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error 
 		go h.poller.PollOne(context.WithoutCancel(ctx), artifact.Id, artifact.FlowTaskId)
 	}
 
-	return nil
+	return &retryArtifactResult{}, nil
 }
 
 func (h *RetryArtifactHandler) cancelAndWait(ctx context.Context, flowTaskId string) error {

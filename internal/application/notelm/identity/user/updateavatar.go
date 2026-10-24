@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/gonotelm-lab/gonotelm/internal/application/shared/storekey"
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
 	identerr "github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
@@ -14,9 +15,10 @@ import (
 )
 
 type UpdateAvatarHandler struct {
-	userRepo    repository.UserRepository
-	objectStore adapter.ObjectStore
-	keyFactory  adapter.StoreKeyFactory
+	userRepo         repository.UserRepository
+	objectStore      adapter.ObjectStore
+	storeKeyResolver *storekey.Resolver
+	keyFactory       adapter.StoreKeyFactory
 }
 
 func NewUpdateAvatarHandler(
@@ -25,9 +27,10 @@ func NewUpdateAvatarHandler(
 	keyFactory adapter.StoreKeyFactory,
 ) *UpdateAvatarHandler {
 	return &UpdateAvatarHandler{
-		userRepo:    userRepo,
-		objectStore: objectStore,
-		keyFactory:  keyFactory,
+		userRepo:         userRepo,
+		objectStore:      objectStore,
+		storeKeyResolver: storekey.New(objectStore),
+		keyFactory:       keyFactory,
 	}
 }
 
@@ -78,9 +81,9 @@ func (h *UpdateAvatarHandler) Handle(ctx context.Context, content []byte) (strin
 		}
 	}
 
-	url, err := h.objectStore.PublicURL(ctx, newAvatar)
-	if err != nil {
-		return "", errors.WithMessage(err, "resolve avatar public url failed")
+	url := h.storeKeyResolver.ResolvePublic(ctx, newAvatar)
+	if url == "" {
+		return "", errors.ErrInner.Msg("resolve avatar public url failed")
 	}
 
 	return url, nil

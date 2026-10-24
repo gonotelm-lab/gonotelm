@@ -15,6 +15,7 @@ type UserRepository interface {
 	// CreateWithFirstIdentity 创建账号与挂第一个身份必须原子
 	CreateWithFirstIdentity(ctx context.Context, user *entity.User, identity *entity.UserIdentity) error
 	GetById(ctx context.Context, id valobj.Uid) (*entity.User, error)
+	BatchGetById(ctx context.Context, ids []valobj.Uid) ([]*entity.User, error)
 	GetByEmail(ctx context.Context, email string) (*entity.User, error)
 	GetPasswordHash(ctx context.Context, id valobj.Uid) (string, error)
 	UpdateProfile(ctx context.Context, user *entity.User) error

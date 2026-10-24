@@ -7,6 +7,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	chatentity "github.com/gonotelm-lab/gonotelm/internal/domain/chat/entity"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
@@ -15,9 +16,13 @@ type ListMessagesHandler struct {
 	chatMessageRepo chatrepo.MessageRepository
 }
 
-func NewListMessagesHandler(chatRepo chatrepo.ChatRepository, chatMessageRepo chatrepo.MessageRepository) *ListMessagesHandler {
+func NewListMessagesHandler(
+	chatRepo chatrepo.ChatRepository,
+	notebookAccessService *notebookservice.AccessService,
+	chatMessageRepo chatrepo.MessageRepository,
+) *ListMessagesHandler {
 	return &ListMessagesHandler{
-		baseHandler:     newBaseHandler(chatRepo),
+		baseHandler:     newBaseHandler(chatRepo, notebookAccessService),
 		chatMessageRepo: chatMessageRepo,
 	}
 }

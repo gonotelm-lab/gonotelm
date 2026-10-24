@@ -104,6 +104,28 @@ func (r *UserRepositoryImpl) GetById(ctx context.Context, id valobj.Uid) (*ident
 	return user, nil
 }
 
+func (r *UserRepositoryImpl) BatchGetById(ctx context.Context, ids []valobj.Uid) ([]*identityentity.User, error) {
+	if len(ids) == 0 {
+		return []*identityentity.User{}, nil
+	}
+
+	rows, err := r.userStore.BatchGetById(ctx, ids)
+	if err != nil {
+		return nil, errors.WithMessage(err, "failed to get users by ids")
+	}
+
+	users := make([]*identityentity.User, 0, len(rows))
+	for _, row := range rows {
+		user, err := mapper.UserFromSchema(row)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, user)
+	}
+
+	return users, nil
+}
+
 func (r *UserRepositoryImpl) GetByEmail(ctx context.Context, email string) (*identityentity.User, error) {
 	sch, err := r.userStore.GetByEmail(ctx, email)
 	if err != nil {

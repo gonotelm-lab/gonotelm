@@ -10,14 +10,14 @@ import (
 type contextKey string
 
 const (
-	ContextKeyReqId        = contextKey("_req_id")
-	ContextKeyUserId       = contextKey("_user_id")
-	ContextKeySceneType    = contextKey("_scene_type")
-	ContextKeySceneGroupId = contextKey("_scene_group_id")
-	ContextLang            = contextKey("_lang")
-	ContextOperatorType    = contextKey("_operator_type")
-	ContextKeySubagent     = contextKey("_subagent")
-	ContextKeyLoginSource  = contextKey("_login_source")
+	ContextKeyReqId        contextKey = "_req_id"
+	ContextKeyUserId       contextKey = "_user_id"
+	ContextKeySceneType    contextKey = "_scene_type"
+	ContextKeySceneGroupId contextKey = "_scene_group_id"
+	ContextLang            contextKey = "_lang"
+	ContextOperatorType    contextKey = "_operator_type"
+	ContextKeySubagent     contextKey = "_subagent"
+	ContextKeyLoginSource  contextKey = "_login_source"
 )
 
 func WithReqId(ctx context.Context, reqId requestid.ID) context.Context {

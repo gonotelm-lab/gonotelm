@@ -2,6 +2,9 @@ package schema
 
 import (
 	notebookapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/notebook"
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	"github.com/gonotelm-lab/gonotelm/internal/domain/notebook/vo"
+	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 
@@ -23,12 +26,22 @@ func (r *GetNotebookRequest) Validate() error {
 }
 
 type GetNotebookResponse struct {
-	Id          string `json:"id"`
-	Name        string `json:"name"`
-	Desc        string `json:"desc"`
-	SourceCount int64  `json:"source_count"`
-	UpdatedAt   int64  `json:"updated_at"` // unix ms
-	CreatedAt   int64  `json:"created_at"` // unix ms
+	Id          string                 `json:"id"`
+	Name        string                 `json:"name"`
+	Desc        string                 `json:"desc"`
+	SourceCount int64                  `json:"source_count"`
+	Visibility  string                 `json:"visibility"`
+	UpdatedAt   int64                  `json:"updated_at"`      // unix ms
+	CreatedAt   int64                  `json:"created_at"`      // unix ms
+	Owner       *NotebookOwnerResponse `json:"owner,omitempty"` // notebook owner
+}
+
+type GetNotebookAccessResponse struct {
+	Role              string `json:"role"`
+	CanView           bool   `json:"can_view"`
+	CanManageContent  bool   `json:"can_manage_content"`
+	CanManageNotebook bool   `json:"can_manage_notebook"`
+	CanManageSharing  bool   `json:"can_manage_sharing"`
 }
 
 type ListNotebooksSortBy string
@@ -37,6 +50,10 @@ const (
 	ListNotebooksSortByLastActive ListNotebooksSortBy = "last_active"
 	ListNotebooksSortByCreateTime ListNotebooksSortBy = "create_time"
 )
+
+func (s ListNotebooksSortBy) IsValid() bool {
+	return s == ListNotebooksSortByLastActive || s == ListNotebooksSortByCreateTime
+}
 
 func (s ListNotebooksSortBy) ToSortBy() notebookapp.SortBy {
 	switch s {
@@ -49,10 +66,31 @@ func (s ListNotebooksSortBy) ToSortBy() notebookapp.SortBy {
 	return notebookapp.SortByCreateTime
 }
 
+// 首页列出笔记本时 可指定筛选的scope；owned 与 shared 互斥。
+type ListNotebooksScope string
+
+const (
+	ListNotebooksScopeOwned  ListNotebooksScope = "owned"
+	ListNotebooksScopeShared ListNotebooksScope = "shared"
+)
+
+func (s ListNotebooksScope) IsValid() bool {
+	return s == ListNotebooksScopeOwned || s == ListNotebooksScopeShared
+}
+
+func (s ListNotebooksScope) ToScope() notebookapp.AccessScope {
+	if s == ListNotebooksScopeShared {
+		return notebookapp.AccessScopeShared
+	}
+
+	return notebookapp.AccessScopeOwned
+}
+
 type ListNotebooksRequest struct {
 	Limit  int                 `query:"limit"   validate:"omitempty,min=1,max=100"`
 	Offset int                 `query:"offset"  validate:"min=0"`
-	SortBy ListNotebooksSortBy `query:"sort_by" validate:"omitempty,oneof=last_active create_time"`
+	SortBy ListNotebooksSortBy `query:"sort_by"`
+	Scope  ListNotebooksScope  `query:"scope"`
 }
 
 const defaultNotebooksListLimit = 20
@@ -64,6 +102,14 @@ func (r *ListNotebooksRequest) Validate() error {
 
 	if r.SortBy == "" {
 		r.SortBy = ListNotebooksSortByCreateTime
+	} else if !r.SortBy.IsValid() {
+		return errors.ErrParams.Msgf("invalid sort_by: %s", r.SortBy)
+	}
+
+	if r.Scope == "" {
+		r.Scope = ListNotebooksScopeOwned
+	} else if !r.Scope.IsValid() {
+		return errors.ErrParams.Msgf("invalid scope: %s", r.Scope)
 	}
 
 	return nil
@@ -76,13 +122,47 @@ type ListNotebooksResponse struct {
 	HasMore   bool                        `json:"has_more"`
 }
 
+type NotebookOwnerResponse struct {
+	UserId    string `json:"user_id"`
+	Nickname  string `json:"nickname"`
+	AvatarURL string `json:"avatar_url"`
+}
+
+func NewNotebookOwnerResponse(owner *notebookapp.NotebookOwner) *NotebookOwnerResponse {
+	if owner == nil {
+		return nil
+	}
+	return &NotebookOwnerResponse{
+		UserId:    owner.Id.String(),
+		Nickname:  owner.Nickname,
+		AvatarURL: owner.AvatarURL,
+	}
+}
+
 type ListNotebookItemResponse struct {
-	Id          string `json:"id"`
-	Name        string `json:"name"`
-	Desc        string `json:"desc"`
-	SourceCount int64  `json:"source_count"`
-	UpdatedAt   int64  `json:"updated_at"` // unix ms
-	CreatedAt   int64  `json:"created_at"` // unix ms
+	Id          string                 `json:"id"`
+	Name        string                 `json:"name"`
+	Desc        string                 `json:"desc"`
+	SourceCount int64                  `json:"source_count"`
+	Visibility  string                 `json:"visibility"`
+	Owner       *NotebookOwnerResponse `json:"owner,omitempty"`
+	UpdatedAt   int64                  `json:"updated_at"` // unix ms
+	CreatedAt   int64                  `json:"created_at"` // unix ms
+}
+
+func NewListNotebookItemResponse(
+	notebook *notebookapp.Notebook,
+) *ListNotebookItemResponse {
+	return &ListNotebookItemResponse{
+		Id:          notebook.Id.String(),
+		Name:        notebook.Name,
+		Desc:        notebook.Description,
+		SourceCount: notebook.SourceCount,
+		Visibility:  string(notebook.Visibility),
+		Owner:       NewNotebookOwnerResponse(notebook.Owner),
+		UpdatedAt:   notebook.UpdateTime.Value(),
+		CreatedAt:   notebook.CreateTime.Value(),
+	}
 }
 
 type ListNotebookSourcesRequest struct {
@@ -138,4 +218,57 @@ func (r *GenerateNotebookDescriptionRequest) Validate() error {
 
 type GenerateNotebookDescriptionResponse struct {
 	Desc string `json:"desc"`
+}
+
+type GetNotebookSharingRequest struct {
+	Id uuid.UUID `path:"id,required"`
+}
+
+type NotebookSharingMember struct {
+	UserId    string `json:"user_id"`
+	Email     string `json:"email"`
+	Nickname  string `json:"nickname"`
+	AvatarURL string `json:"avatar_url"`
+	Role      string `json:"role"`
+}
+
+type GetNotebookSharingResponse struct {
+	Visibility string                   `json:"visibility"`
+	Members    []*NotebookSharingMember `json:"members"`
+}
+
+type UpdateNotebookSharingRequest struct {
+	Id         uuid.UUID `path:"id,required"`
+	Visibility string    `json:"visibility" validate:"required"`
+}
+
+func (r *UpdateNotebookSharingRequest) Validate() error {
+	if vo.Visibility(r.Visibility).IsInvalid() {
+		return errors.ErrParams.Msgf("invalid visibility %s", r.Visibility)
+	}
+
+	return nil
+}
+
+type UpsertNotebookMemberRequest struct {
+	Id    uuid.UUID `path:"id,required"`
+	Email string    `json:"email" validate:"required,email"`
+	Role  string    `json:"role"  validate:"required"`
+}
+
+func (r *UpsertNotebookMemberRequest) Validate() error {
+	if vo.Role(r.Role).IsInvalid() {
+		return errors.ErrParams.Msgf("invalid role %s", r.Role)
+	}
+	return nil
+}
+
+type UpsertNotebookMemberResponse struct {
+	UserId string `json:"user_id"`
+	Role   string `json:"role"`
+}
+
+type DeleteNotebookMemberRequest struct {
+	Id     uuid.UUID  `path:"id,required"` // notebook id
+	UserId valobj.Uid `path:"user_id,required"`
 }

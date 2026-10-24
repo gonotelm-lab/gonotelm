@@ -8,6 +8,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/chat/entity"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
@@ -21,10 +22,11 @@ type ChatSuggestHandler struct {
 
 func NewChatSuggestHandler(
 	chatRepo chatrepo.ChatRepository,
+	notebookAccessService *notebookservice.AccessService,
 	service *suggestion.Service,
 ) *ChatSuggestHandler {
 	return &ChatSuggestHandler{
-		baseHandler: newBaseHandler(chatRepo),
+		baseHandler: newBaseHandler(chatRepo, notebookAccessService),
 		service:     service,
 	}
 }

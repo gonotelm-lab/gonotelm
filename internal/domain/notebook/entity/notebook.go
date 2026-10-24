@@ -8,6 +8,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	notebookerrors "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/errors"
 	notebookevent "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/event"
+	"github.com/gonotelm-lab/gonotelm/internal/domain/notebook/vo"
 )
 
 const (
@@ -25,6 +26,7 @@ type Notebook struct {
 	Name        string
 	Description string
 	OwnerId     valobj.Uid
+	Visibility  vo.Visibility
 
 	SourceCount int64
 }
@@ -39,6 +41,7 @@ func NewNotebook(
 		Name:        name,
 		Description: description,
 		OwnerId:     ownerId,
+		Visibility:  vo.VisibilityRestricted,
 	}
 
 	if err := n.validate(); err != nil {
@@ -63,7 +66,26 @@ func (n *Notebook) validate() error {
 		return notebookerrors.ErrInvalidOwnerId
 	}
 
+	n.Visibility = vo.NormalizeVisibility(n.Visibility)
+	if !n.Visibility.IsValid() {
+		return notebookerrors.ErrInvalidVisibility
+	}
+
 	return nil
+}
+
+func (n *Notebook) SetVisibility(visibility vo.Visibility) error {
+	if !visibility.IsValid() {
+		return notebookerrors.ErrInvalidVisibility
+	}
+
+	n.Visibility = visibility
+	n.UpdateTime = valobj.NewTime()
+	return nil
+}
+
+func (n *Notebook) IsPublic() bool {
+	return n.Visibility.IsPublic()
 }
 
 func (n *Notebook) Delete() {

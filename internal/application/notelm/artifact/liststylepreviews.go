@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/gonotelm-lab/gonotelm/internal/application/shared/storekey"
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	artifacterrors "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/errors"
@@ -29,14 +30,17 @@ type ListStylePreviewsResult struct {
 
 type ListStylePreviewsHandler struct {
 	stylePreviewRepo artifactrepo.StylePreviewRepository
-	objectStore      adapter.ObjectPublicURLer
+	storeKeyResolver *storekey.Resolver
 }
 
 func NewListStylePreviewsHandler(
 	stylePreviewRepo artifactrepo.StylePreviewRepository,
 	objectStore adapter.ObjectPublicURLer,
 ) *ListStylePreviewsHandler {
-	return &ListStylePreviewsHandler{stylePreviewRepo: stylePreviewRepo, objectStore: objectStore}
+	return &ListStylePreviewsHandler{
+		stylePreviewRepo: stylePreviewRepo,
+		storeKeyResolver: storekey.New(objectStore),
+	}
 }
 
 func (h *ListStylePreviewsHandler) Handle(
@@ -92,15 +96,5 @@ func (h *ListStylePreviewsHandler) previewURL(
 		return ""
 	}
 
-	url, err := h.objectStore.PublicURL(ctx, preview.StoreKey)
-	if err != nil {
-		slog.WarnContext(ctx, "resolve style preview public url failed",
-			slog.String("kind", kind.String()),
-			slog.String("identifier", ref.Identifier.String()),
-			slog.Any("err", err),
-		)
-		return ""
-	}
-
-	return url
+	return h.storeKeyResolver.ResolvePublic(ctx, preview.StoreKey)
 }

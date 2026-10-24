@@ -2,8 +2,8 @@ package user
 
 import (
 	"context"
-	"log/slog"
 
+	"github.com/gonotelm-lab/gonotelm/internal/application/shared/storekey"
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
@@ -12,15 +12,18 @@ import (
 )
 
 type GetMeHandler struct {
-	userService *identityservice.UserService
-	objectStore adapter.ObjectPublicURLer
+	userService      *identityservice.UserService
+	storeKeyResolver *storekey.Resolver
 }
 
 func NewGetMeHandler(
 	userService *identityservice.UserService,
 	objectStore adapter.ObjectPublicURLer,
 ) *GetMeHandler {
-	return &GetMeHandler{userService: userService, objectStore: objectStore}
+	return &GetMeHandler{
+		userService:      userService,
+		storeKeyResolver: storekey.New(objectStore),
+	}
 }
 
 type MeResult struct {
@@ -46,7 +49,7 @@ func (h *GetMeHandler) Handle(ctx context.Context) (*MeResult, error) {
 		UserId:      user.Id.String(),
 		Nickname:    user.Nickname,
 		Email:       user.Email,
-		AvatarUrl:   h.avatarURL(ctx, user.Avatar),
+		AvatarUrl:   h.storeKeyResolver.ResolvePublic(ctx, user.Avatar),
 		CreatedAt:   user.CreatedAt,
 		UpdatedAt:   user.UpdatedAt,
 		LoginSource: h.loginSource(ctx, agg),
@@ -66,21 +69,4 @@ func (h *GetMeHandler) loginSource(ctx context.Context, agg *entity.UserAggregat
 	}
 
 	return identities[0].Provider.String()
-}
-
-func (h *GetMeHandler) avatarURL(ctx context.Context, avatar valobj.StoreKey) string {
-	if !avatar.Valid() {
-		return ""
-	}
-
-	url, err := h.objectStore.PublicURL(ctx, avatar)
-	if err != nil {
-		slog.WarnContext(ctx, "resolve avatar public url failed",
-			slog.String("avatar", avatar.String()),
-			slog.Any("err", err),
-		)
-		return ""
-	}
-
-	return url
 }

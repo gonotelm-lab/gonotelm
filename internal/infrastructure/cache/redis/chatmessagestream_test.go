@@ -365,16 +365,19 @@ func TestChatMessageStreamCache_AppendEventStream_NilGuards(t *testing.T) {
 }
 
 func TestChatMessageStreamCache_CancelByContext(t *testing.T) {
-	Convey("ChatMessageStreamCache PullEventStream respects context cancellation", t, func() {
+	Convey("ChatMessageStreamCache PullEventStream unblocks when context is done", t, func() {
 		testKey := "test-stream-cancel-" + uuid.NewV4().String()
-		ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(50*time.Millisecond))
+		ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
 		defer cancel()
 
+		start := time.Now()
 		events, err := testChatMessageStreamCache.PullEventStream(
 			ctx, testKey, schema.PullEventStreamArgs{Block: 2 * time.Second},
 		)
-		So(err, ShouldNotBeNil)
+		// 断言返回值本身是 DeadlineExceeded，而不是事后读 ctx.Err()：
+		// go-redis 的 socket deadline 与 ctx 置位存在竞态，ctx.Err() 可能仍为 nil。
 		So(errors.Is(err, context.DeadlineExceeded), ShouldBeTrue)
+		So(time.Since(start), ShouldBeLessThan, time.Second)
 		So(events, ShouldHaveLength, 0)
 	})
 }

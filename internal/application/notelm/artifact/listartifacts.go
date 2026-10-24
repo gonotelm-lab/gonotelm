@@ -3,10 +3,10 @@ package artifact
 import (
 	"context"
 
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
-	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
@@ -18,27 +18,35 @@ type ListRequest struct {
 }
 
 type ListResponse struct {
-	Artifacts []*artifactentity.Artifact
+	Artifacts []*ArtifactView
 	HasMore   bool
 }
 
 type ListArtifactsHandler struct {
-	notebookRepo notebookrepo.Repository
-	repo         artifactrepo.Repository
+	repo                  artifactrepo.Repository
+	notebookAccessService *notebookservice.AccessService
+	storage               adapter.ObjectStore
 }
 
-func NewListArtifactsHandler(notebookRepo notebookrepo.Repository, repo artifactrepo.Repository) *ListArtifactsHandler {
-	return &ListArtifactsHandler{notebookRepo: notebookRepo, repo: repo}
+func NewListArtifactsHandler(
+	repo artifactrepo.Repository,
+	notebookAccessService *notebookservice.AccessService,
+	storage adapter.ObjectStore,
+) *ListArtifactsHandler {
+	return &ListArtifactsHandler{
+		repo:                  repo,
+		notebookAccessService: notebookAccessService,
+		storage:               storage,
+	}
 }
 
 func (h *ListArtifactsHandler) Handle(ctx context.Context, cmd *ListRequest) (*ListResponse, error) {
-	userId := pkgcontext.GetUserId(ctx)
-	notebook, err := h.notebookRepo.FindById(ctx, cmd.NotebookId)
+	access, err := h.notebookAccessService.Resolve(ctx, cmd.NotebookId, pkgcontext.GetUserId(ctx))
 	if err != nil {
 		return nil, errors.WithMessagef(err, "get notebook failed, notebook_id=%s", cmd.NotebookId)
 	}
-	if notebook.OwnerId != userId {
-		return nil, errors.ErrPermission.Msgf("notebook access denied, notebook_id=%s", cmd.NotebookId)
+	if err := access.CanViewReturnErr(); err != nil {
+		return nil, err
 	}
 
 	fetchLimit := cmd.Limit + 1
@@ -53,5 +61,11 @@ func (h *ListArtifactsHandler) Handle(ctx context.Context, cmd *ListRequest) (*L
 	if hasMore {
 		rows = rows[:cmd.Limit]
 	}
-	return &ListResponse{Artifacts: rows, HasMore: hasMore}, nil
+
+	views := make([]*ArtifactView, 0, len(rows))
+	for _, a := range rows {
+		views = append(views, toArtifactView(ctx, h.storage, a))
+	}
+
+	return &ListResponse{Artifacts: views, HasMore: hasMore}, nil
 }

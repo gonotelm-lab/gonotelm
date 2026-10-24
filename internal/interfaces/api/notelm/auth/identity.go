@@ -7,7 +7,6 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/schema"
-	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 
@@ -67,7 +66,6 @@ func (s *Server) AuthBind(ctx context.Context, c *app.RequestContext) {
 
 	resp, err := s.authBindIdentityHandler.Handle(ctx, &authapp.BindIdentityCommand{
 		ProviderType: entity.ProviderType(req.Provider),
-		UserId:       pkgcontext.GetUserId(ctx),
 		SessionId:    string(c.Cookie(schema.AuthSessionCookieName)),
 		ReturnTo:     req.ReturnTo,
 	})
@@ -106,7 +104,6 @@ func (s *Server) AuthUnbind(ctx context.Context, c *app.RequestContext) {
 	if err := s.authUnbindIdentityHandler.Handle(ctx, &authapp.UnbindIdentityCommand{
 		BindId:       req.BindId,
 		ProviderType: entity.ProviderType(req.Provider),
-		UserId:       pkgcontext.GetUserId(ctx),
 	}); err != nil {
 		http.ErrResp(c, err)
 		return

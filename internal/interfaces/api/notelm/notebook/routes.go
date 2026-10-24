@@ -22,5 +22,17 @@ func (s *Server) RegisterRoutes(g *route.RouterGroup) {
 		notebookIdGroup.PATCH("", s.UpdateNotebook)
 		// POST /api/v1/notebooks/:id/description/generation
 		notebookIdGroup.POST("/description/generation", s.GenerateNotebookDescription)
+
+		// GET /api/v1/notebooks/:id/access
+		notebookIdGroup.GET("/access", s.GetNotebookAccess)
+
+		// GET /api/v1/notebooks/:id/sharing
+		notebookIdGroup.GET("/sharing", s.GetNotebookSharing)
+		// PATCH /api/v1/notebooks/:id/visibility
+		notebookIdGroup.PATCH("/visibility", s.UpdateNotebookVisibility)
+		// PUT /api/v1/notebooks/:id/sharing/members
+		notebookIdGroup.PUT("/sharing/members", s.UpsertNotebookMember)
+		// DELETE /api/v1/notebooks/:id/sharing/members/:user_id
+		notebookIdGroup.DELETE("/sharing/members/:user_id", s.DeleteNotebookMember)
 	}
 }

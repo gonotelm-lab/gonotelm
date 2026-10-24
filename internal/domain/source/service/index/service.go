@@ -100,7 +100,7 @@ func (s *Service) IndexSource(
 		sourceDoc, err := entity.NewSourceDoc(
 			source.Id,
 			source.NotebookId,
-			source.OwnerId,
+			source.CreatorId,
 			idx,
 			doc,
 		)

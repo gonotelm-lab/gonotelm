@@ -12,6 +12,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/protocol"
 	"github.com/cloudwego/hertz/pkg/route/param"
 	xerror "github.com/gonotelm-lab/gonotelm/pkg/errors"
+	"github.com/gonotelm-lab/gonotelm/pkg/ulid"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 
 	"github.com/go-playground/validator/v10"
@@ -53,6 +54,15 @@ func uuidArrayUnmarshaler(req *protocol.Request, params param.Params, text strin
 	return reflect.ValueOf(uuids), nil
 }
 
+func ulidUnmarshaler(req *protocol.Request, params param.Params, text string) (reflect.Value, error) {
+	parsed, err := ulid.ParseString(text)
+	if err != nil {
+		return reflect.Value{}, err
+	}
+
+	return reflect.ValueOf(parsed), nil
+}
+
 func urlUnmarshaler(req *protocol.Request, params param.Params, text string) (reflect.Value, error) {
 	parsed, err := url.ParseRequestURI(text)
 	if err != nil {
@@ -65,6 +75,7 @@ func registerTypeUnmarshalers(cfg *binding.BindConfig) {
 	cfg.MustRegTypeUnmarshal(reflect.TypeFor[uuid.UUID](), uuidUnmarshaler)
 	cfg.MustRegTypeUnmarshal(reflect.TypeFor[url.URL](), urlUnmarshaler)
 	cfg.MustRegTypeUnmarshal(reflect.TypeFor[uuid.UUIDArray](), uuidArrayUnmarshaler)
+	cfg.MustRegTypeUnmarshal(reflect.TypeFor[ulid.ULID](), ulidUnmarshaler)
 }
 
 func initValidator() *validator.Validate {

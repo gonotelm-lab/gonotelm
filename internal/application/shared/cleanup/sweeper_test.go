@@ -83,6 +83,9 @@ func (f *fakeNotebookRepo) Exists(context.Context, valobj.Id) (bool, error) {
 func (f *fakeNotebookRepo) ListByOwner(context.Context, valobj.Uid, *notebookrepo.ListSpec) ([]*notebookentity.Notebook, error) {
 	return nil, nil
 }
+func (f *fakeNotebookRepo) ListShared(context.Context, valobj.Uid, *notebookrepo.ListSpec) ([]*notebookentity.Notebook, error) {
+	return nil, nil
+}
 
 type fakeArtifactRepo struct {
 	artifact    *artifactentity.Artifact

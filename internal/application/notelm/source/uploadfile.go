@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -18,11 +19,12 @@ type PresignUploadFileHandler struct {
 
 func NewPresignUploadFileHandler(
 	sourceRepo sourcerepo.Repository,
+	notebookAccessService *notebookservice.AccessService,
 	objectStore adapter.ObjectStore,
 	keyFactory adapter.StoreKeyFactory,
 ) *PresignUploadFileHandler {
 	return &PresignUploadFileHandler{
-		baseHandler: newBaseHandler(sourceRepo),
+		baseHandler: newBaseHandler(sourceRepo, notebookAccessService),
 		objectStore: objectStore,
 		keyFactory:  keyFactory,
 	}
@@ -40,12 +42,19 @@ func (h *PresignUploadFileHandler) Handle(
 	ctx context.Context,
 	cmd *PresignUploadFileHandleCommand,
 ) (*adapter.PresignUploadResult, error) {
-	targetSource, err := h.handle(ctx, cmd.SourceId)
-	if err != nil {
-		return nil, err
-	}
+	return withSourceAccess(h.baseHandler, ctx, cmd.SourceId, accessManage,
+		func(ctx context.Context, source *sourceentity.Source) (*adapter.PresignUploadResult, error) {
+			return h.presignUpload(ctx, source, cmd)
+		},
+	)
+}
 
-	err = targetSource.UploadFile(ctx, &sourceentity.UploadFileParams{
+func (h *PresignUploadFileHandler) presignUpload(
+	ctx context.Context,
+	targetSource *sourceentity.Source,
+	cmd *PresignUploadFileHandleCommand,
+) (*adapter.PresignUploadResult, error) {
+	err := targetSource.UploadFile(ctx, &sourceentity.UploadFileParams{
 		Filename: cmd.Filename,
 		MimeType: cmd.MimeType,
 		Size:     cmd.Size,

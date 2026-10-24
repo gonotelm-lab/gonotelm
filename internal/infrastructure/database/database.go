@@ -12,20 +12,54 @@ import (
 
 type Id = uuid.UUID
 
+// NotebookListOrder 控制 notebook 列表查询的排序；具体 SQL 由 store 决定。
+type NotebookListOrder int
+
+const (
+	// NotebookListOrderLastActive 按最后活跃时间倒序（updated_at DESC，id DESC 兜底）。
+	NotebookListOrderLastActive NotebookListOrder = iota
+	// NotebookListOrderCreateTime 按创建时间正序（uuidv7 id ASC）。
+	NotebookListOrderCreateTime
+)
+
 type NotebookStore interface {
 	Create(ctx context.Context, notebook *schema.Notebook) error
 	Upsert(ctx context.Context, notebook *schema.Notebook) error
 	GetById(ctx context.Context, id Id) (*schema.Notebook, error)
 	Exists(ctx context.Context, id Id) (bool, error)
 	GetByNameAndOwnerId(ctx context.Context, name string, ownerId valobj.Uid) (*schema.Notebook, error)
-	// orderBy=0 -> default order, orderBy=1 -> order by updated_at
-	ListByOwnerId(ctx context.Context, ownerId valobj.Uid, limit, offset, orderBy int) ([]*schema.Notebook, error)
+	// ListByOwnerId 分页返回 owner 的 notebook。
+	ListByOwnerId(
+		ctx context.Context,
+		ownerId valobj.Uid,
+		limit, offset int,
+		order NotebookListOrder,
+	) ([]*schema.Notebook, error)
+	// ListByIds 按 id 批量查询；ids 为空时返回空切片。
+	ListByIds(ctx context.Context, ids []Id) ([]*schema.Notebook, error)
+	// ListByIdsExcludingOwner 分页返回 ids 中 owner_id != excludeOwnerId 的 notebook；ids 为空时返回空切片。
+	ListByIdsExcludingOwner(
+		ctx context.Context,
+		ids []Id,
+		excludeOwnerId valobj.Uid,
+		limit, offset int,
+		order NotebookListOrder,
+	) ([]*schema.Notebook, error)
 	Update(ctx context.Context, notebook *schema.Notebook) error
 	DeleteById(ctx context.Context, id Id) error
 	UpdateName(ctx context.Context, params *schema.NotebookUpdateNameParams) error
 	UpdateDescription(ctx context.Context, params *schema.NotebookUpdateDescriptionParams) error
 	// 仅填充空的name/description，非空字段保持不变
 	FillNameAndDescriptionIfEmpty(ctx context.Context, params *schema.NotebookFillNameAndDescriptionParams) error
+}
+
+type NotebookMemberStore interface {
+	Upsert(ctx context.Context, member *schema.NotebookMember) error
+	GetByNotebookIdAndUserId(ctx context.Context, notebookId Id, userId valobj.Uid) (*schema.NotebookMember, error)
+	ListByNotebookId(ctx context.Context, notebookId Id) ([]*schema.NotebookMember, error)
+	ListByUserId(ctx context.Context, userId valobj.Uid) ([]*schema.NotebookMember, error)
+	Delete(ctx context.Context, notebookId Id, userId valobj.Uid) error
+	DeleteByNotebookId(ctx context.Context, notebookId Id) error
 }
 
 type SourceStore interface {
@@ -96,6 +130,7 @@ type WorkerCheckpointStore interface {
 type UserStore interface {
 	Create(ctx context.Context, user *schema.User) error
 	GetById(ctx context.Context, id valobj.Uid) (*schema.User, error)
+	BatchGetById(ctx context.Context, ids []valobj.Uid) ([]*schema.User, error)
 	GetByEmail(ctx context.Context, email string) (*schema.User, error)
 	GetPasswordHash(ctx context.Context, id valobj.Uid) (string, error)
 	UpdateProfile(ctx context.Context, params *schema.UserUpdateProfileParams) error
@@ -131,6 +166,7 @@ type Dao struct {
 	Closer misc.Closer
 
 	NotebookStore             NotebookStore
+	NotebookMemberStore       NotebookMemberStore
 	SourceStore               SourceStore
 	ChatStore                 ChatStore
 	ChatMessageStore          ChatMessageStore
@@ -146,6 +182,7 @@ type Dao struct {
 func NewDao(
 	closer misc.Closer,
 	notebookStore NotebookStore,
+	notebookMemberStore NotebookMemberStore,
 	sourceStore SourceStore,
 	chatStore ChatStore,
 	chatMessageStore ChatMessageStore,
@@ -160,6 +197,7 @@ func NewDao(
 	return &Dao{
 		Closer:                    closer,
 		NotebookStore:             notebookStore,
+		NotebookMemberStore:       notebookMemberStore,
 		SourceStore:               sourceStore,
 		ChatStore:                 chatStore,
 		ChatMessageStore:          chatMessageStore,

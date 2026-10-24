@@ -6,9 +6,10 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 	notebookapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/notebook"
 	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/schema"
-	pkgctx "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 )
+
+// notebook 响应组装只透传 app 已解析好的 URL，不再持有 ObjectStore。
 
 // Create new notebook
 func (s *Server) CreateNotebook(ctx context.Context, c *app.RequestContext) {
@@ -19,12 +20,10 @@ func (s *Server) CreateNotebook(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	userId := pkgctx.GetUserId(ctx)
 	id, err := s.createNotebookHandler.Handle(ctx,
 		&notebookapp.CreateNotebookHandleCommand{
-			Name:    req.Name,
-			Desc:    req.Desc,
-			OwnerId: userId,
+			Name: req.Name,
+			Desc: req.Desc,
 		})
 	if err != nil {
 		http.ErrResp(c, err)
@@ -47,17 +46,27 @@ func (s *Server) GetNotebook(ctx context.Context, c *app.RequestContext) {
 		http.ErrResp(c, err)
 		return
 	}
-
-	http.OkResp(c, schema.GetNotebookResponse{
+	result := schema.GetNotebookResponse{
 		Id:          notebook.Id.String(),
 		Name:        notebook.Name,
 		Desc:        notebook.Description,
 		SourceCount: notebook.SourceCount,
+		Visibility:  string(notebook.Visibility),
+		Owner:       schema.NewNotebookOwnerResponse(notebook.Owner),
 		UpdatedAt:   notebook.UpdateTime.Value(),
 		CreatedAt:   notebook.CreateTime.Value(),
-	})
+	}
+
+	http.OkResp(c, result)
 }
 
+// ListNotebooks 按 scope 返回当前用户的 notebook 列表，owned 与 shared 互斥：
+//   - scope=owned（默认）：当前用户作为 owner 的 notebook；
+//   - scope=shared：显式授权给当前用户的 notebook（不包含本人拥有的）。
+//
+// 仅通过 public 获得访问的 notebook 不进入列表；
+// 需要当前用户的角色时调用 GET /notebooks/:id/access。
+// 列表在数据库侧分页，所有列表项都会附带 owner 概要。
 func (s *Server) ListNotebooks(ctx context.Context, c *app.RequestContext) {
 	var req schema.ListNotebooksRequest
 	err := c.BindAndValidate(&req)
@@ -66,13 +75,12 @@ func (s *Server) ListNotebooks(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	userId := pkgctx.GetUserId(ctx)
 	result, err := s.listNotebooksHandler.Handle(ctx,
 		&notebookapp.ListNotebooksHandleQuery{
-			OwnerId: userId,
-			Limit:   req.Limit,
-			Offset:  req.Offset,
-			SortBy:  req.SortBy.ToSortBy(),
+			Scope:  req.Scope.ToScope(),
+			Limit:  req.Limit,
+			Offset: req.Offset,
+			SortBy: req.SortBy.ToSortBy(),
 		})
 	if err != nil {
 		http.ErrResp(c, err)
@@ -81,14 +89,7 @@ func (s *Server) ListNotebooks(ctx context.Context, c *app.RequestContext) {
 
 	notebooks := make([]*schema.ListNotebookItemResponse, 0, len(result.Notebooks))
 	for _, notebook := range result.Notebooks {
-		notebooks = append(notebooks, &schema.ListNotebookItemResponse{
-			Id:          notebook.Id.String(),
-			Name:        notebook.Name,
-			Desc:        notebook.Description,
-			SourceCount: notebook.SourceCount,
-			UpdatedAt:   notebook.UpdateTime.Value(),
-			CreatedAt:   notebook.CreateTime.Value(),
-		})
+		notebooks = append(notebooks, schema.NewListNotebookItemResponse(notebook))
 	}
 
 	http.OkResp(c, schema.ListNotebooksResponse{

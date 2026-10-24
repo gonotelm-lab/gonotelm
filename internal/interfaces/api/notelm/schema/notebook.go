@@ -53,7 +53,7 @@ func NewNotebookResponse(notebook *notebookapp.Notebook) *NotebookResponse {
 			CustomizeDescription: notebook.CustomizeDescription(),
 		},
 		SourceCount: notebook.SourceCount,
-		Visibility:  string(notebook.Visibility),
+		Visibility:  notebook.Visibility.String(),
 		Owner:       NewNotebookOwnerResponse(notebook.Owner),
 		UpdatedAt:   notebook.UpdateTime.Value(),
 		CreatedAt:   notebook.CreateTime.Value(),

@@ -374,8 +374,9 @@ func TestChatMessageStreamCache_CancelByContext(t *testing.T) {
 		events, err := testChatMessageStreamCache.PullEventStream(
 			ctx, testKey, schema.PullEventStreamArgs{Block: 2 * time.Second},
 		)
-		So(err, ShouldNotBeNil)
-		So(ctx.Err(), ShouldNotBeNil)
+		// 断言返回值本身是 DeadlineExceeded，而不是事后读 ctx.Err()：
+		// go-redis 的 socket deadline 与 ctx 置位存在竞态，ctx.Err() 可能仍为 nil。
+		So(errors.Is(err, context.DeadlineExceeded), ShouldBeTrue)
 		So(time.Since(start), ShouldBeLessThan, time.Second)
 		So(events, ShouldHaveLength, 0)
 	})

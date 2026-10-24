@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"time"
 
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/cache"
@@ -249,6 +250,12 @@ func (c *ChatMessageStreamCacheImpl) PullEventStream(
 		// ctx 已结束时优先返回 context 错误，避免被 redis.Nil / 其它错误盖住。
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return nil, ctxErr
+		}
+		// go-redis ContextTimeoutEnabled 用 net.Conn deadline 打断阻塞读；
+		// socket deadline 可能略早于 ctx.Err() 置位（调度/wall vs monotonic），
+		// 此时仍应视为调用方 deadline，而不是 CACHE_ERROR。
+		if _, hasDeadline := ctx.Deadline(); hasDeadline && errors.Is(err, os.ErrDeadlineExceeded) {
+			return nil, context.DeadlineExceeded
 		}
 		if errors.Is(err, goredis.Nil) {
 			return nil, cacheerrors.ErrStreamNoData

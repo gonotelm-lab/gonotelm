@@ -13,7 +13,7 @@ func newArtifactFixture(notebookId uuid.UUID, status string) *schema.Artifact {
 	now := nowMilli()
 
 	return &schema.Artifact{
-		Id: uuid.NewV7(), NotebookId: notebookId, CreatedBy: valobj.NewUid(),
+		Id: uuid.NewV7(), NotebookId: notebookId, CreatorId: valobj.NewUid(),
 		Kind: "mindmap", Status: status, FlowTaskId: uuid.NewV7().String(),
 		Payload: []byte(`{}`), CreatedAt: now, UpdatedAt: now,
 	}
@@ -37,7 +37,7 @@ func TestArtifactStoreCRUD(t *testing.T) {
 
 		got, err := store.GetById(ctx, artifact.Id)
 		So(err, ShouldBeNil)
-		So(got.CreatedBy, ShouldEqual, artifact.CreatedBy)
+		So(got.CreatorId, ShouldEqual, artifact.CreatorId)
 		So(got.Status, ShouldEqual, "pending")
 
 		Convey("UpdateExisting overwrites an existing row", func() {

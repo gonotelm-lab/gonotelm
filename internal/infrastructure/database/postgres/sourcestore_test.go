@@ -328,7 +328,7 @@ func TestSourceStoreUpdate(t *testing.T) {
 }
 
 func TestSourceStoreParsedContentCompatibility(t *testing.T) {
-	Convey("SourceStore should keep parsed_content and owner_id compatible", t, func() {
+	Convey("SourceStore should keep parsed_content and creator_id compatible", t, func() {
 		store := testSourceStore
 		ctx := t.Context()
 		notebookID := createNotebookForSourceTest(t, testDB)
@@ -371,7 +371,7 @@ func TestSourceStoreParsedContentCompatibility(t *testing.T) {
 		updated, err := store.GetById(ctx, source.Id)
 		So(err, ShouldBeNil)
 		So(updated, ShouldNotBeNil)
-		// update path does not touch parsed_content/abstract/owner_id, they should remain stable.
+		// update path does not touch parsed_content/abstract/creator_id, they should remain stable.
 		So(string(updated.ParsedContentKey), ShouldEqual, "converted-content")
 		So(updated.Abstract, ShouldEqual, source.Abstract)
 		So(updated.CreatorId, ShouldEqual, source.CreatorId)

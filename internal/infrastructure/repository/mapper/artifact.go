@@ -21,7 +21,7 @@ func ArtifactToSchema(a *artifactentity.Artifact) *schema.Artifact {
 	return &schema.Artifact{
 		Id:         uuid.UUID(a.Id),
 		NotebookId: uuid.UUID(a.NotebookId),
-		CreatedBy:  a.CreatorId,
+		CreatorId:  a.CreatorId,
 		Kind:       a.Kind.String(),
 		Status:     a.Status.String(),
 		FlowTaskId: a.FlowTaskId,
@@ -42,7 +42,7 @@ func ArtifactFromSchema(sch *schema.Artifact) (*artifactentity.Artifact, error) 
 			UpdateTime: valobj.NewTimeFrom(sch.UpdatedAt),
 		},
 		NotebookId: valobj.Id(sch.NotebookId),
-		CreatorId:  sch.CreatedBy,
+		CreatorId:  sch.CreatorId,
 		Kind:       artifactentity.Kind(sch.Kind),
 		Status:     artifactentity.Status(sch.Status),
 		FlowTaskId: sch.FlowTaskId,

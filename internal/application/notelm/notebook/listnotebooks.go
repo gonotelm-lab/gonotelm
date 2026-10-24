@@ -3,8 +3,8 @@ package notebook
 import (
 	"context"
 
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	idententity "github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
 	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
@@ -45,9 +45,10 @@ type ListNotebooksHandler struct {
 func NewListNotebooksHandler(
 	notebookRepo notebookrepo.Repository,
 	userRepo identrepo.UserRepository,
+	objectStore adapter.ObjectPublicURLer,
 ) *ListNotebooksHandler {
 	return &ListNotebooksHandler{
-		baseHandler:  newBaseHandler(notebookRepo, nil, userRepo),
+		baseHandler:  newBaseHandler(notebookRepo, nil, userRepo, objectStore),
 		notebookRepo: notebookRepo,
 	}
 }
@@ -60,9 +61,16 @@ type ListNotebooksHandleQuery struct {
 	SortBy SortBy
 }
 
+// NotebookOwner 应用层对外的 owner 视图，AvatarURL 已是公有读完整 URL。
+type NotebookOwner struct {
+	Id        valobj.Uid
+	Nickname  string
+	AvatarURL string
+}
+
 type Notebook struct {
 	*notebookentity.Notebook
-	Owner *idententity.User
+	Owner *NotebookOwner
 }
 
 type ListNotebooksHandleResult struct {

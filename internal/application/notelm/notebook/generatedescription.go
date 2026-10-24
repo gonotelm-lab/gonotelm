@@ -40,7 +40,7 @@ func NewGenerateDescriptionHandler(
 	summarizer adapter.Summarizer,
 ) *GenerateDescriptionHandler {
 	return &GenerateDescriptionHandler{
-		baseHandler: newBaseHandler(notebookRepo, notebookAccessService, userRepo),
+		baseHandler: newBaseHandler(notebookRepo, notebookAccessService, userRepo, nil),
 		sourceRepo:  sourceRepo,
 		distLock:    distLock,
 		summarizer:  summarizer,

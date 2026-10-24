@@ -10,6 +10,8 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 )
 
+// notebook 响应组装只透传 app 已解析好的 URL，不再持有 ObjectStore。
+
 // Create new notebook
 func (s *Server) CreateNotebook(ctx context.Context, c *app.RequestContext) {
 	var req schema.CreateNotebookRequest
@@ -53,12 +55,10 @@ func (s *Server) GetNotebook(ctx context.Context, c *app.RequestContext) {
 		Desc:        notebook.Description,
 		SourceCount: notebook.SourceCount,
 		Visibility:  string(notebook.Visibility),
+		Owner:       schema.NewNotebookOwnerResponse(notebook.Owner),
 		UpdatedAt:   notebook.UpdateTime.Value(),
 		CreatedAt:   notebook.CreateTime.Value(),
 	}
-
-	result.Owner = schema.NewNotebookOwnerResponse(notebook.Owner)
-	result.Owner.AvatarURL = s.avatarURL(ctx, notebook.Owner.Avatar)
 
 	http.OkResp(c, result)
 }
@@ -92,12 +92,9 @@ func (s *Server) ListNotebooks(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	// // 所有列表项统一返回 owner 概要
 	notebooks := make([]*schema.ListNotebookItemResponse, 0, len(result.Notebooks))
 	for _, notebook := range result.Notebooks {
-		n := schema.NewListNotebookItemResponse(notebook)
-		n.Owner.AvatarURL = s.avatarURL(ctx, notebook.Owner.Avatar)
-		notebooks = append(notebooks, n)
+		notebooks = append(notebooks, schema.NewListNotebookItemResponse(notebook))
 	}
 
 	http.OkResp(c, schema.ListNotebooksResponse{

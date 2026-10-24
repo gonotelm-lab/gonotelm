@@ -77,7 +77,7 @@ func TestListNotebooksHandleOwned(t *testing.T) {
 	repo := &fakeNotebookRepo{ownedRows: []*notebookentity.Notebook{nb1, nb2}}
 	handler := NewListNotebooksHandler(repo, &fakeUserRepo{
 		users: []*idententity.User{{Id: ownerId, Nickname: "owner"}},
-	})
+	}, nil)
 
 	result, err := handler.Handle(context.Background(), &ListNotebooksHandleQuery{
 		UserId: ownerId,
@@ -111,7 +111,7 @@ func TestListNotebooksHandleOwnedHasMore(t *testing.T) {
 	}}
 	handler := NewListNotebooksHandler(repo, &fakeUserRepo{
 		users: []*idententity.User{{Id: ownerId, Nickname: "owner"}},
-	})
+	}, nil)
 
 	result, err := handler.Handle(context.Background(), &ListNotebooksHandleQuery{
 		UserId: ownerId,
@@ -134,7 +134,7 @@ func TestListNotebooksHandleShared(t *testing.T) {
 	repo := &fakeNotebookRepo{sharedRows: []*notebookentity.Notebook{newNotebook(ownerId)}}
 	handler := NewListNotebooksHandler(repo, &fakeUserRepo{
 		users: []*idententity.User{{Id: ownerId, Nickname: "owner"}},
-	})
+	}, nil)
 
 	result, err := handler.Handle(context.Background(), &ListNotebooksHandleQuery{
 		UserId: userId,
@@ -154,7 +154,7 @@ func TestListNotebooksHandleShared(t *testing.T) {
 }
 
 func TestListNotebooksHandleInvalidScope(t *testing.T) {
-	handler := NewListNotebooksHandler(&fakeNotebookRepo{}, &fakeUserRepo{})
+	handler := NewListNotebooksHandler(&fakeNotebookRepo{}, &fakeUserRepo{}, nil)
 
 	_, err := handler.Handle(context.Background(), &ListNotebooksHandleQuery{
 		UserId: valobj.NewUid(),

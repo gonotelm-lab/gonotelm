@@ -3,6 +3,7 @@ package notebook
 import (
 	"context"
 
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
@@ -19,9 +20,10 @@ func NewGetNotebookHandler(
 	notebookRepo notebookrepo.Repository,
 	notebookAccessService *notebookservice.AccessService,
 	userRepo identrepo.UserRepository,
+	objectStore adapter.ObjectPublicURLer,
 ) *GetNotebookHandler {
 	return &GetNotebookHandler{
-		baseHandler: newBaseHandler(notebookRepo, notebookAccessService, userRepo),
+		baseHandler: newBaseHandler(notebookRepo, notebookAccessService, userRepo, objectStore),
 	}
 }
 

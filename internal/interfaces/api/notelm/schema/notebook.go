@@ -3,7 +3,6 @@ package schema
 import (
 	notebookapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/notebook"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	idententity "github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/notebook/vo"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
@@ -129,10 +128,14 @@ type NotebookOwnerResponse struct {
 	AvatarURL string `json:"avatar_url"`
 }
 
-func NewNotebookOwnerResponse(owner *idententity.User) *NotebookOwnerResponse {
+func NewNotebookOwnerResponse(owner *notebookapp.NotebookOwner) *NotebookOwnerResponse {
+	if owner == nil {
+		return nil
+	}
 	return &NotebookOwnerResponse{
-		UserId:   owner.Id.String(),
-		Nickname: owner.Nickname,
+		UserId:    owner.Id.String(),
+		Nickname:  owner.Nickname,
+		AvatarURL: owner.AvatarURL,
 	}
 }
 

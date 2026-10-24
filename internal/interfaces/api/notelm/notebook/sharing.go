@@ -5,7 +5,6 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	notebookapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/notebook"
-	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	notebookvo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/vo"
 	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/schema"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
@@ -120,12 +119,4 @@ func (s *Server) DeleteNotebookMember(ctx context.Context, c *app.RequestContext
 	}
 
 	http.OkRespNoContent(c)
-}
-
-func (s *Server) avatarURL(ctx context.Context, avatar valobj.StoreKey) string {
-	if !avatar.Valid() {
-		return ""
-	}
-
-	return s.storeKeyURLExchanger.Exchange(ctx, avatar)
 }

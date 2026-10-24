@@ -2,7 +2,6 @@ package notebook
 
 import (
 	"context"
-	"log/slog"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
@@ -31,9 +30,8 @@ type GetNotebookSharingResult struct {
 
 type GetNotebookSharingHandler struct {
 	*baseHandler
-	memberRepo  notebookrepo.MemberRepository
-	userRepo    identityrepo.UserRepository
-	objectStore adapter.ObjectPublicURLer
+	memberRepo notebookrepo.MemberRepository
+	userRepo   identityrepo.UserRepository
 }
 
 func NewGetNotebookSharingHandler(
@@ -44,10 +42,9 @@ func NewGetNotebookSharingHandler(
 	objectStore adapter.ObjectPublicURLer,
 ) *GetNotebookSharingHandler {
 	return &GetNotebookSharingHandler{
-		baseHandler: newBaseHandler(notebookRepo, notebookAccessService, userRepo),
+		baseHandler: newBaseHandler(notebookRepo, notebookAccessService, userRepo, objectStore),
 		memberRepo:  memberRepo,
 		userRepo:    userRepo,
-		objectStore: objectStore,
 	}
 }
 
@@ -95,7 +92,7 @@ func (h *GetNotebookSharingHandler) getSharing(
 		if user, ok := userMap[member.UserId]; ok {
 			result.Email = user.Email
 			result.Nickname = user.Nickname
-			result.AvatarURL = h.avatarURL(ctx, user.Avatar)
+			result.AvatarURL = h.storeKeyResolver.ResolvePublic(ctx, user.Avatar)
 		}
 		results = append(results, result)
 	}
@@ -104,21 +101,4 @@ func (h *GetNotebookSharingHandler) getSharing(
 		Visibility: access.Notebook.Visibility,
 		Members:    results,
 	}, nil
-}
-
-func (h *GetNotebookSharingHandler) avatarURL(ctx context.Context, avatar valobj.StoreKey) string {
-	if !avatar.Valid() {
-		return ""
-	}
-
-	url, err := h.objectStore.PublicURL(ctx, avatar)
-	if err != nil {
-		slog.WarnContext(ctx, "resolve avatar public url failed",
-			slog.String("avatar", avatar.String()),
-			slog.Any("err", err),
-		)
-		return ""
-	}
-
-	return url
 }

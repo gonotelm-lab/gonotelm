@@ -3,6 +3,8 @@ package notebook
 import (
 	"context"
 
+	"github.com/gonotelm-lab/gonotelm/internal/application/shared/storekey"
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	idententity "github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
 	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
@@ -26,17 +28,20 @@ type baseHandler struct {
 	notebookRepo          notebookrepo.Repository
 	notebookAccessService *notebookservice.AccessService
 	userRepo              identrepo.UserRepository
+	storeKeyResolver      *storekey.Resolver
 }
 
 func newBaseHandler(
 	notebookRepo notebookrepo.Repository,
 	notebookAccessService *notebookservice.AccessService,
 	userRepo identrepo.UserRepository,
+	objectStore adapter.ObjectPublicURLer,
 ) *baseHandler {
 	return &baseHandler{
 		notebookRepo:          notebookRepo,
 		notebookAccessService: notebookAccessService,
 		userRepo:              userRepo,
+		storeKeyResolver:      storekey.New(objectStore),
 	}
 }
 
@@ -102,10 +107,13 @@ func (h *baseHandler) attachNotebookOwners(ctx context.Context, notebooks []*Not
 		}
 
 		userMap := pkgslices.AsMapF(users, func(t *idententity.User) valobj.Uid { return t.Id })
-		// attach user
 		for _, n := range notebooks {
 			if owner, ok := userMap[n.OwnerId]; ok && owner != nil {
-				n.Owner = owner
+				n.Owner = &NotebookOwner{
+					Id:        owner.Id,
+					Nickname:  owner.Nickname,
+					AvatarURL: h.storeKeyResolver.ResolvePublic(ctx, owner.Avatar),
+				}
 			}
 		}
 	}

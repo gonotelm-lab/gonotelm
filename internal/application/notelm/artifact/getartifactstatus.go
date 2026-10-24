@@ -58,14 +58,9 @@ func (h *GetArtifactStatusHandler) getStatus(
 	return resp, nil
 }
 
-func (h *GetArtifactStatusHandler) FindById(ctx context.Context, artifactId valobj.Id) (*artifactentity.Artifact, error) {
-	return h.resolveAccess(ctx, artifactId, accessView)
-}
-
-func (h *GetArtifactStatusHandler) AttachStorageURL(ctx context.Context, a *artifactentity.Artifact) (url string, mime string) {
-	if a == nil || !a.ResultKind.Storage() || len(a.Result) == 0 {
-		return "", ""
-	}
-
-	return materializeStorageResult(ctx, h.storage, a.Result)
+// GetView 返回带 ContentUrl 的产物视图，供详情接口直接透传。
+func (h *GetArtifactStatusHandler) GetView(ctx context.Context, artifactId valobj.Id) (*ArtifactView, error) {
+	return withArtifactAccess(h.baseHandler, ctx, artifactId, accessView, func(ctx context.Context, a *artifactentity.Artifact) (*ArtifactView, error) {
+		return toArtifactView(ctx, h.storage, a), nil
+	})
 }

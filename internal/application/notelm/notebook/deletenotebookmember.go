@@ -27,7 +27,7 @@ func NewDeleteNotebookMemberHandler(
 	userRepo identrepo.UserRepository,
 ) *DeleteNotebookMemberHandler {
 	return &DeleteNotebookMemberHandler{
-		baseHandler: newBaseHandler(notebookRepo, notebookAccessService, userRepo),
+		baseHandler: newBaseHandler(notebookRepo, notebookAccessService, userRepo, nil),
 		memberRepo:  memberRepo,
 	}
 }

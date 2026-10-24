@@ -23,7 +23,7 @@ func NewUpdateNotebookNameHandler(
 	userRepo identrepo.UserRepository,
 ) *UpdateNotebookNameHandler {
 	return &UpdateNotebookNameHandler{
-		baseHandler: newBaseHandler(notebookRepo, notebookAccessService, userRepo),
+		baseHandler: newBaseHandler(notebookRepo, notebookAccessService, userRepo, nil),
 	}
 }
 

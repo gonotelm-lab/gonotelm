@@ -33,7 +33,7 @@ func NewDeleteNotebookHandler(
 	cleaner *cleanup.Cleaner,
 ) *DeleteNotebookHandler {
 	return &DeleteNotebookHandler{
-		baseHandler: newBaseHandler(notebookRepo, notebookAccessService, userRepo),
+		baseHandler: newBaseHandler(notebookRepo, notebookAccessService, userRepo, nil),
 		eventBus:    eventBus,
 		cleaner:     cleaner,
 		memberRepo:  memberRepo,

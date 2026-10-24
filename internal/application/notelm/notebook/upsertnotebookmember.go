@@ -33,7 +33,7 @@ func NewUpsertNotebookMemberHandler(
 	userRepo identityrepo.UserRepository,
 ) *UpsertNotebookMemberHandler {
 	return &UpsertNotebookMemberHandler{
-		baseHandler: newBaseHandler(notebookRepo, notebookAccessService, userRepo),
+		baseHandler: newBaseHandler(notebookRepo, notebookAccessService, userRepo, nil),
 		memberRepo:  memberRepo,
 		userRepo:    userRepo,
 	}

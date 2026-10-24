@@ -24,7 +24,7 @@ func NewUpdateNotebookVisibilityHandler(
 	userRepo identrepo.UserRepository,
 ) *UpdateNotebookVisibilityHandler {
 	return &UpdateNotebookVisibilityHandler{
-		baseHandler: newBaseHandler(notebookRepo, notebookAccessService, userRepo),
+		baseHandler: newBaseHandler(notebookRepo, notebookAccessService, userRepo, nil),
 	}
 }
 

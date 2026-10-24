@@ -3,8 +3,8 @@ package artifact
 import (
 	"context"
 
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
@@ -18,20 +18,26 @@ type ListRequest struct {
 }
 
 type ListResponse struct {
-	Artifacts []*artifactentity.Artifact
+	Artifacts []*ArtifactView
 	HasMore   bool
 }
 
 type ListArtifactsHandler struct {
 	repo                  artifactrepo.Repository
 	notebookAccessService *notebookservice.AccessService
+	storage               adapter.ObjectStore
 }
 
 func NewListArtifactsHandler(
 	repo artifactrepo.Repository,
 	notebookAccessService *notebookservice.AccessService,
+	storage adapter.ObjectStore,
 ) *ListArtifactsHandler {
-	return &ListArtifactsHandler{repo: repo, notebookAccessService: notebookAccessService}
+	return &ListArtifactsHandler{
+		repo:                  repo,
+		notebookAccessService: notebookAccessService,
+		storage:               storage,
+	}
 }
 
 func (h *ListArtifactsHandler) Handle(ctx context.Context, cmd *ListRequest) (*ListResponse, error) {
@@ -55,5 +61,11 @@ func (h *ListArtifactsHandler) Handle(ctx context.Context, cmd *ListRequest) (*L
 	if hasMore {
 		rows = rows[:cmd.Limit]
 	}
-	return &ListResponse{Artifacts: rows, HasMore: hasMore}, nil
+
+	views := make([]*ArtifactView, 0, len(rows))
+	for _, a := range rows {
+		views = append(views, toArtifactView(ctx, h.storage, a))
+	}
+
+	return &ListResponse{Artifacts: views, HasMore: hasMore}, nil
 }

@@ -5,7 +5,6 @@ import (
 
 	authapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/identity/auth"
 	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/schema"
-	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 
 	"github.com/cloudwego/hertz/pkg/app"
@@ -20,7 +19,6 @@ func (s *Server) AuthSetPassword(ctx context.Context, c *app.RequestContext) {
 	}
 
 	resp, err := s.authSetPasswordHandler.Handle(ctx, &authapp.SetPasswordCommand{
-		UserId:      pkgcontext.GetUserId(ctx),
 		OldPassword: req.OldPassword,
 		NewPassword: req.NewPassword,
 	})

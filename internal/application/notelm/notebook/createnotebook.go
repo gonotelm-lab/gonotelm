@@ -8,6 +8,7 @@ import (
 	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
@@ -24,16 +25,15 @@ func NewCreateNotebookHandler(notebookRepo notebookrepo.Repository, eventBus eve
 }
 
 type CreateNotebookHandleCommand struct {
-	Name    string
-	Desc    string
-	OwnerId valobj.Uid
+	Name string
+	Desc string
 }
 
 func (h *CreateNotebookHandler) Handle(
 	ctx context.Context,
 	cmd *CreateNotebookHandleCommand,
 ) (valobj.Id, error) {
-	notebook, err := notebookentity.NewNotebook(cmd.Name, cmd.Desc, cmd.OwnerId)
+	notebook, err := notebookentity.NewNotebook(cmd.Name, cmd.Desc, pkgcontext.GetUserId(ctx))
 	if err != nil {
 		return valobj.Id{}, errors.WithMessage(err, "create notebook failed")
 	}

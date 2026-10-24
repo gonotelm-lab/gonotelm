@@ -10,6 +10,7 @@ import (
 	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -79,8 +80,8 @@ func TestListNotebooksHandleOwned(t *testing.T) {
 		users: []*idententity.User{{Id: ownerId, Nickname: "owner"}},
 	}, nil)
 
-	result, err := handler.Handle(context.Background(), &ListNotebooksHandleQuery{
-		UserId: ownerId,
+	ctx := pkgcontext.WithUserId(context.Background(), ownerId)
+	result, err := handler.Handle(ctx, &ListNotebooksHandleQuery{
 		Scope:  AccessScopeOwned,
 		Limit:  2,
 		Offset: 4,
@@ -113,8 +114,8 @@ func TestListNotebooksHandleOwnedHasMore(t *testing.T) {
 		users: []*idententity.User{{Id: ownerId, Nickname: "owner"}},
 	}, nil)
 
-	result, err := handler.Handle(context.Background(), &ListNotebooksHandleQuery{
-		UserId: ownerId,
+	ctx := pkgcontext.WithUserId(context.Background(), ownerId)
+	result, err := handler.Handle(ctx, &ListNotebooksHandleQuery{
 		Scope:  AccessScopeOwned,
 		Limit:  2,
 		Offset: 0,
@@ -136,8 +137,8 @@ func TestListNotebooksHandleShared(t *testing.T) {
 		users: []*idententity.User{{Id: ownerId, Nickname: "owner"}},
 	}, nil)
 
-	result, err := handler.Handle(context.Background(), &ListNotebooksHandleQuery{
-		UserId: userId,
+	ctx := pkgcontext.WithUserId(context.Background(), userId)
+	result, err := handler.Handle(ctx, &ListNotebooksHandleQuery{
 		Scope:  AccessScopeShared,
 		Limit:  10,
 		Offset: 0,
@@ -156,10 +157,10 @@ func TestListNotebooksHandleShared(t *testing.T) {
 func TestListNotebooksHandleInvalidScope(t *testing.T) {
 	handler := NewListNotebooksHandler(&fakeNotebookRepo{}, &fakeUserRepo{}, nil)
 
-	_, err := handler.Handle(context.Background(), &ListNotebooksHandleQuery{
-		UserId: valobj.NewUid(),
-		Scope:  AccessScope(99),
-		Limit:  10,
+	ctx := pkgcontext.WithUserId(context.Background(), valobj.NewUid())
+	_, err := handler.Handle(ctx, &ListNotebooksHandleQuery{
+		Scope: AccessScope(99),
+		Limit: 10,
 	})
 	require.Error(t, err)
 }

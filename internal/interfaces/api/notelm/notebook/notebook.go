@@ -6,7 +6,6 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 	notebookapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/notebook"
 	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/schema"
-	pkgctx "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 )
 
@@ -21,12 +20,10 @@ func (s *Server) CreateNotebook(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	userId := pkgctx.GetUserId(ctx)
 	id, err := s.createNotebookHandler.Handle(ctx,
 		&notebookapp.CreateNotebookHandleCommand{
-			Name:    req.Name,
-			Desc:    req.Desc,
-			OwnerId: userId,
+			Name: req.Name,
+			Desc: req.Desc,
 		})
 	if err != nil {
 		http.ErrResp(c, err)
@@ -78,10 +75,8 @@ func (s *Server) ListNotebooks(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	userId := pkgctx.GetUserId(ctx)
 	result, err := s.listNotebooksHandler.Handle(ctx,
 		&notebookapp.ListNotebooksHandleQuery{
-			UserId: userId,
 			Scope:  req.Scope.ToScope(),
 			Limit:  req.Limit,
 			Offset: req.Offset,

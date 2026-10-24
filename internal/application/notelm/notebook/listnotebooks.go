@@ -8,6 +8,7 @@ import (
 	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
@@ -54,7 +55,6 @@ func NewListNotebooksHandler(
 }
 
 type ListNotebooksHandleQuery struct {
-	UserId valobj.Uid
 	Scope  AccessScope
 	Limit  int
 	Offset int
@@ -92,15 +92,17 @@ func (h *ListNotebooksHandler) Handle(
 		Order:  query.SortBy.toListOrder(),
 	}
 
+	userId := pkgcontext.GetUserId(ctx)
+
 	var (
 		notebooks []*notebookentity.Notebook
 		err       error
 	)
 	switch query.Scope {
 	case AccessScopeOwned:
-		notebooks, err = h.notebookRepo.ListByOwner(ctx, query.UserId, spec)
+		notebooks, err = h.notebookRepo.ListByOwner(ctx, userId, spec)
 	case AccessScopeShared:
-		notebooks, err = h.notebookRepo.ListShared(ctx, query.UserId, spec)
+		notebooks, err = h.notebookRepo.ListShared(ctx, userId, spec)
 	default:
 		return nil, errors.ErrParams.Msgf("invalid scope: %d", query.Scope)
 	}

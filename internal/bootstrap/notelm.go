@@ -100,6 +100,7 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 	)
 	streamTaskRepo := repository.NewStreamTaskRepository(infra.Cache.ChatMessageStreamCache)
 	suggestionRepo := repository.NewSuggestionRepository(infra.Cache.ChatSuggestionCache)
+	notebookAIDescRepo := repository.NewNotebookAIDescriptionRepository(infra.Cache.NotebookAIDescriptionCache)
 	providerRegistry, err := repository.NewProviderRegistry(rootCtx, cfg.ToIDPConfig())
 	if err != nil {
 		return nil, err
@@ -235,31 +236,39 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 	wg := &sync.WaitGroup{}
 	svr := notelmapi.NewServer(
 		notelmapi.ServerDeps{
-			RootCtx:                rootCtx,
-			NotebookRepo:           notebookRepo,
-			NotebookMemberRepo:     notebookMemberRepo,
-			NotebookAccessService:  notebookAccessService,
-			SourceRepo:             sourceRepo,
-			ObjectStore:            infra.ObjectStore,
-			KeyFactory:             infra.KeyFactory,
-			SourceDocRepo:          sourceDocRepo,
+			RootCtx: rootCtx,
+
+			NotebookRepo:              notebookRepo,
+			NotebookMemberRepo:        notebookMemberRepo,
+			NotebookAccessService:     notebookAccessService,
+			NotebookAIDescriptionRepo: notebookAIDescRepo,
+
+			SourceRepo:    sourceRepo,
+			SourceDocRepo: sourceDocRepo,
+
+			ObjectStore: infra.ObjectStore,
+			KeyFactory:  infra.KeyFactory,
+
 			ChatRepo:               chatRepo,
 			ChatMessageRepo:        messageRepo,
 			ChatContextMessageRepo: contextMsgRepo,
 			ChatStreamTaskRepo:     streamTaskRepo,
 			ChatSuggestionRepo:     suggestionRepo,
 			ChatSuggestService:     suggestionService,
-			ArtifactRepo:           artifactRepo,
-			StylePreviewRepo:       stylePreviewRepo,
-			ProviderRegistry:       providerRegistry,
-			OAuthStateRepo:         oauthStateRepo,
-			UserRepo:               userRepo,
-			UserService:            userService,
-			SignupService:          signupService,
-			PasswordResetService:   passwordResetService,
-			UserSessionRepo:        userSessionRepo,
-			VerifyMailer:           identityMailer,
-			ResetMailer:            identityMailer,
+
+			ArtifactRepo: artifactRepo,
+
+			StylePreviewRepo: stylePreviewRepo,
+			ProviderRegistry: providerRegistry,
+
+			OAuthStateRepo:       oauthStateRepo,
+			UserRepo:             userRepo,
+			UserService:          userService,
+			SignupService:        signupService,
+			PasswordResetService: passwordResetService,
+			UserSessionRepo:      userSessionRepo,
+			VerifyMailer:         identityMailer,
+			ResetMailer:          identityMailer,
 
 			EventBus:   eventBus,
 			WaitGroup:  wg,

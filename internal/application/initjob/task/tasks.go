@@ -5,6 +5,7 @@ package task
 import (
 	"github.com/gonotelm-lab/gonotelm/internal/application/initjob/dep"
 	"github.com/gonotelm-lab/gonotelm/internal/application/initjob/task/artifact/stylepreview"
+	notebookinit "github.com/gonotelm-lab/gonotelm/internal/application/initjob/task/notebook"
 	pkginitjob "github.com/gonotelm-lab/gonotelm/pkg/initjob"
 )
 
@@ -37,5 +38,6 @@ func New(opt *Option) []pkginitjob.Task {
 			opt.Infra.KeyFactory,
 			opt.AssetsDir,
 		),
+		notebookinit.NewClearDescriptionsTask(opt.Infra.Database.NotebookMaintenanceStore),
 	}
 }

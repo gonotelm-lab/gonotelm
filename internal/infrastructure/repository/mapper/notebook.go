@@ -13,6 +13,7 @@ func NotebookToSchema(notebook *notebookentity.Notebook) *schema.Notebook {
 		Id:          notebook.Id,
 		Name:        notebook.Name,
 		Description: notebook.Description,
+		Flags:       notebook.Flags.Int32(),
 		OwnerId:     notebook.OwnerId,
 		Visibility:  notebook.Visibility.String(),
 		UpdatedAt:   notebook.UpdateTime.Value(),
@@ -28,6 +29,7 @@ func NotebookFromSchema(notebook *schema.Notebook) *notebookentity.Notebook {
 		},
 		Name:        notebook.Name,
 		Description: notebook.Description,
+		Flags:       vo.NewFlags(notebook.Flags),
 		OwnerId:     notebook.OwnerId,
 		Visibility:  vo.NewVisibility(notebook.Visibility),
 	}

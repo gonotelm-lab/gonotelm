@@ -13,17 +13,18 @@ import (
 )
 
 var (
-	testRedis                   goredis.UniversalClient
-	testChatMessageContextCache cache.ChatContextMessageCache
-	testChatMessageStreamCache  cache.ChatMessageStreamCache
-	testChatSuggestionCache     cache.ChatSuggestionCache
-	testSandboxCache            cache.SandboxCache
-	testOAuthStateCache         cache.OAuthStateCache
-	testUserSessionCache        cache.UserSessionCache
-	testStylePreviewCache       cache.StylePreviewCache
-	testUserCache               cache.UserCache
-	testSignupCache             cache.SignupCache
-	testPasswordResetCache      cache.PasswordResetCache
+	testRedis                      goredis.UniversalClient
+	testChatMessageContextCache    cache.ChatContextMessageCache
+	testChatMessageStreamCache     cache.ChatMessageStreamCache
+	testChatSuggestionCache        cache.ChatSuggestionCache
+	testSandboxCache               cache.SandboxCache
+	testNotebookAIDescriptionCache cache.NotebookAIDescriptionCache
+	testOAuthStateCache            cache.OAuthStateCache
+	testUserSessionCache           cache.UserSessionCache
+	testStylePreviewCache          cache.StylePreviewCache
+	testUserCache                  cache.UserCache
+	testSignupCache                cache.SignupCache
+	testPasswordResetCache         cache.PasswordResetCache
 )
 
 func TestMain(m *testing.M) {
@@ -42,6 +43,7 @@ func TestMain(m *testing.M) {
 	testChatMessageStreamCache = NewChatMessageStreamCacheImpl(testRedis)
 	testChatSuggestionCache = NewChatSuggestionCacheImpl(testRedis)
 	testSandboxCache = NewSandboxCacheImpl(testRedis)
+	testNotebookAIDescriptionCache = NewNotebookAIDescriptionCacheImpl(testRedis)
 	testOAuthStateCache = NewOAuthStateCacheImpl(testRedis)
 	testUserSessionCache = NewUserSessionCacheImpl(testRedis)
 	testStylePreviewCache = NewStylePreviewCacheImpl(testRedis)
@@ -65,6 +67,7 @@ func TestNewCache_WiresAllCaches(t *testing.T) {
 		So(c.ChatMessageStreamCache, ShouldNotBeNil)
 		So(c.ChatSuggestionCache, ShouldNotBeNil)
 		So(c.SandboxCache, ShouldNotBeNil)
+		So(c.NotebookAIDescriptionCache, ShouldNotBeNil)
 		So(c.OAuthStateCache, ShouldNotBeNil)
 		So(c.UserSessionCache, ShouldNotBeNil)
 		So(c.StylePreviewCache, ShouldNotBeNil)

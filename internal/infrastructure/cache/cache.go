@@ -53,6 +53,14 @@ type SandboxCache interface {
 	Delete(ctx context.Context, userId, notebookId string) error
 }
 
+const NotebookAIDescriptionTTL = 12 * time.Hour
+
+// NotebookAIDescriptionCache AI 摘要缓存；Get miss 返回 ("", nil)。
+type NotebookAIDescriptionCache interface {
+	Get(ctx context.Context, notebookId, fingerprint string) (string, error)
+	Set(ctx context.Context, notebookId, fingerprint, desc string, ttl time.Duration) error
+}
+
 // OAuthStateCache OAuth 握手的一次性状态，state 本身不入 key
 type OAuthStateCache interface {
 	Set(ctx context.Context, state string, oauthState *schema.OAuthState) error
@@ -115,16 +123,17 @@ type PasswordResetCache interface {
 }
 
 type Cache struct {
-	ChatMessageContextCache ChatContextMessageCache
-	ChatMessageStreamCache  ChatMessageStreamCache
-	ChatSuggestionCache     ChatSuggestionCache
-	SandboxCache            SandboxCache
-	OAuthStateCache         OAuthStateCache
-	UserSessionCache        UserSessionCache
-	StylePreviewCache       StylePreviewCache
-	UserCache               UserCache
-	SignupCache             SignupCache
-	PasswordResetCache      PasswordResetCache
+	ChatMessageContextCache    ChatContextMessageCache
+	ChatMessageStreamCache     ChatMessageStreamCache
+	ChatSuggestionCache        ChatSuggestionCache
+	SandboxCache               SandboxCache
+	NotebookAIDescriptionCache NotebookAIDescriptionCache
+	OAuthStateCache            OAuthStateCache
+	UserSessionCache           UserSessionCache
+	StylePreviewCache          StylePreviewCache
+	UserCache                  UserCache
+	SignupCache                SignupCache
+	PasswordResetCache         PasswordResetCache
 }
 
 var (

@@ -21,6 +21,7 @@ func TestNotebookStoreCRUD(t *testing.T) {
 			Id:          database.Id(uuid.NewV7()),
 			Name:        "nb_" + uuid.NewV7().String(),
 			Description: "initial desc",
+			Flags:       1,
 			OwnerId:     valobj.NewUid(),
 			UpdatedAt:   time.Now().UnixMilli(),
 		}
@@ -38,9 +39,11 @@ func TestNotebookStoreCRUD(t *testing.T) {
 		So(gotByID.Name, ShouldEqual, notebook.Name)
 		So(gotByID.OwnerId, ShouldEqual, notebook.OwnerId)
 		So(gotByID.Description, ShouldEqual, notebook.Description)
+		So(gotByID.Flags, ShouldEqual, int32(1))
 
 		notebook.Name = "nb_updated_" + uuid.NewV7().String()
 		notebook.Description = "updated desc"
+		notebook.Flags = 0
 		notebook.UpdatedAt++
 		err = store.Update(ctx, notebook)
 		So(err, ShouldBeNil)
@@ -50,6 +53,7 @@ func TestNotebookStoreCRUD(t *testing.T) {
 		So(gotByName, ShouldNotBeNil)
 		So(gotByName.Id, ShouldEqual, notebook.Id)
 		So(gotByName.Description, ShouldEqual, notebook.Description)
+		So(gotByName.Flags, ShouldEqual, int32(0))
 
 		err = store.DeleteById(ctx, notebook.Id)
 		So(err, ShouldBeNil)
@@ -508,5 +512,51 @@ func TestNotebookStoreExists(t *testing.T) {
 		exists, err = store.Exists(ctx, notebook.Id)
 		So(err, ShouldBeNil)
 		So(exists, ShouldBeFalse)
+	})
+}
+
+func TestNotebookMaintenanceStoreClearNonEmptyDescriptions(t *testing.T) {
+	Convey("NotebookMaintenanceStore ClearNonEmptyDescriptions", t, func() {
+		store := testNotebookStore
+		var maintenance database.NotebookMaintenanceStore = testNotebookStore
+		ctx := t.Context()
+		ownerID := valobj.NewUid()
+
+		withDesc := &schema.Notebook{
+			Id:          database.Id(uuid.NewV7()),
+			Name:        "nb_desc_" + uuid.NewV7().String(),
+			Description: "legacy",
+			OwnerId:     ownerID,
+			UpdatedAt:   nowMilli(),
+		}
+		empty := &schema.Notebook{
+			Id:          database.Id(uuid.NewV7()),
+			Name:        "nb_empty_" + uuid.NewV7().String(),
+			Description: "",
+			OwnerId:     ownerID,
+			UpdatedAt:   nowMilli(),
+		}
+		So(store.Create(ctx, withDesc), ShouldBeNil)
+		So(store.Create(ctx, empty), ShouldBeNil)
+		t.Cleanup(func() {
+			_ = testDB.WithContext(ctx).Where("owner_id = ?", ownerID).Delete(&schema.Notebook{}).Error
+		})
+
+		count, err := maintenance.CountNonEmptyDescriptions(ctx)
+		So(err, ShouldBeNil)
+		So(count, ShouldBeGreaterThanOrEqualTo, int64(1))
+
+		err = maintenance.ClearNonEmptyDescriptions(ctx, &schema.NotebookClearDescriptionsParams{
+			UpdatedAt: nowMilli() + 1,
+		})
+		So(err, ShouldBeNil)
+
+		got, err := store.GetById(ctx, withDesc.Id)
+		So(err, ShouldBeNil)
+		So(got.Description, ShouldEqual, "")
+
+		stillEmpty, err := store.GetById(ctx, empty.Id)
+		So(err, ShouldBeNil)
+		So(stillEmpty.Description, ShouldEqual, "")
 	})
 }

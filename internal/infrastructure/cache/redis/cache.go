@@ -9,15 +9,16 @@ func NewCache(
 	rdb goredis.UniversalClient,
 ) *cache.Cache {
 	return &cache.Cache{
-		ChatMessageContextCache: NewChatMessageContextCacheImpl(rdb),
-		ChatMessageStreamCache:  NewChatMessageStreamCacheImpl(rdb),
-		ChatSuggestionCache:     NewChatSuggestionCacheImpl(rdb),
-		SandboxCache:            NewSandboxCacheImpl(rdb),
-		OAuthStateCache:         NewOAuthStateCacheImpl(rdb),
-		UserSessionCache:        NewUserSessionCacheImpl(rdb),
-		StylePreviewCache:       NewStylePreviewCacheImpl(rdb),
-		UserCache:               NewUserCacheImpl(rdb),
-		SignupCache:             NewSignupCacheImpl(rdb),
-		PasswordResetCache:      NewPasswordResetCacheImpl(rdb),
+		ChatMessageContextCache:    NewChatMessageContextCacheImpl(rdb),
+		ChatMessageStreamCache:     NewChatMessageStreamCacheImpl(rdb),
+		ChatSuggestionCache:        NewChatSuggestionCacheImpl(rdb),
+		SandboxCache:               NewSandboxCacheImpl(rdb),
+		NotebookAIDescriptionCache: NewNotebookAIDescriptionCacheImpl(rdb),
+		OAuthStateCache:            NewOAuthStateCacheImpl(rdb),
+		UserSessionCache:           NewUserSessionCacheImpl(rdb),
+		StylePreviewCache:          NewStylePreviewCacheImpl(rdb),
+		UserCache:                  NewUserCacheImpl(rdb),
+		SignupCache:                NewSignupCacheImpl(rdb),
+		PasswordResetCache:         NewPasswordResetCacheImpl(rdb),
 	}
 }

@@ -3,6 +3,7 @@ package notebook
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
@@ -19,8 +20,8 @@ import (
 	pkgstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 )
 
-func notebookDescGenerateLockKey(userId valobj.Uid, notebookId valobj.Id) string {
-	return fmt.Sprintf("notelm:notebook:desc:lock:%s:%s", userId, notebookId)
+func notebookDescGenerateLockKey(notebookId valobj.Id) string {
+	return fmt.Sprintf("notelm:notebook:desc:lock:%s", notebookId)
 }
 
 type GenerateDescriptionHandler struct {
@@ -29,6 +30,7 @@ type GenerateDescriptionHandler struct {
 	sourceRepo sourcerepo.Repository
 	distLock   adapter.DistributedLock
 	summarizer adapter.Summarizer
+	aiDescRepo notebookrepo.AIDescriptionRepository
 }
 
 func NewGenerateDescriptionHandler(
@@ -38,12 +40,14 @@ func NewGenerateDescriptionHandler(
 	userRepo identrepo.UserRepository,
 	distLock adapter.DistributedLock,
 	summarizer adapter.Summarizer,
+	aiDescRepo notebookrepo.AIDescriptionRepository,
 ) *GenerateDescriptionHandler {
 	return &GenerateDescriptionHandler{
 		baseHandler: newBaseHandler(notebookRepo, notebookAccessService, userRepo, nil),
 		sourceRepo:  sourceRepo,
 		distLock:    distLock,
 		summarizer:  summarizer,
+		aiDescRepo:  aiDescRepo,
 	}
 }
 
@@ -52,7 +56,7 @@ func (h *GenerateDescriptionHandler) Handle(
 	notebookId valobj.Id,
 ) (string, error) {
 	ctx = pkgcontext.WithScene(ctx, pkgcontext.NotebookDescGenScene, notebookId.String())
-	return withNotebookAccess(h.baseHandler, ctx, notebookId, accessManageNotebook, h.generateDescription)
+	return withNotebookAccess(h.baseHandler, ctx, notebookId, accessView, h.generateDescription)
 }
 
 func (h *GenerateDescriptionHandler) generateDescription(
@@ -61,24 +65,11 @@ func (h *GenerateDescriptionHandler) generateDescription(
 ) (string, error) {
 	notebook := access.Notebook
 
-	if strings.TrimSpace(notebook.Description) != "" {
-		return notebook.Description, nil
+	// 已设自定义摘要时禁止 AI 生成，避免覆盖用户自定义的摘要
+	if notebook.CustomizeDescription() {
+		return "", notebookerrors.ErrCustomizeDescription
 	}
 
-	userId := pkgcontext.GetUserId(ctx)
-	lockKey := notebookDescGenerateLockKey(userId, notebook.Id)
-	if err := h.distLock.Lock(ctx, lockKey); err != nil {
-		return "", errors.WithMessagef(err, "lock notebook description generation failed, notebook_id=%s", notebook.Id)
-	}
-	defer func() { _ = h.distLock.Unlock(ctx, lockKey) }()
-
-	return h.generateAndSave(ctx, notebook)
-}
-
-func (h *GenerateDescriptionHandler) generateAndSave(
-	ctx context.Context,
-	notebook *notebookentity.Notebook,
-) (string, error) {
 	sources, err := h.sourceRepo.ListByNotebookId(
 		ctx, notebook.Id, &sourcerepo.ListSpec{
 			Offset: 0,
@@ -88,33 +79,96 @@ func (h *GenerateDescriptionHandler) generateAndSave(
 		return "", errors.WithMessagef(err, "list sources failed, notebook_id=%s", notebook.Id)
 	}
 
-	text := buildSourcesSummarizeText(sources)
+	// 仅用 ready 来源的 title/abstract 拼 prompt；无可摘要内容返回空串（不报错）
+	text := h.buildSourcesSummarizeText(sources)
 	if text == "" {
-		return "", notebookerrors.ErrNoSourcesForDesc
+		return "", nil
 	}
 
-	desc, err := h.summarizer.Summarize(ctx, text)
-	if err != nil {
-		return "", errors.WithMessagef(err, "summarize notebook description failed, notebook_id=%s", notebook.Id)
+	// 指纹随来源集合变化；同指纹命中缓存则跳过 LLM
+	fp := sourceentity.NewFingerprint(sources)
+	if cached, err := h.getCachedDescription(ctx, notebook.Id, fp); err != nil {
+		return "", err
+	} else if cached != "" {
+		return cached, nil
 	}
 
-	desc = pkgstring.TruncateRune(strings.TrimSpace(desc), notebookentity.MaxDescriptionLength)
-	if desc == "" {
-		return "", errors.WithMessagef(notebookerrors.ErrInvalidDescription, "empty summary, notebook_id=%s", notebook.Id)
+	// 持锁生成，避免并发打多次 LLM；锁内再读一次缓存（double-check）
+	var desc string
+	err = h.distLock.WithLockWithRetry(
+		ctx,
+		notebookDescGenerateLockKey(notebook.Id),
+		adapter.DefaultRetrySpec,
+		func(ctx context.Context) error {
+			if cached, err := h.getCachedDescription(ctx, notebook.Id, fp); err != nil {
+				return err
+			} else if cached != "" {
+				desc = cached
+				return nil
+			}
+
+			generated, err := h.summarizeAndSave(ctx, notebook.Id, fp, text)
+			if err != nil {
+				return err
+			}
+			desc = generated
+			return nil
+		})
+	if err == nil {
+		return desc, nil
+	}
+	if !errors.Is(err, errors.ErrLockNotAcquired) {
+		return "", err
 	}
 
-	if err := notebook.UpdateDescription(desc); err != nil {
-		return "", errors.WithMessage(err, "update notebook description failed")
+	// 重试后仍抢不到锁：无锁独立生成并落缓存，宁可偶发重复调用 LLM
+	slog.WarnContext(ctx, "notebook desc lock contended, generate independently",
+		slog.String("notebook_id", notebook.Id.String()),
+		slog.Any("err", err),
+	)
+	if cached, err := h.getCachedDescription(ctx, notebook.Id, fp); err != nil {
+		return "", err
+	} else if cached != "" {
+		return cached, nil
 	}
-
-	if err := h.notebookRepo.Save(ctx, notebook); err != nil {
-		return "", errors.WithMessagef(err, "save notebook description failed, notebook_id=%s", notebook.Id)
-	}
-
-	return notebook.Description, nil
+	return h.summarizeAndSave(ctx, notebook.Id, fp, text)
 }
 
-func buildSourcesSummarizeText(sources []*sourceentity.Source) string {
+func (h *GenerateDescriptionHandler) summarizeAndSave(
+	ctx context.Context,
+	notebookId valobj.Id,
+	fp string,
+	text string,
+) (string, error) {
+	generated, err := h.summarizer.Summarize(ctx, text)
+	if err != nil {
+		return "", errors.WithMessagef(err, "summarize notebook description failed, notebook_id=%s", notebookId)
+	}
+
+	generated = pkgstring.TruncateRune(strings.TrimSpace(generated), notebookentity.MaxDescriptionLength)
+	if generated == "" {
+		return "", errors.WithMessagef(notebookerrors.ErrInvalidDescription, "empty summary, notebook_id=%s", notebookId)
+	}
+
+	if err := h.aiDescRepo.Save(ctx, notebookId, fp, generated); err != nil {
+		return "", errors.WithMessagef(err, "save ai description failed, notebook_id=%s", notebookId)
+	}
+	return generated, nil
+}
+
+func (h *GenerateDescriptionHandler) getCachedDescription(
+	ctx context.Context,
+	notebookId valobj.Id,
+	fp string,
+) (string, error) {
+	cached, err := h.aiDescRepo.Get(ctx, notebookId, fp)
+	if err != nil {
+		return "", errors.WithMessagef(err, "get ai description failed, notebook_id=%s", notebookId)
+	}
+	return cached, nil
+}
+
+func (h *GenerateDescriptionHandler) buildSourcesSummarizeText(sources []*sourceentity.Source) string {
 	var b strings.Builder
 	idx := 0
 	for _, source := range sources {

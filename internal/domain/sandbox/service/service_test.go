@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/sandbox/entity"
 	sandboxerrors "github.com/gonotelm-lab/gonotelm/internal/domain/sandbox/errors"
@@ -173,6 +174,27 @@ func (l *recordingLock) Unlock(_ context.Context, key string) error {
 
 func (l *recordingLock) Check(context.Context, string) (bool, error) { return false, nil }
 
+func (l *recordingLock) WithLock(
+	ctx context.Context,
+	key string,
+	fn func(context.Context) error,
+) error {
+	if err := l.Lock(ctx, key); err != nil {
+		return err
+	}
+	defer func() { _ = l.Unlock(ctx, key) }()
+	return fn(ctx)
+}
+
+func (l *recordingLock) WithLockWithRetry(
+	ctx context.Context,
+	key string,
+	_ adapter.RetrySpec,
+	fn func(context.Context) error,
+) error {
+	return l.WithLock(ctx, key, fn)
+}
+
 func testKey(t *testing.T) entity.SandboxKey {
 	t.Helper()
 	nb, err := valobj.NewIdFromString("01900000-0000-7000-8000-000000000001")
@@ -259,7 +281,7 @@ func TestGetOrCreateSandbox_ReuseRefreshesTTL(t *testing.T) {
 	require.Equal(t, "sb-existing", sb.Id())
 	require.Equal(t, 0, mgr.createCount)
 
-	// 复用沙箱时：沙箱过期时间与 Redis 绑定 TTL 都要刷新为本次 TTL
+	// 复用沙箱时：沙箱过期时间与绑定 TTL 都要刷新为本次 TTL
 	require.Equal(t, []renewCall{{id: "sb-existing", ttl: ttl}}, mgr.renewCalls)
 	require.Equal(t, ttl, repo.ttls[repo.cacheKey(key)])
 }
@@ -269,7 +291,7 @@ func TestGetOrCreateSandbox_StaleCacheClearedOnce(t *testing.T) {
 	repo := newFakeRepo()
 	mgr := newFakeMgr()
 
-	// Redis 有绑定，但远端沙箱已不存在
+	// 已有绑定，但远端沙箱已不存在
 	require.NoError(t, repo.SetSandbox(context.Background(), key, entity.SandboxDescription{
 		Id:  "sb-dead",
 		Key: key,
@@ -290,7 +312,7 @@ func TestGetOrCreateSandbox_ReuseDeadSandboxRecreates(t *testing.T) {
 	repo := newFakeRepo()
 	mgr := newFakeMgr()
 
-	// Redis 有绑定，句柄也还在内存里，但沙箱已经连不上（存活检查失败）
+	// 已有绑定，句柄也还在内存里，但沙箱已经连不上（存活检查失败）
 	dead := &stubSandbox{id: "sb-dead", key: key, pingErr: pkgerr.ErrNoRecord.Msg("connection refused")}
 	mgr.sandboxes[dead.id] = dead
 	require.NoError(t, repo.SetSandbox(context.Background(), key, dead.Description(), time.Hour))
@@ -318,7 +340,7 @@ func TestGetOrCreateSandbox_RenewFailureKeepsBindingTTL(t *testing.T) {
 	repo := newFakeRepo()
 	mgr := newFakeMgr()
 
-	// 沙箱存活，但续期失败：不能把 Redis 绑定 TTL 续成新值
+	// 沙箱存活，但续期失败：不能把绑定 TTL 续成新值
 	alive := &stubSandbox{id: "sb-existing", key: key}
 	mgr.sandboxes[alive.id] = alive
 	mgr.renewErr = pkgerr.ErrNoRecord.Msg("renew failed")
@@ -331,6 +353,6 @@ func TestGetOrCreateSandbox_RenewFailureKeepsBindingTTL(t *testing.T) {
 	require.Equal(t, 0, mgr.createCount)
 	require.Equal(t, []renewCall{{id: "sb-existing", ttl: 2 * time.Hour}}, mgr.renewCalls)
 
-	// 续期失败：Redis TTL 不应被续成 2h，保持原值
+	// 续期失败：绑定 TTL 不应被续成 2h，保持原值
 	require.Equal(t, time.Minute, repo.ttls[repo.cacheKey(key)])
 }

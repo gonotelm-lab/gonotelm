@@ -23,7 +23,6 @@ func (s *Server) CreateNotebook(ctx context.Context, c *app.RequestContext) {
 	id, err := s.createNotebookHandler.Handle(ctx,
 		&notebookapp.CreateNotebookHandleCommand{
 			Name: req.Name,
-			Desc: req.Desc,
 		})
 	if err != nil {
 		http.ErrResp(c, err)
@@ -46,18 +45,7 @@ func (s *Server) GetNotebook(ctx context.Context, c *app.RequestContext) {
 		http.ErrResp(c, err)
 		return
 	}
-	result := schema.GetNotebookResponse{
-		Id:          notebook.Id.String(),
-		Name:        notebook.Name,
-		Desc:        notebook.Description,
-		SourceCount: notebook.SourceCount,
-		Visibility:  string(notebook.Visibility),
-		Owner:       schema.NewNotebookOwnerResponse(notebook.Owner),
-		UpdatedAt:   notebook.UpdateTime.Value(),
-		CreatedAt:   notebook.CreateTime.Value(),
-	}
-
-	http.OkResp(c, result)
+	http.OkResp(c, schema.NewNotebookResponse(notebook))
 }
 
 // ListNotebooks 按 scope 返回当前用户的 notebook 列表，owned 与 shared 互斥：
@@ -87,9 +75,9 @@ func (s *Server) ListNotebooks(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	notebooks := make([]*schema.ListNotebookItemResponse, 0, len(result.Notebooks))
+	notebooks := make([]*schema.NotebookResponse, 0, len(result.Notebooks))
 	for _, notebook := range result.Notebooks {
-		notebooks = append(notebooks, schema.NewListNotebookItemResponse(notebook))
+		notebooks = append(notebooks, schema.NewNotebookResponse(notebook))
 	}
 
 	http.OkResp(c, schema.ListNotebooksResponse{
@@ -108,7 +96,11 @@ func (s *Server) UpdateNotebook(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	err = s.updateNotebookNameHandler.Handle(ctx, req.Id, req.Name)
+	err = s.updateNotebookHandler.Handle(ctx, req.Id, &notebookapp.UpdateNotebookCommand{
+		Name:                 req.Name,
+		CustomizeDescription: req.CustomizeDescription,
+		Desc:                 req.Desc,
+	})
 	if err != nil {
 		http.ErrResp(c, err)
 		return

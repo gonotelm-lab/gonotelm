@@ -8,4 +8,5 @@ var (
 	IdSlidesStylePreviewInit        = "202610060000"
 	IdInfoGraphicStylePreviewInit   = "202610060001"
 	IdVideoOverviewStylePreviewInit = "202610060002"
+	IdClearNotebookDescriptions     = "202610240000"
 )

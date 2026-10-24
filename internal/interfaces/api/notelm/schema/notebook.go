@@ -1,6 +1,8 @@
 package schema
 
 import (
+	"strings"
+
 	notebookapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/notebook"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/notebook/vo"
@@ -10,7 +12,6 @@ import (
 
 type CreateNotebookRequest struct {
 	Name string `json:"name" validate:"max=128"`
-	Desc string `json:"desc" validate:"max=1024"`
 }
 
 type CreateNotebookResponse struct {
@@ -25,15 +26,38 @@ func (r *GetNotebookRequest) Validate() error {
 	return nil
 }
 
-type GetNotebookResponse struct {
+// NotebookFlagsResponse notebook 位标记的 API 展开。
+type NotebookFlagsResponse struct {
+	CustomizeDescription bool `json:"customize_description"`
+}
+
+// NotebookResponse Get / List 共用的 notebook 视图。
+type NotebookResponse struct {
 	Id          string                 `json:"id"`
 	Name        string                 `json:"name"`
 	Desc        string                 `json:"desc"`
+	Flags       NotebookFlagsResponse  `json:"flags"`
 	SourceCount int64                  `json:"source_count"`
 	Visibility  string                 `json:"visibility"`
-	UpdatedAt   int64                  `json:"updated_at"`      // unix ms
-	CreatedAt   int64                  `json:"created_at"`      // unix ms
-	Owner       *NotebookOwnerResponse `json:"owner,omitempty"` // notebook owner
+	UpdatedAt   int64                  `json:"updated_at"` // unix ms
+	CreatedAt   int64                  `json:"created_at"` // unix ms
+	Owner       *NotebookOwnerResponse `json:"owner,omitempty"`
+}
+
+func NewNotebookResponse(notebook *notebookapp.Notebook) *NotebookResponse {
+	return &NotebookResponse{
+		Id:   notebook.Id.String(),
+		Name: notebook.Name,
+		Desc: notebook.Description,
+		Flags: NotebookFlagsResponse{
+			CustomizeDescription: notebook.CustomizeDescription(),
+		},
+		SourceCount: notebook.SourceCount,
+		Visibility:  string(notebook.Visibility),
+		Owner:       NewNotebookOwnerResponse(notebook.Owner),
+		UpdatedAt:   notebook.UpdateTime.Value(),
+		CreatedAt:   notebook.CreateTime.Value(),
+	}
 }
 
 type GetNotebookAccessResponse struct {
@@ -116,10 +140,10 @@ func (r *ListNotebooksRequest) Validate() error {
 }
 
 type ListNotebooksResponse struct {
-	Notebooks []*ListNotebookItemResponse `json:"notebooks"`
-	Limit     int                         `json:"limit"`
-	Offset    int                         `json:"offset"`
-	HasMore   bool                        `json:"has_more"`
+	Notebooks []*NotebookResponse `json:"notebooks"`
+	Limit     int                 `json:"limit"`
+	Offset    int                 `json:"offset"`
+	HasMore   bool                `json:"has_more"`
 }
 
 type NotebookOwnerResponse struct {
@@ -136,32 +160,6 @@ func NewNotebookOwnerResponse(owner *notebookapp.NotebookOwner) *NotebookOwnerRe
 		UserId:    owner.Id.String(),
 		Nickname:  owner.Nickname,
 		AvatarURL: owner.AvatarURL,
-	}
-}
-
-type ListNotebookItemResponse struct {
-	Id          string                 `json:"id"`
-	Name        string                 `json:"name"`
-	Desc        string                 `json:"desc"`
-	SourceCount int64                  `json:"source_count"`
-	Visibility  string                 `json:"visibility"`
-	Owner       *NotebookOwnerResponse `json:"owner,omitempty"`
-	UpdatedAt   int64                  `json:"updated_at"` // unix ms
-	CreatedAt   int64                  `json:"created_at"` // unix ms
-}
-
-func NewListNotebookItemResponse(
-	notebook *notebookapp.Notebook,
-) *ListNotebookItemResponse {
-	return &ListNotebookItemResponse{
-		Id:          notebook.Id.String(),
-		Name:        notebook.Name,
-		Desc:        notebook.Description,
-		SourceCount: notebook.SourceCount,
-		Visibility:  string(notebook.Visibility),
-		Owner:       NewNotebookOwnerResponse(notebook.Owner),
-		UpdatedAt:   notebook.UpdateTime.Value(),
-		CreatedAt:   notebook.CreateTime.Value(),
 	}
 }
 
@@ -188,8 +186,25 @@ type ListNotebookSourcesResponse struct {
 }
 
 type UpdateNotebookRequest struct {
-	Id   uuid.UUID `path:"id,required"`
-	Name string    `json:"name"        validate:"min=0,max=128"`
+	Id                   uuid.UUID `path:"id,required"`
+	Name                 *string   `json:"name"                   validate:"omitempty,min=0,max=128"`
+	CustomizeDescription *bool     `json:"customize_description"`
+	Desc                 *string   `json:"desc"                   validate:"omitempty,max=1024"`
+}
+
+func (r *UpdateNotebookRequest) Validate() error {
+	if r.Name == nil && r.CustomizeDescription == nil && r.Desc == nil {
+		return errors.ErrParams.Msg("at least one of name, customize_description, desc is required")
+	}
+	if r.CustomizeDescription != nil && *r.CustomizeDescription {
+		if r.Desc == nil || strings.TrimSpace(*r.Desc) == "" {
+			return errors.ErrParams.Msg("desc is required when customize_description is true")
+		}
+	}
+	if r.CustomizeDescription == nil && r.Desc != nil {
+		return errors.ErrParams.Msg("desc requires customize_description")
+	}
+	return nil
 }
 
 type GetNotebookChatRequest struct {

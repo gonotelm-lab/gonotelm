@@ -19,6 +19,7 @@ const (
 	CodeInvalidNotebookId    = 100012
 	CodeInvalidUserId        = 100013
 	CodeInvalidVisibility    = 100014
+	CodeCustomizeDescription = 100015
 )
 
 var (
@@ -38,4 +39,7 @@ var (
 	ErrInvalidNotebookId    = errors.ErrParams.ErrCode(CodeInvalidNotebookId).Msg("invalid notebook id")
 	ErrInvalidUserId        = errors.ErrParams.ErrCode(CodeInvalidUserId).Msg("invalid user id")
 	ErrInvalidVisibility    = errors.ErrParams.ErrCode(CodeInvalidVisibility).Msg("invalid visibility")
+
+	ErrCustomizeDescription = errors.ErrParams.ErrCode(CodeCustomizeDescription).
+				Msg("customize description is set")
 )

@@ -17,7 +17,10 @@ type NotebookStoreImpl struct {
 	db *gorm.DB
 }
 
-var _ database.NotebookStore = &NotebookStoreImpl{}
+var (
+	_ database.NotebookStore            = &NotebookStoreImpl{}
+	_ database.NotebookMaintenanceStore = &NotebookStoreImpl{}
+)
 
 func NewNotebookStoreImpl(db *gorm.DB) *NotebookStoreImpl {
 	return &NotebookStoreImpl{db: db}
@@ -44,6 +47,7 @@ func (s *NotebookStoreImpl) Upsert(
 		DoUpdates: clause.Assignments(map[string]any{
 			"name":        notebook.Name,
 			"description": notebook.Description,
+			"flags":       notebook.Flags,
 			"visibility":  notebook.Visibility,
 			"updated_at":  notebook.UpdatedAt,
 		}),
@@ -202,6 +206,7 @@ func (s *NotebookStoreImpl) Update(ctx context.Context, notebook *schema.Noteboo
 		Updates(map[string]any{
 			"name":        notebook.Name,
 			"description": notebook.Description,
+			"flags":       notebook.Flags,
 			"owner_id":    notebook.OwnerId,
 			"visibility":  notebook.Visibility,
 			"updated_at":  notebook.UpdatedAt,
@@ -311,5 +316,32 @@ func (s *NotebookStoreImpl) FillNameAndDescriptionIfEmpty(
 		return sql.WrapErr(err)
 	}
 
+	return nil
+}
+
+func (s *NotebookStoreImpl) CountNonEmptyDescriptions(ctx context.Context) (int64, error) {
+	var count int64
+	if err := s.db.WithContext(ctx).
+		Model(&schema.Notebook{}).
+		Where("description <> ''").
+		Count(&count).Error; err != nil {
+		return 0, sql.WrapErr(err)
+	}
+	return count, nil
+}
+
+func (s *NotebookStoreImpl) ClearNonEmptyDescriptions(
+	ctx context.Context,
+	params *schema.NotebookClearDescriptionsParams,
+) error {
+	if err := s.db.WithContext(ctx).
+		Model(&schema.Notebook{}).
+		Where("description <> ''").
+		Updates(map[string]any{
+			"description": "",
+			"updated_at":  params.UpdatedAt,
+		}).Error; err != nil {
+		return sql.WrapErr(err)
+	}
 	return nil
 }

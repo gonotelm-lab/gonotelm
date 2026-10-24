@@ -63,12 +63,14 @@ func (h *ConvertNoteToSourceHandler) Handle(
 	ctx context.Context,
 	cmd *ConvertNoteToSourceCommand,
 ) (*ConvertNoteToSourceResult, error) {
-	userId := pkgcontext.GetUserId(ctx)
+	return withArtifactAccess(h.baseHandler, ctx, cmd.ArtifactId, accessManage, h.convertToSource)
+}
 
-	artifact, err := h.checkManageAccess(ctx, cmd.ArtifactId)
-	if err != nil {
-		return nil, err
-	}
+func (h *ConvertNoteToSourceHandler) convertToSource(
+	ctx context.Context,
+	artifact *artifactentity.Artifact,
+) (*ConvertNoteToSourceResult, error) {
+	userId := pkgcontext.GetUserId(ctx)
 
 	if artifact.Kind != artifactentity.KindNote {
 		return nil, errors.ErrParams.Msgf("only note artifact can be converted to source, kind=%s", artifact.Kind)

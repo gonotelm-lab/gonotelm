@@ -52,18 +52,21 @@ func NewRetryArtifactHandler(
 }
 
 func (h *RetryArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error {
-	artifact, err := h.checkManageAccess(ctx, cmd)
-	if err != nil {
-		return err
-	}
+	_, err := withArtifactAccess(h.baseHandler, ctx, cmd, accessManage, h.retryArtifact)
+	return err
+}
 
+func (h *RetryArtifactHandler) retryArtifact(
+	ctx context.Context,
+	artifact *artifactentity.Artifact,
+) (struct{}, error) {
 	if artifact.Status.Completed() {
-		return artifacterrors.ErrCannotRetryCompleted
+		return struct{}{}, artifacterrors.ErrCannotRetryCompleted
 	}
 
 	// 保存为笔记的 artifact 不需要重试
 	if artifact.Kind == artifactentity.KindNote {
-		return artifacterrors.ErrCannotRetryNote
+		return struct{}{}, artifacterrors.ErrCannotRetryNote
 	}
 
 	oldFlowTaskId := artifact.FlowTaskId
@@ -71,7 +74,7 @@ func (h *RetryArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error 
 	if oldFlowTaskId != "" {
 		if err := h.cancelAndWait(ctx, oldFlowTaskId); err != nil {
 			slog.WarnContext(ctx, "cancel old flow task on retry failed, proceeding anyway",
-				"artifact_id", cmd,
+				"artifact_id", artifact.Id,
 				"old_flow_task_id", oldFlowTaskId,
 				slog.Any("err", err),
 			)
@@ -80,25 +83,25 @@ func (h *RetryArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error 
 
 	payloadBytes, err := sonic.Marshal(artifact.Payload)
 	if err != nil {
-		return errors.Wrapf(errors.ErrSerde, "marshal payload on retry err=%v", err)
+		return struct{}{}, errors.Wrapf(errors.ErrSerde, "marshal payload on retry err=%v", err)
 	}
 
 	workerInput := buildWorkerInput(artifact, payloadBytes)
 	workerInputBytes, err := sonic.Marshal(workerInput)
 	if err != nil {
-		return errors.Wrapf(errors.ErrSerde, "marshal worker input on retry err=%v", err)
+		return struct{}{}, errors.Wrapf(errors.ErrSerde, "marshal worker input on retry err=%v", err)
 	}
 
 	newFlowTaskId, err := h.flowc.Submit(ctx, taskTypeFor(artifact.Kind), workerInputBytes)
 	if err != nil {
-		return errors.WithMessage(err, "submit retry task to flow failed")
+		return struct{}{}, errors.WithMessage(err, "submit retry task to flow failed")
 	}
 
 	if err := artifact.Retry(newFlowTaskId); err != nil {
-		return err
+		return struct{}{}, err
 	}
 	if err := h.updateArtifact(ctx, artifact); err != nil {
-		return errors.WithMessage(err, "update retried artifact failed")
+		return struct{}{}, errors.WithMessage(err, "update retried artifact failed")
 	}
 
 	for _, evt := range artifact.PullEvents() {
@@ -111,7 +114,7 @@ func (h *RetryArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error 
 		go h.poller.PollOne(context.WithoutCancel(ctx), artifact.Id, artifact.FlowTaskId)
 	}
 
-	return nil
+	return struct{}{}, nil
 }
 
 func (h *RetryArtifactHandler) cancelAndWait(ctx context.Context, flowTaskId string) error {

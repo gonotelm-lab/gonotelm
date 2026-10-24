@@ -52,10 +52,13 @@ func (h *GenerateDescriptionHandler) Handle(
 	notebookId valobj.Id,
 ) (string, error) {
 	ctx = pkgcontext.WithScene(ctx, pkgcontext.NotebookDescGenScene, notebookId.String())
-	access, err := h.checkManageNotebookAccess(ctx, notebookId)
-	if err != nil {
-		return "", err
-	}
+	return withNotebookAccess(h.baseHandler, ctx, notebookId, accessManageNotebook, h.generateDescription)
+}
+
+func (h *GenerateDescriptionHandler) generateDescription(
+	ctx context.Context,
+	access *notebookentity.Access,
+) (string, error) {
 	notebook := access.Notebook
 
 	if strings.TrimSpace(notebook.Description) != "" {
@@ -63,20 +66,13 @@ func (h *GenerateDescriptionHandler) Handle(
 	}
 
 	userId := pkgcontext.GetUserId(ctx)
-	lockKey := notebookDescGenerateLockKey(userId, notebookId)
+	lockKey := notebookDescGenerateLockKey(userId, notebook.Id)
 	if err := h.distLock.Lock(ctx, lockKey); err != nil {
-		return "", errors.WithMessagef(err, "lock notebook description generation failed, notebook_id=%s", notebookId)
+		return "", errors.WithMessagef(err, "lock notebook description generation failed, notebook_id=%s", notebook.Id)
 	}
-	defer func() {
-		_ = h.distLock.Unlock(ctx, lockKey)
-	}()
+	defer func() { _ = h.distLock.Unlock(ctx, lockKey) }()
 
-	desc, err := h.generateAndSave(ctx, notebook)
-	if err != nil {
-		return "", err
-	}
-
-	return desc, nil
+	return h.generateAndSave(ctx, notebook)
 }
 
 func (h *GenerateDescriptionHandler) generateAndSave(

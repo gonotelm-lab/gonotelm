@@ -14,6 +14,14 @@ import (
 	pkgslices "github.com/gonotelm-lab/gonotelm/pkg/slices"
 )
 
+type accessKind int
+
+const (
+	accessView accessKind = iota
+	accessManageNotebook
+	accessManageSharing
+)
+
 type baseHandler struct {
 	notebookRepo          notebookrepo.Repository
 	notebookAccessService *notebookservice.AccessService
@@ -32,53 +40,53 @@ func newBaseHandler(
 	}
 }
 
-// 无任何角色时返回 404，避免泄露私有 notebook 是否存在。检查用户是否有权限获取笔记
-func (h *baseHandler) checkViewNotebookAccess(
+// withNotebookAccess 鉴权通过后把 access 注入业务方法
+func withNotebookAccess[T any](
+	h *baseHandler,
 	ctx context.Context,
 	notebookId valobj.Id,
+	kind accessKind,
+	fn func(ctx context.Context, access *notebookentity.Access) (T, error),
+) (T, error) {
+	access, err := h.resolveAccess(ctx, notebookId, kind)
+	if err != nil {
+		var zero T
+		return zero, err
+	}
+	return fn(ctx, access)
+}
+
+func (h *baseHandler) resolveAccess(
+	ctx context.Context,
+	notebookId valobj.Id,
+	kind accessKind,
 ) (*notebookentity.Access, error) {
 	access, err := h.notebookAccessService.Resolve(ctx, notebookId, pkgcontext.GetUserId(ctx))
 	if err != nil {
 		return nil, errors.WithMessagef(err, "get notebook failed, notebook_id=%s", notebookId)
 	}
 
+	// 无任何角色时返回 404，避免泄露私有 notebook 是否存在
 	if err := access.CanViewReturnErr(); err != nil {
-		return nil, err // 统一返回NOT_FOUND
-	}
-
-	return access, nil
-}
-
-func (h *baseHandler) checkManageNotebookAccess(
-	ctx context.Context,
-	notebookId valobj.Id,
-) (*notebookentity.Access, error) {
-	access, err := h.checkViewNotebookAccess(ctx, notebookId)
-	if err != nil {
 		return nil, err
 	}
 
-	if !access.CanManageNotebook() {
-		return nil, errors.ErrPermission.Msgf("notebook owner required, notebook_id=%s", notebookId)
+	switch kind {
+	case accessView:
+		return access, nil
+	case accessManageNotebook:
+		if !access.CanManageNotebook() {
+			return nil, errors.ErrPermission.Msgf("notebook owner required, notebook_id=%s", notebookId)
+		}
+		return access, nil
+	case accessManageSharing:
+		if !access.CanManageSharing() {
+			return nil, errors.ErrPermission.Msgf("notebook sharing owner required, notebook_id=%s", notebookId)
+		}
+		return access, nil
+	default:
+		return nil, errors.ErrInner.Msgf("unknown notebook access kind=%d", kind)
 	}
-
-	return access, nil
-}
-
-func (h *baseHandler) checkManageSharingAccess(
-	ctx context.Context,
-	notebookId valobj.Id,
-) (*notebookentity.Access, error) {
-	access, err := h.checkViewNotebookAccess(ctx, notebookId)
-	if err != nil {
-		return nil, err
-	}
-
-	if !access.CanManageSharing() {
-		return nil, errors.ErrPermission.Msgf("notebook sharing owner required, notebook_id=%s", notebookId)
-	}
-
-	return access, nil
 }
 
 func (h *baseHandler) attachNotebookOwners(ctx context.Context, notebooks []*Notebook) error {

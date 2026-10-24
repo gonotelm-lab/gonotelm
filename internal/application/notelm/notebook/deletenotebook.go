@@ -7,6 +7,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/application/shared/cleanup"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
+	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookerrors "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/errors"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
@@ -38,19 +39,23 @@ func NewDeleteNotebookHandler(
 }
 
 func (h *DeleteNotebookHandler) Handle(ctx context.Context, id valobj.Id) error {
-	access, err := h.checkManageNotebookAccess(ctx, id)
-	if err != nil {
-		if errors.Is(err, notebookerrors.ErrNotebookNotFound) {
-			return nil
-		}
-		return err
+	_, err := withNotebookAccess(h.baseHandler, ctx, id, accessManageNotebook, h.deleteNotebook)
+	if errors.Is(err, notebookerrors.ErrNotebookNotFound) {
+		return nil
 	}
+	return err
+}
+
+func (h *DeleteNotebookHandler) deleteNotebook(
+	ctx context.Context,
+	access *notebookentity.Access,
+) (struct{}, error) {
 	n := access.Notebook
+	id := n.Id
 
 	n.Delete()
-	err = h.notebookRepo.Save(ctx, n)
-	if err != nil {
-		return errors.WithMessage(err, "delete notebook failed")
+	if err := h.notebookRepo.Save(ctx, n); err != nil {
+		return struct{}{}, errors.WithMessage(err, "delete notebook failed")
 	}
 
 	if err := h.memberRepo.DeleteByNotebookId(ctx, id); err != nil {
@@ -69,11 +74,10 @@ func (h *DeleteNotebookHandler) Handle(ctx context.Context, id valobj.Id) error 
 	}
 
 	for _, event := range n.PullEvents() {
-		err = h.eventBus.Publish(ctx, event)
-		if err != nil {
+		if err := h.eventBus.Publish(ctx, event); err != nil {
 			slog.ErrorContext(ctx, "publish notebook deleted event failed", "error", err, "notebook_id", id)
 		}
 	}
 
-	return nil
+	return struct{}{}, nil
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookerrors "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/errors"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
@@ -34,20 +35,31 @@ func (h *DeleteNotebookMemberHandler) Handle(
 	notebookId valobj.Id,
 	userId valobj.Uid,
 ) error {
-	if _, err := h.checkManageSharingAccess(ctx, notebookId); err != nil {
-		return err
-	}
+	_, err := withNotebookAccess(h.baseHandler, ctx, notebookId, accessManageSharing,
+		func(ctx context.Context, access *notebookentity.Access) (struct{}, error) {
+			return h.deleteMember(ctx, access, userId)
+		},
+	)
+	return err
+}
+
+func (h *DeleteNotebookMemberHandler) deleteMember(
+	ctx context.Context,
+	access *notebookentity.Access,
+	userId valobj.Uid,
+) (struct{}, error) {
+	notebookId := access.Notebook.Id
 
 	if _, err := h.memberRepo.FindByNotebookIdAndUserId(ctx, notebookId, userId); err != nil {
 		if errors.Is(err, errors.ErrNoRecord) {
-			return notebookerrors.ErrMemberNotFound
+			return struct{}{}, notebookerrors.ErrMemberNotFound
 		}
-		return errors.WithMessage(err, "get notebook member failed")
+		return struct{}{}, errors.WithMessage(err, "get notebook member failed")
 	}
 
 	if err := h.memberRepo.Delete(ctx, notebookId, userId); err != nil {
-		return errors.WithMessage(err, "delete notebook member failed")
+		return struct{}{}, errors.WithMessage(err, "delete notebook member failed")
 	}
 
-	return nil
+	return struct{}{}, nil
 }

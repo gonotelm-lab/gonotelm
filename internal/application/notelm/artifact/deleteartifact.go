@@ -7,6 +7,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/application/shared/cleanup"
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
@@ -36,13 +37,17 @@ func NewDeleteArtifactHandler(
 }
 
 func (h *DeleteArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error {
-	a, err := h.checkManageAccess(ctx, cmd)
-	if err != nil {
-		return err
-	}
+	_, err := withArtifactAccess(h.baseHandler, ctx, cmd, accessManage, h.deleteArtifact)
+	return err
+}
+
+func (h *DeleteArtifactHandler) deleteArtifact(
+	ctx context.Context,
+	a *artifactentity.Artifact,
+) (struct{}, error) {
 	if !a.IsTerminal() && a.FlowTaskId != "" {
 		if err := h.flowc.Cancel(ctx, a.FlowTaskId); err != nil {
-			return errors.WithMessage(err, "cancel flow task failed")
+			return struct{}{}, errors.WithMessage(err, "cancel flow task failed")
 		}
 	}
 
@@ -69,5 +74,8 @@ func (h *DeleteArtifactHandler) Handle(ctx context.Context, cmd valobj.Id) error
 		_ = h.storage.DeleteObject(ctx, storeKey)
 	}
 
-	return h.repo.DeleteById(ctx, a.Id)
+	if err := h.repo.DeleteById(ctx, a.Id); err != nil {
+		return struct{}{}, err
+	}
+	return struct{}{}, nil
 }

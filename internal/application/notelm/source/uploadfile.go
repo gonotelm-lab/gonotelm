@@ -42,12 +42,19 @@ func (h *PresignUploadFileHandler) Handle(
 	ctx context.Context,
 	cmd *PresignUploadFileHandleCommand,
 ) (*adapter.PresignUploadResult, error) {
-	targetSource, err := h.handleManage(ctx, cmd.SourceId)
-	if err != nil {
-		return nil, err
-	}
+	return withSourceAccess(h.baseHandler, ctx, cmd.SourceId, accessManage,
+		func(ctx context.Context, source *sourceentity.Source) (*adapter.PresignUploadResult, error) {
+			return h.presignUpload(ctx, source, cmd)
+		},
+	)
+}
 
-	err = targetSource.UploadFile(ctx, &sourceentity.UploadFileParams{
+func (h *PresignUploadFileHandler) presignUpload(
+	ctx context.Context,
+	targetSource *sourceentity.Source,
+	cmd *PresignUploadFileHandleCommand,
+) (*adapter.PresignUploadResult, error) {
+	err := targetSource.UploadFile(ctx, &sourceentity.UploadFileParams{
 		Filename: cmd.Filename,
 		MimeType: cmd.MimeType,
 		Size:     cmd.Size,

@@ -44,10 +44,19 @@ func (h *UpsertNotebookMemberHandler) Handle(
 	notebookId valobj.Id,
 	cmd *UpsertNotebookMemberCommand,
 ) (*notebookentity.NotebookMember, error) {
-	access, err := h.checkManageSharingAccess(ctx, notebookId)
-	if err != nil {
-		return nil, err
-	}
+	return withNotebookAccess(h.baseHandler, ctx, notebookId, accessManageSharing,
+		func(ctx context.Context, access *notebookentity.Access) (*notebookentity.NotebookMember, error) {
+			return h.upsertMember(ctx, access, cmd)
+		},
+	)
+}
+
+func (h *UpsertNotebookMemberHandler) upsertMember(
+	ctx context.Context,
+	access *notebookentity.Access,
+	cmd *UpsertNotebookMemberCommand,
+) (*notebookentity.NotebookMember, error) {
+	notebookId := access.Notebook.Id
 
 	role := vo.Role(cmd.Role)
 	if !role.IsMemberRole() {

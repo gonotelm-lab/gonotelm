@@ -32,18 +32,20 @@ func (h *GetSourceHandler) Handle(
 	ctx context.Context,
 	sourceId valobj.Id,
 ) (*sourceentity.SourceDetail, error) {
-	targetSource, err := h.handleView(ctx, sourceId)
-	if err != nil {
-		return nil, err
-	}
+	return withSourceAccess(h.baseHandler, ctx, sourceId, accessView, h.getSource)
+}
 
+func (h *GetSourceHandler) getSource(
+	ctx context.Context,
+	targetSource *sourceentity.Source,
+) (*sourceentity.SourceDetail, error) {
 	if !targetSource.Status.IsReady() {
 		return nil, errors.ErrParams.Msgf("source is not ready, status=%s", targetSource.Status)
 	}
 
 	result, err := h.sourceService.GetSourceDetail(ctx, targetSource)
 	if err != nil {
-		return nil, errors.WithMessagef(err, "get source detail failed, source_id=%s", sourceId)
+		return nil, errors.WithMessagef(err, "get source detail failed, source_id=%s", targetSource.Id)
 	}
 
 	return result, nil

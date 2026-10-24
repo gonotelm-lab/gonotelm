@@ -5,6 +5,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
+	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -29,21 +30,27 @@ func (h *UpdateNotebookNameHandler) Handle(
 	id valobj.Id,
 	name string,
 ) error {
-	access, err := h.checkManageNotebookAccess(ctx, id)
-	if err != nil {
-		return err
-	}
+	_, err := withNotebookAccess(h.baseHandler, ctx, id, accessManageNotebook,
+		func(ctx context.Context, access *notebookentity.Access) (struct{}, error) {
+			return h.updateName(ctx, access, name)
+		},
+	)
+	return err
+}
 
+func (h *UpdateNotebookNameHandler) updateName(
+	ctx context.Context,
+	access *notebookentity.Access,
+	name string,
+) (struct{}, error) {
 	n := access.Notebook
-	err = n.UpdateName(name)
-	if err != nil {
-		return errors.WithMessage(err, "update notebook name failed")
+	if err := n.UpdateName(name); err != nil {
+		return struct{}{}, errors.WithMessage(err, "update notebook name failed")
 	}
 
-	err = h.notebookRepo.Save(ctx, n)
-	if err != nil {
-		return errors.WithMessage(err, "update notebook name failed")
+	if err := h.notebookRepo.Save(ctx, n); err != nil {
+		return struct{}{}, errors.WithMessage(err, "update notebook name failed")
 	}
 
-	return nil
+	return struct{}{}, nil
 }

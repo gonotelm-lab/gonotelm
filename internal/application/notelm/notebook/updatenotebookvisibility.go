@@ -5,6 +5,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
+	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/notebook/vo"
@@ -30,18 +31,26 @@ func (h *UpdateNotebookVisibilityHandler) Handle(
 	notebookId valobj.Id,
 	visibility vo.Visibility,
 ) error {
-	access, err := h.checkManageSharingAccess(ctx, notebookId)
-	if err != nil {
-		return err
-	}
+	_, err := withNotebookAccess(h.baseHandler, ctx, notebookId, accessManageSharing,
+		func(ctx context.Context, access *notebookentity.Access) (struct{}, error) {
+			return h.updateVisibility(ctx, access, visibility)
+		},
+	)
+	return err
+}
 
+func (h *UpdateNotebookVisibilityHandler) updateVisibility(
+	ctx context.Context,
+	access *notebookentity.Access,
+	visibility vo.Visibility,
+) (struct{}, error) {
 	if err := access.Notebook.SetVisibility(visibility); err != nil {
-		return err
+		return struct{}{}, err
 	}
 
 	if err := h.notebookRepo.Save(ctx, access.Notebook); err != nil {
-		return errors.WithMessage(err, "save notebook visibility failed")
+		return struct{}{}, errors.WithMessage(err, "save notebook visibility failed")
 	}
 
-	return nil
+	return struct{}{}, nil
 }

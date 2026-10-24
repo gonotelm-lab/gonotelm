@@ -8,6 +8,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	identityentity "github.com/gonotelm-lab/gonotelm/internal/domain/identity/entity"
 	identityrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
+	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/notebook/vo"
@@ -55,10 +56,14 @@ func (h *GetNotebookSharingHandler) Handle(
 	ctx context.Context,
 	notebookId valobj.Id,
 ) (*GetNotebookSharingResult, error) {
-	access, err := h.checkManageSharingAccess(ctx, notebookId)
-	if err != nil {
-		return nil, err
-	}
+	return withNotebookAccess(h.baseHandler, ctx, notebookId, accessManageSharing, h.getSharing)
+}
+
+func (h *GetNotebookSharingHandler) getSharing(
+	ctx context.Context,
+	access *notebookentity.Access,
+) (*GetNotebookSharingResult, error) {
+	notebookId := access.Notebook.Id
 
 	members, err := h.memberRepo.ListByNotebookId(ctx, notebookId)
 	if err != nil {

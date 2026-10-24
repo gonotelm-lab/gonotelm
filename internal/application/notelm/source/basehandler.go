@@ -4,13 +4,19 @@ import (
 	"context"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourceerr "github.com/gonotelm-lab/gonotelm/internal/domain/source/errors"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+)
+
+type accessKind int
+
+const (
+	accessView accessKind = iota
+	accessManage
 )
 
 type baseHandler struct {
@@ -28,57 +34,52 @@ func newBaseHandler(
 	}
 }
 
-func (h *baseHandler) handleView(
+// withSourceAccess 鉴权通过后把 source 注入业务方法。
+func withSourceAccess[T any](
+	h *baseHandler,
 	ctx context.Context,
 	sourceId valobj.Id,
-) (*sourceentity.Source, error) {
-	source, access, err := h.resolve(ctx, sourceId)
+	kind accessKind,
+	fn func(ctx context.Context, source *sourceentity.Source) (T, error),
+) (T, error) {
+	source, err := h.resolveAccess(ctx, sourceId, kind)
 	if err != nil {
-		return nil, err
+		var zero T
+		return zero, err
 	}
-
-	if err := access.CanViewReturnErr(); err != nil {
-		return nil, err
-	}
-
-	return source, nil
+	return fn(ctx, source)
 }
 
-func (h *baseHandler) handleManage(
+func (h *baseHandler) resolveAccess(
 	ctx context.Context,
 	sourceId valobj.Id,
+	kind accessKind,
 ) (*sourceentity.Source, error) {
-	source, access, err := h.resolve(ctx, sourceId)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := access.CanViewReturnErr(); err != nil {
-		return nil, err
-	}
-
-	if !access.CanManageContent() {
-		return nil, errors.ErrPermission.Msgf("source write denied, source_id=%s", sourceId)
-	}
-
-	return source, nil
-}
-
-func (h *baseHandler) resolve(
-	ctx context.Context,
-	sourceId valobj.Id,
-) (*sourceentity.Source, *notebookentity.Access, error) {
 	source, err := h.sourceRepo.FindById(ctx, sourceId)
 	if err != nil {
-		return nil, nil, errors.WithMessagef(err, "get source failed, source_id=%s", sourceId)
+		return nil, errors.WithMessagef(err, "get source failed, source_id=%s", sourceId)
 	}
 
 	access, err := h.notebookAccessService.Resolve(ctx, source.NotebookId, pkgcontext.GetUserId(ctx))
 	if err != nil {
-		return nil, nil, errors.WithMessagef(err, "resolve notebook access failed, source_id=%s", sourceId)
+		return nil, errors.WithMessagef(err, "resolve notebook access failed, source_id=%s", sourceId)
 	}
 
-	return source, access, nil
+	if err := access.CanViewReturnErr(); err != nil {
+		return nil, err
+	}
+
+	switch kind {
+	case accessView:
+		return source, nil
+	case accessManage:
+		if !access.CanManageContent() {
+			return nil, errors.ErrPermission.Msgf("source write denied, source_id=%s", sourceId)
+		}
+		return source, nil
+	default:
+		return nil, errors.ErrInner.Msgf("unknown source access kind=%d", kind)
+	}
 }
 
 func (h *baseHandler) updateSource(ctx context.Context, source *sourceentity.Source) error {

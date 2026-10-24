@@ -41,11 +41,18 @@ func (h *BatchGetSourceDocsHandler) Handle(
 	ctx context.Context,
 	cmd *BatchGetSourceDocsHandleQuery,
 ) (*BatchGetSourceDocsHandleResult, error) {
-	source, err := h.handleView(ctx, cmd.SourceId)
-	if err != nil {
-		return nil, err
-	}
+	return withSourceAccess(h.baseHandler, ctx, cmd.SourceId, accessView,
+		func(ctx context.Context, source *sourceentity.Source) (*BatchGetSourceDocsHandleResult, error) {
+			return h.batchGetDocs(ctx, source, cmd)
+		},
+	)
+}
 
+func (h *BatchGetSourceDocsHandler) batchGetDocs(
+	ctx context.Context,
+	source *sourceentity.Source,
+	cmd *BatchGetSourceDocsHandleQuery,
+) (*BatchGetSourceDocsHandleResult, error) {
 	docs, err := h.sourceDocRepo.BatchFind(ctx, source.NotebookId, source.Id, cmd.DocIds)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "batch find source docs failed, source_id=%s", cmd.SourceId)

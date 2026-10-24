@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -31,22 +32,30 @@ func NewUpdateArtifactHandler(
 }
 
 func (h *UpdateArtifactHandler) Handle(ctx context.Context, cmd *UpdateCommand) error {
-	a, err := h.checkManageAccess(ctx, cmd.ArtifactId)
-	if err != nil {
-		return err
-	}
+	_, err := withArtifactAccess(h.baseHandler, ctx, cmd.ArtifactId, accessManage,
+		func(ctx context.Context, artifact *artifactentity.Artifact) (struct{}, error) {
+			return h.update(ctx, artifact, cmd)
+		},
+	)
+	return err
+}
 
+func (h *UpdateArtifactHandler) update(
+	ctx context.Context,
+	a *artifactentity.Artifact,
+	cmd *UpdateCommand,
+) (struct{}, error) {
 	switch cmd.Target {
 	case UpdateTargetTitle:
 		if err := a.UpdateTitle(cmd.Title); err != nil {
-			return err
+			return struct{}{}, err
 		}
 	default:
-		return errors.ErrParams.Msgf("unsupported update target: %s", cmd.Target)
+		return struct{}{}, errors.ErrParams.Msgf("unsupported update target: %s", cmd.Target)
 	}
 
 	if err := h.updateArtifact(ctx, a); err != nil {
-		return errors.WithMessage(err, "update artifact failed")
+		return struct{}{}, errors.WithMessage(err, "update artifact failed")
 	}
-	return nil
+	return struct{}{}, nil
 }

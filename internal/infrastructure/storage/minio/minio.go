@@ -25,12 +25,13 @@ import (
 )
 
 type Storage struct {
-	client        *minio.Client
-	bucket        string
-	region        string
-	presignExpiry time.Duration
-	cfg           *storage.Config
-	publicBase    *url.URL
+	client              *minio.Client
+	bucket              string
+	region              string
+	presignExpiry       time.Duration
+	uploadPresignExpiry time.Duration
+	cfg                 *storage.Config
+	publicBase          *url.URL
 }
 
 var (
@@ -65,12 +66,13 @@ func New(cfg *storage.Config) (*Storage, error) {
 	}
 
 	return &Storage{
-		client:        client,
-		bucket:        cfg.Bucket,
-		region:        cfg.Region,
-		presignExpiry: cfg.PresignExpiry,
-		cfg:           cfg,
-		publicBase:    publicBase,
+		client:              client,
+		bucket:              cfg.Bucket,
+		region:              cfg.Region,
+		presignExpiry:       cfg.PresignExpiry,
+		uploadPresignExpiry: cfg.PresignUploadExpiry,
+		cfg:                 cfg,
+		publicBase:          publicBase,
 	}, nil
 }
 
@@ -379,8 +381,8 @@ func (s *Storage) PresignedPostPolicy(
 		finishSpan(span, err)
 		return nil, err
 	}
-	if err := policy.SetExpires(time.Now().UTC().Add(s.presignExpiry)); err != nil {
-		err = errors.Wrapf(err, "set post policy expiry failed, expiry=%s", s.presignExpiry)
+	if err := policy.SetExpires(time.Now().UTC().Add(s.uploadPresignExpiry)); err != nil {
+		err = errors.Wrapf(err, "set post policy expiry failed, expiry=%s", s.uploadPresignExpiry)
 		finishSpan(span, err)
 		return nil, err
 	}

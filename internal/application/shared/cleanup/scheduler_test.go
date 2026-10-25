@@ -3,6 +3,7 @@ package cleanup
 import (
 	"context"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -144,6 +145,47 @@ func TestScheduleArtifactCleanup(t *testing.T) {
 		So(payload.Kind, ShouldEqual, KindArtifact)
 		So(payload.ArtifactId, ShouldEqual, artifactId)
 		So(payload.Keys, ShouldResemble, []string{key.Encode()})
+	})
+}
+
+func TestScheduleCoverCleanup(t *testing.T) {
+	Convey("cover checkpoint URL, key, name, payload and caller-controlled fireAt", t, func() {
+		client := &fakeScheduleClient{}
+		scheduler := newTestScheduler(client, "http://notelm:7099")
+
+		notebookId := valobj.NewId()
+		key, err := valobj.NewStoreKey(testBucket, "notebooks/cover/tok123", true)
+		So(err, ShouldBeNil)
+
+		// 调用方传 entity.CoverCleanupDelay
+		ctx, userId, reqId := newTestCtx()
+		So(scheduler.ScheduleCoverCleanup(ctx, notebookId, []valobj.StoreKey{key}, 24*time.Hour), ShouldBeNil)
+
+		So(client.calls, ShouldEqual, 1)
+		So(client.callbackURL, ShouldEqual, "http://notelm:7099"+CoverCallbackPath)
+		So(client.name, ShouldEqual, userId.String()+"+"+actionDeleteCover+"+"+notebookId.String()+"@"+reqId.String()[:scheduleNameReqIdLen])
+
+		// 忽略全局 delay/jitter，直接 = now + fireDelay
+		So(client.fireAt, ShouldEqual, time.Unix(0, 0).Add(24*time.Hour))
+
+		// idempotencyKey = cover-cleanup:<nb>:<key>:<nonce>，nonce 保证每次注册互相独立
+		So(strings.HasPrefix(client.idempotencyKey, KindCover+":"+notebookId.String()+":"+key.Encode()+":"), ShouldBeTrue)
+
+		payload, err := Unmarshal(client.payload)
+		So(err, ShouldBeNil)
+		So(payload.Kind, ShouldEqual, KindCover)
+		So(payload.NotebookId, ShouldEqual, notebookId)
+		So(payload.Keys, ShouldResemble, []string{key.Encode()})
+	})
+}
+
+func TestScheduleCoverCleanupRejectsEmptyKeys(t *testing.T) {
+	Convey("a cover checkpoint without valid keys is rejected", t, func() {
+		client := &fakeScheduleClient{}
+		scheduler := newTestScheduler(client, "http://notelm:7099")
+
+		So(scheduler.ScheduleCoverCleanup(t.Context(), valobj.NewId(), nil, 24*time.Hour), ShouldNotBeNil)
+		So(client.calls, ShouldEqual, 0)
 	})
 }
 

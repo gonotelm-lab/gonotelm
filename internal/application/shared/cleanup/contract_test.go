@@ -153,6 +153,14 @@ func TestUnmarshalRejectsInvalidPayload(t *testing.T) {
 			So(err, ShouldNotBeNil)
 		})
 
+		Convey("cover kind without keys", func() {
+			data, err := (&Payload{Kind: KindCover, NotebookId: notebookId}).Marshal()
+			So(err, ShouldBeNil)
+
+			_, err = Unmarshal(data)
+			So(err, ShouldNotBeNil)
+		})
+
 		Convey("not JSON", func() {
 			_, err := Unmarshal([]byte("not-json"))
 			So(err, ShouldNotBeNil)

@@ -1,6 +1,7 @@
 package uuid
 
 import (
+	"encoding/base64"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -102,4 +103,32 @@ func TestUUIDEmpty(t *testing.T) {
 	max := MaxUUID()
 	t.Log(max.String())
 	t.Log(max.Compare(id))
+}
+
+func TestNewRandomURLToken(t *testing.T) {
+	tok1, err := NewRandomURLToken(8)
+	if err != nil {
+		t.Fatalf("NewRandomURLToken failed, err: %v", err)
+	}
+	if len(tok1) != 32 {
+		t.Errorf("len(tok1) = %d, want 32", len(tok1))
+	}
+
+	raw, err := base64.RawURLEncoding.DecodeString(tok1)
+	if err != nil {
+		t.Errorf("RawURLEncoding.DecodeString(%s) failed, err: %v", tok1, err)
+	}
+	if len(raw) != 24 {
+		t.Errorf("len(raw) = %d, want 24", len(raw))
+	}
+
+	tok2, err := NewRandomURLToken(8)
+	if err != nil {
+		t.Fatalf("NewRandomURLToken failed, err: %v", err)
+	}
+	if tok1 == tok2 {
+		t.Errorf("tok1 == tok2, want different")
+	}
+	t.Log(tok1)
+	t.Log(tok2)
 }

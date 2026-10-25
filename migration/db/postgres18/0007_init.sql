@@ -1,7 +1,6 @@
 -- +goose Up
 
-ALTER TABLE notebooks
-  ADD COLUMN flags INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE notebooks ADD COLUMN flags INTEGER NOT NULL DEFAULT 0;
 
 COMMENT ON COLUMN notebooks.flags IS 'notebook bit flags';
 COMMENT ON COLUMN notebooks.description IS 'owner custom description';

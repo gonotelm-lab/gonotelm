@@ -16,6 +16,7 @@ func (s *Server) registerFlowRoutes(h *server.Hertz) {
 	h.POST(cleanup.SourceCallbackPath, s.flowCleanupHandler(cleanup.KindSource))
 	h.POST(cleanup.NotebookCallbackPath, s.flowCleanupHandler(cleanup.KindNotebook))
 	h.POST(cleanup.ArtifactCallbackPath, s.flowCleanupHandler(cleanup.KindArtifact))
+	h.POST(cleanup.CoverCallbackPath, s.flowCleanupHandler(cleanup.KindCover))
 }
 
 // 200/400 表示处理完成，5xx 交给调度方重试

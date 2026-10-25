@@ -233,6 +233,9 @@ type Config struct {
 
 	PresignExpiry time.Duration `toml:"presign_expiry" json:"presign_expiry"`
 
+	// PresignUploadExpiry 仅作用于写方向（presign POST policy），读走 PresignExpiry。
+	PresignUploadExpiry time.Duration `toml:"presign_upload_expiry" json:"presign_upload_expiry"`
+
 	Extra map[string]string `toml:"extra" json:"extra"`
 }
 
@@ -248,13 +251,14 @@ type StorageTypeConfig struct {
 }
 
 type MinioConfig struct {
-	Endpoint      string        `toml:"endpoint"  validate:"required"`
-	AccessKey     string        `toml:"accessKey" validate:"required"`
-	SecretKey     string        `toml:"secretKey" validate:"required"`
-	Bucket        string        `toml:"bucket"    validate:"required"`
-	Region        string        `toml:"region"`
-	Secure        bool          `toml:"secure"`
-	PresignExpiry time.Duration `toml:"presignExpiry"`
+	Endpoint            string        `toml:"endpoint"  validate:"required"`
+	AccessKey           string        `toml:"accessKey" validate:"required"`
+	SecretKey           string        `toml:"secretKey" validate:"required"`
+	Bucket              string        `toml:"bucket"    validate:"required"`
+	Region              string        `toml:"region"`
+	Secure              bool          `toml:"secure"`
+	PresignExpiry       time.Duration `toml:"presignExpiry"`
+	PresignUploadExpiry time.Duration `toml:"presignUploadExpiry"`
 
 	PublicBucket    string `toml:"publicBucket"`
 	PublicAccessKey string `toml:"publicAccessKey"`
@@ -270,6 +274,14 @@ func (c *MinioConfig) presignExpiryOrDefault() time.Duration {
 	return 30 * time.Minute
 }
 
+func (c *MinioConfig) uploadPresignExpiryOrDefault() time.Duration {
+	if c.PresignUploadExpiry != 0 {
+		return c.PresignUploadExpiry
+	}
+
+	return 15 * time.Minute
+}
+
 func (c *StorageTypeConfig) Bucket() string {
 	switch c.Type {
 	case Minio:
@@ -283,13 +295,14 @@ func (c *StorageTypeConfig) ObjectStorageConfig() (*Config, error) {
 	switch c.Type {
 	case Minio:
 		return &Config{
-			Endpoint:      c.Minio.Endpoint,
-			Region:        c.Minio.Region,
-			Bucket:        c.Minio.Bucket,
-			AccessKey:     c.Minio.AccessKey,
-			SecretKey:     c.Minio.SecretKey,
-			Secure:        c.Minio.Secure,
-			PresignExpiry: c.Minio.presignExpiryOrDefault(),
+			Endpoint:            c.Minio.Endpoint,
+			Region:              c.Minio.Region,
+			Bucket:              c.Minio.Bucket,
+			AccessKey:           c.Minio.AccessKey,
+			SecretKey:           c.Minio.SecretKey,
+			Secure:              c.Minio.Secure,
+			PresignExpiry:       c.Minio.presignExpiryOrDefault(),
+			PresignUploadExpiry: c.Minio.uploadPresignExpiryOrDefault(),
 		}, nil
 	default:
 		return nil, fmt.Errorf("storage type %q is not supported", c.Type)
@@ -311,14 +324,15 @@ func (c *StorageTypeConfig) PublicObjectStorageConfig() (*Config, error) {
 		}
 
 		return &Config{
-			Endpoint:      c.Minio.Endpoint,
-			Region:        c.Minio.Region,
-			Bucket:        c.Minio.PublicBucket,
-			AccessKey:     c.Minio.PublicAccessKey,
-			SecretKey:     c.Minio.PublicSecretKey,
-			Secure:        c.Minio.Secure,
-			PresignExpiry: c.Minio.presignExpiryOrDefault(),
-			PublicBaseURL: c.Minio.PublicBaseURL,
+			Endpoint:            c.Minio.Endpoint,
+			Region:              c.Minio.Region,
+			Bucket:              c.Minio.PublicBucket,
+			AccessKey:           c.Minio.PublicAccessKey,
+			SecretKey:           c.Minio.PublicSecretKey,
+			Secure:              c.Minio.Secure,
+			PresignExpiry:       c.Minio.presignExpiryOrDefault(),
+			PresignUploadExpiry: c.Minio.uploadPresignExpiryOrDefault(),
+			PublicBaseURL:       c.Minio.PublicBaseURL,
 		}, nil
 	default:
 		return nil, fmt.Errorf("storage type %q is not supported", c.Type)
@@ -341,6 +355,9 @@ func (c *Config) Validate() error {
 
 	if c.PresignExpiry <= 0 {
 		c.PresignExpiry = 15 * time.Minute
+	}
+	if c.PresignUploadExpiry <= 0 {
+		c.PresignUploadExpiry = 15 * time.Minute
 	}
 
 	return nil

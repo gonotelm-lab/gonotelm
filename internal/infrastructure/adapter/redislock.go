@@ -87,7 +87,7 @@ func (l *redisDistributedLock) WithLock(
 	fn func(ctx context.Context) error,
 ) (err error) {
 	if err := l.Lock(ctx, key); err != nil {
-		return err
+		return errors.WithMessage(err, "withLock failed")
 	}
 	defer func() {
 		unlockErr := l.Unlock(ctx, key)

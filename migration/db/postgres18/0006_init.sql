@@ -1,7 +1,6 @@
 -- +goose Up
 
-ALTER TABLE notebooks
-  ADD COLUMN visibility VARCHAR(16) NOT NULL DEFAULT '';
+ALTER TABLE notebooks ADD COLUMN visibility VARCHAR(16) NOT NULL DEFAULT '';
 
 CREATE INDEX IF NOT EXISTS idx_notebooks_owner_id ON notebooks (owner_id);
 

@@ -10,13 +10,15 @@ import (
 
 func NotebookToSchema(notebook *notebookentity.Notebook) *schema.Notebook {
 	return &schema.Notebook{
-		Id:          notebook.Id,
-		Name:        notebook.Name,
-		Description: notebook.Description,
-		Flags:       notebook.Flags.Int32(),
-		OwnerId:     notebook.OwnerId,
-		Visibility:  notebook.Visibility.String(),
-		UpdatedAt:   notebook.UpdateTime.Value(),
+		Id:           notebook.Id,
+		Name:         notebook.Name,
+		Description:  notebook.Description,
+		Flags:        notebook.Flags.Int32(),
+		OwnerId:      notebook.OwnerId,
+		Visibility:   notebook.Visibility.String(),
+		Cover:        notebook.Cover.Encode(),
+		PendingCover: notebook.PendingCover.Encode(),
+		UpdatedAt:    notebook.UpdateTime.Value(),
 	}
 }
 
@@ -26,17 +28,21 @@ func NotebookFromSchema(notebook *schema.Notebook) *notebookentity.Notebook {
 	if flags.CustomizeDescription() {
 		desc = notebook.Description
 	}
+	coverKey, _ := valobj.DecodeStoreKey(notebook.Cover)          // 损坏 encoded 按无封面处理
+	pendingKey, _ := valobj.DecodeStoreKey(notebook.PendingCover) // 同上，不打挂读路径
 	return &notebookentity.Notebook{
 		Base: entity.Base{
 			Id:         notebook.Id,
 			CreateTime: valobj.NewTimeFromId(notebook.Id),
 			UpdateTime: valobj.NewTimeFrom(notebook.UpdatedAt),
 		},
-		Name:        notebook.Name,
-		Description: desc,
-		Flags:       flags,
-		OwnerId:     notebook.OwnerId,
-		Visibility:  vo.NewVisibility(notebook.Visibility),
+		Name:         notebook.Name,
+		Description:  desc,
+		Flags:        flags,
+		OwnerId:      notebook.OwnerId,
+		Visibility:   vo.NewVisibility(notebook.Visibility),
+		Cover:        coverKey,
+		PendingCover: pendingKey,
 	}
 }
 

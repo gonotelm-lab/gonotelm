@@ -11,6 +11,7 @@ const (
 	KindSource   = "source-cleanup"
 	KindNotebook = "notebook-cleanup"
 	KindArtifact = "artifact-cleanup"
+	KindCover    = "cover-cleanup"
 )
 
 // 回调路径写死；host 由配置提供。
@@ -18,6 +19,7 @@ const (
 	SourceCallbackPath   = "/inner-api/v1/flow/webhook/source-cleanup"
 	NotebookCallbackPath = "/inner-api/v1/flow/webhook/notebook-cleanup"
 	ArtifactCallbackPath = "/inner-api/v1/flow/webhook/artifact-cleanup"
+	CoverCallbackPath    = "/inner-api/v1/flow/webhook/cover-cleanup"
 )
 
 // Payload 是清理检查点的线协议载荷
@@ -69,6 +71,11 @@ func Unmarshal(data []byte) (*Payload, error) {
 			return nil, errors.ErrParams.Msg("artifact id is empty in cleanup payload")
 		}
 	case KindNotebook:
+	case KindCover:
+		// 没有要清扫的 key 就没有意义
+		if len(p.Keys) == 0 {
+			return nil, errors.ErrParams.Msg("cover cleanup payload without keys")
+		}
 	default:
 		return nil, errors.ErrParams.Msgf("unknown cleanup kind: %s", p.Kind)
 	}

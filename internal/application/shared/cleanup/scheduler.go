@@ -12,6 +12,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+	pkgstr "github.com/gonotelm-lab/gonotelm/pkg/string"
 )
 
 const scheduleNameReqIdLen = 8
@@ -41,6 +42,7 @@ const (
 	actionDeleteSource   = "del-source"
 	actionDeleteNotebook = "del-notebook"
 	actionDeleteArtifact = "del-artifact"
+	actionDeleteCover    = "del-cover"
 )
 
 func (s *checkpointScheduler) ScheduleSourceCleanup(
@@ -90,6 +92,30 @@ func (s *checkpointScheduler) ScheduleArtifactCleanup(
 	return s.register(ctx, p, ArtifactCallbackPath, key, name)
 }
 
+// ScheduleCoverCleanup 注册封面在途 key 的清理检查点；fireDelay 由调用方传 entity.CoverCleanupDelay。
+func (s *checkpointScheduler) ScheduleCoverCleanup(
+	ctx context.Context,
+	notebookId valobj.Id,
+	keys []valobj.StoreKey,
+	fireDelay time.Duration,
+) error {
+	nonce, err := pkgstr.Random(8)
+	if err != nil {
+		return errors.WithMessage(err, "generate cover cleanup nonce failed")
+	}
+
+	p := &Payload{Kind: KindCover, NotebookId: notebookId, Keys: EncodeKeys(keys)}
+	if len(p.Keys) == 0 {
+		return errors.ErrParams.Msg("cover cleanup without valid keys")
+	}
+
+	// key 带 nonce：每次改挂封面都注册独立检查点
+	idempotencyKey := KindCover + ":" + notebookId.String() + ":" + nonce
+	name := scheduleName(ctx, actionDeleteCover, notebookId)
+
+	return s.registerAt(ctx, p, CoverCallbackPath, idempotencyKey, name, s.now().Add(fireDelay))
+}
+
 // name = userid+action+resourceid@reqid，reqid 只取前 8 位
 func scheduleName(ctx context.Context, action string, resourceId valobj.Id) string {
 	userId := pkgcontext.GetUserId(ctx)
@@ -113,12 +139,23 @@ func (s *checkpointScheduler) register(
 	idempotencyKey string,
 	name string,
 ) error {
+	return s.registerAt(ctx, p, path, idempotencyKey, name, s.nextFireAt())
+}
+
+// registerAt 注册回调；fireAt 由调用方决定（默认 nextFireAt = now + delay + jitter）。
+func (s *checkpointScheduler) registerAt(
+	ctx context.Context,
+	p *Payload,
+	path string,
+	idempotencyKey string,
+	name string,
+	fireAt time.Time,
+) error {
 	payload, err := p.Marshal()
 	if err != nil {
 		return err
 	}
 
-	fireAt := s.nextFireAt()
 	scheduleId, err := s.client.RegisterOneShot(
 		ctx,
 		fireAt,

@@ -3,6 +3,7 @@ package cleanup
 import (
 	"context"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -20,6 +21,7 @@ type fakeScheduleClient struct {
 	payload        []byte
 	idempotencyKey string
 	name           string
+	keys           []string
 	err            error
 }
 
@@ -37,6 +39,7 @@ func (f *fakeScheduleClient) RegisterOneShot(
 	f.payload = payload
 	f.idempotencyKey = idempotencyKey
 	f.name = name
+	f.keys = append(f.keys, idempotencyKey)
 
 	return "schedule-1", f.err
 }
@@ -144,6 +147,76 @@ func TestScheduleArtifactCleanup(t *testing.T) {
 		So(payload.Kind, ShouldEqual, KindArtifact)
 		So(payload.ArtifactId, ShouldEqual, artifactId)
 		So(payload.Keys, ShouldResemble, []string{key.Encode()})
+	})
+}
+
+func TestScheduleCoverCleanup(t *testing.T) {
+	Convey("cover checkpoint URL, key, name, payload and caller-controlled fireAt", t, func() {
+		client := &fakeScheduleClient{}
+		scheduler := newTestScheduler(client, "http://notelm:7099")
+
+		notebookId := valobj.NewId()
+		// 与 entity.GenerateCoverKey 一致：prefix + 32 字符 token，编码后的 StoreKey 最长
+		key, err := valobj.NewStoreKey(testBucket, "notebooks/cover/01234567890123456789012345678901", true)
+		So(err, ShouldBeNil)
+
+		// 调用方传 entity.CoverCleanupDelay
+		ctx, userId, reqId := newTestCtx()
+		So(scheduler.ScheduleCoverCleanup(ctx, notebookId, []valobj.StoreKey{key}, 24*time.Hour), ShouldBeNil)
+
+		So(client.calls, ShouldEqual, 1)
+		So(client.callbackURL, ShouldEqual, "http://notelm:7099"+CoverCallbackPath)
+		So(client.name, ShouldEqual, userId.String()+"+"+actionDeleteCover+"+"+notebookId.String()+"@"+reqId.String()[:scheduleNameReqIdLen])
+
+		// 忽略全局 delay/jitter，直接 = now + fireDelay
+		So(client.fireAt, ShouldEqual, time.Unix(0, 0).Add(24*time.Hour))
+
+		// idempotencyKey = cover-cleanup:<nb>:<nonce>，nonce 保证每次注册互相独立；
+		// 编码后的 StoreKey 有 100+ 字符，只留在 payload 里，不进幂等键。
+		So(strings.HasPrefix(client.idempotencyKey, KindCover+":"+notebookId.String()+":"), ShouldBeTrue)
+		So(len(client.idempotencyKey), ShouldBeLessThan, 64)
+		So(len(client.idempotencyKey), ShouldBeLessThanOrEqualTo, 128)
+
+		payload, err := Unmarshal(client.payload)
+		So(err, ShouldBeNil)
+		So(payload.Kind, ShouldEqual, KindCover)
+		So(payload.NotebookId, ShouldEqual, notebookId)
+		So(payload.Keys, ShouldResemble, []string{key.Encode()})
+	})
+}
+
+// 所有检查点的幂等键都必须落在 flow 的 128 字符上限内
+func TestScheduleIdempotencyKeyWithinFlowLimit(t *testing.T) {
+	Convey("every cleanup idempotency key fits the flow limit", t, func() {
+		client := &fakeScheduleClient{}
+		scheduler := newTestScheduler(client, "http://notelm:7099")
+
+		notebookId, sourceId, artifactId := valobj.NewId(), valobj.NewId(), valobj.NewId()
+		// 最长的 key 形态：公有桶 + 32 字符 token
+		key, err := valobj.NewStoreKey(testBucket, "notebooks/cover/01234567890123456789012345678901", true)
+		So(err, ShouldBeNil)
+		keys := []valobj.StoreKey{key}
+
+		ctx := t.Context()
+		So(scheduler.ScheduleSourceCleanup(ctx, notebookId, sourceId, keys), ShouldBeNil)
+		So(scheduler.scheduleNotebookCleanup(ctx, notebookId, nil, nil), ShouldBeNil)
+		So(scheduler.ScheduleArtifactCleanup(ctx, notebookId, artifactId, keys), ShouldBeNil)
+		So(scheduler.ScheduleCoverCleanup(ctx, notebookId, keys, 24*time.Hour), ShouldBeNil)
+
+		So(client.keys, ShouldHaveLength, 4)
+		for _, idempotencyKey := range client.keys {
+			So(len(idempotencyKey), ShouldBeLessThanOrEqualTo, 128)
+		}
+	})
+}
+
+func TestScheduleCoverCleanupRejectsEmptyKeys(t *testing.T) {
+	Convey("a cover checkpoint without valid keys is rejected", t, func() {
+		client := &fakeScheduleClient{}
+		scheduler := newTestScheduler(client, "http://notelm:7099")
+
+		So(scheduler.ScheduleCoverCleanup(t.Context(), valobj.NewId(), nil, 24*time.Hour), ShouldNotBeNil)
+		So(client.calls, ShouldEqual, 0)
 	})
 }
 

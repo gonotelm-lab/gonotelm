@@ -70,7 +70,8 @@ type NotebookOwner struct {
 
 type Notebook struct {
 	*notebookentity.Notebook
-	Owner *NotebookOwner
+	Owner    *NotebookOwner
+	CoverUrl string
 }
 
 type ListNotebooksHandleResult struct {
@@ -122,7 +123,7 @@ func (h *ListNotebooksHandler) Handle(
 			Notebook: notebook,
 		})
 	}
-	if err := h.attachNotebookOwners(ctx, targetNotebooks); err != nil {
+	if err := h.populateNotebooks(ctx, targetNotebooks); err != nil {
 		return nil, errors.WithMessage(err, "list attach notebook owners failed")
 	}
 

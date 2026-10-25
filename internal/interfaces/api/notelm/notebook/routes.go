@@ -34,5 +34,12 @@ func (s *Server) RegisterRoutes(g *route.RouterGroup) {
 		notebookIdGroup.PUT("/sharing/members", s.UpsertNotebookMember)
 		// DELETE /api/v1/notebooks/:id/sharing/members/:user_id
 		notebookIdGroup.DELETE("/sharing/members/:user_id", s.DeleteNotebookMember)
+
+		// POST /api/v1/notebooks/:id/cover/uploads
+		notebookIdGroup.POST("/cover/uploads", s.CoverUploadPresign)
+		// POST /api/v1/notebooks/:id/cover/confirm
+		notebookIdGroup.POST("/cover/confirm", s.ConfirmCoverUpload)
+		// DELETE /api/v1/notebooks/:id/cover
+		notebookIdGroup.DELETE("/cover", s.DeleteNotebookCover)
 	}
 }

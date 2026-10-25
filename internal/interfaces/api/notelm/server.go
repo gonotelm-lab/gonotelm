@@ -137,6 +137,7 @@ func NewServer(
 			Cleaner:               deps.Cleaner,
 			UserRepo:              deps.UserRepo,
 			ObjectStore:           deps.ObjectStore,
+			KeyFactory:            deps.KeyFactory,
 		}),
 
 		source: sourceapi.NewServer(sourceapi.Deps{

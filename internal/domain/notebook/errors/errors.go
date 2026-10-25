@@ -20,6 +20,7 @@ const (
 	CodeInvalidUserId        = 100013
 	CodeInvalidVisibility    = 100014
 	CodeCustomizeDescription = 100015
+	CodeInvalidCover         = 100016
 )
 
 var (
@@ -42,4 +43,6 @@ var (
 
 	ErrCustomizeDescription = errors.ErrParams.ErrCode(CodeCustomizeDescription).
 				Msg("customize description is set")
+
+	ErrInvalidCover = errors.ErrParams.ErrCode(CodeInvalidCover).Msg("invalid cover image")
 )

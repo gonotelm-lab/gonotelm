@@ -479,13 +479,14 @@ func newStorage(cfg *storage.StorageTypeConfig) (storage.Storage, error) {
 	case storage.Minio:
 		mc := cfg.Minio
 		return minio.New(&storage.Config{
-			Endpoint:      mc.Endpoint,
-			Region:        mc.Region,
-			Bucket:        mc.Bucket,
-			AccessKey:     mc.AccessKey,
-			SecretKey:     mc.SecretKey,
-			Secure:        mc.Secure,
-			PresignExpiry: mc.PresignExpiry,
+			Endpoint:            mc.Endpoint,
+			Region:              mc.Region,
+			Bucket:              mc.Bucket,
+			AccessKey:           mc.AccessKey,
+			SecretKey:           mc.SecretKey,
+			Secure:              mc.Secure,
+			PresignExpiry:       mc.PresignExpiry,
+			PresignUploadExpiry: mc.PresignUploadExpiry,
 		})
 	default:
 		return nil, fmt.Errorf("unknown storage type: %s", cfg.Type)

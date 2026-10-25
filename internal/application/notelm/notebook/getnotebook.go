@@ -41,7 +41,7 @@ func (h *GetNotebookHandler) getNotebook(
 	result := &Notebook{
 		Notebook: access.Notebook,
 	}
-	if err := h.attachNotebookOwners(ctx, []*Notebook{result}); err != nil {
+	if err := h.populateNotebooks(ctx, []*Notebook{result}); err != nil {
 		return nil, pkgerr.WithMessagef(err, "attach notebook owners failed, notebook_id=%s", access.Notebook.Id)
 	}
 

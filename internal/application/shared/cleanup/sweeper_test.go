@@ -11,6 +11,7 @@ import (
 	artifacterrors "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/errors"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
+	notebookerrors "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/errors"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourceerr "github.com/gonotelm-lab/gonotelm/internal/domain/source/errors"
@@ -69,12 +70,32 @@ func (f *fakeSourceRepo) DeleteByNotebookId(_ context.Context, id valobj.Id) err
 func (f *fakeSourceRepo) BatchDeleteByIds(context.Context, []valobj.Id) error { return nil }
 
 type fakeNotebookRepo struct {
-	exists bool
-	err    error
+	notebook *notebookentity.Notebook
+	exists   bool
+	findErr  error
+	err      error
+
+	savedNotes []*notebookentity.Notebook
+	saveErr    error
 }
 
-func (f *fakeNotebookRepo) Save(context.Context, *notebookentity.Notebook) error { return nil }
+func (f *fakeNotebookRepo) Save(_ context.Context, n *notebookentity.Notebook) error {
+	if f.saveErr != nil {
+		return f.saveErr
+	}
+
+	f.savedNotes = append(f.savedNotes, n)
+	return nil
+}
+
 func (f *fakeNotebookRepo) FindById(context.Context, valobj.Id) (*notebookentity.Notebook, error) {
+	if f.findErr != nil {
+		return nil, f.findErr
+	}
+	if f.notebook != nil {
+		return f.notebook, nil
+	}
+
 	return nil, errors.ErrNoRecord
 }
 func (f *fakeNotebookRepo) Exists(context.Context, valobj.Id) (bool, error) {
@@ -538,5 +559,101 @@ func TestSweepDeletedNotebookArtifactsOnlyTouchesArtifacts(t *testing.T) {
 		So(objects.deletedKeys, ShouldHaveLength, 1)
 		So(artifacts.deletedByNb, ShouldResemble, []valobj.Id{notebookId})
 		So(sources.deletedByNb, ShouldBeEmpty)
+	})
+}
+
+func TestSweepCoverDeletesObjectsWhenNotebookGone(t *testing.T) {
+	Convey("deletes the cover objects once the notebook row is gone", t, func() {
+		objects := &fakeObjectStore{}
+		notebooks := &fakeNotebookRepo{findErr: notebookerrors.ErrNotebookNotFound}
+		sweeper := newTestSweeper(&fakeSourceRepo{}, notebooks, &fakeArtifactRepo{}, &fakeSourceDocRepo{}, objects)
+
+		pendingKey, err := valobj.NewStoreKey(testBucket, "notebooks/cover/tok123", true)
+		So(err, ShouldBeNil)
+
+		So(sweeper.SweepNotebookObsoleteCover(t.Context(), valobj.NewId(), []string{pendingKey.Encode()}), ShouldBeNil)
+		So(objects.deletedKeys, ShouldResemble, []valobj.StoreKey{pendingKey})
+		So(notebooks.savedNotes, ShouldBeEmpty)
+	})
+}
+
+func TestSweepCoverRollsBackPendingCover(t *testing.T) {
+	Convey("a matching pending cover is cleared without touching the live cover", t, func() {
+		pendingKey, err := valobj.NewStoreKey(testBucket, "notebooks/cover/tok123", true)
+		So(err, ShouldBeNil)
+		oldCover, err := valobj.NewStoreKey(testBucket, "notebooks/cover/oldtok", true)
+		So(err, ShouldBeNil)
+
+		notebook := &notebookentity.Notebook{Cover: oldCover, PendingCover: pendingKey}
+		objects := &fakeObjectStore{}
+		notebooks := &fakeNotebookRepo{notebook: notebook}
+		sweeper := newTestSweeper(&fakeSourceRepo{}, notebooks, &fakeArtifactRepo{}, &fakeSourceDocRepo{}, objects)
+
+		So(sweeper.SweepNotebookObsoleteCover(t.Context(), valobj.NewId(), []string{pendingKey.Encode()}), ShouldBeNil)
+		So(objects.deletedKeys, ShouldResemble, []valobj.StoreKey{pendingKey})
+		So(notebooks.savedNotes, ShouldHaveLength, 1)
+
+		// 只清 pending：旧封面自动恢复展示
+		So(notebooks.savedNotes[0].PendingCover.Valid(), ShouldBeFalse)
+		So(notebooks.savedNotes[0].Cover, ShouldResemble, oldCover)
+	})
+}
+
+func TestSweepCoverSkipsWhenPendingMismatched(t *testing.T) {
+	Convey("stale callbacks (pending empty or changed) touch nothing", t, func() {
+		pendingKey, err := valobj.NewStoreKey(testBucket, "notebooks/cover/tok123", true)
+		So(err, ShouldBeNil)
+
+		Convey("pending already cleared", func() {
+			notebooks := &fakeNotebookRepo{notebook: &notebookentity.Notebook{}}
+			objects := &fakeObjectStore{}
+			sweeper := newTestSweeper(&fakeSourceRepo{}, notebooks, &fakeArtifactRepo{}, &fakeSourceDocRepo{}, objects)
+
+			So(sweeper.SweepNotebookObsoleteCover(t.Context(), valobj.NewId(), []string{pendingKey.Encode()}), ShouldBeNil)
+			So(objects.calls, ShouldEqual, 0)
+			So(notebooks.savedNotes, ShouldBeEmpty)
+		})
+
+		Convey("pending moved to another key", func() {
+			newPending, err := valobj.NewStoreKey(testBucket, "notebooks/cover/newtok", true)
+			So(err, ShouldBeNil)
+
+			notebooks := &fakeNotebookRepo{notebook: &notebookentity.Notebook{PendingCover: newPending}}
+			objects := &fakeObjectStore{}
+			sweeper := newTestSweeper(&fakeSourceRepo{}, notebooks, &fakeArtifactRepo{}, &fakeSourceDocRepo{}, objects)
+
+			So(sweeper.SweepNotebookObsoleteCover(t.Context(), valobj.NewId(), []string{pendingKey.Encode()}), ShouldBeNil)
+			So(objects.calls, ShouldEqual, 0)
+			So(notebooks.savedNotes, ShouldBeEmpty)
+		})
+	})
+}
+
+func TestSweepCoverPropagatesDependencyError(t *testing.T) {
+	Convey("store and save failures bubble up so flow retries", t, func() {
+		pendingKey, err := valobj.NewStoreKey(testBucket, "notebooks/cover/tok123", true)
+		So(err, ShouldBeNil)
+
+		Convey("object store failure", func() {
+			objects := &fakeObjectStore{err: errors.ErrInner.Msg("minio down")}
+			notebooks := &fakeNotebookRepo{notebook: &notebookentity.Notebook{PendingCover: pendingKey}}
+			sweeper := newTestSweeper(&fakeSourceRepo{}, notebooks, &fakeArtifactRepo{}, &fakeSourceDocRepo{}, objects)
+
+			err := sweeper.SweepNotebookObsoleteCover(t.Context(), valobj.NewId(), []string{pendingKey.Encode()})
+			So(err, ShouldNotBeNil)
+			So(notebooks.savedNotes, ShouldBeEmpty)
+		})
+
+		Convey("save failure", func() {
+			objects := &fakeObjectStore{}
+			notebooks := &fakeNotebookRepo{
+				notebook: &notebookentity.Notebook{PendingCover: pendingKey},
+				saveErr:  errors.ErrInner.Msg("pg down"),
+			}
+			sweeper := newTestSweeper(&fakeSourceRepo{}, notebooks, &fakeArtifactRepo{}, &fakeSourceDocRepo{}, objects)
+
+			err := sweeper.SweepNotebookObsoleteCover(t.Context(), valobj.NewId(), []string{pendingKey.Encode()})
+			So(err, ShouldNotBeNil)
+		})
 	})
 }

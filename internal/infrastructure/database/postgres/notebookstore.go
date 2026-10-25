@@ -45,11 +45,13 @@ func (s *NotebookStoreImpl) Upsert(
 	cl := clause.OnConflict{
 		Columns: []clause.Column{{Name: "id"}},
 		DoUpdates: clause.Assignments(map[string]any{
-			"name":        notebook.Name,
-			"description": notebook.Description,
-			"flags":       notebook.Flags,
-			"visibility":  notebook.Visibility,
-			"updated_at":  notebook.UpdatedAt,
+			"name":          notebook.Name,
+			"description":   notebook.Description,
+			"flags":         notebook.Flags,
+			"visibility":    notebook.Visibility,
+			"cover":         notebook.Cover,
+			"pending_cover": notebook.PendingCover,
+			"updated_at":    notebook.UpdatedAt,
 		}),
 	}
 	if err := s.db.WithContext(ctx).

@@ -36,6 +36,7 @@ type NotebookResponse struct {
 	Id          string                 `json:"id"`
 	Name        string                 `json:"name"`
 	Desc        string                 `json:"desc"`
+	CoverUrl    string                 `json:"cover_url"`
 	Flags       NotebookFlagsResponse  `json:"flags"`
 	SourceCount int64                  `json:"source_count"`
 	Visibility  string                 `json:"visibility"`
@@ -51,9 +52,10 @@ func NewNotebookResponse(notebook *notebookapp.Notebook) *NotebookResponse {
 		desc = notebook.Description
 	}
 	return &NotebookResponse{
-		Id:   notebook.Id.String(),
-		Name: notebook.Name,
-		Desc: desc,
+		Id:       notebook.Id.String(),
+		Name:     notebook.Name,
+		Desc:     desc,
+		CoverUrl: notebook.CoverUrl,
 		Flags: NotebookFlagsResponse{
 			CustomizeDescription: customize,
 		},
@@ -291,4 +293,31 @@ type UpsertNotebookMemberResponse struct {
 type DeleteNotebookMemberRequest struct {
 	Id     uuid.UUID  `path:"id,required"` // notebook id
 	UserId valobj.Uid `path:"user_id,required"`
+}
+
+type NotebookCoverUploadRequest struct {
+	Id          uuid.UUID `path:"id,required"`
+	Size        int64     `json:"size"`
+	ContentType string    `json:"content_type" validate:"required"`
+}
+
+type NotebookCoverUploadResponse struct {
+	StoreKey string            `json:"store_key"`
+	Url      string            `json:"url"`
+	Method   string            `json:"method"`
+	Forms    map[string]string `json:"forms"`
+	Headers  map[string]string `json:"headers"`
+}
+
+type ConfirmNotebookCoverRequest struct {
+	Id       uuid.UUID `path:"id,required"`
+	StoreKey string    `json:"store_key" validate:"required"`
+}
+
+type ConfirmNotebookCoverResponse struct {
+	CoverUrl string `json:"cover_url"`
+}
+
+type DeleteNotebookCoverRequest struct {
+	Id uuid.UUID `path:"id,required"`
 }

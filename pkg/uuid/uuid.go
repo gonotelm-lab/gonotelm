@@ -1,6 +1,7 @@
 package uuid
 
 import (
+	"crypto/rand"
 	"database/sql/driver"
 	"encoding"
 	"encoding/base64"
@@ -72,6 +73,17 @@ func NewV7() UUID {
 
 func NewV4() UUID {
 	return UUID{googl.New()}
+}
+
+// NewRandomURLToken 生成 base64url(uuidv4 16B + padBytes 字节 crypto/rand) 的短 token，
+// pad=8 时为 24B → 32 字符，URL 安全
+func NewRandomURLToken(padBytes int) (string, error) {
+	buf := make([]byte, 16+padBytes)
+	copy(buf, NewV4().Bytes())
+	if _, err := rand.Read(buf[16:]); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(buf), nil
 }
 
 func FromBytes(b []byte) (UUID, error) {

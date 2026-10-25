@@ -24,11 +24,13 @@ const (
 type Notebook struct {
 	coreentity.Base
 
-	Name        string
-	Description string // 用户自定义摘要
-	Flags       vo.Flags
-	OwnerId     valobj.Uid
-	Visibility  vo.Visibility
+	Name         string
+	Description  string // 用户自定义摘要
+	Flags        vo.Flags
+	OwnerId      valobj.Uid
+	Visibility   vo.Visibility
+	Cover        valobj.StoreKey // 生效封面
+	PendingCover valobj.StoreKey // 正在进行中的封面上传流程的key 未正式生效
 
 	SourceCount int64
 }

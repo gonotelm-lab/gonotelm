@@ -6,13 +6,15 @@ import (
 )
 
 type Notebook struct {
-	Id          uuid.UUID  `gorm:"column:id"`
-	Name        string     `gorm:"column:name"`
-	Description string     `gorm:"column:description"`
-	Flags       int32      `gorm:"column:flags"`
-	OwnerId     valobj.Uid `gorm:"column:owner_id"`
-	Visibility  string     `gorm:"column:visibility"`
-	UpdatedAt   int64      `gorm:"column:updated_at"`
+	Id           uuid.UUID  `gorm:"column:id"`
+	Name         string     `gorm:"column:name"`
+	Description  string     `gorm:"column:description"`
+	Flags        int32      `gorm:"column:flags"`
+	OwnerId      valobj.Uid `gorm:"column:owner_id"`
+	Visibility   string     `gorm:"column:visibility"`
+	UpdatedAt    int64      `gorm:"column:updated_at"`
+	Cover        string     `gorm:"column:cover"`
+	PendingCover string     `gorm:"column:pending_cover"`
 }
 
 func (Notebook) TableName() string {

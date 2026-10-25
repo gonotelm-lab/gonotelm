@@ -2,6 +2,8 @@ package notebook
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/shared/storekey"
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
@@ -29,20 +31,26 @@ type baseHandler struct {
 	notebookAccessService *notebookservice.AccessService
 	userRepo              identrepo.UserRepository
 	storeKeyResolver      *storekey.Resolver
+	objectStore           adapter.ObjectStore
 }
 
 func newBaseHandler(
 	notebookRepo notebookrepo.Repository,
 	notebookAccessService *notebookservice.AccessService,
 	userRepo identrepo.UserRepository,
-	objectStore adapter.ObjectPublicURLer,
+	objectPublicUrler adapter.ObjectPublicURLer,
 ) *baseHandler {
 	return &baseHandler{
 		notebookRepo:          notebookRepo,
 		notebookAccessService: notebookAccessService,
 		userRepo:              userRepo,
-		storeKeyResolver:      storekey.New(objectStore),
+		storeKeyResolver:      storekey.New(objectPublicUrler),
 	}
+}
+
+func (h *baseHandler) withObjectStore(s adapter.ObjectStore) *baseHandler {
+	h.objectStore = s
+	return h
 }
 
 // withNotebookAccess 鉴权通过后把 access 注入业务方法
@@ -94,7 +102,29 @@ func (h *baseHandler) resolveAccess(
 	}
 }
 
-func (h *baseHandler) attachNotebookOwners(ctx context.Context, notebooks []*Notebook) error {
+func notebookCoverLockKey(notebookId valobj.Id) string {
+	return fmt.Sprintf("notelm:notebook:cover:lock:%s", notebookId)
+}
+
+// deleteCoverObject 删除封面相关对象；失败只告警，散落对象留待兜底检查点。
+func (h *baseHandler) deleteCoverObject(
+	ctx context.Context,
+	notebookId valobj.Id,
+	key valobj.StoreKey,
+) {
+	if !key.Valid() {
+		return
+	}
+	if err := h.objectStore.DeleteObject(ctx, key); err != nil {
+		slog.WarnContext(ctx, "delete cover object failed",
+			slog.String("notebook_id", notebookId.String()),
+			slog.String("store_key", key.String()),
+			slog.Any("err", err),
+		)
+	}
+}
+
+func (h *baseHandler) populateNotebooks(ctx context.Context, notebooks []*Notebook) error {
 	ownerIds := make([]valobj.Uid, 0, len(notebooks))
 	for _, n := range notebooks {
 		ownerIds = append(ownerIds, n.OwnerId)
@@ -108,6 +138,9 @@ func (h *baseHandler) attachNotebookOwners(ctx context.Context, notebooks []*Not
 
 		userMap := pkgslices.AsMapF(users, func(t *idententity.User) valobj.Uid { return t.Id })
 		for _, n := range notebooks {
+			if n.Cover.Valid() {
+				n.CoverUrl = h.storeKeyResolver.ResolvePublic(ctx, n.Cover) // cover url是对外的
+			}
 			if owner, ok := userMap[n.OwnerId]; ok && owner != nil {
 				n.Owner = &NotebookOwner{
 					Id:        owner.Id,

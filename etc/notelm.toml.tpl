@@ -69,6 +69,7 @@ bucket = "gonotelm"
 region = "${GONOTELM_MINIO_REGION:-us-east-1}"
 secure = ${GONOTELM_MINIO_SECURE:-false}
 presignExpiry = "${GONOTELM_MINIO_PRESIGN_EXPIRY:-60m}"
+presignUploadExpiry = "${GONOTELM_MINIO_PRESIGN_UPLOAD_EXPIRY:-15m}"
 publicBucket = "${GONOTELM_PUBLIC_MINIO_BUCKET:-gonotelm-public}"
 publicAccessKey = "${GONOTELM_PUBLIC_MINIO_ACCESS_KEY:-}"
 publicSecretKey = "${GONOTELM_PUBLIC_MINIO_SECRET_KEY:-}"

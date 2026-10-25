@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/shared/cleanup"
+	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
@@ -30,13 +31,16 @@ func NewDeleteNotebookHandler(
 	userRepo identrepo.UserRepository,
 	eventBus eventbus.Publisher,
 	cleaner *cleanup.Cleaner,
+	objectStore adapter.ObjectStore,
 ) *DeleteNotebookHandler {
-	return &DeleteNotebookHandler{
-		baseHandler: newBaseHandler(notebookRepo, notebookAccessService, userRepo, nil),
+	h := &DeleteNotebookHandler{
+		baseHandler: newBaseHandler(notebookRepo, notebookAccessService, userRepo, objectStore).withObjectStore(objectStore),
 		eventBus:    eventBus,
 		cleaner:     cleaner,
 		memberRepo:  memberRepo,
 	}
+
+	return h
 }
 
 func (h *DeleteNotebookHandler) Handle(ctx context.Context, id valobj.Id) error {
@@ -55,6 +59,9 @@ func (h *DeleteNotebookHandler) deleteNotebook(
 	if err := h.notebookRepo.Save(ctx, n); err != nil {
 		return nil, errors.WithMessage(err, "delete notebook failed")
 	}
+
+	h.deleteCoverObject(ctx, id, n.Cover)
+	h.deleteCoverObject(ctx, id, n.PendingCover)
 
 	if err := h.memberRepo.DeleteByNotebookId(ctx, id); err != nil {
 		slog.ErrorContext(ctx, "delete notebook members failed",

@@ -10,6 +10,7 @@ import (
 	artifactentity "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/entity"
 	artifacterrors "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/errors"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
+	notebookerrors "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/errors"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourceerr "github.com/gonotelm-lab/gonotelm/internal/domain/source/errors"
@@ -61,6 +62,8 @@ func (s *sweeper) Sweep(ctx context.Context, p *Payload) error {
 		return s.SweepNotebook(ctx, p.NotebookId, p.Sources, p.Artifacts)
 	case KindArtifact:
 		return s.SweepArtifact(ctx, p.NotebookId, p.ArtifactId, p.Keys)
+	case KindCover:
+		return s.SweepNotebookObsoleteCover(ctx, p.NotebookId, p.Keys)
 	default:
 		return errors.ErrParams.Msgf("unknown cleanup kind: %s", p.Kind)
 	}
@@ -146,8 +149,68 @@ func (s *sweeper) SweepDeletedNotebookArtifacts(
 	return stderrors.Join(errs...)
 }
 
-func (s *sweeper) SweepNotebook(
-	ctx context.Context,
+// 清理notebook过期遗留为完成上传的封面对象
+func (s *sweeper) SweepNotebookObsoleteCover(ctx context.Context, notebookId valobj.Id, keys []string) error {
+	slog.DebugContext(ctx, "sweep cover",
+		slog.String("notebook_id", notebookId.String()),
+		slog.Int("keys", len(keys)),
+	)
+
+	n, err := s.notebookRepo.FindById(ctx, notebookId)
+	if errors.Is(err, notebookerrors.ErrNotebookNotFound) {
+		// 笔记本不存在 笔记本被删掉了 所以需要清理keys 此处keys为悬垂对象了
+		keysToDelete := make([]valobj.StoreKey, 0, len(keys))
+		for _, encoded := range keys {
+			if key, ok := decodeObjectKey(ctx, notebookId, encoded); ok {
+				keysToDelete = append(keysToDelete, key)
+			}
+		}
+
+		if err := s.objectStore.BatchDeleteObject(ctx, keysToDelete); err != nil {
+			return errors.WithMessage(err, "delete cover objects failed")
+		}
+
+		return nil
+	}
+	if err != nil {
+		return errors.WithMessage(err, "check notebook exists failed")
+	}
+
+	if len(keys) == 0 {
+		slog.InfoContext(ctx, "cover cleanup payload without keys, skip",
+			slog.String("notebook_id", notebookId.String()))
+		return nil
+	}
+
+	// key 无效说明载荷损坏，不能拿去匹配
+	key, ok := decodeObjectKey(ctx, notebookId, keys[0])
+	if !ok {
+		return nil
+	}
+
+	if !n.PendingCover.Valid() || key != n.PendingCover {
+		// 如果在途的封面key过期 或者在封面上传过程中 key发生了变化(一般不会发生) 就跳过
+		slog.InfoContext(ctx, "pending cover mismatched, skip cleanup",
+			slog.String("notebook_id", notebookId.String()),
+			slog.String("pending", n.PendingCover.String()),
+			slog.String("payload_key", key.String()),
+		)
+		return nil
+	}
+
+	if err := s.objectStore.BatchDeleteObject(ctx, []valobj.StoreKey{key}); err != nil {
+		return errors.WithMessage(err, "delete cover object failed")
+	}
+
+	n.ClearPendingCover()
+	if err := s.notebookRepo.Save(ctx, n); err != nil {
+		return errors.WithMessage(err, "save notebook after cover cleanup failed")
+	}
+
+	return nil
+}
+
+func (s *sweeper) SweepNotebook(ctx context.Context,
 	notebookId valobj.Id,
 	sources []SourceRef,
 	artifacts []ArtifactRef,

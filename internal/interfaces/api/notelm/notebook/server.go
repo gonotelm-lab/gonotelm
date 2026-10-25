@@ -23,7 +23,9 @@ type Deps struct {
 	Cleaner               *cleanup.Cleaner
 	UserRepo              identityrepo.UserRepository
 	// ObjectStore 仅注入 app handler；API handler 本身不解析 StoreKey。
-	ObjectStore adapter.ObjectPublicURLer
+	// 封面 presign/confirm/delete 需要完整 ObjectStore 能力
+	ObjectStore adapter.ObjectStore
+	KeyFactory  adapter.StoreKeyFactory
 }
 
 type Server struct {
@@ -39,6 +41,10 @@ type Server struct {
 	updateNotebookVisibilityHandler *notebookapp.UpdateNotebookVisibilityHandler
 	upsertNotebookMemberHandler     *notebookapp.UpsertNotebookMemberHandler
 	deleteNotebookMemberHandler     *notebookapp.DeleteNotebookMemberHandler
+
+	coverUploadPresignHandler *notebookapp.CoverUploadPresignHandler
+	confirmCoverUploadHandler *notebookapp.ConfirmCoverUploadHandler
+	deleteCoverHandler        *notebookapp.DeleteCoverHandler
 }
 
 func NewServer(deps Deps) *Server {
@@ -57,6 +63,7 @@ func NewServer(deps Deps) *Server {
 			deps.UserRepo,
 			deps.EventBus,
 			deps.Cleaner,
+			deps.ObjectStore,
 		),
 		updateNotebookHandler: notebookapp.NewUpdateNotebookHandler(deps.NotebookRepo, deps.NotebookAccessService, deps.UserRepo),
 		generateNotebookDescriptionHandler: notebookapp.NewGenerateDescriptionHandler(
@@ -80,5 +87,29 @@ func NewServer(deps Deps) *Server {
 		updateNotebookVisibilityHandler: notebookapp.NewUpdateNotebookVisibilityHandler(deps.NotebookRepo, deps.NotebookAccessService, deps.UserRepo),
 		upsertNotebookMemberHandler:     notebookapp.NewUpsertNotebookMemberHandler(deps.NotebookRepo, deps.NotebookAccessService, deps.MemberRepo, deps.UserRepo),
 		deleteNotebookMemberHandler:     notebookapp.NewDeleteNotebookMemberHandler(deps.NotebookRepo, deps.NotebookAccessService, deps.MemberRepo, deps.UserRepo),
+
+		coverUploadPresignHandler: notebookapp.NewCoverUploadPresignHandler(
+			deps.NotebookRepo,
+			deps.NotebookAccessService,
+			deps.UserRepo,
+			deps.ObjectStore,
+			deps.KeyFactory,
+			deps.DistLock,
+			deps.Cleaner,
+		),
+		confirmCoverUploadHandler: notebookapp.NewConfirmCoverUploadHandler(
+			deps.NotebookRepo,
+			deps.NotebookAccessService,
+			deps.UserRepo,
+			deps.ObjectStore,
+			deps.DistLock,
+		),
+		deleteCoverHandler: notebookapp.NewDeleteCoverHandler(
+			deps.NotebookRepo,
+			deps.NotebookAccessService,
+			deps.UserRepo,
+			deps.ObjectStore,
+			deps.DistLock,
+		),
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	identerr "github.com/gonotelm-lab/gonotelm/internal/domain/identity/errors"
 	pkgstr "github.com/gonotelm-lab/gonotelm/pkg/string"
+	pkguuid "github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
 
 const (
@@ -73,7 +74,12 @@ func (u *User) normalizeNickname() {
 
 // 生成一个新的头像存储Key
 func (u *User) GenerateAvatarKey(keyFactory adapter.StoreKeyFactory) (valobj.StoreKey, error) {
-	return keyFactory.New(userAvatarObjectPathPrefix+valobj.NewUnOrderedId().String(), true)
+	token, err := pkguuid.NewRandomURLToken(8)
+	if err != nil {
+		return valobj.StoreKey{}, err
+	}
+
+	return keyFactory.New(userAvatarObjectPathPrefix+token, true)
 }
 
 func (u *User) SetAvatar(avatar valobj.StoreKey) {

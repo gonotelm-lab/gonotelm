@@ -30,7 +30,7 @@ type Notebook struct {
 	OwnerId      valobj.Uid
 	Visibility   vo.Visibility
 	Cover        valobj.StoreKey // 生效封面
-	PendingCover valobj.StoreKey // 在途 key（uploads 下发，confirm 单写点转化）
+	PendingCover valobj.StoreKey // 正在进行中的封面上传流程的key 未正式生效
 
 	SourceCount int64
 }

@@ -63,7 +63,7 @@ func (s *sweeper) Sweep(ctx context.Context, p *Payload) error {
 	case KindArtifact:
 		return s.SweepArtifact(ctx, p.NotebookId, p.ArtifactId, p.Keys)
 	case KindCover:
-		return s.SweepNotebookObseleteCover(ctx, p.NotebookId, p.Keys)
+		return s.SweepNotebookObsoleteCover(ctx, p.NotebookId, p.Keys)
 	default:
 		return errors.ErrParams.Msgf("unknown cleanup kind: %s", p.Kind)
 	}
@@ -150,7 +150,7 @@ func (s *sweeper) SweepDeletedNotebookArtifacts(
 }
 
 // 清理notebook过期遗留为完成上传的封面对象
-func (s *sweeper) SweepNotebookObseleteCover(ctx context.Context, notebookId valobj.Id, keys []string) error {
+func (s *sweeper) SweepNotebookObsoleteCover(ctx context.Context, notebookId valobj.Id, keys []string) error {
 	slog.DebugContext(ctx, "sweep cover",
 		slog.String("notebook_id", notebookId.String()),
 		slog.Int("keys", len(keys)),
@@ -189,7 +189,7 @@ func (s *sweeper) SweepNotebookObseleteCover(ctx context.Context, notebookId val
 	}
 
 	if !n.PendingCover.Valid() || key != n.PendingCover {
-		// pending 已被 confirm / 换 key / 清空过 → 回调过期，对象去留不管
+		// 如果在途的封面key过期 或者在封面上传过程中 key发生了变化(一般不会发生) 就跳过
 		slog.InfoContext(ctx, "pending cover mismatched, skip cleanup",
 			slog.String("notebook_id", notebookId.String()),
 			slog.String("pending", n.PendingCover.String()),

@@ -12,7 +12,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
-	pkguuid "github.com/gonotelm-lab/gonotelm/pkg/uuid"
+	pkgstr "github.com/gonotelm-lab/gonotelm/pkg/string"
 )
 
 const scheduleNameReqIdLen = 8
@@ -99,7 +99,7 @@ func (s *checkpointScheduler) ScheduleCoverCleanup(
 	keys []valobj.StoreKey,
 	fireDelay time.Duration,
 ) error {
-	nonce, err := pkguuid.NewRandomURLToken(8)
+	nonce, err := pkgstr.Random(8)
 	if err != nil {
 		return errors.WithMessage(err, "generate cover cleanup nonce failed")
 	}
@@ -110,7 +110,7 @@ func (s *checkpointScheduler) ScheduleCoverCleanup(
 	}
 
 	// key 带 nonce：每次改挂封面都注册独立检查点
-	idempotencyKey := KindCover + ":" + notebookId.String() + ":" + p.Keys[0] + ":" + nonce
+	idempotencyKey := KindCover + ":" + notebookId.String() + ":" + nonce
 	name := scheduleName(ctx, actionDeleteCover, notebookId)
 
 	return s.registerAt(ctx, p, CoverCallbackPath, idempotencyKey, name, s.now().Add(fireDelay))

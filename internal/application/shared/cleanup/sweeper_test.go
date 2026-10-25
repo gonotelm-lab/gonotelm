@@ -571,7 +571,7 @@ func TestSweepCoverDeletesObjectsWhenNotebookGone(t *testing.T) {
 		pendingKey, err := valobj.NewStoreKey(testBucket, "notebooks/cover/tok123", true)
 		So(err, ShouldBeNil)
 
-		So(sweeper.SweepCover(t.Context(), valobj.NewId(), []string{pendingKey.Encode()}), ShouldBeNil)
+		So(sweeper.SweepNotebookObseleteCover(t.Context(), valobj.NewId(), []string{pendingKey.Encode()}), ShouldBeNil)
 		So(objects.deletedKeys, ShouldResemble, []valobj.StoreKey{pendingKey})
 		So(notebooks.savedNotes, ShouldBeEmpty)
 	})
@@ -589,7 +589,7 @@ func TestSweepCoverRollsBackPendingCover(t *testing.T) {
 		notebooks := &fakeNotebookRepo{notebook: notebook}
 		sweeper := newTestSweeper(&fakeSourceRepo{}, notebooks, &fakeArtifactRepo{}, &fakeSourceDocRepo{}, objects)
 
-		So(sweeper.SweepCover(t.Context(), valobj.NewId(), []string{pendingKey.Encode()}), ShouldBeNil)
+		So(sweeper.SweepNotebookObseleteCover(t.Context(), valobj.NewId(), []string{pendingKey.Encode()}), ShouldBeNil)
 		So(objects.deletedKeys, ShouldResemble, []valobj.StoreKey{pendingKey})
 		So(notebooks.savedNotes, ShouldHaveLength, 1)
 
@@ -609,7 +609,7 @@ func TestSweepCoverSkipsWhenPendingMismatched(t *testing.T) {
 			objects := &fakeObjectStore{}
 			sweeper := newTestSweeper(&fakeSourceRepo{}, notebooks, &fakeArtifactRepo{}, &fakeSourceDocRepo{}, objects)
 
-			So(sweeper.SweepCover(t.Context(), valobj.NewId(), []string{pendingKey.Encode()}), ShouldBeNil)
+			So(sweeper.SweepNotebookObseleteCover(t.Context(), valobj.NewId(), []string{pendingKey.Encode()}), ShouldBeNil)
 			So(objects.calls, ShouldEqual, 0)
 			So(notebooks.savedNotes, ShouldBeEmpty)
 		})
@@ -622,7 +622,7 @@ func TestSweepCoverSkipsWhenPendingMismatched(t *testing.T) {
 			objects := &fakeObjectStore{}
 			sweeper := newTestSweeper(&fakeSourceRepo{}, notebooks, &fakeArtifactRepo{}, &fakeSourceDocRepo{}, objects)
 
-			So(sweeper.SweepCover(t.Context(), valobj.NewId(), []string{pendingKey.Encode()}), ShouldBeNil)
+			So(sweeper.SweepNotebookObseleteCover(t.Context(), valobj.NewId(), []string{pendingKey.Encode()}), ShouldBeNil)
 			So(objects.calls, ShouldEqual, 0)
 			So(notebooks.savedNotes, ShouldBeEmpty)
 		})
@@ -639,7 +639,7 @@ func TestSweepCoverPropagatesDependencyError(t *testing.T) {
 			notebooks := &fakeNotebookRepo{notebook: &notebookentity.Notebook{PendingCover: pendingKey}}
 			sweeper := newTestSweeper(&fakeSourceRepo{}, notebooks, &fakeArtifactRepo{}, &fakeSourceDocRepo{}, objects)
 
-			err := sweeper.SweepCover(t.Context(), valobj.NewId(), []string{pendingKey.Encode()})
+			err := sweeper.SweepNotebookObseleteCover(t.Context(), valobj.NewId(), []string{pendingKey.Encode()})
 			So(err, ShouldNotBeNil)
 			So(notebooks.savedNotes, ShouldBeEmpty)
 		})
@@ -652,7 +652,7 @@ func TestSweepCoverPropagatesDependencyError(t *testing.T) {
 			}
 			sweeper := newTestSweeper(&fakeSourceRepo{}, notebooks, &fakeArtifactRepo{}, &fakeSourceDocRepo{}, objects)
 
-			err := sweeper.SweepCover(t.Context(), valobj.NewId(), []string{pendingKey.Encode()})
+			err := sweeper.SweepNotebookObseleteCover(t.Context(), valobj.NewId(), []string{pendingKey.Encode()})
 			So(err, ShouldNotBeNil)
 		})
 	})

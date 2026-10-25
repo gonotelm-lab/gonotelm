@@ -8,22 +8,21 @@ import (
 	"strings"
 	"time"
 
-	_ "golang.org/x/image/webp"
-
 	coreadapter "github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	notebookerrors "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/errors"
 	pkguuid "github.com/gonotelm-lab/gonotelm/pkg/uuid"
 
 	"github.com/gabriel-vasile/mimetype"
+	_ "golang.org/x/image/webp"
 )
 
 const (
 	CoverObjectPathPrefix = "notebooks/cover/"
-	MaxCoverBytes         = 2 << 20
+	MaxCoverBytes         = 2 << 20 // 2MB
 	MaxCoverDimension     = 2048
-	CoverHeadProbeBytes   = 3072           // 与 mimetype 默认探测长度一致
-	CoverCleanupDelay     = 24 * time.Hour // 检查点 fireAt = 链接生成 + 1 天
+	CoverHeadProbeBytes   = 3072
+	CoverCleanupDelay     = 24 * time.Hour
 )
 
 var coverMimeWhitelist = map[string]bool{
@@ -78,7 +77,7 @@ func CheckCoverKey(key valobj.StoreKey) error {
 	return nil
 }
 
-// GenerateCoverKey 生成一个新的封面在途 key：prefix + 随机 token，公有读。
+// GenerateCoverKey 生成一个新的封面key 公有读
 func (n *Notebook) GenerateCoverKey(keyFactory coreadapter.StoreKeyFactory) (valobj.StoreKey, error) {
 	token, err := pkguuid.NewRandomURLToken(8)
 	if err != nil {
@@ -88,7 +87,8 @@ func (n *Notebook) GenerateCoverKey(keyFactory coreadapter.StoreKeyFactory) (val
 	return keyFactory.New(CoverObjectPathPrefix+token, true)
 }
 
-// BeginCoverFlow 幂等下发封面在途 key
+// BeginCoverFlow 幂等下发封面storeKey
+// 如果已经存在申请过的storeKey但是没有完成上传确认 会复用这个storeKey
 func (n *Notebook) BeginCoverFlow(keyFactory coreadapter.StoreKeyFactory) (valobj.StoreKey, bool, error) {
 	// 已有在途cover 直接返回
 	if n.PendingCover.Valid() {

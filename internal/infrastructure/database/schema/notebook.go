@@ -13,8 +13,8 @@ type Notebook struct {
 	OwnerId      valobj.Uid `gorm:"column:owner_id"`
 	Visibility   string     `gorm:"column:visibility"`
 	UpdatedAt    int64      `gorm:"column:updated_at"`
-	Cover        string     `gorm:"column:cover"`         // encoded StoreKey，空串=无生效封面
-	PendingCover string     `gorm:"column:pending_cover"` // encoded StoreKey，空串=无在途 key
+	Cover        string     `gorm:"column:cover"`
+	PendingCover string     `gorm:"column:pending_cover"`
 }
 
 func (Notebook) TableName() string {

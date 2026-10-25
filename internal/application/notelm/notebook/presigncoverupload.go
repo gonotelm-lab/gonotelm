@@ -22,7 +22,7 @@ type CoverUploadPresignHandler struct {
 	keyFactory   adapter.StoreKeyFactory
 	distLock     adapter.DistributedLock
 	cleaner      *cleanup.Cleaner
-	cleanupDelay time.Duration // 固定 entity.CoverCleanupDelay（24h），独立于 presign 链接 TTL
+	cleanupDelay time.Duration
 }
 
 func NewCoverUploadPresignHandler(
@@ -39,7 +39,7 @@ func NewCoverUploadPresignHandler(
 		keyFactory:   keyFactory,
 		distLock:     distLock,
 		cleaner:      cleaner,
-		cleanupDelay: notebookentity.CoverCleanupDelay,
+		cleanupDelay: notebookentity.CoverCleanupDelay, // 固定 entity.CoverCleanupDelay
 	}
 
 	return h
@@ -135,6 +135,8 @@ func (h *CoverUploadPresignHandler) presign(
 			slog.String("notebook_id", n.Id.String()),
 			slog.Any("err", err),
 		)
+	} else {
+		slog.InfoContext(ctx, "schedule cover clean succeeded", slog.String("notebook_id", n.Id.String()))
 	}
 
 	return &CoverUploadPresignHandleResult{StoreKey: key.Encode(), Presign: presign}, nil

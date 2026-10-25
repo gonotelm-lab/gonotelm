@@ -28,8 +28,9 @@ func NotebookFromSchema(notebook *schema.Notebook) *notebookentity.Notebook {
 	if flags.CustomizeDescription() {
 		desc = notebook.Description
 	}
-	coverKey, _ := valobj.DecodeStoreKey(notebook.Cover)          // 损坏 encoded 按无封面处理
-	pendingKey, _ := valobj.DecodeStoreKey(notebook.PendingCover) // 同上，不打挂读路径
+	// 损坏 encoded 按无封面处理
+	coverKey, _ := valobj.DecodeStoreKey(notebook.Cover)
+	pendingKey, _ := valobj.DecodeStoreKey(notebook.PendingCover)
 	return &notebookentity.Notebook{
 		Base: entity.Base{
 			Id:         notebook.Id,

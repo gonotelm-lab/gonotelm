@@ -63,7 +63,7 @@ func (s *sweeper) Sweep(ctx context.Context, p *Payload) error {
 	case KindArtifact:
 		return s.SweepArtifact(ctx, p.NotebookId, p.ArtifactId, p.Keys)
 	case KindCover:
-		return s.SweepCover(ctx, p.NotebookId, p.Keys)
+		return s.SweepNotebookObseleteCover(ctx, p.NotebookId, p.Keys)
 	default:
 		return errors.ErrParams.Msgf("unknown cleanup kind: %s", p.Kind)
 	}
@@ -149,9 +149,8 @@ func (s *sweeper) SweepDeletedNotebookArtifacts(
 	return stderrors.Join(errs...)
 }
 
-// SweepCover 兜底处理在途封面 key：notebook 没了就清对象；
-// pending 仍等于载荷 key 则回滚（清对象并只清 pending，旧封面自动恢复展示），否则回调过期丢弃。
-func (s *sweeper) SweepCover(ctx context.Context, notebookId valobj.Id, keys []string) error {
+// 清理notebook过期遗留为完成上传的封面对象
+func (s *sweeper) SweepNotebookObseleteCover(ctx context.Context, notebookId valobj.Id, keys []string) error {
 	slog.DebugContext(ctx, "sweep cover",
 		slog.String("notebook_id", notebookId.String()),
 		slog.Int("keys", len(keys)),
@@ -159,7 +158,7 @@ func (s *sweeper) SweepCover(ctx context.Context, notebookId valobj.Id, keys []s
 
 	n, err := s.notebookRepo.FindById(ctx, notebookId)
 	if errors.Is(err, notebookerrors.ErrNotebookNotFound) {
-		// notebook 连带删除产生的对象清理
+		// 笔记本不存在 笔记本被删掉了 所以需要清理keys 此处keys为悬垂对象了
 		keysToDelete := make([]valobj.StoreKey, 0, len(keys))
 		for _, encoded := range keys {
 			if key, ok := decodeObjectKey(ctx, notebookId, encoded); ok {

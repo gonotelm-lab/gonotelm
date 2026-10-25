@@ -14,7 +14,6 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-// fakeCoverKeyFactory 补固定公有桶名，业务侧不接触桶名。
 type fakeCoverKeyFactory struct {
 	bucket string
 }

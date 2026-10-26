@@ -80,6 +80,7 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 	// ── 2. Repositories ──
 	notebookRepo := repository.NewNotebookRepository(infra.Database.NotebookStore, infra.Database.NotebookMemberStore, infra.Database.SourceStore)
 	notebookMemberRepo := repository.NewNotebookMemberRepository(infra.Database.NotebookMemberStore)
+	pinRepo := repository.NewPinRepository(infra.Database.UserNotebookPinStore)
 	notebookAccessService := notebookservice.NewAccessService(notebookRepo, notebookMemberRepo)
 	sourceRepo := repository.NewSourceRepository(infra.Database.SourceStore)
 	sourceDocRepo := repository.NewSourceDocRepository(
@@ -193,6 +194,7 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 			NotebookRepo:   notebookRepo,
 			ArtifactRepo:   artifactRepo,
 			SourceDocRepo:  sourceDocRepo,
+			PinRepo:        pinRepo,
 			ObjectStore:    infra.ObjectStore,
 		},
 	)
@@ -212,6 +214,7 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 		RootCtx: rootCtx,
 
 		NotebookRepo: notebookRepo,
+		PinRepo:      pinRepo,
 
 		SourceRepo:    sourceRepo,
 		ObjectStore:   infra.ObjectStore,
@@ -240,6 +243,7 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 
 			NotebookRepo:              notebookRepo,
 			NotebookMemberRepo:        notebookMemberRepo,
+			PinRepo:                   pinRepo,
 			NotebookAccessService:     notebookAccessService,
 			NotebookAIDescriptionRepo: notebookAIDescRepo,
 

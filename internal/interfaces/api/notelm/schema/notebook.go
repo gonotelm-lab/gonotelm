@@ -40,6 +40,8 @@ type NotebookResponse struct {
 	Flags       NotebookFlagsResponse  `json:"flags"`
 	SourceCount int64                  `json:"source_count"`
 	Visibility  string                 `json:"visibility"`
+	IsPinned    bool                   `json:"is_pinned"`
+	PinnedAt    int64                  `json:"pinned_at"`  // unix ms；未置顶为 0
 	UpdatedAt   int64                  `json:"updated_at"` // unix ms
 	CreatedAt   int64                  `json:"created_at"` // unix ms
 	Owner       *NotebookOwnerResponse `json:"owner,omitempty"`
@@ -61,10 +63,25 @@ func NewNotebookResponse(notebook *notebookapp.Notebook) *NotebookResponse {
 		},
 		SourceCount: notebook.SourceCount,
 		Visibility:  notebook.Visibility.String(),
+		IsPinned:    notebook.IsPinned,
+		PinnedAt:    notebook.PinnedAt,
 		Owner:       NewNotebookOwnerResponse(notebook.Owner),
 		UpdatedAt:   notebook.UpdateTime.Value(),
 		CreatedAt:   notebook.CreateTime.Value(),
 	}
+}
+
+type PinNotebookRequest struct {
+	Id uuid.UUID `path:"id,required"`
+}
+
+func (r *PinNotebookRequest) Validate() error {
+	return nil
+}
+
+type PinNotebookResponse struct {
+	IsPinned bool  `json:"is_pinned"`
+	PinnedAt int64 `json:"pinned_at"` // unix ms；未置顶为 0
 }
 
 type GetNotebookAccessResponse struct {

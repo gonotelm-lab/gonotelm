@@ -68,6 +68,22 @@ func (s *NotebookRepositoryImpl) FindById(ctx context.Context, id valobj.Id) (*n
 	return result, nil
 }
 
+func (s *NotebookRepositoryImpl) ListByIds(
+	ctx context.Context,
+	ids []valobj.Id,
+) ([]*notebookentity.Notebook, error) {
+	if len(ids) == 0 {
+		return []*notebookentity.Notebook{}, nil
+	}
+
+	rows, err := s.notebookStore.ListByIds(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.withSourceCounts(ctx, rows)
+}
+
 func (s *NotebookRepositoryImpl) ListByOwner(
 	ctx context.Context,
 	ownerId valobj.Uid,
@@ -83,6 +99,7 @@ func (s *NotebookRepositoryImpl) ListByOwner(
 		spec.Limit,
 		spec.Offset,
 		notebookListOrder(spec.Order),
+		spec.ExcludeIds,
 	)
 	if err != nil {
 		return nil, err
@@ -105,8 +122,16 @@ func (s *NotebookRepositoryImpl) ListShared(
 		return nil, err
 	}
 
+	exclude := make(map[valobj.Id]struct{}, len(spec.ExcludeIds))
+	for _, id := range spec.ExcludeIds {
+		exclude[id] = struct{}{}
+	}
+
 	notebookIds := make([]valobj.Id, 0, len(members))
 	for _, member := range members {
+		if _, skip := exclude[member.NotebookId]; skip {
+			continue
+		}
 		notebookIds = append(notebookIds, member.NotebookId)
 	}
 	notebookIds = pkgslices.Unique(notebookIds)

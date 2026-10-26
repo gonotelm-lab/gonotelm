@@ -20,6 +20,10 @@ func (s *Server) RegisterRoutes(g *route.RouterGroup) {
 		notebookIdGroup.DELETE("", s.DeleteNotebook)
 		// PATCH /api/v1/notebooks/:id
 		notebookIdGroup.PATCH("", s.UpdateNotebook)
+		// POST /api/v1/notebooks/:id/pin
+		notebookIdGroup.POST("/pin", s.PinNotebook)
+		// POST /api/v1/notebooks/:id/unpin
+		notebookIdGroup.POST("/unpin", s.UnpinNotebook)
 		// POST /api/v1/notebooks/:id/description/generation
 		notebookIdGroup.POST("/description/generation", s.GenerateNotebookDescription)
 

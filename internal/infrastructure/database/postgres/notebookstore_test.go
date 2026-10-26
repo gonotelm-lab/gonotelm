@@ -98,40 +98,40 @@ func TestNotebookStoreListByOwnerId(t *testing.T) {
 		})
 
 		// updated_at DESC: nbNew 在前，nbOld 在后；同毫秒由 id DESC 兜底。
-		rows, err := store.ListByOwnerId(ctx, ownerID, 10, 0, database.NotebookListOrderLastActive)
+		rows, err := store.ListByOwnerId(ctx, ownerID, 10, 0, database.NotebookListOrderLastActive, nil)
 		So(err, ShouldBeNil)
 		So(len(rows), ShouldEqual, 2)
 		So(rows[0].Id, ShouldEqual, nbNew.Id)
 		So(rows[1].Id, ShouldEqual, nbOld.Id)
 
-		rows, err = store.ListByOwnerId(ctx, ownerID, 1, 0, database.NotebookListOrderLastActive)
+		rows, err = store.ListByOwnerId(ctx, ownerID, 1, 0, database.NotebookListOrderLastActive, nil)
 		So(err, ShouldBeNil)
 		So(len(rows), ShouldEqual, 1)
 		So(rows[0].Id, ShouldEqual, nbNew.Id)
 
-		rows, err = store.ListByOwnerId(ctx, ownerID, 1, 1, database.NotebookListOrderLastActive)
+		rows, err = store.ListByOwnerId(ctx, ownerID, 1, 1, database.NotebookListOrderLastActive, nil)
 		So(err, ShouldBeNil)
 		So(len(rows), ShouldEqual, 1)
 		So(rows[0].Id, ShouldEqual, nbOld.Id)
 
-		rows, err = store.ListByOwnerId(ctx, ownerID, 1, 2, database.NotebookListOrderLastActive)
+		rows, err = store.ListByOwnerId(ctx, ownerID, 1, 2, database.NotebookListOrderLastActive, nil)
 		So(err, ShouldBeNil)
 		So(len(rows), ShouldEqual, 0)
 
 		// id ASC 等价于创建时间正序（uuidv7 内嵌时间戳）。
-		rows, err = store.ListByOwnerId(ctx, ownerID, 10, 0, database.NotebookListOrderCreateTime)
+		rows, err = store.ListByOwnerId(ctx, ownerID, 10, 0, database.NotebookListOrderCreateTime, nil)
 		So(err, ShouldBeNil)
 		So(len(rows), ShouldEqual, 2)
 		So(rows[0].Id, ShouldEqual, nbOld.Id)
 		So(rows[1].Id, ShouldEqual, nbNew.Id)
 
-		_, err = store.ListByOwnerId(ctx, ownerID, 0, 0, database.NotebookListOrderLastActive)
+		_, err = store.ListByOwnerId(ctx, ownerID, 0, 0, database.NotebookListOrderLastActive, nil)
 		So(err, ShouldNotBeNil)
 
-		_, err = store.ListByOwnerId(ctx, ownerID, 1, -1, database.NotebookListOrderLastActive)
+		_, err = store.ListByOwnerId(ctx, ownerID, 1, -1, database.NotebookListOrderLastActive, nil)
 		So(err, ShouldNotBeNil)
 
-		_, err = store.ListByOwnerId(ctx, ownerID, 1, 0, database.NotebookListOrder(99))
+		_, err = store.ListByOwnerId(ctx, ownerID, 1, 0, database.NotebookListOrder(99), nil)
 		So(err, ShouldNotBeNil)
 	})
 }

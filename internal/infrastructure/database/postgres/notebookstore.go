@@ -111,15 +111,17 @@ func (s *NotebookStoreImpl) ListByOwnerId(
 	ownerId valobj.Uid,
 	limit, offset int,
 	order database.NotebookListOrder,
+	excludeIds []database.Id,
 ) ([]*schema.Notebook, error) {
 	if limit <= 0 || offset < 0 {
 		return nil, xerror.ErrParams.Msgf("invalid pagination params: limit=%d offset=%d", limit, offset)
 	}
 
-	query, err := applyNotebookListOrder(
-		s.db.WithContext(ctx).Where("owner_id = ?", ownerId),
-		order,
-	)
+	q := s.db.WithContext(ctx).Where("owner_id = ?", ownerId)
+	if len(excludeIds) > 0 {
+		q = q.Where("id NOT IN ?", excludeIds)
+	}
+	query, err := applyNotebookListOrder(q, order)
 	if err != nil {
 		return nil, err
 	}

@@ -101,6 +101,9 @@ func (f *fakeNotebookRepo) FindById(context.Context, valobj.Id) (*notebookentity
 func (f *fakeNotebookRepo) Exists(context.Context, valobj.Id) (bool, error) {
 	return f.exists, f.err
 }
+func (f *fakeNotebookRepo) ListByIds(context.Context, []valobj.Id) ([]*notebookentity.Notebook, error) {
+	return nil, nil
+}
 func (f *fakeNotebookRepo) ListByOwner(context.Context, valobj.Uid, *notebookrepo.ListSpec) ([]*notebookentity.Notebook, error) {
 	return nil, nil
 }
@@ -231,7 +234,7 @@ func newTestSweeper(
 	docs *fakeSourceDocRepo,
 	objects *fakeObjectStore,
 ) *sweeper {
-	return newSweeper(source, notebook, artifacts, docs, objects)
+	return newSweeper(source, notebook, artifacts, docs, nil, objects)
 }
 
 func newDefaultTestSweeper(source *fakeSourceRepo, notebook *fakeNotebookRepo, docs *fakeSourceDocRepo, objects *fakeObjectStore) *sweeper {

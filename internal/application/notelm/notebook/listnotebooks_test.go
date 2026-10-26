@@ -10,6 +10,8 @@ import (
 	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
+	pinentity "github.com/gonotelm-lab/gonotelm/internal/domain/pin/entity"
+	pinrepo "github.com/gonotelm-lab/gonotelm/internal/domain/pin/repository"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -32,6 +34,10 @@ func (f *fakeNotebookRepo) FindById(context.Context, valobj.Id) (*notebookentity
 
 func (f *fakeNotebookRepo) Exists(context.Context, valobj.Id) (bool, error) { return false, nil }
 
+func (f *fakeNotebookRepo) ListByIds(context.Context, []valobj.Id) ([]*notebookentity.Notebook, error) {
+	return nil, nil
+}
+
 func (f *fakeNotebookRepo) ListByOwner(
 	_ context.Context,
 	_ valobj.Uid,
@@ -53,6 +59,23 @@ func (f *fakeNotebookRepo) ListShared(
 	return f.sharedRows, nil
 }
 
+type fakeMemberRepo struct {
+	notebookrepo.MemberRepository
+}
+
+func (f *fakeMemberRepo) ListByUserId(context.Context, valobj.Uid) ([]*notebookentity.NotebookMember, error) {
+	return nil, nil
+}
+
+type fakePinRepo struct {
+	pinrepo.Repository
+	pins []*pinentity.UserNotebookPin
+}
+
+func (f *fakePinRepo) ListByUserId(context.Context, valobj.Uid) ([]*pinentity.UserNotebookPin, error) {
+	return f.pins, nil
+}
+
 type fakeUserRepo struct {
 	identrepo.UserRepository
 	users []*idententity.User
@@ -70,15 +93,19 @@ func newNotebook(ownerId valobj.Uid) *notebookentity.Notebook {
 	}
 }
 
+func newListHandler(repo *fakeNotebookRepo, users *fakeUserRepo) *ListNotebooksHandler {
+	return NewListNotebooksHandler(repo, &fakeMemberRepo{}, &fakePinRepo{}, users, nil)
+}
+
 func TestListNotebooksHandleOwned(t *testing.T) {
 	ownerId := valobj.NewUid()
 	nb1 := newNotebook(ownerId)
 	nb2 := newNotebook(ownerId)
 
 	repo := &fakeNotebookRepo{ownedRows: []*notebookentity.Notebook{nb1, nb2}}
-	handler := NewListNotebooksHandler(repo, &fakeUserRepo{
+	handler := newListHandler(repo, &fakeUserRepo{
 		users: []*idententity.User{{Id: ownerId, Nickname: "owner"}},
-	}, nil)
+	})
 
 	ctx := pkgcontext.WithUserId(context.Background(), ownerId)
 	result, err := handler.Handle(ctx, &ListNotebooksHandleQuery{
@@ -110,9 +137,9 @@ func TestListNotebooksHandleOwnedHasMore(t *testing.T) {
 		newNotebook(ownerId),
 		newNotebook(ownerId),
 	}}
-	handler := NewListNotebooksHandler(repo, &fakeUserRepo{
+	handler := newListHandler(repo, &fakeUserRepo{
 		users: []*idententity.User{{Id: ownerId, Nickname: "owner"}},
-	}, nil)
+	})
 
 	ctx := pkgcontext.WithUserId(context.Background(), ownerId)
 	result, err := handler.Handle(ctx, &ListNotebooksHandleQuery{
@@ -133,9 +160,9 @@ func TestListNotebooksHandleShared(t *testing.T) {
 	ownerId := valobj.NewUid()
 
 	repo := &fakeNotebookRepo{sharedRows: []*notebookentity.Notebook{newNotebook(ownerId)}}
-	handler := NewListNotebooksHandler(repo, &fakeUserRepo{
+	handler := newListHandler(repo, &fakeUserRepo{
 		users: []*idententity.User{{Id: ownerId, Nickname: "owner"}},
-	}, nil)
+	})
 
 	ctx := pkgcontext.WithUserId(context.Background(), userId)
 	result, err := handler.Handle(ctx, &ListNotebooksHandleQuery{
@@ -155,7 +182,7 @@ func TestListNotebooksHandleShared(t *testing.T) {
 }
 
 func TestListNotebooksHandleInvalidScope(t *testing.T) {
-	handler := NewListNotebooksHandler(&fakeNotebookRepo{}, &fakeUserRepo{}, nil)
+	handler := newListHandler(&fakeNotebookRepo{}, &fakeUserRepo{})
 
 	ctx := pkgcontext.WithUserId(context.Background(), valobj.NewUid())
 	_, err := handler.Handle(ctx, &ListNotebooksHandleQuery{

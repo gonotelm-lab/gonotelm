@@ -17,6 +17,7 @@ import (
 	identityservice "github.com/gonotelm-lab/gonotelm/internal/domain/identity/service"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
+	pinrepo "github.com/gonotelm-lab/gonotelm/internal/domain/pin/repository"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
@@ -39,6 +40,7 @@ type ServerDeps struct {
 
 	NotebookRepo           notebookrepo.Repository
 	NotebookMemberRepo     notebookrepo.MemberRepository
+	PinRepo                pinrepo.Repository
 	NotebookAccessService  *notebookservice.AccessService
 	SourceRepo             sourcerepo.Repository
 	ObjectStore            adapter.ObjectStore
@@ -128,6 +130,7 @@ func NewServer(
 		notebook: notebookapi.NewServer(notebookapi.Deps{
 			NotebookRepo:          deps.NotebookRepo,
 			MemberRepo:            deps.NotebookMemberRepo,
+			PinRepo:               deps.PinRepo,
 			NotebookAccessService: deps.NotebookAccessService,
 			SourceRepo:            deps.SourceRepo,
 			EventBus:              deps.EventBus,

@@ -34,6 +34,10 @@ func (f *fakeNotebookRepo) Exists(_ context.Context, id valobj.Id) (bool, error)
 	return ok, nil
 }
 
+func (f *fakeNotebookRepo) ListByIds(context.Context, []valobj.Id) ([]*notebookentity.Notebook, error) {
+	return nil, nil
+}
+
 func (f *fakeNotebookRepo) ListByOwner(context.Context, valobj.Uid, *notebookrepo.ListSpec) ([]*notebookentity.Notebook, error) {
 	return nil, nil
 }

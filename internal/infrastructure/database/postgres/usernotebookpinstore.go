@@ -73,19 +73,14 @@ func (s *UserNotebookPinStoreImpl) ListByUserId(
 	return rows, nil
 }
 
-func (s *UserNotebookPinStoreImpl) CountByUserAndNotebookIds(
+func (s *UserNotebookPinStoreImpl) CountByUserId(
 	ctx context.Context,
 	userId valobj.Uid,
-	notebookIds []database.Id,
 ) (int64, error) {
-	if len(notebookIds) == 0 {
-		return 0, nil
-	}
-
 	var count int64
 	err := s.db.WithContext(ctx).
 		Model(&schema.UserNotebookPin{}).
-		Where("user_id = ? AND notebook_id IN ?", userId, notebookIds).
+		Where("user_id = ?", userId).
 		Count(&count).Error
 	if err != nil {
 		return 0, sql.WrapErr(err)

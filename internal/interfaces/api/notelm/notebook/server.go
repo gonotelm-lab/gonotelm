@@ -35,6 +35,7 @@ type Server struct {
 	getNotebookHandler                 *notebookapp.GetNotebookHandler
 	createNotebookHandler              *notebookapp.CreateNotebookHandler
 	listNotebooksHandler               *notebookapp.ListNotebooksHandler
+	listPinnedNotebooksHandler         *notebookapp.ListPinnedNotebooksHandler
 	deleteNotebookHandler              *notebookapp.DeleteNotebookHandler
 	updateNotebookHandler              *notebookapp.UpdateNotebookHandler
 	generateNotebookDescriptionHandler *notebookapp.GenerateDescriptionHandler
@@ -60,12 +61,17 @@ func NewServer(deps Deps) *Server {
 		),
 		createNotebookHandler: notebookapp.NewCreateNotebookHandler(deps.NotebookRepo, deps.EventBus),
 		listNotebooksHandler: notebookapp.NewListNotebooksHandler(
+			deps.NotebookRepo, deps.PinRepo, deps.UserRepo, deps.ObjectStore,
+		),
+		listPinnedNotebooksHandler: notebookapp.NewListPinnedNotebooksHandler(
 			deps.NotebookRepo, deps.MemberRepo, deps.PinRepo, deps.UserRepo, deps.ObjectStore,
 		),
 		pinNotebookHandler: pinapp.NewPinNotebookHandler(
 			deps.NotebookRepo, deps.MemberRepo, deps.PinRepo,
 		),
-		unpinNotebookHandler: pinapp.NewUnpinNotebookHandler(deps.PinRepo),
+		unpinNotebookHandler: pinapp.NewUnpinNotebookHandler(
+			deps.NotebookRepo, deps.MemberRepo, deps.PinRepo,
+		),
 		deleteNotebookHandler: notebookapp.NewDeleteNotebookHandler(
 			deps.NotebookRepo,
 			deps.NotebookAccessService,

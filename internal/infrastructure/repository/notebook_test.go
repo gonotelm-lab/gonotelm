@@ -85,7 +85,7 @@ func TestNotebookRepositoryListShared(t *testing.T) {
 		Limit:  5,
 		Offset: 10,
 		Order:  notebookrepo.ListOrderCreateTime,
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	assert.Equal(t, []database.Id{notebookId, otherNotebookId}, notebookStore.ids, "成员关系去重后按 id 查询")
@@ -101,7 +101,7 @@ func TestNotebookRepositoryListSharedNoMembership(t *testing.T) {
 	notebookStore := &fakeNotebookStore{}
 	repo := NewNotebookRepository(notebookStore, &fakeNotebookMemberStore{}, &fakeSourceStore{})
 
-	rows, err := repo.ListShared(context.Background(), valobj.NewUid(), &notebookrepo.ListSpec{Limit: 5})
+	rows, err := repo.ListShared(context.Background(), valobj.NewUid(), &notebookrepo.ListSpec{Limit: 5}, nil)
 	require.NoError(t, err)
 
 	assert.Empty(t, rows)

@@ -41,7 +41,7 @@ type NotebookResponse struct {
 	SourceCount int64                  `json:"source_count"`
 	Visibility  string                 `json:"visibility"`
 	IsPinned    bool                   `json:"is_pinned"`
-	PinnedAt    int64                  `json:"pinned_at"`  // unix ms；未置顶为 0
+	PinnedAt    int64                  `json:"pinned_at"`  // unix ms，未置顶为 0
 	UpdatedAt   int64                  `json:"updated_at"` // unix ms
 	CreatedAt   int64                  `json:"created_at"` // unix ms
 	Owner       *NotebookOwnerResponse `json:"owner,omitempty"`
@@ -81,7 +81,7 @@ func (r *PinNotebookRequest) Validate() error {
 
 type PinNotebookResponse struct {
 	IsPinned bool  `json:"is_pinned"`
-	PinnedAt int64 `json:"pinned_at"` // unix ms；未置顶为 0
+	PinnedAt int64 `json:"pinned_at"` // unix ms，未置顶为 0
 }
 
 type GetNotebookAccessResponse struct {
@@ -168,6 +168,10 @@ type ListNotebooksResponse struct {
 	Limit     int                 `json:"limit"`
 	Offset    int                 `json:"offset"`
 	HasMore   bool                `json:"has_more"`
+}
+
+type ListPinnedNotebooksResponse struct {
+	Notebooks []*NotebookResponse `json:"notebooks"`
 }
 
 type NotebookOwnerResponse struct {

@@ -5,10 +5,8 @@ import (
 	pinerrors "github.com/gonotelm-lab/gonotelm/internal/domain/pin/errors"
 )
 
-// MaxPinsPerScope 每个列表 scope（owned / shared）的置顶上限。
-const MaxPinsPerScope = 20
+const MaxPins = 50
 
-// UserNotebookPin 用户对某 notebook 的个人置顶关系（非 notebook 属性）。
 type UserNotebookPin struct {
 	UserId     valobj.Uid
 	NotebookId valobj.Id
@@ -37,7 +35,6 @@ func (p *UserNotebookPin) validate() error {
 	return nil
 }
 
-// TouchPinnedAt 再置顶时刷新时间，使本子排到置顶区最前。
 func (p *UserNotebookPin) TouchPinnedAt() {
 	p.PinnedAt = valobj.NewTime()
 }

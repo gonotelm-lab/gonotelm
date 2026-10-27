@@ -13,7 +13,6 @@ const (
 	EventActionMemberDeleted EventAction = "notebook.member.deleted"
 )
 
-// MemberEvent notebook 成员关系变更（in-process）。
 type MemberEvent struct {
 	notebookId valobj.Id
 	userId     valobj.Uid

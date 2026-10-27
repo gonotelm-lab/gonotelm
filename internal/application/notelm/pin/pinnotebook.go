@@ -38,8 +38,7 @@ type PinResult struct {
 func (h *PinNotebookHandler) Handle(ctx context.Context, notebookId valobj.Id) (*PinResult, error) {
 	actor := pkgcontext.GetUserId(ctx)
 
-	_, scope, err := h.resolveAccess(ctx, actor, notebookId)
-	if err != nil {
+	if _, _, err := h.resolveAccess(ctx, actor, notebookId); err != nil {
 		return nil, err
 	}
 
@@ -53,11 +52,11 @@ func (h *PinNotebookHandler) Handle(ctx context.Context, notebookId valobj.Id) (
 		return nil, errors.WithMessage(err, "find pin failed")
 	}
 
-	count, _, err := h.countPinsInScope(ctx, actor, scope)
+	count, err := h.pinRepo.CountByUserId(ctx, actor)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithMessage(err, "count pins failed")
 	}
-	if count >= pinentity.MaxPinsPerScope {
+	if count >= int64(pinentity.MaxPins) {
 		return nil, pinerrors.ErrPinLimitExceeded
 	}
 

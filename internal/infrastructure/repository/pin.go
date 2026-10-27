@@ -57,16 +57,11 @@ func (r *PinRepositoryImpl) ListByUserId(
 	return mapper.UserNotebookPinsFromSchema(rows), nil
 }
 
-func (r *PinRepositoryImpl) CountByUserAndNotebookIds(
+func (r *PinRepositoryImpl) CountByUserId(
 	ctx context.Context,
 	userId valobj.Uid,
-	notebookIds []valobj.Id,
 ) (int64, error) {
-	ids := make([]database.Id, 0, len(notebookIds))
-	for _, id := range notebookIds {
-		ids = append(ids, id)
-	}
-	return r.pinStore.CountByUserAndNotebookIds(ctx, userId, ids)
+	return r.pinStore.CountByUserId(ctx, userId)
 }
 
 func (r *PinRepositoryImpl) Delete(

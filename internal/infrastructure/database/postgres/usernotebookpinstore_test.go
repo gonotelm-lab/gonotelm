@@ -47,11 +47,11 @@ func TestUserNotebookPinStoreCRUD(t *testing.T) {
 		So(rows[0].PinnedAt, ShouldEqual, 3000)
 		So(rows[1].NotebookId, ShouldEqual, nb2)
 
-		count, err := store.CountByUserAndNotebookIds(ctx, userId, []database.Id{nb1, nb2})
+		count, err := store.CountByUserId(ctx, userId)
 		So(err, ShouldBeNil)
 		So(count, ShouldEqual, 2)
 
-		count, err = store.CountByUserAndNotebookIds(ctx, userId, nil)
+		count, err = store.CountByUserId(ctx, valobj.NewUid())
 		So(err, ShouldBeNil)
 		So(count, ShouldEqual, 0)
 

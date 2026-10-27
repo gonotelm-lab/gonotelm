@@ -28,7 +28,7 @@ type NotebookStore interface {
 	GetById(ctx context.Context, id Id) (*schema.Notebook, error)
 	Exists(ctx context.Context, id Id) (bool, error)
 	GetByNameAndOwnerId(ctx context.Context, name string, ownerId valobj.Uid) (*schema.Notebook, error)
-	// ListByOwnerId 分页返回 owner 的 notebook；excludeIds 非空时用 NOT IN 排除（非 JOIN）。
+	// ListByOwnerId 分页返回 owner 的 notebook；excludeIds 非空时 NOT IN。
 	ListByOwnerId(
 		ctx context.Context,
 		ownerId valobj.Uid,
@@ -73,7 +73,7 @@ type UserNotebookPinStore interface {
 	Upsert(ctx context.Context, pin *schema.UserNotebookPin) error
 	Get(ctx context.Context, userId valobj.Uid, notebookId Id) (*schema.UserNotebookPin, error)
 	ListByUserId(ctx context.Context, userId valobj.Uid) ([]*schema.UserNotebookPin, error)
-	CountByUserAndNotebookIds(ctx context.Context, userId valobj.Uid, notebookIds []Id) (int64, error)
+	CountByUserId(ctx context.Context, userId valobj.Uid) (int64, error)
 	Delete(ctx context.Context, userId valobj.Uid, notebookId Id) error
 	DeleteByNotebookId(ctx context.Context, notebookId Id) error
 }

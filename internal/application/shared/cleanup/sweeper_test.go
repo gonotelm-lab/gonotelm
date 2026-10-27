@@ -104,10 +104,10 @@ func (f *fakeNotebookRepo) Exists(context.Context, valobj.Id) (bool, error) {
 func (f *fakeNotebookRepo) ListByIds(context.Context, []valobj.Id) ([]*notebookentity.Notebook, error) {
 	return nil, nil
 }
-func (f *fakeNotebookRepo) ListByOwner(context.Context, valobj.Uid, *notebookrepo.ListSpec) ([]*notebookentity.Notebook, error) {
+func (f *fakeNotebookRepo) ListByOwner(context.Context, valobj.Uid, *notebookrepo.ListSpec, []valobj.Id) ([]*notebookentity.Notebook, error) {
 	return nil, nil
 }
-func (f *fakeNotebookRepo) ListShared(context.Context, valobj.Uid, *notebookrepo.ListSpec) ([]*notebookentity.Notebook, error) {
+func (f *fakeNotebookRepo) ListShared(context.Context, valobj.Uid, *notebookrepo.ListSpec, []valobj.Id) ([]*notebookentity.Notebook, error) {
 	return nil, nil
 }
 

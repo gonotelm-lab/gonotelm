@@ -11,6 +11,8 @@ func (s *Server) RegisterRoutes(g *route.RouterGroup) {
 	g.POST("/notebooks", s.CreateNotebook)
 	// GET /api/v1/notebooks
 	g.GET("/notebooks", s.ListNotebooks)
+	// GET /api/v1/notebooks/pins
+	g.GET("/notebooks/pins", s.ListPinnedNotebooks)
 
 	notebookIdGroup := g.Group("/notebooks/:id")
 	{

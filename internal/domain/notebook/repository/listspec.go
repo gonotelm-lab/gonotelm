@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	xerror "github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
@@ -20,8 +19,6 @@ type ListSpec struct {
 	Limit  int
 	Offset int
 	Order  ListOrder
-	// ExcludeIds 从结果中排除（非 JOIN，通常为已置顶 id）；空则不排除。
-	ExcludeIds []valobj.Id
 }
 
 func (s *ListSpec) Validate() error {

@@ -88,6 +88,7 @@ func (s *NotebookRepositoryImpl) ListByOwner(
 	ctx context.Context,
 	ownerId valobj.Uid,
 	spec *notebookrepo.ListSpec,
+	excludeIds []valobj.Id,
 ) ([]*notebookentity.Notebook, error) {
 	if err := spec.Validate(); err != nil {
 		return nil, err
@@ -99,7 +100,7 @@ func (s *NotebookRepositoryImpl) ListByOwner(
 		spec.Limit,
 		spec.Offset,
 		notebookListOrder(spec.Order),
-		spec.ExcludeIds,
+		excludeIds,
 	)
 	if err != nil {
 		return nil, err
@@ -112,6 +113,7 @@ func (s *NotebookRepositoryImpl) ListShared(
 	ctx context.Context,
 	userId valobj.Uid,
 	spec *notebookrepo.ListSpec,
+	excludeIds []valobj.Id,
 ) ([]*notebookentity.Notebook, error) {
 	if err := spec.Validate(); err != nil {
 		return nil, err
@@ -122,8 +124,8 @@ func (s *NotebookRepositoryImpl) ListShared(
 		return nil, err
 	}
 
-	exclude := make(map[valobj.Id]struct{}, len(spec.ExcludeIds))
-	for _, id := range spec.ExcludeIds {
+	exclude := make(map[valobj.Id]struct{}, len(excludeIds))
+	for _, id := range excludeIds {
 		exclude[id] = struct{}{}
 	}
 

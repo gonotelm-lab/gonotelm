@@ -18,8 +18,8 @@ func New(pinRepo pinrepo.Repository) *Service {
 	return &Service{pinRepo: pinRepo}
 }
 
-// CheckPinnable 检查用户是否还能新增 pin；已达上限返回 ErrPinLimitExceeded。
-func (s *Service) CheckPinnable(ctx context.Context, userId valobj.Uid) error {
+// CheckPinLimit 检查用户 pin 额度；已达上限返回 ErrPinLimitExceeded。
+func (s *Service) CheckPinLimit(ctx context.Context, userId valobj.Uid) error {
 	count, err := s.pinRepo.CountByUserId(ctx, userId)
 	if err != nil {
 		return errors.WithMessage(err, "count pins failed")

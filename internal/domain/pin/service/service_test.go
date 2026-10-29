@@ -26,22 +26,22 @@ func (f *fakePinRepo) CountByUserId(context.Context, valobj.Uid) (int64, error) 
 	return f.count, nil
 }
 
-func TestCheckPinnableUnderLimit(t *testing.T) {
+func TestCheckPinLimitUnderLimit(t *testing.T) {
 	s := New(&fakePinRepo{count: int64(pinentity.MaxPinsAllowed - 1)})
-	err := s.CheckPinnable(context.Background(), valobj.NewUid())
+	err := s.CheckPinLimit(context.Background(), valobj.NewUid())
 	require.NoError(t, err)
 }
 
-func TestCheckPinnableAtLimit(t *testing.T) {
+func TestCheckPinLimitAtLimit(t *testing.T) {
 	s := New(&fakePinRepo{count: int64(pinentity.MaxPinsAllowed)})
-	err := s.CheckPinnable(context.Background(), valobj.NewUid())
+	err := s.CheckPinLimit(context.Background(), valobj.NewUid())
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, pinerrors.ErrPinLimitExceeded))
 }
 
-func TestCheckPinnableCountFailed(t *testing.T) {
+func TestCheckPinLimitCountFailed(t *testing.T) {
 	s := New(&fakePinRepo{err: errors.ErrInner.Msg("boom")})
-	err := s.CheckPinnable(context.Background(), valobj.NewUid())
+	err := s.CheckPinLimit(context.Background(), valobj.NewUid())
 	require.Error(t, err)
 	assert.False(t, errors.Is(err, pinerrors.ErrPinLimitExceeded))
 }

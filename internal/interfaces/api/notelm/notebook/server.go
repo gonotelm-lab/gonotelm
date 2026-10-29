@@ -69,10 +69,10 @@ func NewServer(deps Deps) *Server {
 			deps.NotebookRepo, deps.MemberRepo, deps.PinRepo, deps.UserRepo, deps.ObjectStore,
 		),
 		pinNotebookHandler: pinapp.NewPinNotebookHandler(
-			deps.NotebookRepo, deps.MemberRepo, deps.PinRepo, deps.PinService, deps.DistLock,
+			deps.NotebookAccessService, deps.PinRepo, deps.PinService, deps.DistLock,
 		),
 		unpinNotebookHandler: pinapp.NewUnpinNotebookHandler(
-			deps.NotebookRepo, deps.MemberRepo, deps.PinRepo,
+			deps.NotebookAccessService, deps.PinRepo,
 		),
 		deleteNotebookHandler: notebookapp.NewDeleteNotebookHandler(
 			deps.NotebookRepo,

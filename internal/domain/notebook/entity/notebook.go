@@ -96,6 +96,18 @@ func (n *Notebook) IsPublic() bool {
 	return n.Visibility.IsPublic()
 }
 
+func (n *Notebook) IsOwnedBy(userId valobj.Uid) bool {
+	return n != nil && n.OwnerId.EqualsTo(userId)
+}
+
+// CanPinBy 仅 owner 或显式成员可 pin（不含 public viewer）。
+func (n *Notebook) CanPinBy(userId valobj.Uid, isExplicitMember bool) bool {
+	if n == nil {
+		return false
+	}
+	return n.IsOwnedBy(userId) || isExplicitMember
+}
+
 func (n *Notebook) Delete() {
 	n.Base.Delete()
 	n.AddEvent(notebookevent.NewDeleteEvent(n.Id))

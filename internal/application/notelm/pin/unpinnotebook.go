@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	pinrepo "github.com/gonotelm-lab/gonotelm/internal/domain/pin/repository"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
@@ -12,19 +12,16 @@ import (
 
 type UnpinNotebookHandler struct {
 	*scopeResolver
+	pinRepo pinrepo.Repository
 }
 
 func NewUnpinNotebookHandler(
-	notebookRepo notebookrepo.Repository,
-	memberRepo notebookrepo.MemberRepository,
+	accessService *notebookservice.AccessService,
 	pinRepo pinrepo.Repository,
 ) *UnpinNotebookHandler {
 	return &UnpinNotebookHandler{
-		scopeResolver: &scopeResolver{
-			notebookRepo: notebookRepo,
-			memberRepo:   memberRepo,
-			pinRepo:      pinRepo,
-		},
+		scopeResolver: &scopeResolver{accessService: accessService},
+		pinRepo:       pinRepo,
 	}
 }
 
@@ -38,6 +35,6 @@ func (h *UnpinNotebookHandler) Handle(ctx context.Context, notebookId valobj.Id)
 	if err := h.pinRepo.Delete(ctx, actor, notebookId); err != nil {
 		return nil, errors.WithMessage(err, "delete pin failed")
 	}
-	
+
 	return &PinResult{IsPinned: false, PinnedAt: 0}, nil
 }

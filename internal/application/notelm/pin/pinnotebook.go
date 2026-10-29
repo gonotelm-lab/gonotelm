@@ -6,7 +6,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
+	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	pinentity "github.com/gonotelm-lab/gonotelm/internal/domain/pin/entity"
 	pinerrors "github.com/gonotelm-lab/gonotelm/internal/domain/pin/errors"
 	pinrepo "github.com/gonotelm-lab/gonotelm/internal/domain/pin/repository"
@@ -21,25 +21,22 @@ func userPinLockKey(userId valobj.Uid) string {
 
 type PinNotebookHandler struct {
 	*scopeResolver
+	pinRepo    pinrepo.Repository
 	pinService *pinservice.Service
 	distLock   adapter.DistributedLock
 }
 
 func NewPinNotebookHandler(
-	notebookRepo notebookrepo.Repository,
-	memberRepo notebookrepo.MemberRepository,
+	accessService *notebookservice.AccessService,
 	pinRepo pinrepo.Repository,
 	pinService *pinservice.Service,
 	distLock adapter.DistributedLock,
 ) *PinNotebookHandler {
 	return &PinNotebookHandler{
-		scopeResolver: &scopeResolver{
-			notebookRepo: notebookRepo,
-			memberRepo:   memberRepo,
-			pinRepo:      pinRepo,
-		},
-		pinService: pinService,
-		distLock:   distLock,
+		scopeResolver: &scopeResolver{accessService: accessService},
+		pinRepo:       pinRepo,
+		pinService:    pinService,
+		distLock:      distLock,
 	}
 }
 
@@ -62,7 +59,7 @@ func (h *PinNotebookHandler) Handle(ctx context.Context, notebookId valobj.Id) (
 	}
 
 	// 锁外预检：已满则直接拒绝，避免无谓抢锁
-	if err := h.pinService.CheckPinnable(ctx, actor); err != nil {
+	if err := h.pinService.CheckPinLimit(ctx, actor); err != nil {
 		return nil, err
 	}
 
@@ -99,8 +96,8 @@ func (h *PinNotebookHandler) handlePin(
 			return errors.WithMessage(err, "find pin failed")
 		}
 
-		// 锁内再检上限，通过才能新增 pin
-		if err := h.pinService.CheckPinnable(ctx, actor); err != nil {
+		// 锁内再检额度，通过才能新增 pin
+		if err := h.pinService.CheckPinLimit(ctx, actor); err != nil {
 			return err
 		}
 

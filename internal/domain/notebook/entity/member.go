@@ -4,6 +4,7 @@ import (
 	coreentity "github.com/gonotelm-lab/gonotelm/internal/core/entity"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	notebookerrors "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/errors"
+	notebookevent "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/event"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/notebook/vo"
 )
 
@@ -60,4 +61,9 @@ func (m *NotebookMember) ChangeRole(role vo.Role) error {
 
 	m.UpdateTime = valobj.NewTime()
 	return nil
+}
+
+func (m *NotebookMember) Delete() {
+	m.Base.Delete()
+	m.AddEvent(notebookevent.NewMemberDeletedEvent(m.NotebookId, m.UserId))
 }

@@ -19,6 +19,7 @@ func NewOnNotebookMemberEventHandler(pinRepo pinrepo.Repository) *OnNotebookMemb
 	return &OnNotebookMemberEventHandler{pinRepo: pinRepo}
 }
 
+// 订阅notebook的访问成员变更事件 此处移除pin记录
 func (h *OnNotebookMemberEventHandler) Handle(ctx context.Context, evt *notebookevent.MemberEvent) error {
 	if evt.Action() != notebookevent.EventActionMemberDeleted {
 		return nil

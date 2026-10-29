@@ -4,18 +4,10 @@ import (
 	"context"
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
-	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookerrors "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/errors"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	pinrepo "github.com/gonotelm-lab/gonotelm/internal/domain/pin/repository"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
-)
-
-type pinScope int
-
-const (
-	pinScopeOwned pinScope = iota
-	pinScopeShared
 )
 
 type scopeResolver struct {
@@ -29,25 +21,26 @@ func (r *scopeResolver) resolveAccess(
 	ctx context.Context,
 	actor valobj.Uid,
 	notebookId valobj.Id,
-) (*notebookentity.Notebook, pinScope, error) {
+) error {
 	nb, err := r.notebookRepo.FindById(ctx, notebookId)
 	if err != nil {
 		if errors.Is(err, notebookerrors.ErrNotebookNotFound) {
-			return nil, 0, notebookerrors.ErrNotebookNotFound
+			return notebookerrors.ErrNotebookNotFound
 		}
-		return nil, 0, errors.WithMessage(err, "find notebook failed")
+		return errors.WithMessage(err, "find notebook failed")
 	}
 
-	if nb.OwnerId == actor {
-		return nb, pinScopeOwned, nil
+	// 只有 notebook owner 和 notebook member 能够执行 pin，其他都不能执行pin
+	if nb.OwnerId.EqualsTo(actor) {
+		return nil
 	}
 
 	if _, err := r.memberRepo.FindByNotebookIdAndUserId(ctx, notebookId, actor); err != nil {
 		if errors.Is(err, errors.ErrNoRecord) {
-			return nil, 0, notebookerrors.ErrNotebookNotFound
+			return notebookerrors.ErrNotebookNotFound
 		}
-		return nil, 0, errors.WithMessage(err, "find notebook member failed")
+		return errors.WithMessage(err, "find notebook member failed")
 	}
 
-	return nb, pinScopeShared, nil
+	return nil
 }

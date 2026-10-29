@@ -40,12 +40,13 @@ type ListPinnedNotebooksHandleResult struct {
 	Notebooks []*Notebook
 }
 
+// 列出用户的置顶notebook
 func (h *ListPinnedNotebooksHandler) Handle(
 	ctx context.Context,
 ) (*ListPinnedNotebooksHandleResult, error) {
 	userId := pkgcontext.GetUserId(ctx)
 
-	// 全量取
+	// 每个用户允许的置顶notebook数量有限 这里可以全量取
 	pins, err := h.pinRepo.ListByUserId(ctx, userId)
 	if err != nil {
 		return nil, errors.WithMessage(err, "list pins failed")
@@ -94,7 +95,8 @@ func (h *ListPinnedNotebooksHandler) Handle(
 	return &ListPinnedNotebooksHandleResult{Notebooks: target}, nil
 }
 
-// filterAccessiblePins 只保留仍可访问的 pin（owner 或显式成员）；顺序保持 pinned_at DESC。
+// 获取用户可以访问的置顶的notebook
+// 此处过滤被回收掉权限的notebook
 func (h *ListPinnedNotebooksHandler) filterAccessiblePins(
 	ctx context.Context,
 	userId valobj.Uid,
@@ -113,6 +115,7 @@ func (h *ListPinnedNotebooksHandler) filterAccessiblePins(
 		nbById[nb.Id] = nb
 	}
 
+	// 检查是否有权限访问
 	members, err := h.memberRepo.ListByUserId(ctx, userId)
 	if err != nil {
 		return nil, errors.WithMessage(err, "list members for pin filter failed")
@@ -128,7 +131,7 @@ func (h *ListPinnedNotebooksHandler) filterAccessiblePins(
 		if nb == nil {
 			continue
 		}
-		if nb.OwnerId == userId {
+		if nb.OwnerId.EqualsTo(userId) {
 			out = append(out, p)
 			continue
 		}
@@ -136,5 +139,6 @@ func (h *ListPinnedNotebooksHandler) filterAccessiblePins(
 			out = append(out, p)
 		}
 	}
+
 	return out, nil
 }

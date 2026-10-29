@@ -8,7 +8,6 @@ import (
 	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookerrors "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/errors"
-	notebookevent "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/event"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
@@ -57,23 +56,27 @@ func (h *DeleteNotebookMemberHandler) deleteMember(
 ) (*deleteNotebookMemberResult, error) {
 	notebookId := access.Notebook.Id
 
-	if _, err := h.memberRepo.FindByNotebookIdAndUserId(ctx, notebookId, userId); err != nil {
+	member, err := h.memberRepo.FindByNotebookIdAndUserId(ctx, notebookId, userId)
+	if err != nil {
 		if errors.Is(err, errors.ErrNoRecord) {
 			return nil, notebookerrors.ErrMemberNotFound
 		}
 		return nil, errors.WithMessage(err, "get notebook member failed")
 	}
 
-	if err := h.memberRepo.Delete(ctx, notebookId, userId); err != nil {
+	member.Delete()
+	if err := h.memberRepo.Save(ctx, member); err != nil {
 		return nil, errors.WithMessage(err, "delete notebook member failed")
 	}
 
-	if err := h.eventBus.Publish(ctx, notebookevent.NewMemberDeletedEvent(notebookId, userId)); err != nil {
-		slog.ErrorContext(ctx, "publish notebook.member.deleted failed",
-			slog.String("notebook_id", notebookId.String()),
-			slog.String("user_id", userId.String()),
-			slog.Any("err", err),
-		)
+	for _, evt := range member.PullEvents() {
+		if err := h.eventBus.Publish(ctx, evt); err != nil {
+			slog.ErrorContext(ctx, "publish notebook member deleted event failed",
+				slog.String("notebook_id", notebookId.String()),
+				slog.String("user_id", userId.String()),
+				slog.Any("err", err),
+			)
+		}
 	}
 
 	return &deleteNotebookMemberResult{}, nil

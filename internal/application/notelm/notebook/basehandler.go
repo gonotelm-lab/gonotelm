@@ -74,6 +74,10 @@ func (h *baseHandler) resolveAccess(
 	notebookId valobj.Id,
 	kind accessKind,
 ) (*notebookentity.Access, error) {
+	if h.notebookAccessService == nil {
+		return nil, errors.Wrap(errors.ErrInner.Msg("nil access service"), "mis-assemble of notebook access service")
+	}
+
 	access, err := h.notebookAccessService.Resolve(ctx, notebookId, pkgcontext.GetUserId(ctx))
 	if err != nil {
 		return nil, errors.WithMessagef(err, "get notebook failed, notebook_id=%s", notebookId)

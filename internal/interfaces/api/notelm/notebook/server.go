@@ -9,6 +9,7 @@ import (
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	pinrepo "github.com/gonotelm-lab/gonotelm/internal/domain/pin/repository"
+	pinservice "github.com/gonotelm-lab/gonotelm/internal/domain/pin/service"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 )
@@ -17,6 +18,7 @@ type Deps struct {
 	NotebookRepo          notebookrepo.Repository
 	MemberRepo            notebookrepo.MemberRepository
 	PinRepo               pinrepo.Repository
+	PinService            *pinservice.Service
 	NotebookAccessService *notebookservice.AccessService
 	SourceRepo            sourcerepo.Repository
 	EventBus              eventbus.Publisher
@@ -67,7 +69,7 @@ func NewServer(deps Deps) *Server {
 			deps.NotebookRepo, deps.MemberRepo, deps.PinRepo, deps.UserRepo, deps.ObjectStore,
 		),
 		pinNotebookHandler: pinapp.NewPinNotebookHandler(
-			deps.NotebookRepo, deps.MemberRepo, deps.PinRepo,
+			deps.NotebookRepo, deps.MemberRepo, deps.PinRepo, deps.PinService, deps.DistLock,
 		),
 		unpinNotebookHandler: pinapp.NewUnpinNotebookHandler(
 			deps.NotebookRepo, deps.MemberRepo, deps.PinRepo,

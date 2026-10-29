@@ -50,7 +50,7 @@ func (h *baseHandler) commonHandle(ctx context.Context, chatId valobj.Id) (*chat
 		return nil, err
 	}
 
-	if chat.OwnerId != userId {
+	if chat.OwnerId.NotEqualsTo(userId) {
 		return nil, notebookerrors.ErrNotebookNotFound // notebook的权限不足统一返回NOT_FOUND
 	}
 
@@ -69,7 +69,7 @@ func (h *baseHandler) ensureStreamAccess(
 			task.Id, chatId)
 	}
 
-	if task.UserId != userId {
+	if task.UserId.NotEqualsTo(userId) {
 		return chaterrors.ErrStreamTaskNotFound
 	}
 
@@ -86,7 +86,7 @@ func (h *baseHandler) ensureStreamAccess(
 	if err := access.CanViewReturnErr(); err != nil {
 		return err
 	}
-	if chat.OwnerId != userId {
+	if chat.OwnerId.NotEqualsTo(userId) {
 		return chaterrors.ErrStreamTaskNotFound
 	}
 

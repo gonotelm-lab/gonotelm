@@ -5,7 +5,7 @@ import (
 	pinerrors "github.com/gonotelm-lab/gonotelm/internal/domain/pin/errors"
 )
 
-const MaxPins = 50
+const MaxPinsAllowed = 50
 
 type UserNotebookPin struct {
 	UserId     valobj.Uid

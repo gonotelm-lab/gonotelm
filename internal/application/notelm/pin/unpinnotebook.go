@@ -31,12 +31,13 @@ func NewUnpinNotebookHandler(
 func (h *UnpinNotebookHandler) Handle(ctx context.Context, notebookId valobj.Id) (*PinResult, error) {
 	actor := pkgcontext.GetUserId(ctx)
 
-	if _, _, err := h.resolveAccess(ctx, actor, notebookId); err != nil {
+	if err := h.resolveAccess(ctx, actor, notebookId); err != nil {
 		return nil, err
 	}
 
 	if err := h.pinRepo.Delete(ctx, actor, notebookId); err != nil {
 		return nil, errors.WithMessage(err, "delete pin failed")
 	}
+	
 	return &PinResult{IsPinned: false, PinnedAt: 0}, nil
 }

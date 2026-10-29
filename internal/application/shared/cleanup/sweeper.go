@@ -251,10 +251,8 @@ func (s *sweeper) SweepNotebook(ctx context.Context,
 	if err := s.artifactRepo.DeleteByNotebookId(ctx, notebookId); err != nil {
 		errs = append(errs, errors.WithMessage(err, "delete artifacts by notebook failed"))
 	}
-	if s.pinRepo != nil {
-		if err := s.pinRepo.DeleteByNotebookId(ctx, notebookId); err != nil {
-			errs = append(errs, errors.WithMessage(err, "delete pins by notebook failed"))
-		}
+	if err := s.pinRepo.DeleteByNotebookId(ctx, notebookId); err != nil {
+		errs = append(errs, errors.WithMessage(err, "delete pins by notebook failed"))
 	}
 
 	return stderrors.Join(errs...)

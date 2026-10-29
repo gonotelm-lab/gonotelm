@@ -70,10 +70,8 @@ func TestResolveAccessOwner(t *testing.T) {
 		memberRepo:   &fakeMemberRepo{err: errors.ErrNoRecord},
 		pinRepo:      fakePinRepo{},
 	}
-	got, scope, err := r.resolveAccess(context.Background(), owner, nb.Id)
+	err := r.resolveAccess(context.Background(), owner, nb.Id)
 	require.NoError(t, err)
-	assert.Equal(t, pinScopeOwned, scope)
-	assert.Equal(t, nb.Id, got.Id)
 }
 
 func TestResolveAccessExplicitMember(t *testing.T) {
@@ -91,9 +89,8 @@ func TestResolveAccessExplicitMember(t *testing.T) {
 		}},
 		pinRepo: fakePinRepo{},
 	}
-	_, scope, err := r.resolveAccess(context.Background(), member, nb.Id)
+	err := r.resolveAccess(context.Background(), member, nb.Id)
 	require.NoError(t, err)
-	assert.Equal(t, pinScopeShared, scope)
 }
 
 func TestResolveAccessPublicOnlyDenied(t *testing.T) {
@@ -109,7 +106,7 @@ func TestResolveAccessPublicOnlyDenied(t *testing.T) {
 		memberRepo:   &fakeMemberRepo{err: errors.ErrNoRecord},
 		pinRepo:      fakePinRepo{},
 	}
-	_, _, err := r.resolveAccess(context.Background(), stranger, nb.Id)
+	err := r.resolveAccess(context.Background(), stranger, nb.Id)
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, notebookerrors.ErrNotebookNotFound))
 }

@@ -39,7 +39,7 @@ func (s *AccessService) Resolve(
 		return nil, errors.WithMessagef(err, "notebook repo find by id failed, notebook_id=%s", notebookId)
 	}
 
-	if notebook.OwnerId == userId {
+	if notebook.OwnerId.EqualsTo(userId) {
 		return &notebookentity.Access{Notebook: notebook, Role: vo.RoleOwner}, nil
 	}
 

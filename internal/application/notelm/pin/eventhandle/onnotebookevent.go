@@ -19,6 +19,7 @@ func NewOnNotebookEventHandler(pinRepo pinrepo.Repository) *OnNotebookEventHandl
 	return &OnNotebookEventHandler{pinRepo: pinRepo}
 }
 
+// 订阅notebook删除事件 notebook删除后需要去掉存在的pin记录
 func (h *OnNotebookEventHandler) Handle(ctx context.Context, evt *notebookevent.Event) error {
 	if evt.Action() != notebookevent.EventActionDelete {
 		return nil

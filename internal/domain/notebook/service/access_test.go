@@ -73,8 +73,6 @@ func (f *fakeMemberRepo) ListByUserId(context.Context, valobj.Uid) ([]*notebooke
 	return nil, nil
 }
 
-func (f *fakeMemberRepo) Delete(context.Context, valobj.Id, valobj.Uid) error { return nil }
-
 func (f *fakeMemberRepo) DeleteByNotebookId(context.Context, valobj.Id) error { return nil }
 
 func TestAccessServiceResolve(t *testing.T) {

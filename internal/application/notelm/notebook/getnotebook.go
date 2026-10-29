@@ -52,6 +52,7 @@ func (h *GetNotebookHandler) getNotebook(
 	}
 
 	actor := pkgcontext.GetUserId(ctx)
+	// 继续找当前notebook对于当前用户是不是置顶
 	pin, err := h.pinRepo.Find(ctx, actor, access.Notebook.Id)
 	if err != nil {
 		if !pkgerr.Is(err, pinerrors.ErrPinNotFound) {

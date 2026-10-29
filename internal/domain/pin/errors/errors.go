@@ -10,7 +10,7 @@ const (
 )
 
 var (
-	ErrPinLimitExceeded  = errors.ErrParams.ErrCode(CodePinLimitExceeded).Msg("置顶数量已达上限")
+	ErrPinLimitExceeded  = errors.ErrParams.ErrCode(CodePinLimitExceeded).Msg("pin limit exceeded")
 	ErrInvalidNotebookId = errors.ErrParams.ErrCode(CodeInvalidNotebookId).Msg("invalid notebook id")
 	ErrInvalidUserId     = errors.ErrParams.ErrCode(CodeInvalidUserId).Msg("invalid user id")
 	ErrPinNotFound       = errors.ErrNoRecord.ErrCode(CodePinNotFound).Msg("pin not found")

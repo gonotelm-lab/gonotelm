@@ -8,6 +8,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/pkg/http"
 )
 
+// 置顶notebook
 func (s *Server) PinNotebook(ctx context.Context, c *app.RequestContext) {
 	var req schema.PinNotebookRequest
 	if err := c.BindAndValidate(&req); err != nil {
@@ -27,6 +28,7 @@ func (s *Server) PinNotebook(ctx context.Context, c *app.RequestContext) {
 	})
 }
 
+// 取消notebook置顶
 func (s *Server) UnpinNotebook(ctx context.Context, c *app.RequestContext) {
 	var req schema.PinNotebookRequest
 	if err := c.BindAndValidate(&req); err != nil {

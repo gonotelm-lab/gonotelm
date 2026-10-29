@@ -89,7 +89,7 @@ func (h *ListNotebooksHandler) Handle(
 ) (*ListNotebooksHandleResult, error) {
 	userId := pkgcontext.GetUserId(ctx)
 
-	excludeIds, err := h.pinnedNotebookIds(ctx, userId)
+	excludeIds, err := h.getPinnedNotebookIds(ctx, userId)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +134,8 @@ func (h *ListNotebooksHandler) Handle(
 	}, nil
 }
 
-func (h *ListNotebooksHandler) pinnedNotebookIds(
+// 获取userId置顶的notebook ids
+func (h *ListNotebooksHandler) getPinnedNotebookIds(
 	ctx context.Context,
 	userId valobj.Uid,
 ) ([]valobj.Id, error) {
@@ -149,5 +150,6 @@ func (h *ListNotebooksHandler) pinnedNotebookIds(
 	for _, p := range pins {
 		ids = append(ids, p.NotebookId)
 	}
+
 	return ids, nil
 }

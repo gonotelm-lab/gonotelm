@@ -6,12 +6,14 @@ import (
 	artifact "github.com/gonotelm-lab/gonotelm/internal/application/notelm/artifact/eventhandle"
 	chat "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/eventhandle"
 	"github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/suggestion"
+	pin "github.com/gonotelm-lab/gonotelm/internal/application/notelm/pin/eventhandle"
 	source "github.com/gonotelm-lab/gonotelm/internal/application/notelm/source/eventhandle"
 	"github.com/gonotelm-lab/gonotelm/internal/application/shared/cleanup"
 	adapterdefine "github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
+	pinrepo "github.com/gonotelm-lab/gonotelm/internal/domain/pin/repository"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
@@ -22,6 +24,7 @@ type Deps struct {
 	RootCtx context.Context
 
 	NotebookRepo notebookrepo.Repository
+	PinRepo      pinrepo.Repository
 
 	SourceRepo    sourcerepo.Repository
 	ObjectStore   adapterdefine.ObjectStore
@@ -86,9 +89,23 @@ func initNotebookEventConsumers(deps *Deps) error {
 		return err
 	}
 
-	return artifact.RegisterNotebookEventConsumer(
+	if err := artifact.RegisterNotebookEventConsumer(
 		deps.EventBus.InProcess,
 		artifact.NewOnNotebookEventHandler(deps.ArtifactTaskRepo, deps.FlowClient, deps.Cleaner),
+	); err != nil {
+		return err
+	}
+
+	if err := pin.RegisterNotebookEventConsumer(
+		deps.EventBus.InProcess,
+		pin.NewOnNotebookEventHandler(deps.PinRepo),
+	); err != nil {
+		return err
+	}
+
+	return pin.RegisterNotebookMemberEventConsumer(
+		deps.EventBus.InProcess,
+		pin.NewOnNotebookMemberEventHandler(deps.PinRepo),
 	)
 }
 

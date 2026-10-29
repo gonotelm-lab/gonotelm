@@ -2,11 +2,14 @@ package notebook
 
 import (
 	notebookapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/notebook"
+	pinapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/pin"
 	"github.com/gonotelm-lab/gonotelm/internal/application/shared/cleanup"
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	identityrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
+	pinrepo "github.com/gonotelm-lab/gonotelm/internal/domain/pin/repository"
+	pinservice "github.com/gonotelm-lab/gonotelm/internal/domain/pin/service"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 )
@@ -14,6 +17,8 @@ import (
 type Deps struct {
 	NotebookRepo          notebookrepo.Repository
 	MemberRepo            notebookrepo.MemberRepository
+	PinRepo               pinrepo.Repository
+	PinService            *pinservice.Service
 	NotebookAccessService *notebookservice.AccessService
 	SourceRepo            sourcerepo.Repository
 	EventBus              eventbus.Publisher
@@ -32,6 +37,7 @@ type Server struct {
 	getNotebookHandler                 *notebookapp.GetNotebookHandler
 	createNotebookHandler              *notebookapp.CreateNotebookHandler
 	listNotebooksHandler               *notebookapp.ListNotebooksHandler
+	listPinnedNotebooksHandler         *notebookapp.ListPinnedNotebooksHandler
 	deleteNotebookHandler              *notebookapp.DeleteNotebookHandler
 	updateNotebookHandler              *notebookapp.UpdateNotebookHandler
 	generateNotebookDescriptionHandler *notebookapp.GenerateDescriptionHandler
@@ -42,6 +48,9 @@ type Server struct {
 	upsertNotebookMemberHandler     *notebookapp.UpsertNotebookMemberHandler
 	deleteNotebookMemberHandler     *notebookapp.DeleteNotebookMemberHandler
 
+	pinNotebookHandler   *pinapp.PinNotebookHandler
+	unpinNotebookHandler *pinapp.UnpinNotebookHandler
+
 	coverUploadPresignHandler *notebookapp.CoverUploadPresignHandler
 	confirmCoverUploadHandler *notebookapp.ConfirmCoverUploadHandler
 	deleteCoverHandler        *notebookapp.DeleteCoverHandler
@@ -50,11 +59,20 @@ type Server struct {
 func NewServer(deps Deps) *Server {
 	return &Server{
 		getNotebookHandler: notebookapp.NewGetNotebookHandler(
-			deps.NotebookRepo, deps.NotebookAccessService, deps.UserRepo, deps.ObjectStore,
+			deps.NotebookRepo, deps.NotebookAccessService, deps.UserRepo, deps.ObjectStore, deps.PinRepo,
 		),
 		createNotebookHandler: notebookapp.NewCreateNotebookHandler(deps.NotebookRepo, deps.EventBus),
 		listNotebooksHandler: notebookapp.NewListNotebooksHandler(
-			deps.NotebookRepo, deps.UserRepo, deps.ObjectStore,
+			deps.NotebookRepo, deps.PinRepo, deps.UserRepo, deps.ObjectStore,
+		),
+		listPinnedNotebooksHandler: notebookapp.NewListPinnedNotebooksHandler(
+			deps.NotebookRepo, deps.MemberRepo, deps.PinRepo, deps.UserRepo, deps.ObjectStore,
+		),
+		pinNotebookHandler: pinapp.NewPinNotebookHandler(
+			deps.NotebookAccessService, deps.PinRepo, deps.PinService, deps.DistLock,
+		),
+		unpinNotebookHandler: pinapp.NewUnpinNotebookHandler(
+			deps.NotebookAccessService, deps.PinRepo,
 		),
 		deleteNotebookHandler: notebookapp.NewDeleteNotebookHandler(
 			deps.NotebookRepo,
@@ -86,7 +104,9 @@ func NewServer(deps Deps) *Server {
 		),
 		updateNotebookVisibilityHandler: notebookapp.NewUpdateNotebookVisibilityHandler(deps.NotebookRepo, deps.NotebookAccessService, deps.UserRepo),
 		upsertNotebookMemberHandler:     notebookapp.NewUpsertNotebookMemberHandler(deps.NotebookRepo, deps.NotebookAccessService, deps.MemberRepo, deps.UserRepo),
-		deleteNotebookMemberHandler:     notebookapp.NewDeleteNotebookMemberHandler(deps.NotebookRepo, deps.NotebookAccessService, deps.MemberRepo, deps.UserRepo),
+		deleteNotebookMemberHandler: notebookapp.NewDeleteNotebookMemberHandler(
+			deps.NotebookRepo, deps.NotebookAccessService, deps.MemberRepo, deps.UserRepo, deps.EventBus,
+		),
 
 		coverUploadPresignHandler: notebookapp.NewCoverUploadPresignHandler(
 			deps.NotebookRepo,

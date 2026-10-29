@@ -34,11 +34,15 @@ func (f *fakeNotebookRepo) Exists(_ context.Context, id valobj.Id) (bool, error)
 	return ok, nil
 }
 
-func (f *fakeNotebookRepo) ListByOwner(context.Context, valobj.Uid, *notebookrepo.ListSpec) ([]*notebookentity.Notebook, error) {
+func (f *fakeNotebookRepo) ListByIds(context.Context, []valobj.Id) ([]*notebookentity.Notebook, error) {
 	return nil, nil
 }
 
-func (f *fakeNotebookRepo) ListShared(context.Context, valobj.Uid, *notebookrepo.ListSpec) ([]*notebookentity.Notebook, error) {
+func (f *fakeNotebookRepo) ListByOwner(context.Context, valobj.Uid, *notebookrepo.ListSpec, []valobj.Id) ([]*notebookentity.Notebook, error) {
+	return nil, nil
+}
+
+func (f *fakeNotebookRepo) ListShared(context.Context, valobj.Uid, *notebookrepo.ListSpec, []valobj.Id) ([]*notebookentity.Notebook, error) {
 	return nil, nil
 }
 
@@ -68,8 +72,6 @@ func (f *fakeMemberRepo) ListByNotebookId(context.Context, valobj.Id) ([]*notebo
 func (f *fakeMemberRepo) ListByUserId(context.Context, valobj.Uid) ([]*notebookentity.NotebookMember, error) {
 	return nil, nil
 }
-
-func (f *fakeMemberRepo) Delete(context.Context, valobj.Id, valobj.Uid) error { return nil }
 
 func (f *fakeMemberRepo) DeleteByNotebookId(context.Context, valobj.Id) error { return nil }
 
@@ -122,6 +124,61 @@ func TestAccessServiceResolve(t *testing.T) {
 			access, err := service.Resolve(context.Background(), notebookId, tt.userId)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectRole, access.Role)
+		})
+	}
+}
+
+func TestAccessServiceResolveOwnerOrMember(t *testing.T) {
+	ownerId := valobj.NewUid()
+	otherId := valobj.NewUid()
+	notebookId := valobj.NewId()
+
+	tests := []struct {
+		name       string
+		visibility vo.Visibility
+		memberRole *vo.Role
+		userId     valobj.Uid
+		wantRole   vo.Role
+		wantErr    error
+	}{
+		{"owner", vo.VisibilityPublic, nil, ownerId, vo.RoleOwner, nil},
+		{"explicit member", vo.VisibilityRestricted, rolePtr(vo.RoleViewer), otherId, vo.RoleViewer, nil},
+		{"public only denied", vo.VisibilityPublic, nil, otherId, "", notebookerrors.ErrNotebookNotFound},
+		{"restricted stranger", vo.VisibilityRestricted, nil, otherId, "", notebookerrors.ErrNotebookNotFound},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			notebook := &notebookentity.Notebook{
+				Base:       newBase(notebookId),
+				OwnerId:    ownerId,
+				Visibility: tt.visibility,
+			}
+			memberRepo := &fakeMemberRepo{members: map[valobj.Id]map[valobj.Uid]*notebookentity.NotebookMember{}}
+			if tt.memberRole != nil {
+				memberRepo.members[notebookId] = map[valobj.Uid]*notebookentity.NotebookMember{
+					otherId: {
+						Base:       newBase(notebookId),
+						NotebookId: notebookId,
+						UserId:     otherId,
+						Role:       *tt.memberRole,
+					},
+				}
+			}
+
+			service := NewAccessService(
+				&fakeNotebookRepo{notebooks: map[valobj.Id]*notebookentity.Notebook{notebookId: notebook}},
+				memberRepo,
+			)
+
+			access, err := service.ResolveOwnerOrMember(context.Background(), notebookId, tt.userId)
+			if tt.wantErr != nil {
+				require.Error(t, err)
+				assert.True(t, errors.Is(err, tt.wantErr))
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantRole, access.Role)
 		})
 	}
 }

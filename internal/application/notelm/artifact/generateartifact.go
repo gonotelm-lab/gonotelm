@@ -334,7 +334,7 @@ func (h *GenerateArtifactHandler) saveAsNote(
 	if targetChat.NotebookId != req.NotebookId {
 		return nil, errors.ErrPermission.Msg("chat is not in the notebook")
 	}
-	if targetChat.OwnerId != userId {
+	if targetChat.OwnerId.NotEqualsTo(userId) {
 		return nil, errors.ErrPermission.Msg("chat is not owned by the user")
 	}
 
@@ -348,7 +348,7 @@ func (h *GenerateArtifactHandler) saveAsNote(
 			"find chat message by chat_id=%s, msg_id=%s failed",
 			req.Note.ChatId, req.Note.MsgId)
 	}
-	if targetMsg.UserId != userId {
+	if targetMsg.UserId.NotEqualsTo(userId) {
 		return nil, errors.ErrPermission.Msg("chat message is not owned by the user")
 	}
 

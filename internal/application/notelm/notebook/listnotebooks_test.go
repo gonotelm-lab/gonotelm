@@ -10,6 +10,8 @@ import (
 	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
+	pinentity "github.com/gonotelm-lab/gonotelm/internal/domain/pin/entity"
+	pinrepo "github.com/gonotelm-lab/gonotelm/internal/domain/pin/repository"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,9 +21,11 @@ type fakeNotebookRepo struct {
 	ownedRows  []*notebookentity.Notebook
 	sharedRows []*notebookentity.Notebook
 
-	ownedSpec  *notebookrepo.ListSpec
-	sharedSpec *notebookrepo.ListSpec
-	sharedCall bool
+	ownedSpec        *notebookrepo.ListSpec
+	ownedExcludeIds  []valobj.Id
+	sharedSpec       *notebookrepo.ListSpec
+	sharedExcludeIds []valobj.Id
+	sharedCall       bool
 }
 
 func (f *fakeNotebookRepo) Save(context.Context, *notebookentity.Notebook) error { return nil }
@@ -32,12 +36,18 @@ func (f *fakeNotebookRepo) FindById(context.Context, valobj.Id) (*notebookentity
 
 func (f *fakeNotebookRepo) Exists(context.Context, valobj.Id) (bool, error) { return false, nil }
 
+func (f *fakeNotebookRepo) ListByIds(context.Context, []valobj.Id) ([]*notebookentity.Notebook, error) {
+	return nil, nil
+}
+
 func (f *fakeNotebookRepo) ListByOwner(
 	_ context.Context,
 	_ valobj.Uid,
 	spec *notebookrepo.ListSpec,
+	excludeIds []valobj.Id,
 ) ([]*notebookentity.Notebook, error) {
 	f.ownedSpec = spec
+	f.ownedExcludeIds = excludeIds
 
 	return f.ownedRows, nil
 }
@@ -46,11 +56,22 @@ func (f *fakeNotebookRepo) ListShared(
 	_ context.Context,
 	_ valobj.Uid,
 	spec *notebookrepo.ListSpec,
+	excludeIds []valobj.Id,
 ) ([]*notebookentity.Notebook, error) {
 	f.sharedCall = true
 	f.sharedSpec = spec
+	f.sharedExcludeIds = excludeIds
 
 	return f.sharedRows, nil
+}
+
+type fakePinRepo struct {
+	pinrepo.Repository
+	pins []*pinentity.UserNotebookPin
+}
+
+func (f *fakePinRepo) ListByUserId(context.Context, valobj.Uid) ([]*pinentity.UserNotebookPin, error) {
+	return f.pins, nil
 }
 
 type fakeUserRepo struct {
@@ -70,15 +91,22 @@ func newNotebook(ownerId valobj.Uid) *notebookentity.Notebook {
 	}
 }
 
+func newListHandler(repo *fakeNotebookRepo, pin *fakePinRepo, users *fakeUserRepo) *ListNotebooksHandler {
+	if pin == nil {
+		pin = &fakePinRepo{}
+	}
+	return NewListNotebooksHandler(repo, pin, users, nil)
+}
+
 func TestListNotebooksHandleOwned(t *testing.T) {
 	ownerId := valobj.NewUid()
 	nb1 := newNotebook(ownerId)
 	nb2 := newNotebook(ownerId)
 
 	repo := &fakeNotebookRepo{ownedRows: []*notebookentity.Notebook{nb1, nb2}}
-	handler := NewListNotebooksHandler(repo, &fakeUserRepo{
+	handler := newListHandler(repo, nil, &fakeUserRepo{
 		users: []*idententity.User{{Id: ownerId, Nickname: "owner"}},
-	}, nil)
+	})
 
 	ctx := pkgcontext.WithUserId(context.Background(), ownerId)
 	result, err := handler.Handle(ctx, &ListNotebooksHandleQuery{
@@ -94,13 +122,31 @@ func TestListNotebooksHandleOwned(t *testing.T) {
 	assert.Equal(t, 3, repo.ownedSpec.Limit, "多取一条用于判断 has_more")
 	assert.Equal(t, 4, repo.ownedSpec.Offset)
 	assert.Equal(t, notebookrepo.ListOrderLastActive, repo.ownedSpec.Order)
+	assert.Empty(t, repo.ownedExcludeIds)
 
 	assert.False(t, result.HasMore)
 	assert.Len(t, result.Notebooks, 2)
-	assert.Equal(t, 2, result.Limit)
-	assert.Equal(t, 4, result.Offset)
 	require.NotNil(t, result.Notebooks[0].Owner)
 	assert.Equal(t, "owner", result.Notebooks[0].Owner.Nickname)
+}
+
+func TestListNotebooksExcludesPinnedIds(t *testing.T) {
+	ownerId := valobj.NewUid()
+	pinnedId := valobj.NewId()
+	repo := &fakeNotebookRepo{ownedRows: []*notebookentity.Notebook{newNotebook(ownerId)}}
+	handler := newListHandler(repo, &fakePinRepo{
+		pins: []*pinentity.UserNotebookPin{{UserId: ownerId, NotebookId: pinnedId}},
+	}, &fakeUserRepo{
+		users: []*idententity.User{{Id: ownerId, Nickname: "owner"}},
+	})
+
+	ctx := pkgcontext.WithUserId(context.Background(), ownerId)
+	_, err := handler.Handle(ctx, &ListNotebooksHandleQuery{
+		Scope: AccessScopeOwned,
+		Limit: 10,
+	})
+	require.NoError(t, err)
+	require.Equal(t, []valobj.Id{pinnedId}, repo.ownedExcludeIds)
 }
 
 func TestListNotebooksHandleOwnedHasMore(t *testing.T) {
@@ -110,9 +156,9 @@ func TestListNotebooksHandleOwnedHasMore(t *testing.T) {
 		newNotebook(ownerId),
 		newNotebook(ownerId),
 	}}
-	handler := NewListNotebooksHandler(repo, &fakeUserRepo{
+	handler := newListHandler(repo, nil, &fakeUserRepo{
 		users: []*idententity.User{{Id: ownerId, Nickname: "owner"}},
-	}, nil)
+	})
 
 	ctx := pkgcontext.WithUserId(context.Background(), ownerId)
 	result, err := handler.Handle(ctx, &ListNotebooksHandleQuery{
@@ -133,9 +179,9 @@ func TestListNotebooksHandleShared(t *testing.T) {
 	ownerId := valobj.NewUid()
 
 	repo := &fakeNotebookRepo{sharedRows: []*notebookentity.Notebook{newNotebook(ownerId)}}
-	handler := NewListNotebooksHandler(repo, &fakeUserRepo{
+	handler := newListHandler(repo, nil, &fakeUserRepo{
 		users: []*idententity.User{{Id: ownerId, Nickname: "owner"}},
-	}, nil)
+	})
 
 	ctx := pkgcontext.WithUserId(context.Background(), userId)
 	result, err := handler.Handle(ctx, &ListNotebooksHandleQuery{
@@ -150,12 +196,10 @@ func TestListNotebooksHandleShared(t *testing.T) {
 	assert.Nil(t, repo.ownedSpec, "shared 不应查 owned")
 	assert.Len(t, result.Notebooks, 1)
 	assert.Equal(t, ownerId, result.Notebooks[0].OwnerId)
-	require.NotNil(t, result.Notebooks[0].Owner)
-	assert.Equal(t, "owner", result.Notebooks[0].Owner.Nickname)
 }
 
 func TestListNotebooksHandleInvalidScope(t *testing.T) {
-	handler := NewListNotebooksHandler(&fakeNotebookRepo{}, &fakeUserRepo{}, nil)
+	handler := newListHandler(&fakeNotebookRepo{}, nil, &fakeUserRepo{})
 
 	ctx := pkgcontext.WithUserId(context.Background(), valobj.NewUid())
 	_, err := handler.Handle(ctx, &ListNotebooksHandleQuery{

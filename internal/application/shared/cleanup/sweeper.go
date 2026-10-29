@@ -12,6 +12,7 @@ import (
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	notebookerrors "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/errors"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
+	pinrepo "github.com/gonotelm-lab/gonotelm/internal/domain/pin/repository"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourceerr "github.com/gonotelm-lab/gonotelm/internal/domain/source/errors"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
@@ -24,6 +25,7 @@ type sweeper struct {
 	notebookRepo  notebookrepo.Repository
 	artifactRepo  artifactrepo.Repository
 	sourceDocRepo sourcerepo.SourceDocRepository
+	pinRepo       pinrepo.Repository
 	objectStore   adapter.ObjectStore
 }
 
@@ -32,6 +34,7 @@ func newSweeper(
 	notebookRepo notebookrepo.Repository,
 	artifactRepo artifactrepo.Repository,
 	sourceDocRepo sourcerepo.SourceDocRepository,
+	pinRepo pinrepo.Repository,
 	objectStore adapter.ObjectStore,
 ) *sweeper {
 	return &sweeper{
@@ -39,6 +42,7 @@ func newSweeper(
 		notebookRepo:  notebookRepo,
 		artifactRepo:  artifactRepo,
 		sourceDocRepo: sourceDocRepo,
+		pinRepo:       pinRepo,
 		objectStore:   objectStore,
 	}
 }
@@ -240,12 +244,15 @@ func (s *sweeper) SweepNotebook(ctx context.Context,
 		errs = append(errs, err)
 	}
 
-	// 兜底：删除过程中失败可能留下 source / artifact 记录
+	// 兜底：删除过程中失败可能留下 source / artifact / pin 记录
 	if err := s.sourceRepo.DeleteByNotebookId(ctx, notebookId); err != nil {
 		errs = append(errs, errors.WithMessage(err, "delete sources by notebook failed"))
 	}
 	if err := s.artifactRepo.DeleteByNotebookId(ctx, notebookId); err != nil {
 		errs = append(errs, errors.WithMessage(err, "delete artifacts by notebook failed"))
+	}
+	if err := s.pinRepo.DeleteByNotebookId(ctx, notebookId); err != nil {
+		errs = append(errs, errors.WithMessage(err, "delete pins by notebook failed"))
 	}
 
 	return stderrors.Join(errs...)

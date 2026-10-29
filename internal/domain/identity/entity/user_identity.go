@@ -42,5 +42,5 @@ func (i *UserIdentity) TouchLogin(at valobj.Time) {
 }
 
 func (i *UserIdentity) BelongsTo(userId valobj.Uid) bool {
-	return i.UserId == userId
+	return i.UserId.EqualsTo(userId)
 }

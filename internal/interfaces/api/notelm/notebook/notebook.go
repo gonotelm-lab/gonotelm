@@ -88,6 +88,22 @@ func (s *Server) ListNotebooks(ctx context.Context, c *app.RequestContext) {
 	})
 }
 
+// ListPinnedNotebooks 返回当前用户全部仍可访问的置顶 notebook（一次返回，无分页）。
+func (s *Server) ListPinnedNotebooks(ctx context.Context, c *app.RequestContext) {
+	result, err := s.listPinnedNotebooksHandler.Handle(ctx)
+	if err != nil {
+		http.ErrResp(c, err)
+		return
+	}
+
+	notebooks := make([]*schema.NotebookResponse, 0, len(result.Notebooks))
+	for _, notebook := range result.Notebooks {
+		notebooks = append(notebooks, schema.NewNotebookResponse(notebook))
+	}
+
+	http.OkResp(c, schema.ListPinnedNotebooksResponse{Notebooks: notebooks})
+}
+
 func (s *Server) UpdateNotebook(ctx context.Context, c *app.RequestContext) {
 	var req schema.UpdateNotebookRequest
 	err := c.BindAndValidate(&req)

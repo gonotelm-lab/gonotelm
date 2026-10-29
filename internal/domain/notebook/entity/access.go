@@ -13,7 +13,7 @@ type Access struct {
 
 // 检查userId是否可以添加为笔记本的成员
 func (a *Access) CanAcceptAsMember(userId valobj.Uid) bool {
-	return a != nil && a.Notebook != nil && !userId.IsZero() && userId != a.Notebook.OwnerId
+	return a != nil && a.Notebook != nil && !userId.IsZero() && userId.NotEqualsTo(a.Notebook.OwnerId)
 }
 
 // 是否可读

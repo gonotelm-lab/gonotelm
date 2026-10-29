@@ -10,6 +10,7 @@ TEST_PKGS := \
 	./internal/conf/... \
 	./internal/domain/artifact/... \
 	./internal/domain/notebook/... \
+	./internal/domain/pin/... \
 	./internal/infrastructure/database/... \
 	./internal/infrastructure/cache \
 	./internal/infrastructure/cache/redis/... \

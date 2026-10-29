@@ -83,7 +83,7 @@ func TestMessageHeadersRoundTrip(t *testing.T) {
 	if got := pkgcontext.GetReqId(restoredCtx); got != reqId {
 		t.Fatalf("restored req id mismatch: got %s want %s", got, reqId)
 	}
-	if got := pkgcontext.GetUserId(restoredCtx); got != userId {
+	if got := pkgcontext.GetUserId(restoredCtx); got.NotEqualsTo(userId) {
 		t.Fatalf("restored user id mismatch: got %s want %s", got, userId)
 	}
 

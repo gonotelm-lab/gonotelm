@@ -28,12 +28,13 @@ type NotebookStore interface {
 	GetById(ctx context.Context, id Id) (*schema.Notebook, error)
 	Exists(ctx context.Context, id Id) (bool, error)
 	GetByNameAndOwnerId(ctx context.Context, name string, ownerId valobj.Uid) (*schema.Notebook, error)
-	// ListByOwnerId 分页返回 owner 的 notebook。
+	// ListByOwnerId 分页返回 owner 的 notebook；excludeIds 非空时 NOT IN。
 	ListByOwnerId(
 		ctx context.Context,
 		ownerId valobj.Uid,
 		limit, offset int,
 		order NotebookListOrder,
+		excludeIds []Id,
 	) ([]*schema.Notebook, error)
 	// ListByIds 按 id 批量查询；ids 为空时返回空切片。
 	ListByIds(ctx context.Context, ids []Id) ([]*schema.Notebook, error)
@@ -65,6 +66,15 @@ type NotebookMemberStore interface {
 	ListByNotebookId(ctx context.Context, notebookId Id) ([]*schema.NotebookMember, error)
 	ListByUserId(ctx context.Context, userId valobj.Uid) ([]*schema.NotebookMember, error)
 	Delete(ctx context.Context, notebookId Id, userId valobj.Uid) error
+	DeleteByNotebookId(ctx context.Context, notebookId Id) error
+}
+
+type UserNotebookPinStore interface {
+	Upsert(ctx context.Context, pin *schema.UserNotebookPin) error
+	Get(ctx context.Context, userId valobj.Uid, notebookId Id) (*schema.UserNotebookPin, error)
+	ListByUserId(ctx context.Context, userId valobj.Uid) ([]*schema.UserNotebookPin, error)
+	CountByUserId(ctx context.Context, userId valobj.Uid) (int64, error)
+	Delete(ctx context.Context, userId valobj.Uid, notebookId Id) error
 	DeleteByNotebookId(ctx context.Context, notebookId Id) error
 }
 
@@ -174,6 +184,7 @@ type Dao struct {
 	NotebookStore             NotebookStore
 	NotebookMaintenanceStore  NotebookMaintenanceStore
 	NotebookMemberStore       NotebookMemberStore
+	UserNotebookPinStore      UserNotebookPinStore
 	SourceStore               SourceStore
 	ChatStore                 ChatStore
 	ChatMessageStore          ChatMessageStore
@@ -191,6 +202,7 @@ func NewDao(
 	notebookStore NotebookStore,
 	notebookMaintenanceStore NotebookMaintenanceStore,
 	notebookMemberStore NotebookMemberStore,
+	userNotebookPinStore UserNotebookPinStore,
 	sourceStore SourceStore,
 	chatStore ChatStore,
 	chatMessageStore ChatMessageStore,
@@ -207,6 +219,7 @@ func NewDao(
 		NotebookStore:             notebookStore,
 		NotebookMaintenanceStore:  notebookMaintenanceStore,
 		NotebookMemberStore:       notebookMemberStore,
+		UserNotebookPinStore:      userNotebookPinStore,
 		SourceStore:               sourceStore,
 		ChatStore:                 chatStore,
 		ChatMessageStore:          chatMessageStore,

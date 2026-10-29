@@ -15,6 +15,7 @@ import (
 	coreadapter "github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	identityservice "github.com/gonotelm-lab/gonotelm/internal/domain/identity/service"
 	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
+	pinservice "github.com/gonotelm-lab/gonotelm/internal/domain/pin/service"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	flowcli "github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
@@ -80,6 +81,8 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 	// ── 2. Repositories ──
 	notebookRepo := repository.NewNotebookRepository(infra.Database.NotebookStore, infra.Database.NotebookMemberStore, infra.Database.SourceStore)
 	notebookMemberRepo := repository.NewNotebookMemberRepository(infra.Database.NotebookMemberStore)
+	pinRepo := repository.NewPinRepository(infra.Database.UserNotebookPinStore)
+	pinService := pinservice.New(pinRepo)
 	notebookAccessService := notebookservice.NewAccessService(notebookRepo, notebookMemberRepo)
 	sourceRepo := repository.NewSourceRepository(infra.Database.SourceStore)
 	sourceDocRepo := repository.NewSourceDocRepository(
@@ -193,6 +196,7 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 			NotebookRepo:   notebookRepo,
 			ArtifactRepo:   artifactRepo,
 			SourceDocRepo:  sourceDocRepo,
+			PinRepo:        pinRepo,
 			ObjectStore:    infra.ObjectStore,
 		},
 	)
@@ -212,6 +216,7 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 		RootCtx: rootCtx,
 
 		NotebookRepo: notebookRepo,
+		PinRepo:      pinRepo,
 
 		SourceRepo:    sourceRepo,
 		ObjectStore:   infra.ObjectStore,
@@ -240,6 +245,8 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 
 			NotebookRepo:              notebookRepo,
 			NotebookMemberRepo:        notebookMemberRepo,
+			PinRepo:                   pinRepo,
+			PinService:                pinService,
 			NotebookAccessService:     notebookAccessService,
 			NotebookAIDescriptionRepo: notebookAIDescRepo,
 

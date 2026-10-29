@@ -8,6 +8,7 @@ import (
 	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
+	pinrepo "github.com/gonotelm-lab/gonotelm/internal/domain/pin/repository"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
@@ -19,7 +20,6 @@ const (
 	SortByLastActive SortBy = 1
 )
 
-// toListOrder 把接口层的排序映射成 repository 的排序枚举。
 func (s SortBy) toListOrder() notebookrepo.ListOrder {
 	if s == SortByLastActive {
 		return notebookrepo.ListOrderLastActive
@@ -32,25 +32,26 @@ func (s SortBy) toListOrder() notebookrepo.ListOrder {
 type AccessScope int
 
 const (
-	// AccessScopeOwned 只返回当前用户作为 owner 的 notebook。
 	AccessScopeOwned AccessScope = iota
-	// AccessScopeShared 只返回显式分享给当前用户、且 owner 不是本人的 notebook。
 	AccessScopeShared
 )
 
 type ListNotebooksHandler struct {
 	*baseHandler
 	notebookRepo notebookrepo.Repository
+	pinRepo      pinrepo.Repository
 }
 
 func NewListNotebooksHandler(
 	notebookRepo notebookrepo.Repository,
+	pinRepo pinrepo.Repository,
 	userRepo identrepo.UserRepository,
 	objectStore adapter.ObjectPublicURLer,
 ) *ListNotebooksHandler {
 	return &ListNotebooksHandler{
 		baseHandler:  newBaseHandler(notebookRepo, nil, userRepo, objectStore),
 		notebookRepo: notebookRepo,
+		pinRepo:      pinRepo,
 	}
 }
 
@@ -61,7 +62,6 @@ type ListNotebooksHandleQuery struct {
 	SortBy SortBy
 }
 
-// NotebookOwner 应用层对外的 owner 视图，AvatarURL 已是公有读完整 URL。
 type NotebookOwner struct {
 	Id        valobj.Uid
 	Nickname  string
@@ -72,10 +72,11 @@ type Notebook struct {
 	*notebookentity.Notebook
 	Owner    *NotebookOwner
 	CoverUrl string
+	IsPinned bool
+	PinnedAt int64
 }
 
 type ListNotebooksHandleResult struct {
-	// Notebooks []*notebookentity.Notebook
 	Notebooks []*Notebook
 	Limit     int
 	Offset    int
@@ -86,24 +87,25 @@ func (h *ListNotebooksHandler) Handle(
 	ctx context.Context,
 	query *ListNotebooksHandleQuery,
 ) (*ListNotebooksHandleResult, error) {
-	// 多取一条用于判断 has_more，分页本身由数据库完成。
+	userId := pkgcontext.GetUserId(ctx)
+
+	excludeIds, err := h.getPinnedNotebookIds(ctx, userId)
+	if err != nil {
+		return nil, err
+	}
+
 	spec := &notebookrepo.ListSpec{
 		Limit:  query.Limit + 1,
 		Offset: query.Offset,
 		Order:  query.SortBy.toListOrder(),
 	}
 
-	userId := pkgcontext.GetUserId(ctx)
-
-	var (
-		notebooks []*notebookentity.Notebook
-		err       error
-	)
+	var notebooks []*notebookentity.Notebook
 	switch query.Scope {
 	case AccessScopeOwned:
-		notebooks, err = h.notebookRepo.ListByOwner(ctx, userId, spec)
+		notebooks, err = h.notebookRepo.ListByOwner(ctx, userId, spec, excludeIds)
 	case AccessScopeShared:
-		notebooks, err = h.notebookRepo.ListShared(ctx, userId, spec)
+		notebooks, err = h.notebookRepo.ListShared(ctx, userId, spec, excludeIds)
 	default:
 		return nil, errors.ErrParams.Msgf("invalid scope: %d", query.Scope)
 	}
@@ -116,21 +118,38 @@ func (h *ListNotebooksHandler) Handle(
 		notebooks = notebooks[:query.Limit]
 	}
 
-	targetNotebooks := make([]*Notebook, 0, len(notebooks))
-	// 给notebook挂上owner
-	for _, notebook := range notebooks {
-		targetNotebooks = append(targetNotebooks, &Notebook{
-			Notebook: notebook,
-		})
+	target := make([]*Notebook, 0, len(notebooks))
+	for _, nb := range notebooks {
+		target = append(target, &Notebook{Notebook: nb})
 	}
-	if err := h.populateNotebooks(ctx, targetNotebooks); err != nil {
+	if err := h.populateNotebooks(ctx, target); err != nil {
 		return nil, errors.WithMessage(err, "list attach notebook owners failed")
 	}
 
 	return &ListNotebooksHandleResult{
-		Notebooks: targetNotebooks,
+		Notebooks: target,
 		Limit:     query.Limit,
 		Offset:    query.Offset,
 		HasMore:   hasMore,
 	}, nil
+}
+
+// 获取userId置顶的notebook ids
+func (h *ListNotebooksHandler) getPinnedNotebookIds(
+	ctx context.Context,
+	userId valobj.Uid,
+) ([]valobj.Id, error) {
+	pins, err := h.pinRepo.ListByUserId(ctx, userId)
+	if err != nil {
+		return nil, errors.WithMessage(err, "list pins failed")
+	}
+	if len(pins) == 0 {
+		return nil, nil
+	}
+	ids := make([]valobj.Id, 0, len(pins))
+	for _, p := range pins {
+		ids = append(ids, p.NotebookId)
+	}
+
+	return ids, nil
 }

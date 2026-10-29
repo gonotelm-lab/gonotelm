@@ -26,6 +26,9 @@ func (r *NotebookMemberRepositoryImpl) Save(
 	ctx context.Context,
 	member *notebookentity.NotebookMember,
 ) error {
+	if member.IsDeleted() {
+		return r.memberStore.Delete(ctx, member.NotebookId, member.UserId)
+	}
 	return r.memberStore.Upsert(ctx, mapper.NotebookMemberToSchema(member))
 }
 
@@ -64,14 +67,6 @@ func (r *NotebookMemberRepositoryImpl) ListByUserId(
 	}
 
 	return mapper.NotebookMembersFromSchema(rows), nil
-}
-
-func (r *NotebookMemberRepositoryImpl) Delete(
-	ctx context.Context,
-	notebookId valobj.Id,
-	userId valobj.Uid,
-) error {
-	return r.memberStore.Delete(ctx, notebookId, userId)
 }
 
 func (r *NotebookMemberRepositoryImpl) DeleteByNotebookId(

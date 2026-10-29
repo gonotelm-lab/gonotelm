@@ -9,11 +9,15 @@ import (
 	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
+	pinerrors "github.com/gonotelm-lab/gonotelm/internal/domain/pin/errors"
+	pinrepo "github.com/gonotelm-lab/gonotelm/internal/domain/pin/repository"
+	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	pkgerr "github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type GetNotebookHandler struct {
 	*baseHandler
+	pinRepo pinrepo.Repository
 }
 
 func NewGetNotebookHandler(
@@ -21,9 +25,11 @@ func NewGetNotebookHandler(
 	notebookAccessService *notebookservice.AccessService,
 	userRepo identrepo.UserRepository,
 	objectStore adapter.ObjectPublicURLer,
+	pinRepo pinrepo.Repository,
 ) *GetNotebookHandler {
 	return &GetNotebookHandler{
 		baseHandler: newBaseHandler(notebookRepo, notebookAccessService, userRepo, objectStore),
+		pinRepo:     pinRepo,
 	}
 }
 
@@ -43,6 +49,18 @@ func (h *GetNotebookHandler) getNotebook(
 	}
 	if err := h.populateNotebooks(ctx, []*Notebook{result}); err != nil {
 		return nil, pkgerr.WithMessagef(err, "attach notebook owners failed, notebook_id=%s", access.Notebook.Id)
+	}
+
+	actor := pkgcontext.GetUserId(ctx)
+	// 继续找当前notebook对于当前用户是不是置顶
+	pin, err := h.pinRepo.Find(ctx, actor, access.Notebook.Id)
+	if err != nil {
+		if !pkgerr.Is(err, pinerrors.ErrPinNotFound) {
+			return nil, pkgerr.WithMessage(err, "find pin failed")
+		}
+	} else {
+		result.IsPinned = true
+		result.PinnedAt = pin.PinnedAt.Value()
 	}
 
 	return result, nil

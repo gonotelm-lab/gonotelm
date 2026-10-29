@@ -7,6 +7,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
+	pinrepo "github.com/gonotelm-lab/gonotelm/internal/domain/pin/repository"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/flow"
 )
@@ -24,6 +25,7 @@ type Deps struct {
 	NotebookRepo  notebookrepo.Repository
 	ArtifactRepo  artifactrepo.Repository
 	SourceDocRepo sourcerepo.SourceDocRepository
+	PinRepo       pinrepo.Repository
 	ObjectStore   adapter.ObjectStore
 }
 
@@ -40,6 +42,7 @@ func New(cfg Config, deps Deps) *Cleaner {
 		deps.NotebookRepo,
 		deps.ArtifactRepo,
 		deps.SourceDocRepo,
+		deps.PinRepo,
 		deps.ObjectStore,
 	)
 	scheduler := newCheckpointScheduler(deps.ScheduleClient, cfg)

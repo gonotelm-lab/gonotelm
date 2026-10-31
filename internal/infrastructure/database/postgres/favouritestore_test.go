@@ -41,7 +41,7 @@ func TestFavouriteStoreCRUD(t *testing.T) {
 		So(got.UpdatedAt, ShouldEqual, 3000)
 		So(got.CreatedAt, ShouldEqual, 1000)
 
-		rows, err := store.ListByUserId(ctx, userId, 10, 0)
+		rows, err := store.PageListByUserId(ctx, userId, 10, 0)
 		So(err, ShouldBeNil)
 		So(len(rows), ShouldEqual, 2)
 		So(rows[0].Id, ShouldEqual, id2)

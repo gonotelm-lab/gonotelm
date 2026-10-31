@@ -19,9 +19,9 @@ type ChatContextMessageCache interface {
 	BatchDestroy(ctx context.Context, chatIds []string) error
 	ListAll(ctx context.Context, chatId string) ([]*schema.ChatContextMessage, error)
 	// 从start开始获取limit条 start从0开始
-	List(ctx context.Context, chatId string, start, limit int) ([]*schema.ChatContextMessage, error)
+	PageList(ctx context.Context, chatId string, start, limit int) ([]*schema.ChatContextMessage, error)
 	// 获取最近的limit条
-	ListRecent(ctx context.Context, chatId string, limit int) ([]*schema.ChatContextMessage, error)
+	PageListRecent(ctx context.Context, chatId string, limit int) ([]*schema.ChatContextMessage, error)
 
 	Override(ctx context.Context, chatId string, messages []*schema.ChatContextMessage) error
 }

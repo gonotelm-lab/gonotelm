@@ -70,7 +70,7 @@ func (h *OnNotebookEventHandler) collectNotebookSources(
 	sources := make([]*sourceentity.Source, 0, notebookSourcesPageSize)
 
 	for offset := 0; ; offset += notebookSourcesPageSize {
-		page, err := h.sourceRepo.ListByNotebookId(ctx, notebookId, &sourcerepo.ListSpec{
+		page, err := h.sourceRepo.PageListByNotebookId(ctx, notebookId, &sourcerepo.PageListSpec{
 			Limit:  notebookSourcesPageSize,
 			Offset: offset,
 		})

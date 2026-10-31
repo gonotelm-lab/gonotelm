@@ -55,7 +55,7 @@ func (s *ChatStoreImpl) GetByNotebookIdAndOwnerId(
 	return &chat, nil
 }
 
-func (s *ChatStoreImpl) ListByOwnerId(
+func (s *ChatStoreImpl) PageListByOwnerId(
 	ctx context.Context,
 	ownerId valobj.Uid,
 	limit, offset int,

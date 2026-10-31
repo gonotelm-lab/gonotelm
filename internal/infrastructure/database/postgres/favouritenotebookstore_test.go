@@ -43,7 +43,7 @@ func TestFavouriteNotebookStoreCRUD(t *testing.T) {
 		So(err, ShouldBeNil)
 		So(got.FavouritedAt, ShouldEqual, 1000)
 
-		rows, err := store.ListByFavouriteId(ctx, favId, 10, 0)
+		rows, err := store.PageListByFavouriteId(ctx, favId, 10, 0)
 		So(err, ShouldBeNil)
 		So(len(rows), ShouldEqual, 2)
 		So(rows[0].NotebookId, ShouldEqual, nb2)

@@ -56,8 +56,8 @@ func (h *ListMessagesHandler) Handle(
 	}
 
 	fetchLimit := query.Limit + 1
-	messages, err := h.chatMessageRepo.ListByChatIdBeforeSeqNo(ctx, query.ChatId,
-		chatrepo.ListByCursorSpec{
+	messages, err := h.chatMessageRepo.PageListByChatIdBeforeSeqNo(ctx, query.ChatId,
+		chatrepo.PageListByCursorSpec{
 			BeforeSeqNo: cursor,
 			Limit:       fetchLimit,
 		})

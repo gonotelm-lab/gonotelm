@@ -14,7 +14,7 @@ type Repository interface {
 	UpdateExisting(ctx context.Context, s *entity.Source) (int64, error)
 	DeleteById(ctx context.Context, id valobj.Id) error
 	FindById(ctx context.Context, id valobj.Id) (*entity.Source, error)
-	ListByNotebookId(ctx context.Context, notebookId valobj.Id, spec *ListSpec) ([]*entity.Source, error)
+	PageListByNotebookId(ctx context.Context, notebookId valobj.Id, spec *PageListSpec) ([]*entity.Source, error)
 	GetByNotebookIdAndIds(ctx context.Context, notebookId valobj.Id, ids []valobj.Id) ([]*entity.Source, error)
 	DeleteByNotebookId(ctx context.Context, notebookId valobj.Id) error
 	BatchDeleteByIds(ctx context.Context, ids []valobj.Id) error

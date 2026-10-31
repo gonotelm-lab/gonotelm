@@ -48,21 +48,21 @@ func (r *MessageRepositoryImpl) FindByChatIdMsgId(
 	return mapper.MessageFromSchema(sch)
 }
 
-func (r *MessageRepositoryImpl) ListByChatId(
+func (r *MessageRepositoryImpl) PageListByChatId(
 	ctx context.Context,
 	chatId valobj.Id,
-	spec chatrepo.ListSpec,
+	spec chatrepo.PageListSpec,
 ) ([]*entity.Message, error) {
 	if err := spec.Validate(); err != nil {
 		return nil, err
 	}
 
 	orderBy := 0
-	if spec.Order == chatrepo.ListSpecOrderSeqNoAsc {
+	if spec.Order == chatrepo.PageListSpecOrderSeqNoAsc {
 		orderBy = 1
 	}
 
-	schemas, err := r.messageStore.ListByChatId(ctx, chatId, spec.Limit, spec.Offset, orderBy)
+	schemas, err := r.messageStore.PageListByChatId(ctx, chatId, spec.Limit, spec.Offset, orderBy)
 	if err != nil {
 		return nil, err
 	}
@@ -70,12 +70,12 @@ func (r *MessageRepositoryImpl) ListByChatId(
 	return mapper.MessagesFromSchema(schemas)
 }
 
-func (r *MessageRepositoryImpl) ListByChatIdBeforeSeqNo(
+func (r *MessageRepositoryImpl) PageListByChatIdBeforeSeqNo(
 	ctx context.Context,
 	chatId valobj.Id,
-	spec chatrepo.ListByCursorSpec,
+	spec chatrepo.PageListByCursorSpec,
 ) ([]*entity.Message, error) {
-	schemas, err := r.messageStore.ListByChatIdBeforeSeqNo(ctx, chatId, spec.BeforeSeqNo, spec.Limit)
+	schemas, err := r.messageStore.PageListByChatIdBeforeSeqNo(ctx, chatId, spec.BeforeSeqNo, spec.Limit)
 	if err != nil {
 		return nil, err
 	}

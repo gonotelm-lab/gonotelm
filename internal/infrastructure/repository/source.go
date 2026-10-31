@@ -52,16 +52,16 @@ func (s *SourceRepositoryImpl) FindById(ctx context.Context, id valobj.Id) (*sou
 	return mapper.SourceFromSchema(source)
 }
 
-func (s *SourceRepositoryImpl) ListByNotebookId(
+func (s *SourceRepositoryImpl) PageListByNotebookId(
 	ctx context.Context,
 	notebookId valobj.Id,
-	spec *sourcerepo.ListSpec,
+	spec *sourcerepo.PageListSpec,
 ) ([]*sourceentity.Source, error) {
 	if err := spec.Validate(); err != nil {
 		return nil, err
 	}
 
-	sources, err := s.sourceStore.ListByNotebookId(ctx, notebookId, spec.Limit, spec.Offset)
+	sources, err := s.sourceStore.PageListByNotebookId(ctx, notebookId, spec.Limit, spec.Offset)
 	if err != nil {
 		return nil, err
 	}

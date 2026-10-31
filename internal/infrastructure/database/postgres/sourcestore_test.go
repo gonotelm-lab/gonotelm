@@ -106,12 +106,12 @@ func TestSourceStoreListAndDeleteByNotebookId(t *testing.T) {
 			_ = testDB.WithContext(ctx).Where("notebook_id = ?", notebookID).Delete(&schema.Source{}).Error
 		})
 
-		firstPage, err := store.ListByNotebookId(ctx, notebookID, 1, 0)
+		firstPage, err := store.PageListByNotebookId(ctx, notebookID, 1, 0)
 		So(err, ShouldBeNil)
 		So(len(firstPage), ShouldEqual, 1)
 		So(firstPage[0].Id, ShouldEqual, srcNew.Id)
 
-		secondPage, err := store.ListByNotebookId(ctx, notebookID, 1, 1)
+		secondPage, err := store.PageListByNotebookId(ctx, notebookID, 1, 1)
 		So(err, ShouldBeNil)
 		So(len(secondPage), ShouldEqual, 1)
 		So(secondPage[0].Id, ShouldEqual, srcOld.Id)
@@ -264,7 +264,7 @@ func TestSourceStoreListAndCountIgnoreInited(t *testing.T) {
 		So(err, ShouldBeNil)
 		So(count, ShouldEqual, int64(2))
 
-		listed, err := store.ListByNotebookId(ctx, notebookID, 10, 0)
+		listed, err := store.PageListByNotebookId(ctx, notebookID, 10, 0)
 		So(err, ShouldBeNil)
 		So(len(listed), ShouldEqual, 2)
 		So(listed[0].Id, ShouldEqual, srcReady.Id)
@@ -273,16 +273,16 @@ func TestSourceStoreListAndCountIgnoreInited(t *testing.T) {
 }
 
 func TestSourceStoreListByNotebookIdInvalidPagination(t *testing.T) {
-	Convey("SourceStore ListByNotebookId invalid pagination", t, func() {
+	Convey("SourceStore PageListByNotebookId invalid pagination", t, func() {
 		store := testSourceStore
 		ctx := t.Context()
 		notebookID := database.Id(uuid.NewV7())
 
-		_, err := store.ListByNotebookId(ctx, notebookID, 0, 0)
+		_, err := store.PageListByNotebookId(ctx, notebookID, 0, 0)
 		So(err, ShouldNotBeNil)
 		So(strings.Contains(err.Error(), "invalid pagination params"), ShouldBeTrue)
 
-		_, err = store.ListByNotebookId(ctx, notebookID, 1, -1)
+		_, err = store.PageListByNotebookId(ctx, notebookID, 1, -1)
 		So(err, ShouldNotBeNil)
 		So(strings.Contains(err.Error(), "invalid pagination params"), ShouldBeTrue)
 	})

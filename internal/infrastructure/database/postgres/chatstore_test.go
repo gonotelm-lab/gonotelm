@@ -42,7 +42,7 @@ func TestChatStoreCRUD(t *testing.T) {
 		So(err, ShouldBeNil)
 		So(byNotebook, ShouldHaveLength, 1)
 
-		byOwner, err := store.ListByOwnerId(ctx, ownerId, 10, 0)
+		byOwner, err := store.PageListByOwnerId(ctx, ownerId, 10, 0)
 		So(err, ShouldBeNil)
 		So(byOwner, ShouldHaveLength, 1)
 		So(byOwner[0].Id, ShouldEqual, chat.Id)
@@ -55,14 +55,14 @@ func TestChatStoreCRUD(t *testing.T) {
 }
 
 func TestChatStoreListByOwnerIdRejectsBadPagination(t *testing.T) {
-	Convey("ChatStore ListByOwnerId rejects invalid pagination", t, func() {
+	Convey("ChatStore PageListByOwnerId rejects invalid pagination", t, func() {
 		store := testChatStore
 		ctx := t.Context()
 
-		_, err := store.ListByOwnerId(ctx, valobj.NewUid(), 0, 0)
+		_, err := store.PageListByOwnerId(ctx, valobj.NewUid(), 0, 0)
 		So(err, ShouldNotBeNil)
 
-		_, err = store.ListByOwnerId(ctx, valobj.NewUid(), 1, -1)
+		_, err = store.PageListByOwnerId(ctx, valobj.NewUid(), 1, -1)
 		So(err, ShouldNotBeNil)
 	})
 }

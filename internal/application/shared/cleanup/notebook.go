@@ -52,7 +52,7 @@ func (r *notebookRegistrar) listSources(
 	sources := make([]*sourceentity.Source, 0, notebookPageSize)
 
 	for offset := 0; ; offset += notebookPageSize {
-		page, err := r.sweeper.sourceRepo.ListByNotebookId(ctx, notebookId, &sourcerepo.ListSpec{
+		page, err := r.sweeper.sourceRepo.PageListByNotebookId(ctx, notebookId, &sourcerepo.PageListSpec{
 			Limit:  notebookPageSize,
 			Offset: offset,
 		})
@@ -80,7 +80,7 @@ func (r *notebookRegistrar) listArtifacts(
 	artifacts := make([]*artifactentity.Artifact, 0, notebookPageSize)
 
 	for offset := 0; ; offset += notebookPageSize {
-		page, err := r.sweeper.artifactRepo.ListByNotebookId(ctx, notebookId, &artifactrepo.ListSpec{
+		page, err := r.sweeper.artifactRepo.PageListByNotebookId(ctx, notebookId, &artifactrepo.PageListSpec{
 			Limit:  notebookPageSize,
 			Offset: offset,
 		})

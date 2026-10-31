@@ -36,7 +36,7 @@ internal/
     adapter/              ports to outside capabilities: ObjectStore, Summarizer, TitleMaker, ImageInterpreter, DistributedLock
   domain/<domain>/        pure business logic; domains = artifact, chat, favourite, identity, notebook, pin, sandbox, source, worker
     entity/ vo/           aggregates and value objects; constructors validate (NewNotebook returns error), mutations call AddEvent
-    repository/           interfaces and ListSpec only — implementations always live in infrastructure
+    repository/           interfaces and PageListSpec only — implementations always live in infrastructure
     service/              logic spanning entities/aggregates (e.g. source parse → chunk → index)
     errors/ event/        domain errors and domain events
   application/            use-case orchestration, one file per use case
@@ -124,6 +124,11 @@ Type and field names stay English (`Password`); this section governs the Chinese
 ## Conventions when changing code
 
 - **New persistence capability**: define the interface in `domain/<domain>/repository` → implement in `infrastructure/repository` → convert models in `mapper` → add the GORM model in `infrastructure/database/schema` → wire it up in `bootstrap`.
+- **List vs PageList naming** (domain `repository` interfaces and infrastructure stores — postgres / cache / etc.; keep names aligned across the two layers):
+  - `ListXxx` — fetch multiple rows **without** pagination (no limit/offset/cursor/batch-limit).
+  - `PageListXxx` — any fetch bounded by pagination or a batch cap (`Limit`/`Offset`, cursor such as `BeforeSeqNo`+`Limit`, or `start`+`limit`).
+  - Pagination params live in `PageListSpec` (and variants like `PageListByStatusSpec` / `PageListByCursorSpec`); do not revive `ListSpec`.
+  - Application Handler / `interfaces` Server method names are product-facing and need not use the `PageList` prefix (e.g. `ListNotebooks` may still call `PageListByOwner`).
 - **No JOIN in Store**: each Store under `infrastructure/database` queries only its own table (single-table `WHERE` / `IN` are fine; no `JOIN` / `Joins` / cross-table `FROM a, b`). Assemble cross-table results in `infrastructure/repository` (or application) with multiple single-table queries; when filtering by another table's columns, load ids first then `IN`, or denormalize the needed column onto this table (and keep the write path consistent) — never JOIN inside a Store.
 - **Every DAO file ships with a test file.** A data-access implementation gets a paired `<file>_test.go` in the same package — `postgres/notebookstore.go` → `notebookstore_test.go`, `cache/redis/suggestion.go` → `suggestion_test.go`, `olap/clickhouse/llmlogstore.go` → `llmlogstore_test.go`. The package's `main_test.go` holds a `TestMain` that builds a throwaway database from the `TEST_GONOTELM_*` env vars through `pkg/testsuite/{sql,redis,clickhouse}`, applies the same goose migrations as `cmd/migrate`, and exposes `testXxxStore` values to the tests; `open_test.go` covers the wiring. Assertions use goconvey (`Convey` / `So`); `Convey` descriptions are written in English, comments stay Chinese.
 - **New external component**: register a `Component` constructor in `bootstrap/shared`, then have each `bootstrap/<binary>.go` request only what it needs. Wiring belongs in code, not in config.

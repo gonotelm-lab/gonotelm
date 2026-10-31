@@ -50,7 +50,7 @@ func (s *FavouriteNotebookStoreImpl) Get(
 	return &row, nil
 }
 
-func (s *FavouriteNotebookStoreImpl) ListByFavouriteId(
+func (s *FavouriteNotebookStoreImpl) PageListByFavouriteId(
 	ctx context.Context,
 	favouriteId database.Id,
 	limit, offset int,

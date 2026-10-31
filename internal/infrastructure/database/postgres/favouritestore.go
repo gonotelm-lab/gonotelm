@@ -49,7 +49,7 @@ func (s *FavouriteStoreImpl) GetById(ctx context.Context, id database.Id) (*sche
 	return &row, nil
 }
 
-func (s *FavouriteStoreImpl) ListByUserId(
+func (s *FavouriteStoreImpl) PageListByUserId(
 	ctx context.Context,
 	userId valobj.Uid,
 	limit, offset int,

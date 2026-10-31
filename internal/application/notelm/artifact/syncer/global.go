@@ -29,7 +29,7 @@ func (s *Syncer) globalLoop(ctx context.Context) {
 }
 
 func (s *Syncer) scanOnce(ctx context.Context) error {
-	rows, err := s.repo.ListByStatus(ctx, &artifactrepo.ListByStatusSpec{
+	rows, err := s.repo.PageListByStatus(ctx, &artifactrepo.PageListByStatusSpec{
 		Statuses: []artifactentity.Status{artifactentity.StatusPending, artifactentity.StatusRunning},
 		Limit:    s.cfg.GlobalBatchSize,
 	})

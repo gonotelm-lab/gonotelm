@@ -52,7 +52,7 @@ func TestChatMessageStoreCreateListDeleteByChatId(t *testing.T) {
 		So(gotByIDAndChatID.Id, ShouldEqual, msgNew.Id)
 		So(gotByIDAndChatID.ChatId, ShouldEqual, chatID)
 
-		listed, err := store.ListByChatId(ctx, chatID, 10, 0, 0)
+		listed, err := store.PageListByChatId(ctx, chatID, 10, 0, 0)
 		So(err, ShouldBeNil)
 		So(len(listed), ShouldEqual, 2)
 		So(listed[0].SeqNo, ShouldEqual, msgNew.SeqNo)
@@ -128,13 +128,13 @@ func TestChatMessageStoreListByChatIdPagination(t *testing.T) {
 			_ = testDB.WithContext(ctx).Where("chat_id = ?", chatID).Delete(&schema.ChatMessage{}).Error
 		})
 
-		firstPage, err := store.ListByChatId(ctx, chatID, 1, 0, 0)
+		firstPage, err := store.PageListByChatId(ctx, chatID, 1, 0, 0)
 		So(err, ShouldBeNil)
 		So(len(firstPage), ShouldEqual, 1)
 		So(firstPage[0].SeqNo, ShouldEqual, msgNew.SeqNo)
 		So(firstPage[0].MsgRole, ShouldEqual, msgNew.MsgRole)
 
-		secondPage, err := store.ListByChatId(ctx, chatID, 1, 1, 0)
+		secondPage, err := store.PageListByChatId(ctx, chatID, 1, 1, 0)
 		So(err, ShouldBeNil)
 		So(len(secondPage), ShouldEqual, 1)
 		So(secondPage[0].SeqNo, ShouldEqual, msgOld.SeqNo)
@@ -170,7 +170,7 @@ func TestChatMessageStoreListByChatIdOrderAsc(t *testing.T) {
 			_ = testDB.WithContext(ctx).Where("chat_id = ?", chatID).Delete(&schema.ChatMessage{}).Error
 		})
 
-		rows, err := store.ListByChatId(ctx, chatID, 10, 0, 1)
+		rows, err := store.PageListByChatId(ctx, chatID, 10, 0, 1)
 		So(err, ShouldBeNil)
 		So(len(rows), ShouldEqual, 2)
 		So(rows[0].SeqNo, ShouldEqual, msgOld.SeqNo)
@@ -207,7 +207,7 @@ func TestChatMessageStoreListByChatIdBeforeSeqNoIncludesExtra(t *testing.T) {
 			_ = testDB.WithContext(ctx).Where("chat_id = ?", chatID).Delete(&schema.ChatMessage{}).Error
 		})
 
-		rows, err := store.ListByChatIdBeforeSeqNo(ctx, chatID, 3000, 10)
+		rows, err := store.PageListByChatIdBeforeSeqNo(ctx, chatID, 3000, 10)
 		So(err, ShouldBeNil)
 		So(len(rows), ShouldEqual, 2)
 
@@ -230,11 +230,11 @@ func TestChatMessageStoreListByChatIdInvalidPagination(t *testing.T) {
 		ctx := t.Context()
 		chatID := uuid.NewV7()
 
-		_, err := store.ListByChatId(ctx, chatID, 0, 0, 0)
+		_, err := store.PageListByChatId(ctx, chatID, 0, 0, 0)
 		So(err, ShouldNotBeNil)
 		So(strings.Contains(err.Error(), "invalid pagination params"), ShouldBeTrue)
 
-		_, err = store.ListByChatId(ctx, chatID, 1, -1, 0)
+		_, err = store.PageListByChatId(ctx, chatID, 1, -1, 0)
 		So(err, ShouldNotBeNil)
 		So(strings.Contains(err.Error(), "invalid pagination params"), ShouldBeTrue)
 	})

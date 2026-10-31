@@ -4,15 +4,15 @@ import (
 	xerror "github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
-// ListSpec 描述收藏夹 / 夹内列表的一页。
-type ListSpec struct {
-	Limit  int
+type PageListSpec struct {
 	Offset int
+	Limit  int
 }
 
-func (s *ListSpec) Validate() error {
+func (s *PageListSpec) Validate() error {
 	if s.Limit <= 0 || s.Offset < 0 {
 		return xerror.ErrParams.Msgf("invalid pagination params: limit=%d offset=%d", s.Limit, s.Offset)
 	}
+
 	return nil
 }

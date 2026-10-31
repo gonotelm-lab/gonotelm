@@ -63,11 +63,11 @@ func (s *syncTestRepo) FindById(ctx context.Context, id valobj.Id) (*artifactent
 	return &copy, nil
 }
 
-func (s *syncTestRepo) ListByNotebookId(ctx context.Context, notebookId valobj.Id, spec *artifactrepo.ListSpec) ([]*artifactentity.Artifact, error) {
+func (s *syncTestRepo) PageListByNotebookId(ctx context.Context, notebookId valobj.Id, spec *artifactrepo.PageListSpec) ([]*artifactentity.Artifact, error) {
 	return nil, nil
 }
 
-func (s *syncTestRepo) ListByStatus(ctx context.Context, spec *artifactrepo.ListByStatusSpec) ([]*artifactentity.Artifact, error) {
+func (s *syncTestRepo) PageListByStatus(ctx context.Context, spec *artifactrepo.PageListByStatusSpec) ([]*artifactentity.Artifact, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	statusSet := make(map[artifactentity.Status]bool)

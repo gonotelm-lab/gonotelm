@@ -36,8 +36,8 @@ func (h *ListFavouritesHandler) Handle(
 	limit, offset int,
 ) (*ListFavouritesResult, error) {
 	actor := pkgcontext.GetUserId(ctx)
-	spec := &repository.ListSpec{Limit: limit + 1, Offset: offset}
-	rows, err := h.favouriteRepo.ListByUserId(ctx, actor, spec)
+	spec := &repository.PageListSpec{Limit: limit + 1, Offset: offset}
+	rows, err := h.favouriteRepo.PageListByUserId(ctx, actor, spec)
 	if err != nil {
 		return nil, errors.WithMessage(err, "list favourites failed")
 	}

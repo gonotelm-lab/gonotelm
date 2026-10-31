@@ -65,19 +65,19 @@ func TestArtifactStoreCRUD(t *testing.T) {
 			So(err, ShouldNotBeNil)
 		})
 
-		Convey("ListByNotebookId returns the notebook's artifacts", func() {
-			rows, err := store.ListByNotebookId(ctx, notebookId, 10, 0)
+		Convey("PageListByNotebookId returns the notebook's artifacts", func() {
+			rows, err := store.PageListByNotebookId(ctx, notebookId, 10, 0)
 			So(err, ShouldBeNil)
 			So(rows, ShouldHaveLength, 1)
 			So(rows[0].Id, ShouldEqual, artifact.Id)
 
-			empty, err := store.ListByNotebookId(ctx, uuid.NewV7(), 10, 0)
+			empty, err := store.PageListByNotebookId(ctx, uuid.NewV7(), 10, 0)
 			So(err, ShouldBeNil)
 			So(empty, ShouldBeEmpty)
 		})
 
-		Convey("ListByStatus returns artifacts with the wanted status", func() {
-			rows, err := store.ListByStatus(ctx, []string{"pending"}, 100)
+		Convey("PageListByStatus returns artifacts with the wanted status", func() {
+			rows, err := store.PageListByStatus(ctx, []string{"pending"}, 100)
 			So(err, ShouldBeNil)
 			So(len(rows), ShouldBeGreaterThanOrEqualTo, 1)
 		})
@@ -112,11 +112,11 @@ func TestArtifactStoreDeleteByNotebookId(t *testing.T) {
 
 		So(store.DeleteByNotebookId(ctx, targetNotebook), ShouldBeNil)
 
-		left, err := store.ListByNotebookId(ctx, targetNotebook, 10, 0)
+		left, err := store.PageListByNotebookId(ctx, targetNotebook, 10, 0)
 		So(err, ShouldBeNil)
 		So(left, ShouldBeEmpty)
 
-		kept, err := store.ListByNotebookId(ctx, otherNotebook, 10, 0)
+		kept, err := store.PageListByNotebookId(ctx, otherNotebook, 10, 0)
 		So(err, ShouldBeNil)
 		So(kept, ShouldHaveLength, 1)
 		So(kept[0].NotebookId, ShouldEqual, otherNotebook)

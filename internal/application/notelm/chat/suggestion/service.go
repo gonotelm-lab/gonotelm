@@ -167,7 +167,7 @@ func (h *Service) Generate(ctx context.Context, cmd *GenerateSuggestionsCommand)
 	// 优先从contextMessage中获取上下文生成建议
 	// 如果没有上下文 则查看最近的对话记录生成建议
 	// 如果没有对话记录 则生成开场建议 开场建议按照来源和笔记本的信息生成建议
-	recentContextMessages, err := h.messageContextRepo.ListRecent(
+	recentContextMessages, err := h.messageContextRepo.PageListRecent(
 		ctx,
 		chatId,
 		maxMessageForSuggestionLimit,
@@ -181,10 +181,10 @@ func (h *Service) Generate(ctx context.Context, cmd *GenerateSuggestionsCommand)
 	var chatMessages []*entity.Message
 	if len(recentContextMessages) <= 0 {
 		// 获取最近的对话记录（倒序：最新在前），渲染前翻转为时间正序
-		chatMessages, err = h.messageRepo.ListByChatId(ctx, chatId, chatrepo.ListSpec{
+		chatMessages, err = h.messageRepo.PageListByChatId(ctx, chatId, chatrepo.PageListSpec{
 			Offset: 0,
 			Limit:  maxMessageForSuggestionLimit,
-			Order:  chatrepo.ListSpecOrderSeqNoDesc,
+			Order:  chatrepo.PageListSpecOrderSeqNoDesc,
 		})
 		if err != nil {
 			slog.ErrorContext(ctx, "suggestion failed to get chat messages",

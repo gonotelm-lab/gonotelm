@@ -14,14 +14,14 @@ const (
 	ListOrderCreateTime ListOrder = 1
 )
 
-// ListSpec 描述 notebook 列表的一页。
-type ListSpec struct {
+// PageListSpec 描述 notebook 列表的一页。
+type PageListSpec struct {
 	Limit  int
 	Offset int
 	Order  ListOrder
 }
 
-func (s *ListSpec) Validate() error {
+func (s *PageListSpec) Validate() error {
 	if s.Limit <= 0 || s.Offset < 0 {
 		return xerror.ErrParams.Msgf("invalid pagination params: limit=%d offset=%d", s.Limit, s.Offset)
 	}

@@ -57,15 +57,15 @@ func (r *FavouriteRepositoryImpl) Find(ctx context.Context, id valobj.Id) (*enti
 	return mapper.FavouriteFromSchema(row), nil
 }
 
-func (r *FavouriteRepositoryImpl) ListByUserId(
+func (r *FavouriteRepositoryImpl) PageListByUserId(
 	ctx context.Context,
 	userId valobj.Uid,
-	spec *favouriterepo.ListSpec,
+	spec *favouriterepo.PageListSpec,
 ) ([]*entity.Favourite, error) {
 	if err := spec.Validate(); err != nil {
 		return nil, err
 	}
-	rows, err := r.favouriteStore.ListByUserId(ctx, userId, spec.Limit, spec.Offset)
+	rows, err := r.favouriteStore.PageListByUserId(ctx, userId, spec.Limit, spec.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func (r *FavouriteRepositoryImpl) ListByUserAndNotebook(
 	userId valobj.Uid,
 	notebookId valobj.Id,
 ) ([]*entity.Favourite, error) {
-	favs, err := r.favouriteStore.ListByUserId(ctx, userId, entity.MaxFavouritesPerUser, 0)
+	favs, err := r.favouriteStore.PageListByUserId(ctx, userId, entity.MaxFavouritesPerUser, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -155,15 +155,15 @@ func (r *FavouriteNotebookRepositoryImpl) Find(
 	return mapper.FavouriteNotebookFromSchema(row), nil
 }
 
-func (r *FavouriteNotebookRepositoryImpl) ListByFavouriteId(
+func (r *FavouriteNotebookRepositoryImpl) PageListByFavouriteId(
 	ctx context.Context,
 	favouriteId valobj.Id,
-	spec *favouriterepo.ListSpec,
+	spec *favouriterepo.PageListSpec,
 ) ([]*entity.FavouriteNotebook, error) {
 	if err := spec.Validate(); err != nil {
 		return nil, err
 	}
-	rows, err := r.favouriteNotebookStore.ListByFavouriteId(ctx, favouriteId, spec.Limit, spec.Offset)
+	rows, err := r.favouriteNotebookStore.PageListByFavouriteId(ctx, favouriteId, spec.Limit, spec.Offset)
 	if err != nil {
 		return nil, err
 	}

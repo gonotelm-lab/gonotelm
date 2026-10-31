@@ -62,8 +62,8 @@ func (h *ListNotebooksHandler) Handle(
 		return nil, err
 	}
 
-	spec := &favouriterepo.ListSpec{Limit: limit + 1, Offset: offset}
-	rows, err := h.favouriteNotebookRepo.ListByFavouriteId(ctx, favouriteId, spec)
+	spec := &favouriterepo.PageListSpec{Limit: limit + 1, Offset: offset}
+	rows, err := h.favouriteNotebookRepo.PageListByFavouriteId(ctx, favouriteId, spec)
 	if err != nil {
 		return nil, errors.WithMessage(err, "list favourite notebooks failed")
 	}

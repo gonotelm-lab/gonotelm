@@ -8,6 +8,7 @@ import (
 )
 
 type FavouriteRepository interface {
+	// 删除收藏夹的同时级联删除收藏夹的笔记本记录
 	Save(ctx context.Context, f *entity.Favourite) error
 	Find(ctx context.Context, id valobj.Id) (*entity.Favourite, error)
 	ListByUserId(ctx context.Context, userId valobj.Uid, spec *ListSpec) ([]*entity.Favourite, error)

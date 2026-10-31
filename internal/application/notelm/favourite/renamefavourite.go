@@ -5,6 +5,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/favourite/repository"
+	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type RenameFavouriteHandler struct {
@@ -22,6 +23,7 @@ func NewRenameFavouriteHandler(
 	}
 }
 
+// 重命名收藏夹
 func (h *RenameFavouriteHandler) Handle(
 	ctx context.Context,
 	id valobj.Id,
@@ -35,12 +37,13 @@ func (h *RenameFavouriteHandler) Handle(
 		return nil, err
 	}
 	if err := h.favouriteRepo.Save(ctx, f); err != nil {
-		return nil, wrap(err, "save favourite failed")
+		return nil, errors.WithMessage(err, "save favourite failed")
 	}
 	count, err := h.favouriteNotebookRepo.CountByFavouriteId(ctx, f.Id)
 	if err != nil {
-		return nil, wrap(err, "count favourite notebooks failed")
+		return nil, errors.WithMessage(err, "count favourite notebooks failed")
 	}
+
 	return &FavouriteView{
 		Id:            f.Id,
 		Name:          f.Name,

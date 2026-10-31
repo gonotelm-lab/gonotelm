@@ -25,10 +25,11 @@ func NewRemoveNotebooksHandler(
 	}
 }
 
+// 移除收藏夹中某个收藏的笔记本
 func (h *RemoveNotebooksHandler) Handle(
 	ctx context.Context,
-	favouriteId valobj.Id,
-	notebookIds []valobj.Id,
+	favouriteId valobj.Id, // 收藏夹id
+	notebookIds []valobj.Id, // 笔记本id
 ) error {
 	if _, err := h.loadOwnedFavourite(ctx, favouriteId); err != nil {
 		return err
@@ -39,14 +40,12 @@ func (h *RemoveNotebooksHandler) Handle(
 		return errors.ErrParams.Msg("notebook_ids is required")
 	}
 	if len(ids) > entity.MaxRemoveNotebookIdsPerReq {
-		return errors.ErrParams.Msgf(
-			"notebook_ids exceeds max %d",
-			entity.MaxRemoveNotebookIdsPerReq,
-		)
+		return errors.ErrParams.Msgf("notebook_ids exceeds max %d", entity.MaxRemoveNotebookIdsPerReq)
 	}
 
 	if err := h.favouriteNotebookRepo.Delete(ctx, favouriteId, ids); err != nil {
-		return wrap(err, "delete favourite notebooks failed")
+		return errors.WithMessage(err, "delete favourite notebooks failed")
 	}
+
 	return nil
 }

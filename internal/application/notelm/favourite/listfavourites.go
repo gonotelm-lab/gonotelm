@@ -5,6 +5,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/domain/favourite/repository"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
+	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
 type ListFavouritesHandler struct {
@@ -29,6 +30,7 @@ type ListFavouritesResult struct {
 	HasMore    bool
 }
 
+// 列出用户的收藏夹
 func (h *ListFavouritesHandler) Handle(
 	ctx context.Context,
 	limit, offset int,
@@ -37,7 +39,7 @@ func (h *ListFavouritesHandler) Handle(
 	spec := &repository.ListSpec{Limit: limit + 1, Offset: offset}
 	rows, err := h.favouriteRepo.ListByUserId(ctx, actor, spec)
 	if err != nil {
-		return nil, wrap(err, "list favourites failed")
+		return nil, errors.WithMessage(err, "list favourites failed")
 	}
 
 	hasMore := len(rows) > limit
@@ -49,7 +51,7 @@ func (h *ListFavouritesHandler) Handle(
 	for _, f := range rows {
 		count, err := h.favouriteNotebookRepo.CountByFavouriteId(ctx, f.Id)
 		if err != nil {
-			return nil, wrap(err, "count favourite notebooks failed")
+			return nil, errors.WithMessage(err, "count favourite notebooks failed")
 		}
 		views = append(views, &FavouriteView{
 			Id:            f.Id,

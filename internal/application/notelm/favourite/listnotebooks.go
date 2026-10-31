@@ -15,6 +15,7 @@ import (
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
+	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	pkgslices "github.com/gonotelm-lab/gonotelm/pkg/slices"
 )
 
@@ -64,7 +65,7 @@ func (h *ListNotebooksHandler) Handle(
 	spec := &favouriterepo.ListSpec{Limit: limit + 1, Offset: offset}
 	rows, err := h.favouriteNotebookRepo.ListByFavouriteId(ctx, favouriteId, spec)
 	if err != nil {
-		return nil, wrap(err, "list favourite notebooks failed")
+		return nil, errors.WithMessage(err, "list favourite notebooks failed")
 	}
 
 	hasMore := len(rows) > limit
@@ -81,7 +82,7 @@ func (h *ListNotebooksHandler) Handle(
 	}
 	notebooks, err := h.notebookRepo.ListByIds(ctx, ids)
 	if err != nil {
-		return nil, wrap(err, "list notebooks by ids failed")
+		return nil, errors.WithMessage(err, "list notebooks by ids failed")
 	}
 	nbById := make(map[valobj.Id]*notebookentity.Notebook, len(notebooks))
 	for _, nb := range notebooks {
@@ -124,7 +125,7 @@ func (h *ListNotebooksHandler) Handle(
 	}
 
 	if err := h.populateNotebookViews(ctx, validViews); err != nil {
-		return nil, wrap(err, "populate notebook views failed")
+		return nil, errors.WithMessage(err, "populate notebook views failed")
 	}
 
 	return &ListNotebooksResult{
@@ -149,7 +150,7 @@ func (h *ListNotebooksHandler) populateNotebookViews(
 	ownerIds = pkgslices.Unique(ownerIds)
 	users, err := h.userRepo.BatchGetById(ctx, ownerIds)
 	if err != nil {
-		return wrap(err, "batch get users failed")
+		return errors.WithMessage(err, "batch get users failed")
 	}
 	userMap := pkgslices.AsMapF(users, func(t *idententity.User) valobj.Uid { return t.Id })
 	for _, n := range notebooks {

@@ -41,6 +41,7 @@ func (r *FavouriteRepositoryImpl) Save(ctx context.Context, f *entity.Favourite)
 			return r.favouriteStore.DeleteById(txCtx, f.Id)
 		})
 	}
+
 	return r.favouriteStore.Upsert(ctx, mapper.FavouriteToSchema(f))
 }
 

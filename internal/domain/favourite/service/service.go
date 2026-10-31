@@ -34,10 +34,11 @@ func (s *Service) CheckFavouriteLimit(ctx context.Context, userId valobj.Uid) er
 	if count >= int64(entity.MaxFavouritesPerUser) {
 		return favouriteerrors.ErrFavouriteLimitExceeded
 	}
+
 	return nil
 }
 
-// CheckNotebookLimit 检查单夹笔记本额度；已达上限返回 ErrFavouriteNotebookLimitExceeded。
+// CheckNotebookLimit 检查单收藏夹笔记本额度；已达上限返回 ErrFavouriteNotebookLimitExceeded。
 func (s *Service) CheckNotebookLimit(ctx context.Context, favouriteId valobj.Id) error {
 	count, err := s.favouriteNotebookRepo.CountByFavouriteId(ctx, favouriteId)
 	if err != nil {
@@ -46,5 +47,6 @@ func (s *Service) CheckNotebookLimit(ctx context.Context, favouriteId valobj.Id)
 	if count >= int64(entity.MaxNotebooksPerFavourite) {
 		return favouriteerrors.ErrFavouriteNotebookLimitExceeded
 	}
+
 	return nil
 }

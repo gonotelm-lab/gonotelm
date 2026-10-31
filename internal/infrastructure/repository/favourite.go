@@ -155,11 +155,7 @@ func (r *FavouriteNotebookRepositoryImpl) Delete(
 	favouriteId valobj.Id,
 	notebookIds []valobj.Id,
 ) error {
-	ids := make([]database.Id, 0, len(notebookIds))
-	for _, id := range notebookIds {
-		ids = append(ids, id)
-	}
-	return r.favouriteNotebookStore.Delete(ctx, favouriteId, ids)
+	return r.favouriteNotebookStore.Delete(ctx, favouriteId, notebookIds)
 }
 
 func (r *FavouriteNotebookRepositoryImpl) DeleteByFavouriteId(

@@ -5,6 +5,7 @@ import (
 
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	favouriterepo "github.com/gonotelm-lab/gonotelm/internal/domain/favourite/repository"
 	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
@@ -17,7 +18,8 @@ import (
 
 type GetNotebookHandler struct {
 	*baseHandler
-	pinRepo pinrepo.Repository
+	pinRepo       pinrepo.Repository
+	favouriteRepo favouriterepo.Repository
 }
 
 func NewGetNotebookHandler(
@@ -26,10 +28,12 @@ func NewGetNotebookHandler(
 	userRepo identrepo.UserRepository,
 	objectStore adapter.ObjectPublicURLer,
 	pinRepo pinrepo.Repository,
+	favouriteRepo favouriterepo.Repository,
 ) *GetNotebookHandler {
 	return &GetNotebookHandler{
-		baseHandler: newBaseHandler(notebookRepo, notebookAccessService, userRepo, objectStore),
-		pinRepo:     pinRepo,
+		baseHandler:   newBaseHandler(notebookRepo, notebookAccessService, userRepo, objectStore),
+		pinRepo:       pinRepo,
+		favouriteRepo: favouriteRepo,
 	}
 }
 
@@ -62,6 +66,16 @@ func (h *GetNotebookHandler) getNotebook(
 		result.IsPinned = true
 		result.PinnedAt = pin.PinnedAt.Value()
 	}
+
+	favs, err := h.favouriteRepo.ListByUserAndNotebook(ctx, actor, access.Notebook.Id)
+	if err != nil {
+		return nil, pkgerr.WithMessage(err, "list favourites failed")
+	}
+	items := make([]*FavouriteItem, 0, len(favs))
+	for _, f := range favs {
+		items = append(items, &FavouriteItem{Id: f.Id, Name: f.Name})
+	}
+	result.Favourite = &Favourite{Items: items}
 
 	return result, nil
 }

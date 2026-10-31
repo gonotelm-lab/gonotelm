@@ -12,8 +12,8 @@ type Repository interface {
 	FindById(ctx context.Context, id valobj.Id) (*notebookentity.Notebook, error)
 	Exists(ctx context.Context, id valobj.Id) (bool, error)
 	ListByIds(ctx context.Context, ids []valobj.Id) ([]*notebookentity.Notebook, error)
-	// ListByOwner 分页返回 owner 的 notebook；excludeIds 非空时排除这些 id。
-	ListByOwner(ctx context.Context, ownerId valobj.Uid, spec *ListSpec, excludeIds []valobj.Id) ([]*notebookentity.Notebook, error)
-	// ListShared 分页返回显式授权给 userId、且 owner 不是本人的 notebook；excludeIds 非空时排除这些 id。
-	ListShared(ctx context.Context, userId valobj.Uid, spec *ListSpec, excludeIds []valobj.Id) ([]*notebookentity.Notebook, error)
+	// PageListByOwner 分页返回 owner 的 notebook；excludeIds 非空时排除这些 id。
+	PageListByOwner(ctx context.Context, ownerId valobj.Uid, spec *PageListSpec, excludeIds []valobj.Id) ([]*notebookentity.Notebook, error)
+	// PageListShared 分页返回显式授权给 userId、且 owner 不是本人的 notebook；excludeIds 非空时排除这些 id。
+	PageListShared(ctx context.Context, userId valobj.Uid, spec *PageListSpec, excludeIds []valobj.Id) ([]*notebookentity.Notebook, error)
 }

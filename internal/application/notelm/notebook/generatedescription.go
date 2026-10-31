@@ -70,8 +70,8 @@ func (h *GenerateDescriptionHandler) generateDescription(
 		return "", notebookerrors.ErrCustomizeDescription
 	}
 
-	sources, err := h.sourceRepo.ListByNotebookId(
-		ctx, notebook.Id, &sourcerepo.ListSpec{
+	sources, err := h.sourceRepo.PageListByNotebookId(
+		ctx, notebook.Id, &sourcerepo.PageListSpec{
 			Offset: 0,
 			Limit:  notebookentity.MaxSourceCountAllowed,
 		})

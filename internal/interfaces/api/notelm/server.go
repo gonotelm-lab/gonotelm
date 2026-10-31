@@ -13,6 +13,8 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
 	artifactrepo "github.com/gonotelm-lab/gonotelm/internal/domain/artifact/repository"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
+	favouriterepo "github.com/gonotelm-lab/gonotelm/internal/domain/favourite/repository"
+	favouriteservice "github.com/gonotelm-lab/gonotelm/internal/domain/favourite/service"
 	identrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 	identityservice "github.com/gonotelm-lab/gonotelm/internal/domain/identity/service"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
@@ -25,6 +27,7 @@ import (
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
 	authapi "github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/auth"
 	chatapi "github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/chat"
+	favouriteapi "github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/favourite"
 	notebookapi "github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/notebook"
 	"github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/schema"
 	sourceapi "github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm/source"
@@ -43,6 +46,9 @@ type ServerDeps struct {
 	NotebookMemberRepo     notebookrepo.MemberRepository
 	PinRepo                pinrepo.Repository
 	PinService             *pinservice.Service
+	FavouriteRepo          favouriterepo.Repository
+	FavouriteNotebookRepo  favouriterepo.NotebookRepository
+	FavouriteService       *favouriteservice.Service
 	NotebookAccessService  *notebookservice.AccessService
 	SourceRepo             sourcerepo.Repository
 	ObjectStore            adapter.ObjectStore
@@ -85,12 +91,13 @@ type ServerDeps struct {
 type Server struct {
 	h *server.Hertz
 
-	auth     *authapi.Server
-	notebook *notebookapi.Server
-	source   *sourceapi.Server
-	chat     *chatapi.Server
-	studio   *studioapi.Server
-	user     *userapi.Server
+	auth      *authapi.Server
+	notebook  *notebookapi.Server
+	source    *sourceapi.Server
+	chat      *chatapi.Server
+	studio    *studioapi.Server
+	user      *userapi.Server
+	favourite *favouriteapi.Server
 
 	webhook *webhook.Server
 }
@@ -134,6 +141,7 @@ func NewServer(
 			MemberRepo:            deps.NotebookMemberRepo,
 			PinRepo:               deps.PinRepo,
 			PinService:            deps.PinService,
+			FavouriteRepo:         deps.FavouriteRepo,
 			NotebookAccessService: deps.NotebookAccessService,
 			SourceRepo:            deps.SourceRepo,
 			EventBus:              deps.EventBus,
@@ -198,6 +206,17 @@ func NewServer(
 			ObjectStore: deps.ObjectStore,
 			KeyFactory:  deps.KeyFactory,
 		}),
+
+		favourite: favouriteapi.NewServer(favouriteapi.Deps{
+			FavouriteRepo:         deps.FavouriteRepo,
+			FavouriteNotebookRepo: deps.FavouriteNotebookRepo,
+			FavouriteService:      deps.FavouriteService,
+			NotebookRepo:          deps.NotebookRepo,
+			NotebookAccessService: deps.NotebookAccessService,
+			UserRepo:              deps.UserRepo,
+			ObjectStore:           deps.ObjectStore,
+			DistLock:              deps.DistLock,
+		}),
 	}
 
 	s.webhook = webhook.NewServer(deps.Cleaner)
@@ -219,6 +238,7 @@ func (s *Server) registerRoutes() {
 			s.chat.RegisterRoutes(v1AuthedGroup)
 			s.studio.RegisterRoutes(v1AuthedGroup)
 			s.user.RegisterRoutes(v1AuthedGroup)
+			s.favourite.RegisterRoutes(v1AuthedGroup)
 			s.auth.RegisterAuthedRoutes(v1AuthedGroup)
 		}
 

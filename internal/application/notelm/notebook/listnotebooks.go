@@ -62,20 +62,6 @@ type ListNotebooksHandleQuery struct {
 	SortBy SortBy
 }
 
-type NotebookOwner struct {
-	Id        valobj.Uid
-	Nickname  string
-	AvatarURL string
-}
-
-type Notebook struct {
-	*notebookentity.Notebook
-	Owner    *NotebookOwner
-	CoverUrl string
-	IsPinned bool
-	PinnedAt int64
-}
-
 type ListNotebooksHandleResult struct {
 	Notebooks []*Notebook
 	Limit     int
@@ -94,7 +80,7 @@ func (h *ListNotebooksHandler) Handle(
 		return nil, err
 	}
 
-	spec := &notebookrepo.ListSpec{
+	spec := &notebookrepo.PageListSpec{
 		Limit:  query.Limit + 1,
 		Offset: query.Offset,
 		Order:  query.SortBy.toListOrder(),
@@ -103,9 +89,9 @@ func (h *ListNotebooksHandler) Handle(
 	var notebooks []*notebookentity.Notebook
 	switch query.Scope {
 	case AccessScopeOwned:
-		notebooks, err = h.notebookRepo.ListByOwner(ctx, userId, spec, excludeIds)
+		notebooks, err = h.notebookRepo.PageListByOwner(ctx, userId, spec, excludeIds)
 	case AccessScopeShared:
-		notebooks, err = h.notebookRepo.ListShared(ctx, userId, spec, excludeIds)
+		notebooks, err = h.notebookRepo.PageListShared(ctx, userId, spec, excludeIds)
 	default:
 		return nil, errors.ErrParams.Msgf("invalid scope: %d", query.Scope)
 	}

@@ -54,7 +54,7 @@ func (s *ArtifactStoreImpl) GetById(ctx context.Context, id database.Id) (*schem
 	return &a, nil
 }
 
-func (s *ArtifactStoreImpl) ListByNotebookId(ctx context.Context, notebookId database.Id, limit, offset int) ([]*schema.Artifact, error) {
+func (s *ArtifactStoreImpl) PageListByNotebookId(ctx context.Context, notebookId database.Id, limit, offset int) ([]*schema.Artifact, error) {
 	var rows []*schema.Artifact
 	if err := s.db.WithContext(ctx).
 		Where("notebook_id = ?", notebookId).
@@ -66,7 +66,7 @@ func (s *ArtifactStoreImpl) ListByNotebookId(ctx context.Context, notebookId dat
 	return rows, nil
 }
 
-func (s *ArtifactStoreImpl) ListByStatus(ctx context.Context, statuses []string, limit int) ([]*schema.Artifact, error) {
+func (s *ArtifactStoreImpl) PageListByStatus(ctx context.Context, statuses []string, limit int) ([]*schema.Artifact, error) {
 	var rows []*schema.Artifact
 	if err := s.db.WithContext(ctx).
 		Where("status IN ?", statuses).

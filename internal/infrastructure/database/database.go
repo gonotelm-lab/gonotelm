@@ -28,8 +28,8 @@ type NotebookStore interface {
 	GetById(ctx context.Context, id Id) (*schema.Notebook, error)
 	Exists(ctx context.Context, id Id) (bool, error)
 	GetByNameAndOwnerId(ctx context.Context, name string, ownerId valobj.Uid) (*schema.Notebook, error)
-	// ListByOwnerId 分页返回 owner 的 notebook；excludeIds 非空时 NOT IN。
-	ListByOwnerId(
+	// PageListByOwnerId 分页返回 owner 的 notebook；excludeIds 非空时 NOT IN。
+	PageListByOwnerId(
 		ctx context.Context,
 		ownerId valobj.Uid,
 		limit, offset int,
@@ -38,8 +38,8 @@ type NotebookStore interface {
 	) ([]*schema.Notebook, error)
 	// ListByIds 按 id 批量查询；ids 为空时返回空切片。
 	ListByIds(ctx context.Context, ids []Id) ([]*schema.Notebook, error)
-	// ListByIdsExcludingOwner 分页返回 ids 中 owner_id != excludeOwnerId 的 notebook；ids 为空时返回空切片。
-	ListByIdsExcludingOwner(
+	// PageListByIdsExcludingOwner 分页返回 ids 中 owner_id != excludeOwnerId 的 notebook；ids 为空时返回空切片。
+	PageListByIdsExcludingOwner(
 		ctx context.Context,
 		ids []Id,
 		excludeOwnerId valobj.Uid,
@@ -78,13 +78,34 @@ type UserNotebookPinStore interface {
 	DeleteByNotebookId(ctx context.Context, notebookId Id) error
 }
 
+type FavouriteStore interface {
+	Upsert(ctx context.Context, favourite *schema.Favourite) error
+	GetById(ctx context.Context, id Id) (*schema.Favourite, error)
+	PageListByUserId(ctx context.Context, userId valobj.Uid, limit, offset int) ([]*schema.Favourite, error)
+	CountByUserId(ctx context.Context, userId valobj.Uid) (int64, error)
+	DeleteById(ctx context.Context, id Id) error
+	DeleteByUserId(ctx context.Context, userId valobj.Uid) error
+}
+
+type FavouriteNotebookStore interface {
+	InsertIgnore(ctx context.Context, row *schema.FavouriteNotebook) error
+	Get(ctx context.Context, favouriteId, notebookId Id) (*schema.FavouriteNotebook, error)
+	PageListByFavouriteId(ctx context.Context, favouriteId Id, limit, offset int) ([]*schema.FavouriteNotebook, error)
+	// ListByNotebookIdAndFavouriteIds 在给定收藏夹 id 集合内，查出包含该 notebook 的关联行；favouriteIds 为空时返回空切片。
+	ListByNotebookIdAndFavouriteIds(ctx context.Context, notebookId Id, favouriteIds []Id) ([]*schema.FavouriteNotebook, error)
+	CountByFavouriteId(ctx context.Context, favouriteId Id) (int64, error)
+	Delete(ctx context.Context, favouriteId Id, notebookIds []Id) error
+	DeleteByFavouriteId(ctx context.Context, favouriteId Id) error
+	DeleteByUserId(ctx context.Context, userId valobj.Uid) error
+}
+
 type SourceStore interface {
 	Create(ctx context.Context, source *schema.Source) error
 	UpdateExisting(ctx context.Context, source *schema.Source) (int64, error)
 	GetById(ctx context.Context, id Id) (*schema.Source, error)
 	CountByNotebookId(ctx context.Context, notebookId Id) (int64, error)
 	BatchCountByNotebookIds(ctx context.Context, notebookIds []Id) (map[Id]int64, error)
-	ListByNotebookId(ctx context.Context, notebookId Id, limit, offset int) ([]*schema.Source, error)
+	PageListByNotebookId(ctx context.Context, notebookId Id, limit, offset int) ([]*schema.Source, error)
 	DeleteById(ctx context.Context, id Id) error
 	BatchDelete(ctx context.Context, ids []Id) error
 	DeleteByNotebookId(ctx context.Context, notebookId Id) error
@@ -102,7 +123,7 @@ type ChatStore interface {
 	GetById(ctx context.Context, id Id) (*schema.Chat, error)
 	GetByNotebookIdAndOwnerId(ctx context.Context, notebookId Id, ownerId valobj.Uid) (*schema.Chat, error)
 	ListByNotebookId(ctx context.Context, notebookId Id) ([]*schema.Chat, error)
-	ListByOwnerId(ctx context.Context, ownerId valobj.Uid, limit, offset int) ([]*schema.Chat, error)
+	PageListByOwnerId(ctx context.Context, ownerId valobj.Uid, limit, offset int) ([]*schema.Chat, error)
 	DeleteById(ctx context.Context, id Id) error
 	DeleteByNotebookId(ctx context.Context, notebookId Id) error
 }
@@ -112,9 +133,9 @@ type ChatMessageStore interface {
 	GetById(ctx context.Context, id Id) (*schema.ChatMessage, error)
 	GetByIdAndChatId(ctx context.Context, id Id, chatId Id) (*schema.ChatMessage, error)
 	// 按照seqno从大到小排序, orderBy=0 -> default, orderBy=1 -> seq_no ASC
-	ListByChatId(ctx context.Context, chatId Id, limit, offset, orderBy int) ([]*schema.ChatMessage, error)
+	PageListByChatId(ctx context.Context, chatId Id, limit, offset, orderBy int) ([]*schema.ChatMessage, error)
 	// 按照seqno从大到小排序, 查询seq_no < beforeSeqNo的消息
-	ListByChatIdBeforeSeqNo(ctx context.Context, chatId Id, beforeSeqNo int64, limit int) ([]*schema.ChatMessage, error)
+	PageListByChatIdBeforeSeqNo(ctx context.Context, chatId Id, beforeSeqNo int64, limit int) ([]*schema.ChatMessage, error)
 	DeleteByChatId(ctx context.Context, chatId Id) error
 	BatchDeleteByChatIds(ctx context.Context, chatIds []Id) error
 }
@@ -123,8 +144,8 @@ type ArtifactStore interface {
 	Create(ctx context.Context, artifact *schema.Artifact) error
 	UpdateExisting(ctx context.Context, artifact *schema.Artifact) (int64, error)
 	GetById(ctx context.Context, id Id) (*schema.Artifact, error)
-	ListByNotebookId(ctx context.Context, notebookId Id, limit, offset int) ([]*schema.Artifact, error)
-	ListByStatus(ctx context.Context, statuses []string, limit int) ([]*schema.Artifact, error)
+	PageListByNotebookId(ctx context.Context, notebookId Id, limit, offset int) ([]*schema.Artifact, error)
+	PageListByStatus(ctx context.Context, statuses []string, limit int) ([]*schema.Artifact, error)
 	DeleteById(ctx context.Context, id Id) error
 	DeleteByNotebookId(ctx context.Context, notebookId Id) error
 }
@@ -185,6 +206,8 @@ type Dao struct {
 	NotebookMaintenanceStore  NotebookMaintenanceStore
 	NotebookMemberStore       NotebookMemberStore
 	UserNotebookPinStore      UserNotebookPinStore
+	FavouriteStore            FavouriteStore
+	FavouriteNotebookStore    FavouriteNotebookStore
 	SourceStore               SourceStore
 	ChatStore                 ChatStore
 	ChatMessageStore          ChatMessageStore
@@ -203,6 +226,8 @@ func NewDao(
 	notebookMaintenanceStore NotebookMaintenanceStore,
 	notebookMemberStore NotebookMemberStore,
 	userNotebookPinStore UserNotebookPinStore,
+	favouriteStore FavouriteStore,
+	favouriteNotebookStore FavouriteNotebookStore,
 	sourceStore SourceStore,
 	chatStore ChatStore,
 	chatMessageStore ChatMessageStore,
@@ -220,6 +245,8 @@ func NewDao(
 		NotebookMaintenanceStore:  notebookMaintenanceStore,
 		NotebookMemberStore:       notebookMemberStore,
 		UserNotebookPinStore:      userNotebookPinStore,
+		FavouriteStore:            favouriteStore,
+		FavouriteNotebookStore:    favouriteNotebookStore,
 		SourceStore:               sourceStore,
 		ChatStore:                 chatStore,
 		ChatMessageStore:          chatMessageStore,

@@ -13,6 +13,7 @@ import (
 	bootshared "github.com/gonotelm-lab/gonotelm/internal/bootstrap/shared"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	coreadapter "github.com/gonotelm-lab/gonotelm/internal/core/adapter"
+	favouriteservice "github.com/gonotelm-lab/gonotelm/internal/domain/favourite/service"
 	identityservice "github.com/gonotelm-lab/gonotelm/internal/domain/identity/service"
 	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
 	pinservice "github.com/gonotelm-lab/gonotelm/internal/domain/pin/service"
@@ -83,6 +84,13 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 	notebookMemberRepo := repository.NewNotebookMemberRepository(infra.Database.NotebookMemberStore)
 	pinRepo := repository.NewPinRepository(infra.Database.UserNotebookPinStore)
 	pinService := pinservice.New(pinRepo)
+	favouriteRepo := repository.NewFavouriteRepository(
+		infra.Database.FavouriteStore,
+		infra.Database.FavouriteNotebookStore,
+		infra.Database.Transactor,
+	)
+	favouriteNotebookRepo := repository.NewFavouriteNotebookRepository(infra.Database.FavouriteNotebookStore)
+	favouriteService := favouriteservice.New(favouriteRepo, favouriteNotebookRepo)
 	notebookAccessService := notebookservice.NewAccessService(notebookRepo, notebookMemberRepo)
 	sourceRepo := repository.NewSourceRepository(infra.Database.SourceStore)
 	sourceDocRepo := repository.NewSourceDocRepository(
@@ -247,6 +255,9 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 			NotebookMemberRepo:        notebookMemberRepo,
 			PinRepo:                   pinRepo,
 			PinService:                pinService,
+			FavouriteRepo:             favouriteRepo,
+			FavouriteNotebookRepo:     favouriteNotebookRepo,
+			FavouriteService:          favouriteService,
 			NotebookAccessService:     notebookAccessService,
 			NotebookAIDescriptionRepo: notebookAIDescRepo,
 

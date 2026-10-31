@@ -34,9 +34,9 @@ internal/
     valobj/               value objects: Id, Uid, Time, StoreKey
     event/                Event interface and Category (inprocess | interprocess)
     adapter/              ports to outside capabilities: ObjectStore, Summarizer, TitleMaker, ImageInterpreter, DistributedLock
-  domain/<domain>/        pure business logic; domains = artifact, chat, identity, notebook, pin, sandbox, source, worker
+  domain/<domain>/        pure business logic; domains = artifact, chat, favourite, identity, notebook, pin, sandbox, source, worker
     entity/ vo/           aggregates and value objects; constructors validate (NewNotebook returns error), mutations call AddEvent
-    repository/           interfaces and ListSpec only — implementations always live in infrastructure
+    repository/           interfaces and PageListSpec only — implementations always live in infrastructure
     service/              logic spanning entities/aggregates (e.g. source parse → chunk → index)
     errors/ event/        domain errors and domain events
   application/            use-case orchestration, one file per use case
@@ -60,7 +60,7 @@ internal/
     eventbus/             routes by event.Category(): inprocess dispatches locally, interprocess goes to MQ; CompositeEventBus is the single publish entry point
   interfaces/             delivery layer
     api/notelm/           composition root: builds Hertz, mounts /api/v1 groups, delegates to one sub-package per domain
-      auth|notebook|source|chat|studio|user/   one Server + Deps per domain, owns its handlers and routes
+      auth|notebook|source|chat|studio|user|favourite/   one Server + Deps per domain, owns its handlers and routes
       schema/             request/response DTOs shared by every sub-package
     entrypoint/worker/    decodes a flow task into contract.WorkerInput and calls into application
     event/                per-process event handler registration (notelm in-process, sourcejob over MQ)
@@ -86,7 +86,7 @@ assets/                   slides templates, artifact preview images, opensandbox
 - **Request binding**: `c.BindAndValidate(&req)` runs the custom binder in `pkg/http/binder.go` — `path:`/`query:`/`json:` tags, then `validator/v10` tags, then the DTO's own `Validate() error`. A plain validator failure surfaces as 200 `code:1000`.
 - **Object URLs are never persisted**: only the encoded `StoreKey` is stored (mapper); every URL is resolved per request. Public-read assets (avatars, style previews) use `adapter.ObjectPublicURLer.PublicURL`; private ones (source content, artifact results) use `PresignGet`. A resolve failure normally degrades to an empty URL plus a WARN, not an API error.
 - **API never resolves StoreKey → URL**: application handlers return response views that already carry complete URLs (e.g. `AvatarURL`, `ContentUrl`, `PreviewUrl`). The HTTP layer only maps app results into `schema` DTOs — no `PublicURL` / `PresignGet` / `AttachStorageURL` in `interfaces/api`. `ObjectStore` may still appear on API `Deps` solely to construct app handlers (upload / delete / presign); handler methods must not call it.
-- **Error codes**: 100xxx notebook, 101xxx chat, 102xxx artifact, 103xxx source, 104xxx worker, 105xxx sandbox, 106xxx identity, 107xxx pin. Each is declared as `errors.ErrXxx.ErrCode(n).Msg(…)`, so its HTTP status is inherited from the builtin it derives from.
+- **Error codes**: 100xxx notebook, 101xxx chat, 102xxx artifact, 103xxx source, 104xxx worker, 105xxx sandbox, 106xxx identity, 107xxx pin, 108xxx favourite. Each is declared as `errors.ErrXxx.ErrCode(n).Msg(…)`, so its HTTP status is inherited from the builtin it derives from.
 - **Wiring**: `ServerDeps` in the root `server.go` is the only injection surface — add the repo field there, build it in `bootstrap/notelm.go`, map it into the sub-package's `Deps` in the root `NewServer`, and construct the application handler in that sub-package's `NewServer`. There is no route manifest to update.
 
 ## Cross-process flows
@@ -111,6 +111,7 @@ Comments, docs, and copy are Chinese; pick one word per concept and keep it. A t
 | 创建账号 | Concretely: insert one row into `users_v2`. |
 | 落库 | Persisting to a store — Postgres, Redis and MinIO all take the same word. |
 | 注销账号 | The user ending their own account. |
+| 收藏夹 | User-private notebook folder (`Favourite`); distinct from pin（置顶）. |
 
 Three verbs with distinct jobs:
 
@@ -123,6 +124,12 @@ Type and field names stay English (`Password`); this section governs the Chinese
 ## Conventions when changing code
 
 - **New persistence capability**: define the interface in `domain/<domain>/repository` → implement in `infrastructure/repository` → convert models in `mapper` → add the GORM model in `infrastructure/database/schema` → wire it up in `bootstrap`.
+- **List vs PageList naming** (domain `repository` interfaces and infrastructure stores — postgres / cache / etc.; keep names aligned across the two layers):
+  - `ListXxx` — fetch multiple rows **without** pagination (no limit/offset/cursor/batch-limit).
+  - `PageListXxx` — any fetch bounded by pagination or a batch cap (`Limit`/`Offset`, cursor such as `BeforeSeqNo`+`Limit`, or `start`+`limit`).
+  - Pagination params live in `PageListSpec` (and variants like `PageListByStatusSpec` / `PageListByCursorSpec`); do not revive `ListSpec`.
+  - Application Handler / `interfaces` Server method names are product-facing and need not use the `PageList` prefix (e.g. `ListNotebooks` may still call `PageListByOwner`).
+- **No JOIN in Store**: each Store under `infrastructure/database` queries only its own table (single-table `WHERE` / `IN` are fine; no `JOIN` / `Joins` / cross-table `FROM a, b`). Assemble cross-table results in `infrastructure/repository` (or application) with multiple single-table queries; when filtering by another table's columns, load ids first then `IN`, or denormalize the needed column onto this table (and keep the write path consistent) — never JOIN inside a Store.
 - **Every DAO file ships with a test file.** A data-access implementation gets a paired `<file>_test.go` in the same package — `postgres/notebookstore.go` → `notebookstore_test.go`, `cache/redis/suggestion.go` → `suggestion_test.go`, `olap/clickhouse/llmlogstore.go` → `llmlogstore_test.go`. The package's `main_test.go` holds a `TestMain` that builds a throwaway database from the `TEST_GONOTELM_*` env vars through `pkg/testsuite/{sql,redis,clickhouse}`, applies the same goose migrations as `cmd/migrate`, and exposes `testXxxStore` values to the tests; `open_test.go` covers the wiring. Assertions use goconvey (`Convey` / `So`); `Convey` descriptions are written in English, comments stay Chinese.
 - **New external component**: register a `Component` constructor in `bootstrap/shared`, then have each `bootstrap/<binary>.go` request only what it needs. Wiring belongs in code, not in config.
 - **New config field**: add it to `internal/conf/<binary>.go` and `etc/<binary>.toml.tpl`, with defaults in the `Init()` method; tag must-have fields with `validate:"required"` (checked after decode by `shared.LoadTOML`, format in `internal/conf/shared/validate.go`) and mark sections a binary may leave unconfigured with `validate:"omitempty"`; use a goose migration under `migration/db/postgres18` for schema changes.

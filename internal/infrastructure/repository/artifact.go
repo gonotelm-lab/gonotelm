@@ -43,13 +43,13 @@ func (r *ArtifactRepositoryImpl) FindById(ctx context.Context, id valobj.Id) (*a
 	return mapper.ArtifactFromSchema(sch)
 }
 
-func (r *ArtifactRepositoryImpl) ListByNotebookId(
-	ctx context.Context, notebookId valobj.Id, spec *artifactrepo.ListSpec,
+func (r *ArtifactRepositoryImpl) PageListByNotebookId(
+	ctx context.Context, notebookId valobj.Id, spec *artifactrepo.PageListSpec,
 ) ([]*artifactentity.Artifact, error) {
 	if err := spec.Validate(); err != nil {
 		return nil, err
 	}
-	rows, err := r.store.ListByNotebookId(ctx, notebookId, spec.Limit, spec.Offset)
+	rows, err := r.store.PageListByNotebookId(ctx, notebookId, spec.Limit, spec.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -65,8 +65,8 @@ func (r *ArtifactRepositoryImpl) ListByNotebookId(
 	return out, nil
 }
 
-func (r *ArtifactRepositoryImpl) ListByStatus(
-	ctx context.Context, spec *artifactrepo.ListByStatusSpec,
+func (r *ArtifactRepositoryImpl) PageListByStatus(
+	ctx context.Context, spec *artifactrepo.PageListByStatusSpec,
 ) ([]*artifactentity.Artifact, error) {
 	if err := spec.Validate(); err != nil {
 		return nil, err
@@ -75,7 +75,7 @@ func (r *ArtifactRepositoryImpl) ListByStatus(
 	for _, s := range spec.Statuses {
 		strs = append(strs, s.String())
 	}
-	rows, err := r.store.ListByStatus(ctx, strs, spec.Limit)
+	rows, err := r.store.PageListByStatus(ctx, strs, spec.Limit)
 	if err != nil {
 		return nil, err
 	}

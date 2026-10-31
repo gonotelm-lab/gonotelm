@@ -12,8 +12,8 @@ type Repository interface {
 	// UpdateExisting 只更新已存在的记录
 	UpdateExisting(ctx context.Context, artifact *entity.Artifact) (int64, error)
 	FindById(ctx context.Context, id valobj.Id) (*entity.Artifact, error)
-	ListByNotebookId(ctx context.Context, notebookId valobj.Id, spec *ListSpec) ([]*entity.Artifact, error)
-	ListByStatus(ctx context.Context, spec *ListByStatusSpec) ([]*entity.Artifact, error)
+	PageListByNotebookId(ctx context.Context, notebookId valobj.Id, spec *PageListSpec) ([]*entity.Artifact, error)
+	PageListByStatus(ctx context.Context, spec *PageListByStatusSpec) ([]*entity.Artifact, error)
 	DeleteById(ctx context.Context, id valobj.Id) error
 	DeleteByNotebookId(ctx context.Context, notebookId valobj.Id) error
 }

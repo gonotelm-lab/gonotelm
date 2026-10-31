@@ -69,7 +69,7 @@ func TestNotebookStoreCRUD(t *testing.T) {
 }
 
 func TestNotebookStoreListByOwnerId(t *testing.T) {
-	Convey("NotebookStore ListByOwnerId pages and orders owner notebooks", t, func() {
+	Convey("NotebookStore PageListByOwnerId pages and orders owner notebooks", t, func() {
 		store := testNotebookStore
 		ctx := t.Context()
 		ownerID := valobj.NewUid()
@@ -98,40 +98,40 @@ func TestNotebookStoreListByOwnerId(t *testing.T) {
 		})
 
 		// updated_at DESC: nbNew 在前，nbOld 在后；同毫秒由 id DESC 兜底。
-		rows, err := store.ListByOwnerId(ctx, ownerID, 10, 0, database.NotebookListOrderLastActive, nil)
+		rows, err := store.PageListByOwnerId(ctx, ownerID, 10, 0, database.NotebookListOrderLastActive, nil)
 		So(err, ShouldBeNil)
 		So(len(rows), ShouldEqual, 2)
 		So(rows[0].Id, ShouldEqual, nbNew.Id)
 		So(rows[1].Id, ShouldEqual, nbOld.Id)
 
-		rows, err = store.ListByOwnerId(ctx, ownerID, 1, 0, database.NotebookListOrderLastActive, nil)
+		rows, err = store.PageListByOwnerId(ctx, ownerID, 1, 0, database.NotebookListOrderLastActive, nil)
 		So(err, ShouldBeNil)
 		So(len(rows), ShouldEqual, 1)
 		So(rows[0].Id, ShouldEqual, nbNew.Id)
 
-		rows, err = store.ListByOwnerId(ctx, ownerID, 1, 1, database.NotebookListOrderLastActive, nil)
+		rows, err = store.PageListByOwnerId(ctx, ownerID, 1, 1, database.NotebookListOrderLastActive, nil)
 		So(err, ShouldBeNil)
 		So(len(rows), ShouldEqual, 1)
 		So(rows[0].Id, ShouldEqual, nbOld.Id)
 
-		rows, err = store.ListByOwnerId(ctx, ownerID, 1, 2, database.NotebookListOrderLastActive, nil)
+		rows, err = store.PageListByOwnerId(ctx, ownerID, 1, 2, database.NotebookListOrderLastActive, nil)
 		So(err, ShouldBeNil)
 		So(len(rows), ShouldEqual, 0)
 
 		// id ASC 等价于创建时间正序（uuidv7 内嵌时间戳）。
-		rows, err = store.ListByOwnerId(ctx, ownerID, 10, 0, database.NotebookListOrderCreateTime, nil)
+		rows, err = store.PageListByOwnerId(ctx, ownerID, 10, 0, database.NotebookListOrderCreateTime, nil)
 		So(err, ShouldBeNil)
 		So(len(rows), ShouldEqual, 2)
 		So(rows[0].Id, ShouldEqual, nbOld.Id)
 		So(rows[1].Id, ShouldEqual, nbNew.Id)
 
-		_, err = store.ListByOwnerId(ctx, ownerID, 0, 0, database.NotebookListOrderLastActive, nil)
+		_, err = store.PageListByOwnerId(ctx, ownerID, 0, 0, database.NotebookListOrderLastActive, nil)
 		So(err, ShouldNotBeNil)
 
-		_, err = store.ListByOwnerId(ctx, ownerID, 1, -1, database.NotebookListOrderLastActive, nil)
+		_, err = store.PageListByOwnerId(ctx, ownerID, 1, -1, database.NotebookListOrderLastActive, nil)
 		So(err, ShouldNotBeNil)
 
-		_, err = store.ListByOwnerId(ctx, ownerID, 1, 0, database.NotebookListOrder(99), nil)
+		_, err = store.PageListByOwnerId(ctx, ownerID, 1, 0, database.NotebookListOrder(99), nil)
 		So(err, ShouldNotBeNil)
 	})
 }
@@ -165,7 +165,7 @@ func TestNotebookStoreListByIds(t *testing.T) {
 }
 
 func TestNotebookStoreListByIdsExcludingOwner(t *testing.T) {
-	Convey("NotebookStore ListByIdsExcludingOwner pages, orders and excludes the owner", t, func() {
+	Convey("NotebookStore PageListByIdsExcludingOwner pages, orders and excludes the owner", t, func() {
 		store := testNotebookStore
 		ctx := t.Context()
 		ownerID := valobj.NewUid()
@@ -204,35 +204,35 @@ func TestNotebookStoreListByIdsExcludingOwner(t *testing.T) {
 		ids := []database.Id{sharedOlder.Id, sharedNewer.Id, ownNotebook.Id}
 
 		// 本人拥有的 notebook 即使出现在 ids 里也要排除。
-		rows, err := store.ListByIdsExcludingOwner(ctx, ids, memberID, 10, 0, database.NotebookListOrderLastActive)
+		rows, err := store.PageListByIdsExcludingOwner(ctx, ids, memberID, 10, 0, database.NotebookListOrderLastActive)
 		So(err, ShouldBeNil)
 		So(len(rows), ShouldEqual, 2)
 		So(rows[0].Id, ShouldEqual, sharedNewer.Id)
 		So(rows[1].Id, ShouldEqual, sharedOlder.Id)
 
-		rows, err = store.ListByIdsExcludingOwner(ctx, ids, memberID, 1, 1, database.NotebookListOrderLastActive)
+		rows, err = store.PageListByIdsExcludingOwner(ctx, ids, memberID, 1, 1, database.NotebookListOrderLastActive)
 		So(err, ShouldBeNil)
 		So(len(rows), ShouldEqual, 1)
 		So(rows[0].Id, ShouldEqual, sharedOlder.Id)
 
-		rows, err = store.ListByIdsExcludingOwner(ctx, ids, memberID, 1, 2, database.NotebookListOrderLastActive)
+		rows, err = store.PageListByIdsExcludingOwner(ctx, ids, memberID, 1, 2, database.NotebookListOrderLastActive)
 		So(err, ShouldBeNil)
 		So(len(rows), ShouldEqual, 0)
 
-		rows, err = store.ListByIdsExcludingOwner(ctx, ids, memberID, 10, 0, database.NotebookListOrderCreateTime)
+		rows, err = store.PageListByIdsExcludingOwner(ctx, ids, memberID, 10, 0, database.NotebookListOrderCreateTime)
 		So(err, ShouldBeNil)
 		So(len(rows), ShouldEqual, 2)
 		So(rows[0].Id, ShouldEqual, sharedOlder.Id)
 		So(rows[1].Id, ShouldEqual, sharedNewer.Id)
 
-		rows, err = store.ListByIdsExcludingOwner(ctx, nil, memberID, 10, 0, database.NotebookListOrderLastActive)
+		rows, err = store.PageListByIdsExcludingOwner(ctx, nil, memberID, 10, 0, database.NotebookListOrderLastActive)
 		So(err, ShouldBeNil)
 		So(len(rows), ShouldEqual, 0)
 
-		_, err = store.ListByIdsExcludingOwner(ctx, ids, memberID, 0, 0, database.NotebookListOrderLastActive)
+		_, err = store.PageListByIdsExcludingOwner(ctx, ids, memberID, 0, 0, database.NotebookListOrderLastActive)
 		So(err, ShouldNotBeNil)
 
-		_, err = store.ListByIdsExcludingOwner(ctx, ids, memberID, 10, 0, database.NotebookListOrder(99))
+		_, err = store.PageListByIdsExcludingOwner(ctx, ids, memberID, 10, 0, database.NotebookListOrder(99))
 		So(err, ShouldNotBeNil)
 	})
 }

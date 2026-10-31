@@ -84,17 +84,17 @@ func (s *NotebookRepositoryImpl) ListByIds(
 	return s.withSourceCounts(ctx, rows)
 }
 
-func (s *NotebookRepositoryImpl) ListByOwner(
+func (s *NotebookRepositoryImpl) PageListByOwner(
 	ctx context.Context,
 	ownerId valobj.Uid,
-	spec *notebookrepo.ListSpec,
+	spec *notebookrepo.PageListSpec,
 	excludeIds []valobj.Id,
 ) ([]*notebookentity.Notebook, error) {
 	if err := spec.Validate(); err != nil {
 		return nil, err
 	}
 
-	rows, err := s.notebookStore.ListByOwnerId(
+	rows, err := s.notebookStore.PageListByOwnerId(
 		ctx,
 		ownerId,
 		spec.Limit,
@@ -109,10 +109,10 @@ func (s *NotebookRepositoryImpl) ListByOwner(
 	return s.withSourceCounts(ctx, rows)
 }
 
-func (s *NotebookRepositoryImpl) ListShared(
+func (s *NotebookRepositoryImpl) PageListShared(
 	ctx context.Context,
 	userId valobj.Uid,
-	spec *notebookrepo.ListSpec,
+	spec *notebookrepo.PageListSpec,
 	excludeIds []valobj.Id,
 ) ([]*notebookentity.Notebook, error) {
 	if err := spec.Validate(); err != nil {
@@ -142,7 +142,7 @@ func (s *NotebookRepositoryImpl) ListShared(
 	}
 
 	// 只取 member 关联到的 notebook
-	rows, err := s.notebookStore.ListByIdsExcludingOwner(
+	rows, err := s.notebookStore.PageListByIdsExcludingOwner(
 		ctx,
 		notebookIds,
 		userId,

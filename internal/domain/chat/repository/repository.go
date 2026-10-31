@@ -16,28 +16,28 @@ type ChatRepository interface {
 	DeleteByNotebookId(ctx context.Context, notebookId valobj.Id) error
 }
 
-type ListSpecOrder int
+type PageListSpecOrder int
 
 const (
 	// 默认排序: seq_no 从大到小 (最新在前)
-	ListSpecOrderSeqNoDesc ListSpecOrder = 0
+	PageListSpecOrderSeqNoDesc PageListSpecOrder = 0
 	// seq_no 从小到大 (最早在前)
-	ListSpecOrderSeqNoAsc ListSpecOrder = 1
+	PageListSpecOrderSeqNoAsc PageListSpecOrder = 1
 )
 
-type ListSpec struct {
+type PageListSpec struct {
 	Offset int
 	Limit  int
-	Order  ListSpecOrder
+	Order  PageListSpecOrder
 }
 
-func (s *ListSpec) Validate() error {
+func (s *PageListSpec) Validate() error {
 	if s.Limit <= 0 || s.Offset < 0 {
 		return xerror.ErrParams.Msgf("invalid pagination params: limit=%d offset=%d", s.Limit, s.Offset)
 	}
 
 	switch s.Order {
-	case ListSpecOrderSeqNoDesc, ListSpecOrderSeqNoAsc:
+	case PageListSpecOrderSeqNoDesc, PageListSpecOrderSeqNoAsc:
 		return nil
 	default:
 		return xerror.ErrParams.Msgf("invalid order: %d", s.Order)

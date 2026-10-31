@@ -1,0 +1,200 @@
+package repository
+
+import (
+	"context"
+
+	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
+	"github.com/gonotelm-lab/gonotelm/internal/domain/favourite/entity"
+	favouriteerrors "github.com/gonotelm-lab/gonotelm/internal/domain/favourite/errors"
+	favouriterepo "github.com/gonotelm-lab/gonotelm/internal/domain/favourite/repository"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/schema"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository/mapper"
+	"github.com/gonotelm-lab/gonotelm/pkg/errors"
+)
+
+type FavouriteRepositoryImpl struct {
+	favouriteStore         database.FavouriteStore
+	favouriteNotebookStore database.FavouriteNotebookStore
+	transactor             database.Transactor
+}
+
+func NewFavouriteRepository(
+	favouriteStore database.FavouriteStore,
+	favouriteNotebookStore database.FavouriteNotebookStore,
+	transactor database.Transactor,
+) favouriterepo.Repository {
+	return &FavouriteRepositoryImpl{
+		favouriteStore:         favouriteStore,
+		favouriteNotebookStore: favouriteNotebookStore,
+		transactor:             transactor,
+	}
+}
+
+var _ favouriterepo.Repository = &FavouriteRepositoryImpl{}
+
+func (r *FavouriteRepositoryImpl) Save(ctx context.Context, f *entity.Favourite) error {
+	if f.IsDeleted() {
+		return r.transactor.Transaction(ctx, func(txCtx context.Context) error {
+			if err := r.favouriteNotebookStore.DeleteByFavouriteId(txCtx, f.Id); err != nil {
+				return err
+			}
+			return r.favouriteStore.DeleteById(txCtx, f.Id)
+		})
+	}
+
+	return r.favouriteStore.Upsert(ctx, mapper.FavouriteToSchema(f))
+}
+
+func (r *FavouriteRepositoryImpl) Find(ctx context.Context, id valobj.Id) (*entity.Favourite, error) {
+	row, err := r.favouriteStore.GetById(ctx, id)
+	if err != nil {
+		if errors.Is(err, errors.ErrNoRecord) {
+			return nil, favouriteerrors.ErrFavouriteNotFound
+		}
+		return nil, err
+	}
+	return mapper.FavouriteFromSchema(row), nil
+}
+
+func (r *FavouriteRepositoryImpl) PageListByUserId(
+	ctx context.Context,
+	userId valobj.Uid,
+	spec *favouriterepo.PageListSpec,
+) ([]*entity.Favourite, error) {
+	if err := spec.Validate(); err != nil {
+		return nil, err
+	}
+	rows, err := r.favouriteStore.PageListByUserId(ctx, userId, spec.Limit, spec.Offset)
+	if err != nil {
+		return nil, err
+	}
+	return mapper.FavouritesFromSchema(rows), nil
+}
+
+// ListByUserAndNotebook 两步单表查询后在内存组装，避免跨表 JOIN。
+func (r *FavouriteRepositoryImpl) ListByUserAndNotebook(
+	ctx context.Context,
+	userId valobj.Uid,
+	notebookId valobj.Id,
+) ([]*entity.Favourite, error) {
+	favs, err := r.favouriteStore.PageListByUserId(ctx, userId, entity.MaxFavouritesPerUser, 0)
+	if err != nil {
+		return nil, err
+	}
+	if len(favs) == 0 {
+		return []*entity.Favourite{}, nil
+	}
+
+	ids := make([]database.Id, 0, len(favs))
+	byId := make(map[database.Id]*schema.Favourite, len(favs))
+	for _, f := range favs {
+		ids = append(ids, f.Id)
+		byId[f.Id] = f
+	}
+
+	links, err := r.favouriteNotebookStore.ListByNotebookIdAndFavouriteIds(ctx, notebookId, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]*entity.Favourite, 0, len(links))
+	for _, link := range links {
+		row, ok := byId[link.FavouriteId]
+		if !ok {
+			continue
+		}
+		out = append(out, mapper.FavouriteFromSchema(row))
+	}
+	return out, nil
+}
+
+func (r *FavouriteRepositoryImpl) CountByUserId(ctx context.Context, userId valobj.Uid) (int64, error) {
+	return r.favouriteStore.CountByUserId(ctx, userId)
+}
+
+func (r *FavouriteRepositoryImpl) DeleteByUserId(ctx context.Context, userId valobj.Uid) error {
+	return r.transactor.Transaction(ctx, func(txCtx context.Context) error {
+		if err := r.favouriteNotebookStore.DeleteByUserId(txCtx, userId); err != nil {
+			return err
+		}
+		return r.favouriteStore.DeleteByUserId(txCtx, userId)
+	})
+}
+
+type FavouriteNotebookRepositoryImpl struct {
+	favouriteNotebookStore database.FavouriteNotebookStore
+}
+
+func NewFavouriteNotebookRepository(
+	favouriteNotebookStore database.FavouriteNotebookStore,
+) favouriterepo.NotebookRepository {
+	return &FavouriteNotebookRepositoryImpl{favouriteNotebookStore: favouriteNotebookStore}
+}
+
+var _ favouriterepo.NotebookRepository = &FavouriteNotebookRepositoryImpl{}
+
+func (r *FavouriteNotebookRepositoryImpl) Save(
+	ctx context.Context,
+	row *entity.FavouriteNotebook,
+) error {
+	return r.favouriteNotebookStore.InsertIgnore(ctx, mapper.FavouriteNotebookToSchema(row))
+}
+
+func (r *FavouriteNotebookRepositoryImpl) Find(
+	ctx context.Context,
+	favouriteId, notebookId valobj.Id,
+) (*entity.FavouriteNotebook, error) {
+	row, err := r.favouriteNotebookStore.Get(ctx, favouriteId, notebookId)
+	if err != nil {
+		if errors.Is(err, errors.ErrNoRecord) {
+			return nil, favouriteerrors.ErrFavouriteNotebookNotFound
+		}
+		return nil, err
+	}
+	return mapper.FavouriteNotebookFromSchema(row), nil
+}
+
+func (r *FavouriteNotebookRepositoryImpl) PageListByFavouriteId(
+	ctx context.Context,
+	favouriteId valobj.Id,
+	spec *favouriterepo.PageListSpec,
+) ([]*entity.FavouriteNotebook, error) {
+	if err := spec.Validate(); err != nil {
+		return nil, err
+	}
+	rows, err := r.favouriteNotebookStore.PageListByFavouriteId(ctx, favouriteId, spec.Limit, spec.Offset)
+	if err != nil {
+		return nil, err
+	}
+	return mapper.FavouriteNotebooksFromSchema(rows), nil
+}
+
+func (r *FavouriteNotebookRepositoryImpl) CountByFavouriteId(
+	ctx context.Context,
+	favouriteId valobj.Id,
+) (int64, error) {
+	return r.favouriteNotebookStore.CountByFavouriteId(ctx, favouriteId)
+}
+
+func (r *FavouriteNotebookRepositoryImpl) Delete(
+	ctx context.Context,
+	favouriteId valobj.Id,
+	notebookIds []valobj.Id,
+) error {
+	return r.favouriteNotebookStore.Delete(ctx, favouriteId, notebookIds)
+}
+
+func (r *FavouriteNotebookRepositoryImpl) DeleteByFavouriteId(
+	ctx context.Context,
+	favouriteId valobj.Id,
+) error {
+	return r.favouriteNotebookStore.DeleteByFavouriteId(ctx, favouriteId)
+}
+
+func (r *FavouriteNotebookRepositoryImpl) DeleteByUserId(
+	ctx context.Context,
+	userId valobj.Uid,
+) error {
+	return r.favouriteNotebookStore.DeleteByUserId(ctx, userId)
+}

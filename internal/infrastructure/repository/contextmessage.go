@@ -64,12 +64,12 @@ func (r *ContextMessageRepositoryImpl) ListAll(
 	return mapper.ContextMessagesFromSchema(schemas)
 }
 
-func (r *ContextMessageRepositoryImpl) List(
+func (r *ContextMessageRepositoryImpl) PageList(
 	ctx context.Context,
 	chatId valobj.Id,
 	start, limit int,
 ) ([]*entity.ContextMessage, error) {
-	schemas, err := r.contextCache.List(ctx, chatId.String(), start, limit)
+	schemas, err := r.contextCache.PageList(ctx, chatId.String(), start, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -77,12 +77,12 @@ func (r *ContextMessageRepositoryImpl) List(
 	return mapper.ContextMessagesFromSchema(schemas)
 }
 
-func (r *ContextMessageRepositoryImpl) ListRecent(
+func (r *ContextMessageRepositoryImpl) PageListRecent(
 	ctx context.Context,
 	chatId valobj.Id,
 	limit int,
 ) ([]*entity.ContextMessage, error) {
-	schemas, err := r.contextCache.ListRecent(ctx, chatId.String(), limit)
+	schemas, err := r.contextCache.PageListRecent(ctx, chatId.String(), limit)
 	if err != nil {
 		return nil, err
 	}

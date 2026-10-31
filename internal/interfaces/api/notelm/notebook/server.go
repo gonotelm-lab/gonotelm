@@ -5,6 +5,7 @@ import (
 	pinapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/pin"
 	"github.com/gonotelm-lab/gonotelm/internal/application/shared/cleanup"
 	"github.com/gonotelm-lab/gonotelm/internal/core/adapter"
+	favouriterepo "github.com/gonotelm-lab/gonotelm/internal/domain/favourite/repository"
 	identityrepo "github.com/gonotelm-lab/gonotelm/internal/domain/identity/repository"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
@@ -19,6 +20,7 @@ type Deps struct {
 	MemberRepo            notebookrepo.MemberRepository
 	PinRepo               pinrepo.Repository
 	PinService            *pinservice.Service
+	FavouriteRepo         favouriterepo.Repository
 	NotebookAccessService *notebookservice.AccessService
 	SourceRepo            sourcerepo.Repository
 	EventBus              eventbus.Publisher
@@ -59,7 +61,12 @@ type Server struct {
 func NewServer(deps Deps) *Server {
 	return &Server{
 		getNotebookHandler: notebookapp.NewGetNotebookHandler(
-			deps.NotebookRepo, deps.NotebookAccessService, deps.UserRepo, deps.ObjectStore, deps.PinRepo,
+			deps.NotebookRepo,
+			deps.NotebookAccessService,
+			deps.UserRepo,
+			deps.ObjectStore,
+			deps.PinRepo,
+			deps.FavouriteRepo,
 		),
 		createNotebookHandler: notebookapp.NewCreateNotebookHandler(deps.NotebookRepo, deps.EventBus),
 		listNotebooksHandler: notebookapp.NewListNotebooksHandler(

@@ -5,24 +5,24 @@ import (
 	xerror "github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
 
-type ListSpec struct {
+type PageListSpec struct {
 	Offset int
 	Limit  int
 }
 
-func (s *ListSpec) Validate() error {
+func (s *PageListSpec) Validate() error {
 	if s.Limit <= 0 || s.Offset < 0 {
 		return xerror.ErrParams.Msgf("invalid pagination params: limit=%d offset=%d", s.Limit, s.Offset)
 	}
 	return nil
 }
 
-type ListByStatusSpec struct {
+type PageListByStatusSpec struct {
 	Statuses []artifactentity.Status
 	Limit    int
 }
 
-func (s *ListByStatusSpec) Validate() error {
+func (s *PageListByStatusSpec) Validate() error {
 	if len(s.Statuses) == 0 {
 		return xerror.ErrParams.Msgf("statuses must not be empty")
 	}

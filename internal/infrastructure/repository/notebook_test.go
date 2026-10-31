@@ -24,7 +24,7 @@ type fakeNotebookStore struct {
 	rows         []*schema.Notebook
 }
 
-func (f *fakeNotebookStore) ListByIdsExcludingOwner(
+func (f *fakeNotebookStore) PageListByIdsExcludingOwner(
 	_ context.Context,
 	ids []database.Id,
 	excludeOwnerId valobj.Uid,
@@ -81,7 +81,7 @@ func TestNotebookRepositoryListShared(t *testing.T) {
 
 	repo := NewNotebookRepository(notebookStore, memberStore, &fakeSourceStore{})
 
-	rows, err := repo.ListShared(context.Background(), userId, &notebookrepo.ListSpec{
+	rows, err := repo.PageListShared(context.Background(), userId, &notebookrepo.PageListSpec{
 		Limit:  5,
 		Offset: 10,
 		Order:  notebookrepo.ListOrderCreateTime,
@@ -101,7 +101,7 @@ func TestNotebookRepositoryListSharedNoMembership(t *testing.T) {
 	notebookStore := &fakeNotebookStore{}
 	repo := NewNotebookRepository(notebookStore, &fakeNotebookMemberStore{}, &fakeSourceStore{})
 
-	rows, err := repo.ListShared(context.Background(), valobj.NewUid(), &notebookrepo.ListSpec{Limit: 5}, nil)
+	rows, err := repo.PageListShared(context.Background(), valobj.NewUid(), &notebookrepo.PageListSpec{Limit: 5}, nil)
 	require.NoError(t, err)
 
 	assert.Empty(t, rows)

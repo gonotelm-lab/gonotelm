@@ -100,7 +100,7 @@ func (c *ChatMessageContextCacheImpl) ListAll(
 	return c.listRange(ctx, chatId, 0, -1)
 }
 
-func (c *ChatMessageContextCacheImpl) List(
+func (c *ChatMessageContextCacheImpl) PageList(
 	ctx context.Context,
 	chatId string,
 	start, limit int,
@@ -112,7 +112,7 @@ func (c *ChatMessageContextCacheImpl) List(
 	return c.listRange(ctx, chatId, int64(start), int64(start+limit-1))
 }
 
-func (c *ChatMessageContextCacheImpl) ListRecent(
+func (c *ChatMessageContextCacheImpl) PageListRecent(
 	ctx context.Context,
 	chatId string,
 	limit int,

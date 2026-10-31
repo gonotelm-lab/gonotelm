@@ -60,7 +60,7 @@ func TestChatMessageContextCacheImplOverride(t *testing.T) {
 }
 
 func TestChatMessageContextCacheImplList(t *testing.T) {
-	Convey("ChatMessageContextCache List/ListRecent", t, func() {
+	Convey("ChatMessageContextCache List/PageListRecent", t, func() {
 		ctx := t.Context()
 		chatId := "test" + uuid.NewV7().String()
 		defer testChatMessageContextCache.Destroy(ctx, chatId)
@@ -74,13 +74,13 @@ func TestChatMessageContextCacheImplList(t *testing.T) {
 		err := testChatMessageContextCache.Append(ctx, chatId, messages)
 		So(err, ShouldBeNil)
 
-		listed, err := testChatMessageContextCache.List(ctx, chatId, 1, 2)
+		listed, err := testChatMessageContextCache.PageList(ctx, chatId, 1, 2)
 		So(err, ShouldBeNil)
 		So(listed, ShouldHaveLength, 2)
 		So(string(listed[0].Message), ShouldEqual, "b")
 		So(string(listed[1].Message), ShouldEqual, "c")
 
-		recent, err := testChatMessageContextCache.ListRecent(ctx, chatId, 2)
+		recent, err := testChatMessageContextCache.PageListRecent(ctx, chatId, 2)
 		So(err, ShouldBeNil)
 		So(recent, ShouldHaveLength, 2)
 		So(string(recent[0].Message), ShouldEqual, "d")

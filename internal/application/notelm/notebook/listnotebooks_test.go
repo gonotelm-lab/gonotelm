@@ -21,9 +21,9 @@ type fakeNotebookRepo struct {
 	ownedRows  []*notebookentity.Notebook
 	sharedRows []*notebookentity.Notebook
 
-	ownedSpec        *notebookrepo.ListSpec
+	ownedSpec        *notebookrepo.PageListSpec
 	ownedExcludeIds  []valobj.Id
-	sharedSpec       *notebookrepo.ListSpec
+	sharedSpec       *notebookrepo.PageListSpec
 	sharedExcludeIds []valobj.Id
 	sharedCall       bool
 }
@@ -40,10 +40,10 @@ func (f *fakeNotebookRepo) ListByIds(context.Context, []valobj.Id) ([]*notebooke
 	return nil, nil
 }
 
-func (f *fakeNotebookRepo) ListByOwner(
+func (f *fakeNotebookRepo) PageListByOwner(
 	_ context.Context,
 	_ valobj.Uid,
-	spec *notebookrepo.ListSpec,
+	spec *notebookrepo.PageListSpec,
 	excludeIds []valobj.Id,
 ) ([]*notebookentity.Notebook, error) {
 	f.ownedSpec = spec
@@ -52,10 +52,10 @@ func (f *fakeNotebookRepo) ListByOwner(
 	return f.ownedRows, nil
 }
 
-func (f *fakeNotebookRepo) ListShared(
+func (f *fakeNotebookRepo) PageListShared(
 	_ context.Context,
 	_ valobj.Uid,
-	spec *notebookrepo.ListSpec,
+	spec *notebookrepo.PageListSpec,
 	excludeIds []valobj.Id,
 ) ([]*notebookentity.Notebook, error) {
 	f.sharedCall = true

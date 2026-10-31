@@ -100,7 +100,7 @@ func (h *OnNotebookEventHandler) listNotebookArtifacts(
 	artifacts := make([]*artifactentity.Artifact, 0, notebookArtifactsPageSize)
 
 	for offset := 0; ; offset += notebookArtifactsPageSize {
-		page, err := h.artifactRepo.ListByNotebookId(ctx, notebookId, &artifactrepo.ListSpec{
+		page, err := h.artifactRepo.PageListByNotebookId(ctx, notebookId, &artifactrepo.PageListSpec{
 			Limit:  notebookArtifactsPageSize,
 			Offset: offset,
 		})

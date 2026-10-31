@@ -65,7 +65,7 @@ func (s *ChatMessageStoreImpl) GetByIdAndChatId(
 	return &row, nil
 }
 
-func (s *ChatMessageStoreImpl) ListByChatId(
+func (s *ChatMessageStoreImpl) PageListByChatId(
 	ctx context.Context,
 	chatId database.Id,
 	limit, offset, orderBy int,
@@ -90,7 +90,7 @@ func (s *ChatMessageStoreImpl) ListByChatId(
 	return rows, nil
 }
 
-func (s *ChatMessageStoreImpl) ListByChatIdBeforeSeqNo(
+func (s *ChatMessageStoreImpl) PageListByChatIdBeforeSeqNo(
 	ctx context.Context,
 	chatId database.Id,
 	beforeSeqNo int64,

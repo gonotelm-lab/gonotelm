@@ -106,7 +106,7 @@ func (s *NotebookStoreImpl) GetByNameAndOwnerId(
 	return &notebook, nil
 }
 
-func (s *NotebookStoreImpl) ListByOwnerId(
+func (s *NotebookStoreImpl) PageListByOwnerId(
 	ctx context.Context,
 	ownerId valobj.Uid,
 	limit, offset int,
@@ -154,8 +154,8 @@ func (s *NotebookStoreImpl) ListByIds(
 	return rows, nil
 }
 
-// ListByIdsExcludingOwner 返回 ids 中 owner 不是 excludeOwnerId 的 notebook，用于 shared 列表。
-func (s *NotebookStoreImpl) ListByIdsExcludingOwner(
+// PageListByIdsExcludingOwner 返回 ids 中 owner 不是 excludeOwnerId 的 notebook，用于 shared 列表。
+func (s *NotebookStoreImpl) PageListByIdsExcludingOwner(
 	ctx context.Context,
 	ids []database.Id,
 	excludeOwnerId valobj.Uid,

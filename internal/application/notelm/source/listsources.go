@@ -53,8 +53,8 @@ func (h *ListSourcesHandler) Handle(ctx context.Context, query *ListSourcesQuery
 		return nil, err
 	}
 
-	sources, err := h.sourceRepo.ListByNotebookId(ctx, query.NotebookId,
-		&sourcerepo.ListSpec{
+	sources, err := h.sourceRepo.PageListByNotebookId(ctx, query.NotebookId,
+		&sourcerepo.PageListSpec{
 			Offset: query.Offset,
 			Limit:  query.Limit + 1,
 		})

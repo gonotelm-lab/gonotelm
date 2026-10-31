@@ -104,7 +104,7 @@ func (s *SourceStoreImpl) BatchCountByNotebookIds(ctx context.Context, notebookI
 	return countsByNotebookId, nil
 }
 
-func (s *SourceStoreImpl) ListByNotebookId(
+func (s *SourceStoreImpl) PageListByNotebookId(
 	ctx context.Context,
 	notebookId database.Id,
 	limit, offset int,

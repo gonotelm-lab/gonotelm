@@ -31,20 +31,33 @@ type NotebookFlagsResponse struct {
 	CustomizeDescription bool `json:"customize_description"`
 }
 
+// NotebookFavouriteItemResponse 嵌套：某个收藏夹。
+type NotebookFavouriteItemResponse struct {
+	Id   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// NotebookFavouriteResponse GET 详情嵌套收藏信息；列表不填。
+// 是否已收藏看 favourites 是否非空。
+type NotebookFavouriteResponse struct {
+	Favourites []*NotebookFavouriteItemResponse `json:"favourites"`
+}
+
 // NotebookResponse Get / List 共用的 notebook 视图。
 type NotebookResponse struct {
-	Id          string                 `json:"id"`
-	Name        string                 `json:"name"`
-	Desc        string                 `json:"desc"`
-	CoverUrl    string                 `json:"cover_url"`
-	Flags       NotebookFlagsResponse  `json:"flags"`
-	SourceCount int64                  `json:"source_count"`
-	Visibility  string                 `json:"visibility"`
-	IsPinned    bool                   `json:"is_pinned"`
-	PinnedAt    int64                  `json:"pinned_at"`  // unix ms，未置顶为 0
-	UpdatedAt   int64                  `json:"updated_at"` // unix ms
-	CreatedAt   int64                  `json:"created_at"` // unix ms
-	Owner       *NotebookOwnerResponse `json:"owner,omitempty"`
+	Id          string                     `json:"id"`
+	Name        string                     `json:"name"`
+	Desc        string                     `json:"desc"`
+	CoverUrl    string                     `json:"cover_url"`
+	Flags       NotebookFlagsResponse      `json:"flags"`
+	SourceCount int64                      `json:"source_count"`
+	Visibility  string                     `json:"visibility"`
+	IsPinned    bool                       `json:"is_pinned"`
+	PinnedAt    int64                      `json:"pinned_at"`  // unix ms，未置顶为 0
+	UpdatedAt   int64                      `json:"updated_at"` // unix ms
+	CreatedAt   int64                      `json:"created_at"` // unix ms
+	Owner       *NotebookOwnerResponse     `json:"owner,omitempty"`
+	Favourite   *NotebookFavouriteResponse `json:"favourite,omitempty"` // 仅 GET 填充
 }
 
 func NewNotebookResponse(notebook *notebookapp.Notebook) *NotebookResponse {
@@ -68,7 +81,25 @@ func NewNotebookResponse(notebook *notebookapp.Notebook) *NotebookResponse {
 		Owner:       NewNotebookOwnerResponse(notebook.Owner),
 		UpdatedAt:   notebook.UpdateTime.Value(),
 		CreatedAt:   notebook.CreateTime.Value(),
+		Favourite:   newNotebookFavouriteResponse(notebook.Favourite),
 	}
+}
+
+func newNotebookFavouriteResponse(fav *notebookapp.Favourite) *NotebookFavouriteResponse {
+	if fav == nil {
+		return nil
+	}
+	items := make([]*NotebookFavouriteItemResponse, 0, len(fav.Items))
+	for _, item := range fav.Items {
+		if item == nil {
+			continue
+		}
+		items = append(items, &NotebookFavouriteItemResponse{
+			Id:   item.Id.String(),
+			Name: item.Name,
+		})
+	}
+	return &NotebookFavouriteResponse{Favourites: items}
 }
 
 type PinNotebookRequest struct {

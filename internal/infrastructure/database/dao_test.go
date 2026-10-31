@@ -29,6 +29,8 @@ func TestNewDaoWiresStores(t *testing.T) {
 			nil, // NotebookMaintenanceStore
 			nil, // NotebookMemberStore
 			nil, // UserNotebookPinStore
+			nil, // FavouriteStore
+			nil, // FavouriteNotebookStore
 			nil, // SourceStore
 			nil, // ChatStore
 			nil, // ChatMessageStore
@@ -81,6 +83,8 @@ func newDaoForCloseTest(closer misc.Closer) *Dao {
 		nil, // NotebookMaintenanceStore
 		nil, // NotebookMemberStore
 		nil, // UserNotebookPinStore
+		nil, // FavouriteStore
+		nil, // FavouriteNotebookStore
 		nil, // SourceStore
 		nil, // ChatStore
 		nil, // ChatMessageStore

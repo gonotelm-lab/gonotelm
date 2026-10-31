@@ -18,6 +18,8 @@ var (
 	testNotebookStore             *NotebookStoreImpl
 	testNotebookMemberStore       *NotebookMemberStoreImpl
 	testUserNotebookPinStore      *UserNotebookPinStoreImpl
+	testFavouriteStore            *FavouriteStoreImpl
+	testFavouriteNotebookStore    *FavouriteNotebookStoreImpl
 	testSourceStore               *SourceStoreImpl
 	testChatStore                 *ChatStoreImpl
 	testChatMessageStore          *ChatMessageStoreImpl
@@ -45,6 +47,8 @@ func TestMain(m *testing.M) {
 	testNotebookStore = NewNotebookStoreImpl(testDB)
 	testNotebookMemberStore = NewNotebookMemberStoreImpl(testDB)
 	testUserNotebookPinStore = NewUserNotebookPinStoreImpl(testDB)
+	testFavouriteStore = NewFavouriteStoreImpl(testDB)
+	testFavouriteNotebookStore = NewFavouriteNotebookStoreImpl(testDB)
 	testSourceStore = NewSourceStoreImpl(testDB)
 	testChatStore = NewChatStoreImpl(testDB)
 	testChatMessageStore = NewChatMessageStoreImpl(testDB)

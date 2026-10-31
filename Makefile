@@ -11,6 +11,7 @@ TEST_PKGS := \
 	./internal/domain/artifact/... \
 	./internal/domain/notebook/... \
 	./internal/domain/pin/... \
+	./internal/domain/favourite/... \
 	./internal/infrastructure/database/... \
 	./internal/infrastructure/cache \
 	./internal/infrastructure/cache/redis/... \

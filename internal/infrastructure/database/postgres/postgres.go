@@ -40,6 +40,8 @@ func Open(cfg *sql.Config) (*database.Dao, error) {
 		notebookStore,
 		NewNotebookMemberStoreImpl(db),
 		NewUserNotebookPinStoreImpl(db),
+		NewFavouriteStoreImpl(db),
+		NewFavouriteNotebookStoreImpl(db),
 		NewSourceStoreImpl(db),
 		NewChatStoreImpl(db),
 		NewChatMessageStoreImpl(db),

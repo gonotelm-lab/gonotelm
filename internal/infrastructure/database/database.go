@@ -78,6 +78,27 @@ type UserNotebookPinStore interface {
 	DeleteByNotebookId(ctx context.Context, notebookId Id) error
 }
 
+type FavouriteStore interface {
+	Upsert(ctx context.Context, favourite *schema.Favourite) error
+	GetById(ctx context.Context, id Id) (*schema.Favourite, error)
+	ListByUserId(ctx context.Context, userId valobj.Uid, limit, offset int) ([]*schema.Favourite, error)
+	CountByUserId(ctx context.Context, userId valobj.Uid) (int64, error)
+	DeleteById(ctx context.Context, id Id) error
+	DeleteByUserId(ctx context.Context, userId valobj.Uid) error
+}
+
+type FavouriteNotebookStore interface {
+	InsertIgnore(ctx context.Context, row *schema.FavouriteNotebook) error
+	Get(ctx context.Context, favouriteId, notebookId Id) (*schema.FavouriteNotebook, error)
+	ListByFavouriteId(ctx context.Context, favouriteId Id, limit, offset int) ([]*schema.FavouriteNotebook, error)
+	// ListFavouritesByUserAndNotebook 只填 Id/Name（及排序用的关联时间在 SQL 中处理）。
+	ListFavouritesByUserAndNotebook(ctx context.Context, userId valobj.Uid, notebookId Id) ([]*schema.Favourite, error)
+	CountByFavouriteId(ctx context.Context, favouriteId Id) (int64, error)
+	Delete(ctx context.Context, favouriteId Id, notebookIds []Id) error
+	DeleteByFavouriteId(ctx context.Context, favouriteId Id) error
+	DeleteByUserId(ctx context.Context, userId valobj.Uid) error
+}
+
 type SourceStore interface {
 	Create(ctx context.Context, source *schema.Source) error
 	UpdateExisting(ctx context.Context, source *schema.Source) (int64, error)
@@ -185,6 +206,8 @@ type Dao struct {
 	NotebookMaintenanceStore  NotebookMaintenanceStore
 	NotebookMemberStore       NotebookMemberStore
 	UserNotebookPinStore      UserNotebookPinStore
+	FavouriteStore            FavouriteStore
+	FavouriteNotebookStore    FavouriteNotebookStore
 	SourceStore               SourceStore
 	ChatStore                 ChatStore
 	ChatMessageStore          ChatMessageStore
@@ -203,6 +226,8 @@ func NewDao(
 	notebookMaintenanceStore NotebookMaintenanceStore,
 	notebookMemberStore NotebookMemberStore,
 	userNotebookPinStore UserNotebookPinStore,
+	favouriteStore FavouriteStore,
+	favouriteNotebookStore FavouriteNotebookStore,
 	sourceStore SourceStore,
 	chatStore ChatStore,
 	chatMessageStore ChatMessageStore,
@@ -220,6 +245,8 @@ func NewDao(
 		NotebookMaintenanceStore:  notebookMaintenanceStore,
 		NotebookMemberStore:       notebookMemberStore,
 		UserNotebookPinStore:      userNotebookPinStore,
+		FavouriteStore:            favouriteStore,
+		FavouriteNotebookStore:    favouriteNotebookStore,
 		SourceStore:               sourceStore,
 		ChatStore:                 chatStore,
 		ChatMessageStore:          chatMessageStore,

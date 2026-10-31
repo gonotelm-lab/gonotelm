@@ -34,7 +34,7 @@ internal/
     valobj/               value objects: Id, Uid, Time, StoreKey
     event/                Event interface and Category (inprocess | interprocess)
     adapter/              ports to outside capabilities: ObjectStore, Summarizer, TitleMaker, ImageInterpreter, DistributedLock
-  domain/<domain>/        pure business logic; domains = artifact, chat, identity, notebook, pin, sandbox, source, worker
+  domain/<domain>/        pure business logic; domains = artifact, chat, favourite, identity, notebook, pin, sandbox, source, worker
     entity/ vo/           aggregates and value objects; constructors validate (NewNotebook returns error), mutations call AddEvent
     repository/           interfaces and ListSpec only — implementations always live in infrastructure
     service/              logic spanning entities/aggregates (e.g. source parse → chunk → index)
@@ -60,7 +60,7 @@ internal/
     eventbus/             routes by event.Category(): inprocess dispatches locally, interprocess goes to MQ; CompositeEventBus is the single publish entry point
   interfaces/             delivery layer
     api/notelm/           composition root: builds Hertz, mounts /api/v1 groups, delegates to one sub-package per domain
-      auth|notebook|source|chat|studio|user/   one Server + Deps per domain, owns its handlers and routes
+      auth|notebook|source|chat|studio|user|favourite/   one Server + Deps per domain, owns its handlers and routes
       schema/             request/response DTOs shared by every sub-package
     entrypoint/worker/    decodes a flow task into contract.WorkerInput and calls into application
     event/                per-process event handler registration (notelm in-process, sourcejob over MQ)
@@ -86,7 +86,7 @@ assets/                   slides templates, artifact preview images, opensandbox
 - **Request binding**: `c.BindAndValidate(&req)` runs the custom binder in `pkg/http/binder.go` — `path:`/`query:`/`json:` tags, then `validator/v10` tags, then the DTO's own `Validate() error`. A plain validator failure surfaces as 200 `code:1000`.
 - **Object URLs are never persisted**: only the encoded `StoreKey` is stored (mapper); every URL is resolved per request. Public-read assets (avatars, style previews) use `adapter.ObjectPublicURLer.PublicURL`; private ones (source content, artifact results) use `PresignGet`. A resolve failure normally degrades to an empty URL plus a WARN, not an API error.
 - **API never resolves StoreKey → URL**: application handlers return response views that already carry complete URLs (e.g. `AvatarURL`, `ContentUrl`, `PreviewUrl`). The HTTP layer only maps app results into `schema` DTOs — no `PublicURL` / `PresignGet` / `AttachStorageURL` in `interfaces/api`. `ObjectStore` may still appear on API `Deps` solely to construct app handlers (upload / delete / presign); handler methods must not call it.
-- **Error codes**: 100xxx notebook, 101xxx chat, 102xxx artifact, 103xxx source, 104xxx worker, 105xxx sandbox, 106xxx identity, 107xxx pin. Each is declared as `errors.ErrXxx.ErrCode(n).Msg(…)`, so its HTTP status is inherited from the builtin it derives from.
+- **Error codes**: 100xxx notebook, 101xxx chat, 102xxx artifact, 103xxx source, 104xxx worker, 105xxx sandbox, 106xxx identity, 107xxx pin, 108xxx favourite. Each is declared as `errors.ErrXxx.ErrCode(n).Msg(…)`, so its HTTP status is inherited from the builtin it derives from.
 - **Wiring**: `ServerDeps` in the root `server.go` is the only injection surface — add the repo field there, build it in `bootstrap/notelm.go`, map it into the sub-package's `Deps` in the root `NewServer`, and construct the application handler in that sub-package's `NewServer`. There is no route manifest to update.
 
 ## Cross-process flows
@@ -111,6 +111,7 @@ Comments, docs, and copy are Chinese; pick one word per concept and keep it. A t
 | 创建账号 | Concretely: insert one row into `users_v2`. |
 | 落库 | Persisting to a store — Postgres, Redis and MinIO all take the same word. |
 | 注销账号 | The user ending their own account. |
+| 收藏夹 | User-private notebook folder (`Favourite`); distinct from pin（置顶）. |
 
 Three verbs with distinct jobs:
 

@@ -62,20 +62,6 @@ type ListNotebooksHandleQuery struct {
 	SortBy SortBy
 }
 
-type NotebookOwner struct {
-	Id        valobj.Uid
-	Nickname  string
-	AvatarURL string
-}
-
-type Notebook struct {
-	*notebookentity.Notebook
-	Owner    *NotebookOwner
-	CoverUrl string
-	IsPinned bool
-	PinnedAt int64
-}
-
 type ListNotebooksHandleResult struct {
 	Notebooks []*Notebook
 	Limit     int

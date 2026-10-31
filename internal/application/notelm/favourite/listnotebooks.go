@@ -21,7 +21,7 @@ import (
 
 type ListNotebooksHandler struct {
 	*baseHandler
-	favouriteNotebookRepo favouriterepo.FavouriteNotebookRepository
+	favouriteNotebookRepo favouriterepo.NotebookRepository
 	notebookRepo          notebookrepo.Repository
 	notebookAccessService *notebookservice.AccessService
 	userRepo              identrepo.UserRepository
@@ -29,8 +29,8 @@ type ListNotebooksHandler struct {
 }
 
 func NewListNotebooksHandler(
-	favouriteRepo favouriterepo.FavouriteRepository,
-	favouriteNotebookRepo favouriterepo.FavouriteNotebookRepository,
+	favouriteRepo favouriterepo.Repository,
+	favouriteNotebookRepo favouriterepo.NotebookRepository,
 	notebookRepo notebookrepo.Repository,
 	notebookAccessService *notebookservice.AccessService,
 	userRepo identrepo.UserRepository,

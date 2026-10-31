@@ -13,7 +13,7 @@ type DeleteFavouriteHandler struct {
 }
 
 func NewDeleteFavouriteHandler(
-	favouriteRepo repository.FavouriteRepository,
+	favouriteRepo repository.Repository,
 ) *DeleteFavouriteHandler {
 	return &DeleteFavouriteHandler{baseHandler: newBaseHandler(favouriteRepo)}
 }

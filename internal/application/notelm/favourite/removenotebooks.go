@@ -12,12 +12,12 @@ import (
 
 type RemoveNotebooksHandler struct {
 	*baseHandler
-	favouriteNotebookRepo repository.FavouriteNotebookRepository
+	favouriteNotebookRepo repository.NotebookRepository
 }
 
 func NewRemoveNotebooksHandler(
-	favouriteRepo repository.FavouriteRepository,
-	favouriteNotebookRepo repository.FavouriteNotebookRepository,
+	favouriteRepo repository.Repository,
+	favouriteNotebookRepo repository.NotebookRepository,
 ) *RemoveNotebooksHandler {
 	return &RemoveNotebooksHandler{
 		baseHandler:           newBaseHandler(favouriteRepo),

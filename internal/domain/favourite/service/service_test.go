@@ -14,7 +14,7 @@ import (
 )
 
 type fakeFavouriteRepo struct {
-	repository.FavouriteRepository
+	repository.Repository
 	count int64
 	err   error
 }
@@ -27,7 +27,7 @@ func (f *fakeFavouriteRepo) CountByUserId(context.Context, valobj.Uid) (int64, e
 }
 
 type fakeFavouriteNotebookRepo struct {
-	repository.FavouriteNotebookRepository
+	repository.NotebookRepository
 	count int64
 	err   error
 }

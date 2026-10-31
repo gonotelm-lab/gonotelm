@@ -8,6 +8,7 @@ import (
 	favouriteerrors "github.com/gonotelm-lab/gonotelm/internal/domain/favourite/errors"
 	favouriterepo "github.com/gonotelm-lab/gonotelm/internal/domain/favourite/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database"
+	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/database/schema"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository/mapper"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 )
@@ -22,7 +23,7 @@ func NewFavouriteRepository(
 	favouriteStore database.FavouriteStore,
 	favouriteNotebookStore database.FavouriteNotebookStore,
 	transactor database.Transactor,
-) favouriterepo.FavouriteRepository {
+) favouriterepo.Repository {
 	return &FavouriteRepositoryImpl{
 		favouriteStore:         favouriteStore,
 		favouriteNotebookStore: favouriteNotebookStore,
@@ -30,7 +31,7 @@ func NewFavouriteRepository(
 	}
 }
 
-var _ favouriterepo.FavouriteRepository = &FavouriteRepositoryImpl{}
+var _ favouriterepo.Repository = &FavouriteRepositoryImpl{}
 
 func (r *FavouriteRepositoryImpl) Save(ctx context.Context, f *entity.Favourite) error {
 	if f.IsDeleted() {
@@ -71,6 +72,43 @@ func (r *FavouriteRepositoryImpl) ListByUserId(
 	return mapper.FavouritesFromSchema(rows), nil
 }
 
+// ListByUserAndNotebook 两步单表查询后在内存组装，避免跨表 JOIN。
+func (r *FavouriteRepositoryImpl) ListByUserAndNotebook(
+	ctx context.Context,
+	userId valobj.Uid,
+	notebookId valobj.Id,
+) ([]*entity.Favourite, error) {
+	favs, err := r.favouriteStore.ListByUserId(ctx, userId, entity.MaxFavouritesPerUser, 0)
+	if err != nil {
+		return nil, err
+	}
+	if len(favs) == 0 {
+		return []*entity.Favourite{}, nil
+	}
+
+	ids := make([]database.Id, 0, len(favs))
+	byId := make(map[database.Id]*schema.Favourite, len(favs))
+	for _, f := range favs {
+		ids = append(ids, f.Id)
+		byId[f.Id] = f
+	}
+
+	links, err := r.favouriteNotebookStore.ListByNotebookIdAndFavouriteIds(ctx, notebookId, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]*entity.Favourite, 0, len(links))
+	for _, link := range links {
+		row, ok := byId[link.FavouriteId]
+		if !ok {
+			continue
+		}
+		out = append(out, mapper.FavouriteFromSchema(row))
+	}
+	return out, nil
+}
+
 func (r *FavouriteRepositoryImpl) CountByUserId(ctx context.Context, userId valobj.Uid) (int64, error) {
 	return r.favouriteStore.CountByUserId(ctx, userId)
 }
@@ -90,11 +128,11 @@ type FavouriteNotebookRepositoryImpl struct {
 
 func NewFavouriteNotebookRepository(
 	favouriteNotebookStore database.FavouriteNotebookStore,
-) favouriterepo.FavouriteNotebookRepository {
+) favouriterepo.NotebookRepository {
 	return &FavouriteNotebookRepositoryImpl{favouriteNotebookStore: favouriteNotebookStore}
 }
 
-var _ favouriterepo.FavouriteNotebookRepository = &FavouriteNotebookRepositoryImpl{}
+var _ favouriterepo.NotebookRepository = &FavouriteNotebookRepositoryImpl{}
 
 func (r *FavouriteNotebookRepositoryImpl) Save(
 	ctx context.Context,
@@ -130,18 +168,6 @@ func (r *FavouriteNotebookRepositoryImpl) ListByFavouriteId(
 		return nil, err
 	}
 	return mapper.FavouriteNotebooksFromSchema(rows), nil
-}
-
-func (r *FavouriteNotebookRepositoryImpl) ListFavouritesByUserAndNotebook(
-	ctx context.Context,
-	userId valobj.Uid,
-	notebookId valobj.Id,
-) ([]*entity.Favourite, error) {
-	rows, err := r.favouriteNotebookStore.ListFavouritesByUserAndNotebook(ctx, userId, notebookId)
-	if err != nil {
-		return nil, err
-	}
-	return mapper.FavouritesFromSchema(rows), nil
 }
 
 func (r *FavouriteNotebookRepositoryImpl) CountByFavouriteId(

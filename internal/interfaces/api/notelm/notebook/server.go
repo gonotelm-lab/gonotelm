@@ -20,7 +20,7 @@ type Deps struct {
 	MemberRepo            notebookrepo.MemberRepository
 	PinRepo               pinrepo.Repository
 	PinService            *pinservice.Service
-	FavouriteNotebookRepo favouriterepo.FavouriteNotebookRepository
+	FavouriteRepo         favouriterepo.Repository
 	NotebookAccessService *notebookservice.AccessService
 	SourceRepo            sourcerepo.Repository
 	EventBus              eventbus.Publisher
@@ -66,7 +66,7 @@ func NewServer(deps Deps) *Server {
 			deps.UserRepo,
 			deps.ObjectStore,
 			deps.PinRepo,
-			deps.FavouriteNotebookRepo,
+			deps.FavouriteRepo,
 		),
 		createNotebookHandler: notebookapp.NewCreateNotebookHandler(deps.NotebookRepo, deps.EventBus),
 		listNotebooksHandler: notebookapp.NewListNotebooksHandler(

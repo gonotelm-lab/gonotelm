@@ -46,8 +46,8 @@ type ServerDeps struct {
 	NotebookMemberRepo     notebookrepo.MemberRepository
 	PinRepo                pinrepo.Repository
 	PinService             *pinservice.Service
-	FavouriteRepo          favouriterepo.FavouriteRepository
-	FavouriteNotebookRepo  favouriterepo.FavouriteNotebookRepository
+	FavouriteRepo          favouriterepo.Repository
+	FavouriteNotebookRepo  favouriterepo.NotebookRepository
 	FavouriteService       *favouriteservice.Service
 	NotebookAccessService  *notebookservice.AccessService
 	SourceRepo             sourcerepo.Repository
@@ -141,7 +141,7 @@ func NewServer(
 			MemberRepo:            deps.NotebookMemberRepo,
 			PinRepo:               deps.PinRepo,
 			PinService:            deps.PinService,
-			FavouriteNotebookRepo: deps.FavouriteNotebookRepo,
+			FavouriteRepo:         deps.FavouriteRepo,
 			NotebookAccessService: deps.NotebookAccessService,
 			SourceRepo:            deps.SourceRepo,
 			EventBus:              deps.EventBus,

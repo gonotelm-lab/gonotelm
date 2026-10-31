@@ -17,15 +17,15 @@ import (
 
 type AddNotebookHandler struct {
 	*baseHandler
-	favouriteNotebookRepo repository.FavouriteNotebookRepository
+	favouriteNotebookRepo repository.NotebookRepository
 	favouriteService      *service.Service
 	notebookAccessService *notebookservice.AccessService
 	distLock              adapter.DistributedLock
 }
 
 func NewAddNotebookHandler(
-	favouriteRepo repository.FavouriteRepository,
-	favouriteNotebookRepo repository.FavouriteNotebookRepository,
+	favouriteRepo repository.Repository,
+	favouriteNotebookRepo repository.NotebookRepository,
 	favouriteService *service.Service,
 	notebookAccessService *notebookservice.AccessService,
 	distLock adapter.DistributedLock,

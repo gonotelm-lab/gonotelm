@@ -67,3 +67,54 @@ func TestFavouriteNotebookStoreCRUD(t *testing.T) {
 		So(count, ShouldEqual, 0)
 	})
 }
+
+func TestFavouriteNotebookStoreListByNotebookIdAndFavouriteIds(t *testing.T) {
+	Convey("ListByNotebookIdAndFavouriteIds filters and orders by favourited_at", t, func() {
+		favStore := testFavouriteStore
+		store := testFavouriteNotebookStore
+		ctx := t.Context()
+		userId := valobj.NewUid()
+		fav1 := database.Id(uuid.NewV7())
+		fav2 := database.Id(uuid.NewV7())
+		favOther := database.Id(uuid.NewV7())
+		nb := database.Id(uuid.NewV7())
+		t.Cleanup(func() {
+			_ = store.DeleteByFavouriteId(ctx, fav1)
+			_ = store.DeleteByFavouriteId(ctx, fav2)
+			_ = store.DeleteByFavouriteId(ctx, favOther)
+			_ = favStore.DeleteById(ctx, fav1)
+			_ = favStore.DeleteById(ctx, fav2)
+			_ = favStore.DeleteById(ctx, favOther)
+		})
+
+		So(favStore.Upsert(ctx, &schema.Favourite{
+			Id: fav1, UserId: userId, Name: "a", CreatedAt: 1, UpdatedAt: 1,
+		}), ShouldBeNil)
+		So(favStore.Upsert(ctx, &schema.Favourite{
+			Id: fav2, UserId: userId, Name: "b", CreatedAt: 2, UpdatedAt: 2,
+		}), ShouldBeNil)
+		So(favStore.Upsert(ctx, &schema.Favourite{
+			Id: favOther, UserId: userId, Name: "c", CreatedAt: 3, UpdatedAt: 3,
+		}), ShouldBeNil)
+
+		So(store.InsertIgnore(ctx, &schema.FavouriteNotebook{
+			FavouriteId: fav1, NotebookId: nb, FavouritedAt: 1000,
+		}), ShouldBeNil)
+		So(store.InsertIgnore(ctx, &schema.FavouriteNotebook{
+			FavouriteId: fav2, NotebookId: nb, FavouritedAt: 3000,
+		}), ShouldBeNil)
+		So(store.InsertIgnore(ctx, &schema.FavouriteNotebook{
+			FavouriteId: favOther, NotebookId: nb, FavouritedAt: 2000,
+		}), ShouldBeNil)
+
+		rows, err := store.ListByNotebookIdAndFavouriteIds(ctx, nb, []database.Id{fav1, fav2})
+		So(err, ShouldBeNil)
+		So(len(rows), ShouldEqual, 2)
+		So(rows[0].FavouriteId, ShouldEqual, fav2)
+		So(rows[1].FavouriteId, ShouldEqual, fav1)
+
+		empty, err := store.ListByNotebookIdAndFavouriteIds(ctx, nb, nil)
+		So(err, ShouldBeNil)
+		So(len(empty), ShouldEqual, 0)
+	})
+}

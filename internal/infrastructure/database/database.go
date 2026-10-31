@@ -91,8 +91,8 @@ type FavouriteNotebookStore interface {
 	InsertIgnore(ctx context.Context, row *schema.FavouriteNotebook) error
 	Get(ctx context.Context, favouriteId, notebookId Id) (*schema.FavouriteNotebook, error)
 	ListByFavouriteId(ctx context.Context, favouriteId Id, limit, offset int) ([]*schema.FavouriteNotebook, error)
-	// ListFavouritesByUserAndNotebook 只填 Id/Name（及排序用的关联时间在 SQL 中处理）。
-	ListFavouritesByUserAndNotebook(ctx context.Context, userId valobj.Uid, notebookId Id) ([]*schema.Favourite, error)
+	// ListByNotebookIdAndFavouriteIds 在给定收藏夹 id 集合内，查出包含该 notebook 的关联行；favouriteIds 为空时返回空切片。
+	ListByNotebookIdAndFavouriteIds(ctx context.Context, notebookId Id, favouriteIds []Id) ([]*schema.FavouriteNotebook, error)
 	CountByFavouriteId(ctx context.Context, favouriteId Id) (int64, error)
 	Delete(ctx context.Context, favouriteId Id, notebookIds []Id) error
 	DeleteByFavouriteId(ctx context.Context, favouriteId Id) error

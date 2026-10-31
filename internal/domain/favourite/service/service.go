@@ -11,13 +11,13 @@ import (
 )
 
 type Service struct {
-	favouriteRepo         repository.FavouriteRepository
-	favouriteNotebookRepo repository.FavouriteNotebookRepository
+	favouriteRepo         repository.Repository
+	favouriteNotebookRepo repository.NotebookRepository
 }
 
 func New(
-	favouriteRepo repository.FavouriteRepository,
-	favouriteNotebookRepo repository.FavouriteNotebookRepository,
+	favouriteRepo repository.Repository,
+	favouriteNotebookRepo repository.NotebookRepository,
 ) *Service {
 	return &Service{
 		favouriteRepo:         favouriteRepo,

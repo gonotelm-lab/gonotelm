@@ -18,8 +18,8 @@ import (
 
 type GetNotebookHandler struct {
 	*baseHandler
-	pinRepo               pinrepo.Repository
-	favouriteNotebookRepo favouriterepo.FavouriteNotebookRepository
+	pinRepo       pinrepo.Repository
+	favouriteRepo favouriterepo.Repository
 }
 
 func NewGetNotebookHandler(
@@ -28,12 +28,12 @@ func NewGetNotebookHandler(
 	userRepo identrepo.UserRepository,
 	objectStore adapter.ObjectPublicURLer,
 	pinRepo pinrepo.Repository,
-	favouriteNotebookRepo favouriterepo.FavouriteNotebookRepository,
+	favouriteRepo favouriterepo.Repository,
 ) *GetNotebookHandler {
 	return &GetNotebookHandler{
-		baseHandler:           newBaseHandler(notebookRepo, notebookAccessService, userRepo, objectStore),
-		pinRepo:               pinRepo,
-		favouriteNotebookRepo: favouriteNotebookRepo,
+		baseHandler:   newBaseHandler(notebookRepo, notebookAccessService, userRepo, objectStore),
+		pinRepo:       pinRepo,
+		favouriteRepo: favouriteRepo,
 	}
 }
 
@@ -67,7 +67,7 @@ func (h *GetNotebookHandler) getNotebook(
 		result.PinnedAt = pin.PinnedAt.Value()
 	}
 
-	favs, err := h.favouriteNotebookRepo.ListFavouritesByUserAndNotebook(ctx, actor, access.Notebook.Id)
+	favs, err := h.favouriteRepo.ListByUserAndNotebook(ctx, actor, access.Notebook.Id)
 	if err != nil {
 		return nil, pkgerr.WithMessage(err, "list favourites failed")
 	}

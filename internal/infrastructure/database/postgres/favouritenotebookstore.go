@@ -68,24 +68,24 @@ func (s *FavouriteNotebookStoreImpl) ListByFavouriteId(
 	return rows, nil
 }
 
-func (s *FavouriteNotebookStoreImpl) ListFavouritesByUserAndNotebook(
+func (s *FavouriteNotebookStoreImpl) ListByNotebookIdAndFavouriteIds(
 	ctx context.Context,
-	userId valobj.Uid,
 	notebookId database.Id,
-) ([]*schema.Favourite, error) {
-	var rows []*schema.Favourite
+	favouriteIds []database.Id,
+) ([]*schema.FavouriteNotebook, error) {
+	if len(favouriteIds) == 0 {
+		return []*schema.FavouriteNotebook{}, nil
+	}
+	var rows []*schema.FavouriteNotebook
 	err := dbFromContext(ctx, s.db).
-		Table("favourites AS f").
-		Select("f.id, f.name").
-		Joins("INNER JOIN favourite_notebooks AS fn ON fn.favourite_id = f.id").
-		Where("f.user_id = ? AND fn.notebook_id = ?", userId, notebookId).
-		Order("fn.favourited_at DESC").
+		Where("notebook_id = ? AND favourite_id IN ?", notebookId, favouriteIds).
+		Order("favourited_at DESC").
 		Find(&rows).Error
 	if err != nil {
 		return nil, sql.WrapErr(err)
 	}
 	if rows == nil {
-		rows = []*schema.Favourite{}
+		rows = []*schema.FavouriteNotebook{}
 	}
 	return rows, nil
 }

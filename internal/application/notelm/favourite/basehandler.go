@@ -11,10 +11,10 @@ import (
 )
 
 type baseHandler struct {
-	favouriteRepo repository.FavouriteRepository
+	favouriteRepo repository.Repository
 }
 
-func newBaseHandler(favouriteRepo repository.FavouriteRepository) *baseHandler {
+func newBaseHandler(favouriteRepo repository.Repository) *baseHandler {
 	return &baseHandler{favouriteRepo: favouriteRepo}
 }
 

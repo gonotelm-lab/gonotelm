@@ -11,8 +11,8 @@ import (
 )
 
 type Deps struct {
-	FavouriteRepo         favouriterepo.FavouriteRepository
-	FavouriteNotebookRepo favouriterepo.FavouriteNotebookRepository
+	FavouriteRepo         favouriterepo.Repository
+	FavouriteNotebookRepo favouriterepo.NotebookRepository
 	FavouriteService      *favouriteservice.Service
 	NotebookRepo          notebookrepo.Repository
 	NotebookAccessService *notebookservice.AccessService

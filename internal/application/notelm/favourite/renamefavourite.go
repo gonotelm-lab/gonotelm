@@ -10,12 +10,12 @@ import (
 
 type RenameFavouriteHandler struct {
 	*baseHandler
-	favouriteNotebookRepo repository.FavouriteNotebookRepository
+	favouriteNotebookRepo repository.NotebookRepository
 }
 
 func NewRenameFavouriteHandler(
-	favouriteRepo repository.FavouriteRepository,
-	favouriteNotebookRepo repository.FavouriteNotebookRepository,
+	favouriteRepo repository.Repository,
+	favouriteNotebookRepo repository.NotebookRepository,
 ) *RenameFavouriteHandler {
 	return &RenameFavouriteHandler{
 		baseHandler:           newBaseHandler(favouriteRepo),

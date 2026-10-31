@@ -19,7 +19,7 @@ type CreateFavouriteHandler struct {
 }
 
 func NewCreateFavouriteHandler(
-	favouriteRepo repository.FavouriteRepository,
+	favouriteRepo repository.Repository,
 	favouriteService *service.Service,
 	distLock adapter.DistributedLock,
 ) *CreateFavouriteHandler {

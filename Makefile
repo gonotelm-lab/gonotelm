@@ -6,7 +6,9 @@ TEST_PKGS := \
 	./internal/application/notelm/artifact/... \
 	./internal/application/notelm/notebook/... \
 	./internal/application/notelm/source/... \
+	./internal/application/shared/agent/tools/... \
 	./internal/application/shared/cleanup/... \
+	./internal/application/worker/artifact/... \
 	./internal/conf/... \
 	./internal/domain/artifact/... \
 	./internal/domain/notebook/... \

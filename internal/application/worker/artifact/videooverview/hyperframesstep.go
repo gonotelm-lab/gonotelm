@@ -224,7 +224,7 @@ func (s *hyperframesStep) getShotSubagentTool(
 		maxRound = defaultShotSubagentMaxRound
 	}
 
-	shotSubagentTool, err := tools.NewSubagentTool(tools.SubagentConfig{
+	shotSubagentTool, err := tools.NewSubagentTool(ctx, tools.SubagentConfig{
 		BaseLLM: agent.BaseLLM(),
 		Options: []einomodel.Option{
 			chat.WithModel(cfg.Model),

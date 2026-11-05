@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 
+	chatvo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/vo"
+
 	"github.com/cloudwego/eino/components/prompt"
 	einoschema "github.com/cloudwego/eino/schema"
 )
@@ -26,20 +28,20 @@ type PromptSource struct {
 
 type PromptTemplateVars struct {
 	Notebook     string
-	Style        ChatMessageStyle
-	AnswerLength ChatMessageAnswerLength
+	Style        chatvo.Style
+	AnswerLength chatvo.AnswerLength
 	Sources      []PromptSource
 }
 
 func (v PromptTemplateVars) promptVars() map[string]any {
-	style := string(v.Style)
+	style := v.Style.String()
 	if style == "" {
-		style = string(ChatMessageStyleDefault)
+		style = chatvo.StyleDefault.String()
 	}
 
-	answerLength := string(v.AnswerLength)
+	answerLength := v.AnswerLength.String()
 	if answerLength == "" {
-		answerLength = string(ChatMessageAnswerLengthDefault)
+		answerLength = chatvo.AnswerLengthDefault.String()
 	}
 
 	return map[string]any{

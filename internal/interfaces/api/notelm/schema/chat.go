@@ -3,7 +3,7 @@ package schema
 import (
 	"math"
 
-	chatagent "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/agent"
+	chatvo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/vo"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
 )
@@ -19,22 +19,22 @@ type ChatCreateMessageRequest struct {
 
 func (r *ChatCreateMessageRequest) Validate() error {
 	if r.Style == "" {
-		r.Style = string(chatagent.ChatMessageStyleDefault)
+		r.Style = chatvo.StyleDefault.String()
 	}
 
 	if len(r.Prompt) == 0 {
 		return errors.ErrParams.Msg("prompt is required")
 	}
 
-	if !chatagent.ChatMessageStyle(r.Style).IsValid() {
+	if !chatvo.Style(r.Style).IsValid() {
 		return errors.ErrParams.Msgf("invalid chat style: %s", r.Style)
 	}
 
 	if r.AnswerLength == "" {
-		r.AnswerLength = string(chatagent.ChatMessageAnswerLengthDefault)
+		r.AnswerLength = chatvo.AnswerLengthDefault.String()
 	}
 
-	if !chatagent.ChatMessageAnswerLength(r.AnswerLength).IsValid() {
+	if !chatvo.AnswerLength(r.AnswerLength).IsValid() {
 		return errors.ErrParams.Msgf("invalid chat answer length: %s", r.AnswerLength)
 	}
 

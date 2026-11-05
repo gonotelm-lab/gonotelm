@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"maps"
+	"sync"
 
 	"github.com/gonotelm-lab/gonotelm/internal/application/shared/agent/tools"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
-	pkgagent "github.com/gonotelm-lab/gonotelm/pkg/agent"
+	agentv2 "github.com/gonotelm-lab/gonotelm/pkg/agent/v2"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 
 	einomodel "github.com/cloudwego/eino/components/model"
@@ -17,7 +19,92 @@ import (
 	einoschema "github.com/cloudwego/eino/schema"
 )
 
-type Agent = pkgagent.Agent[*SessionState]
+// Agent 是 worker artifact 对 v2 Runner 的薄封装：
+// 固定的 Runner 配置 + 一个可复用的 Session，保持原有 React/AppendTools 方法面。
+type Agent struct {
+	mu      sync.RWMutex
+	cfg     agentv2.RunnerConfig
+	tools   map[string]einotool.InvokableTool
+	runner  *agentv2.Runner[*SessionState]
+	session *agentv2.Session[*SessionState]
+}
+
+func (a *Agent) React(
+	ctx context.Context,
+	msgs []*einoschema.Message,
+) (*einoschema.Message, error) {
+	a.mu.RLock()
+	runner, session := a.runner, a.session
+	a.mu.RUnlock()
+
+	session.Append(msgs...)
+	res, err := runner.Run(ctx, session, agentv2.RunConfig[*SessionState]{})
+	if err != nil {
+		return nil, err
+	}
+	return res.Final, nil
+}
+
+func (a *Agent) ReactStream(
+	ctx context.Context,
+	msgs []*einoschema.Message,
+) (*einoschema.Message, error) {
+	a.mu.RLock()
+	runner, session := a.runner, a.session
+	a.mu.RUnlock()
+
+	session.Append(msgs...)
+	res, err := runner.RunStream(ctx, session, agentv2.RunConfig[*SessionState]{})
+	if err != nil {
+		return nil, err
+	}
+	return res.Final, nil
+}
+
+// AppendTools 合并工具后重建不可变 Runner；Session 保持不变。
+func (a *Agent) AppendTools(tools map[string]einotool.InvokableTool) error {
+	if len(tools) == 0 {
+		return nil
+	}
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	merged := make(map[string]einotool.InvokableTool, len(a.tools)+len(tools))
+	maps.Copy(merged, a.tools)
+	maps.Copy(merged, tools)
+
+	cfg := a.cfg
+	cfg.Tools = toolSlice(merged)
+	// 构造期只用于 tool.Info；实际执行使用调用方传入的 ctx。
+	runner, err := agentv2.NewRunner[*SessionState](context.Background(), cfg)
+	if err != nil {
+		return err
+	}
+
+	a.cfg = cfg
+	a.tools = merged
+	a.runner = runner
+	return nil
+}
+
+func (a *Agent) TokenUsage() einoschema.TokenUsage {
+	return a.session.Usage
+}
+
+func (a *Agent) BaseLLM() einomodel.ToolCallingChatModel {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.runner.BaseModel()
+}
+
+func toolSlice(tools map[string]einotool.InvokableTool) []agentv2.Tool {
+	out := make([]agentv2.Tool, 0, len(tools))
+	for _, invokable := range tools {
+		out = append(out, invokable)
+	}
+	return out
+}
 
 func buildSourceExploreAgent(
 	deps *WorkerDeps,
@@ -33,40 +120,38 @@ func buildSourceExploreAgent(
 		return nil, errors.Wrapf(errors.ErrParams, "get source explore llm model failed: %v", err)
 	}
 
-	agConfig := pkgagent.Config[*SessionState]{
-		MaxRound: maxRound,
-		BaseLLM:  tcm,
+	spChecker := sourceCheckerFromSourceIDs(sourceIds)
+	toolSet := make(map[string]einotool.InvokableTool)
+	if bindAllTools {
+		toolSet[tools.ReadSourceToolName] = tools.NewReadSourceTool(deps.Agentize, spChecker)
+	}
+	toolSet[tools.GrepSourceToolName] = tools.NewGrepSourceTool(deps.Agentize, spChecker)
+	toolSet[tools.StatSourceToolName] = tools.NewStatSourceTool(deps.Agentize, spChecker)
+	toolSet[tools.QuerySourceToolName] = tools.NewQuerySourceTool(deps.Agentize, notebookId, spChecker)
+
+	cfg := agentv2.RunnerConfig{
+		Name:     "artifact",
+		Model:    tcm,
 		Options:  options,
+		Tools:    toolSlice(toolSet),
+		MaxRound: maxRound,
 		Verbose:  conf.WorkerGlobal().Worker.AgentVerbose,
 	}
-
-	ag := pkgagent.New(agConfig, &SessionState{
-		NotebookId: notebookId,
-		SourceIds:  sourceIds,
-	})
-
-	spChecker := sourceCheckerFromSourceIDs(sourceIds)
-	if bindAllTools {
-		err = ag.BindTools(map[string]einotool.InvokableTool{
-			tools.ReadSourceToolName:  tools.NewReadSourceTool(deps.Agentize, spChecker),
-			tools.GrepSourceToolName:  tools.NewGrepSourceTool(deps.Agentize, spChecker),
-			tools.StatSourceToolName:  tools.NewStatSourceTool(deps.Agentize, spChecker),
-			tools.QuerySourceToolName: tools.NewQuerySourceTool(deps.Agentize, notebookId, spChecker),
-		})
-	} else {
-		err = ag.BindTools(map[string]einotool.InvokableTool{
-			tools.StatSourceToolName:  tools.NewStatSourceTool(deps.Agentize, spChecker),
-			tools.GrepSourceToolName:  tools.NewGrepSourceTool(deps.Agentize, spChecker),
-			tools.QuerySourceToolName: tools.NewQuerySourceTool(deps.Agentize, notebookId, spChecker),
-		})
-	}
+	// 构造期只用于 tool.Info；实际执行使用调用方传入的 ctx。
+	runner, err := agentv2.NewRunner[*SessionState](context.Background(), cfg)
 	if err != nil {
 		return nil, errors.Wrapf(errors.ErrParams, "bind source tools failed: %v", err)
 	}
 
-	ag.OnBeforeRound(pkgagent.NewFinalRoundHook(ag, maxRound))
-
-	return ag, nil
+	return &Agent{
+		cfg:    cfg,
+		tools:  toolSet,
+		runner: runner,
+		session: agentv2.NewSession(&SessionState{
+			NotebookId: notebookId,
+			SourceIds:  sourceIds,
+		}),
+	}, nil
 }
 
 func sourceCheckerFromSourceIDs(sourceIDs []valobj.Id) tools.SourcePermissionChecker {

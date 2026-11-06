@@ -132,6 +132,11 @@ func (NoopHooks[S]) OnContentStart(context.Context, *OutputContext) error     { 
 func (NoopHooks[S]) OnContentDelta(context.Context, *OutputContext) error     { return nil }
 func (NoopHooks[S]) OnContentEnd(context.Context, *OutputContext) error       { return nil }
 
+// NewStatelessFinalRoundHook 构造无状态 agent 的末轮策略
+func NewStatelessFinalRoundHook() FinalRoundHook[NoState] {
+	return FinalRoundHook[NoState]{}
+}
+
 // FinalRoundHook 是内置的末轮策略：
 // 最后一轮注入 instruction，并默认不绑定工具。
 type FinalRoundHook[S any] struct {

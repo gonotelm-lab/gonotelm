@@ -17,10 +17,6 @@ import (
 type chatHooks struct {
 	agentv2.NoopHooks[*SessionState]
 
-	// finalRound 是末轮策略。运行时不传 Hooks 才会默认启用它，
-	// 传入自定义 hooks 后需要自己嵌入，否则末轮不会注入结束指令。
-	finalRound agentv2.FinalRoundHook[*SessionState]
-
 	inner *Hooks
 	// pushOutput 为 false 时丢弃推理与正文增量。
 	pushOutput bool
@@ -28,12 +24,12 @@ type chatHooks struct {
 	stopPhase1 bool
 }
 
-func newChatHooks(inner *Hooks, pushOutput, stopPhase1 bool) *chatHooks {
-	return &chatHooks{inner: inner, pushOutput: pushOutput, stopPhase1: stopPhase1}
-}
-
-func (h *chatHooks) OnRoundStart(ctx context.Context, rc *agentv2.RoundContext[*SessionState]) error {
-	return h.finalRound.OnRoundStart(ctx, rc)
+// newChatHooks 把末轮策略与业务回调组合成一个链。
+func newChatHooks(inner *Hooks, pushOutput, stopPhase1 bool) agentv2.Hooks[*SessionState] {
+	return agentv2.NewChainHooks(
+		agentv2.FinalRoundHook[*SessionState]{},
+		&chatHooks{inner: inner, pushOutput: pushOutput, stopPhase1: stopPhase1},
+	)
 }
 
 // OnRoundComplete 处理本轮的工具结果：回调阶段标记，并把本轮新增消息交给业务落库。

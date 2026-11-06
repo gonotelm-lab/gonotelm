@@ -307,6 +307,38 @@ func TestRunChatManualPushOnPhase1Stop(t *testing.T) {
 	}
 }
 
+// TestNewChatHooksAppliesFinalRound 守住链上的末轮策略：最后一轮仍注入结束指令并摘掉工具，
+// 非末轮不注入。（自定义 hooks 会覆盖引擎默认的 FinalRoundHook，全靠这条链补回来。）
+func TestNewChatHooksAppliesFinalRound(t *testing.T) {
+	ctx := context.Background()
+	hooks := newChatHooks(&Hooks{}, false, false)
+
+	finalRound := &agentv2.RoundContext[*SessionState]{
+		Session: agentv2.NewSession(&SessionState{}),
+		Info:    agentv2.RunInfo{Agent: "chat-test", Round: 0, MaxRound: 1},
+	}
+	if err := hooks.OnRoundStart(ctx, finalRound); err != nil {
+		t.Fatalf("on final round start: %v", err)
+	}
+	if !finalRound.Plan.NoTools {
+		t.Fatalf("final round must strip tools")
+	}
+	if len(finalRound.Plan.Inject) != 1 || finalRound.Plan.Inject[0].Content != agentv2.FinalRoundInstruction {
+		t.Fatalf("unexpected injected messages: %+v", finalRound.Plan.Inject)
+	}
+
+	middleRound := &agentv2.RoundContext[*SessionState]{
+		Session: agentv2.NewSession(&SessionState{}),
+		Info:    agentv2.RunInfo{Agent: "chat-test", Round: 0, MaxRound: 3},
+	}
+	if err := hooks.OnRoundStart(ctx, middleRound); err != nil {
+		t.Fatalf("on middle round start: %v", err)
+	}
+	if middleRound.Plan.NoTools || len(middleRound.Plan.Inject) != 0 {
+		t.Fatalf("middle round must keep tools and inject nothing: %+v", middleRound.Plan)
+	}
+}
+
 func containsMessage(msgs []*einoschema.Message, content string) bool {
 	for _, msg := range msgs {
 		if msg != nil && msg.Content == content {

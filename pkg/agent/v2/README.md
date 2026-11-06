@@ -111,7 +111,7 @@ runner, _ := agent.NewRunner[struct{}](ctx, agent.RunnerConfig{
 - 每轮先调模型；没有工具调用即结束（`StopFinal`），有工具调用则执行后进入下一轮。
 - 达到上限返回 `ErrMaxRounds`。
 - 未传 `Hooks` 时使用 `FinalRoundHook`：最后一轮注入「直接输出结果、不要再调工具」的指令并解绑工具；
-  自定义 hooks 时若仍需要该行为，把 `FinalRoundHook` 嵌进自己的 hooks。
+  自定义 hooks 时引擎不会再自动补：用 `NewChainHooks(FinalRoundHook[S]{}, ...)` 把它作为一个成员显式传入。
 - `RoundPlan.Inject` 可在某轮临时插入消息（不写入 `Session`），`rc.Stop = true` 可在 `OnRoundEnd` 主动收尾（`StopEarly`）。
 
 ## Hooks
@@ -127,6 +127,26 @@ runner, _ := agent.NewRunner[struct{}](ctx, agent.RunnerConfig{
 | `OnToolCallStart` | 本轮全部工具执行前，按调用顺序 | 返回错误会终止本轮（工具尚未执行） |
 | `OnToolCallEnd` | 每个工具结束后 | 并行模式下会在多个 goroutine 中并发调用，注意加锁 |
 | `OnContentDelta` / `OnReasoningDelta` 等 | 流式输出期间 | 仅 `RunStream` 有增量 |
+
+### 组合多个 hooks
+
+`NewChainHooks` 把多个 `Hooks` 按给定顺序串成一个 `Hooks`，用于「末轮策略 + 业务回调」这类叠加场景：
+
+```go
+hooks := agent.NewChainHooks(
+	agent.FinalRoundHook[*MyState]{}, // 仍需要默认末轮策略时显式传入
+	&myHooks{},                       // 业务回调
+)
+runner.Run(ctx, session, agent.RunConfig[*MyState]{Hooks: hooks})
+```
+
+- 所有阶段按传入顺序执行，后面的成员能看到前面成员对 `RoundPlan` / `Stop` 的修改。
+- 返回错误的阶段遇到第一个错误即中止，错误带成员序号（`chain hook 1 failed: ...`）。
+- `nil` 成员被忽略；零参数返回一个什么都不做的链（不是 `nil`，因此也会覆盖默认末轮策略）。
+- `OnToolCallStart` / `OnToolCallEnd` 仍可能在多个 goroutine 中并发调用，链只做转发，成员需自行保证并发安全。
+
+无状态 agent 可用 `agent.NewChainHooks(agent.NewStatelessFinalRoundHook(), &myHooks{})`，
+省掉 `NoState` 的泛型参数。
 
 ## 预算
 

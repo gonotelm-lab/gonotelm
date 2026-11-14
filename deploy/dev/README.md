@@ -22,8 +22,7 @@ make dev-up-notrace   # = make -C deploy/dev up-notrace
 
 变量默认取仓库根目录的 `.env`（也就是 app 用的那份），优先级：**shell 里 export 的 > `--env-file` 指定的**。
 所以临时换端口不用改文件：`GONOTELM_DB_PORT=15432 make dev-up`。
-必需变量（缺失时 compose 直接报错）：`GONOTELM_DB_PASSWORD`、`GONOTELM_OLAP_DB_PASSWORD`、
-`GONOTELM_MINIO_SECRET_KEY`、`GONOTELM_KAFKA_PASSWORD`。
+本地启动的必需变量汇总在仓库根目录的 [`.env.minimum`](../../.env.minimum)；缺失时 compose 或对应进程会直接报错。
 
 ## 服务与端口
 

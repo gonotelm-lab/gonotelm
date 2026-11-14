@@ -82,10 +82,16 @@ GoNoteLM turns a pile of PDFs, links, and notes into real understanding. Upload 
 
 ## Getting Started Locally
 
-Prerequisites: Go (see `go.mod`), Docker with Compose, and `make`.
+Prerequisites: Go (see `go.mod`), Docker Compose, and `make`.
+
+### Minimum environment variables
+
+Copy the keys from [`.env.minimum`](.env.minimum) into `.env` and fill them in; everything else can stay
+empty and falls back to the defaults in `etc/*.toml.tpl`. `make dev-up` and the Go processes refuse to
+start while their required keys are empty. The full annotated list is in [`.env.example`](.env.example).
 
 ```bash
-# 1. environment variables (all optional — defaults live in etc/*.toml.tpl)
+# 1. environment variables (required keys: .env.minimum)
 cp .env.example .env
 
 # 2. start local middleware: postgres / redis / clickhouse / kafka / minio / milvus / flow-server (+ jaeger)

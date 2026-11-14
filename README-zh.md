@@ -84,8 +84,12 @@ PDF、链接、笔记这些零散资料，GoNoteLM 能帮你真正读透。上�
 
 需要 Go（版本见 `go.mod`）、Docker Compose 和 `make`。
 
+### 最小环境变量
+
+把 [`.env.minimum`](.env.minimum) 里的 key 复制进 `.env` 并填值，其余变量留空即可，会回退到 `etc/*.toml.tpl` 的默认值。这些 key 为空时，`make dev-up` 或对应进程会直接启动失败。完整清单和注释见 [`.env.example`](.env.example)。
+
 ```bash
-# 1. 配置环境变量（都可选，默认值在 etc/*.toml.tpl 里）
+# 1. 配置环境变量（必需项见 .env.minimum）
 cp .env.example .env
 
 # 2. 启动本地中间件：postgres / redis / clickhouse / kafka / minio / milvus / flow-server（默认还会启动 jaeger）

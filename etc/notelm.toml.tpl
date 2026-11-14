@@ -296,7 +296,7 @@ exporter = "grpc"
 [idp.github]
 clientId = "${GONOTELM_OAUTH_GITHUB_CLIENT_ID}"
 clientSecret = "${GONOTELM_OAUTH_GITHUB_CLIENT_SECRET}"
-redirectUri = "${GONOTELM_OAUTH_REDIRECT_URI:-http://127.0.0.1:7099/api/v1/auth/callback/github}"
+redirectUri = "${GONOTELM_OAUTH_GITHUB_REDIRECT_URI:-http://127.0.0.1:7099/api/v1/auth/callback/github}"
 scopes = ["read:user", "user:email"]
 authEndpoint = ""
 tokenEndpoint = ""

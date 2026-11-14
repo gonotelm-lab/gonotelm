@@ -3,12 +3,12 @@ package tools
 import (
 	"context"
 	"fmt"
-	"maps"
 	"strings"
 	"sync/atomic"
 	"time"
+	"unicode/utf8"
 
-	pkgagent "github.com/gonotelm-lab/gonotelm/pkg/agent"
+	agentv2 "github.com/gonotelm-lab/gonotelm/pkg/agent/v2"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	pkstring "github.com/gonotelm-lab/gonotelm/pkg/string"
 
@@ -28,6 +28,9 @@ const (
 	defaultSubagentMaxRound    = 15
 	defaultSubagentConcurrency = 3
 	defaultSubagentResultChars = 20000
+
+	subagentResultFooter        = "\n</subagent_result>"
+	subagentResultTruncatedMark = "\n... [subagent result truncated]"
 
 	defaultSubagentSystemPrompt = "You are a subagent executing a self-contained task in an isolated context window. " +
 		"You cannot see the calling agent's conversation and you cannot ask questions. " +
@@ -58,22 +61,18 @@ type SubagentConfig struct {
 }
 
 type SubagentTool struct {
-	llm          model.ToolCallingChatModel
-	options      []model.Option
+	runner       *agentv2.StatelessRunner
 	systemPrompt string
-	tools        map[string]tool.InvokableTool
 
-	maxRound       int
 	timeout        time.Duration
 	maxCallsPerRun int
 	maxResultChars int
-	verbose        bool
 
 	sem   *semaphore.Weighted
 	calls atomic.Int64
 }
 
-func NewSubagentTool(cfg SubagentConfig) (*SubagentTool, error) {
+func NewSubagentTool(ctx context.Context, cfg SubagentConfig) (*SubagentTool, error) {
 	if cfg.BaseLLM == nil {
 		return nil, fmt.Errorf("base llm is required")
 	}
@@ -103,16 +102,24 @@ func NewSubagentTool(cfg SubagentConfig) (*SubagentTool, error) {
 		return nil, err
 	}
 
+	runner, err := agentv2.NewStatelessRunner(ctx, agentv2.RunnerConfig{
+		Name:     "subagent",
+		Model:    cfg.BaseLLM,
+		Options:  cfg.Options,
+		Tools:    toolSet,
+		MaxRound: maxRound,
+		Verbose:  cfg.Verbose,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("new subagent runner: %w", err)
+	}
+
 	return &SubagentTool{
-		llm:            cfg.BaseLLM,
-		options:        cfg.Options,
+		runner:         runner,
 		systemPrompt:   systemPrompt,
-		tools:          toolSet,
-		maxRound:       maxRound,
 		timeout:        cfg.Timeout,
 		maxCallsPerRun: cfg.MaxCallsPerRun,
 		maxResultChars: maxResultChars,
-		verbose:        cfg.Verbose,
 		sem:            semaphore.NewWeighted(int64(maxConcurrency)),
 	}, nil
 }
@@ -186,7 +193,7 @@ func (t *SubagentTool) InvokableRun(
 	return formatSubagentResult(name, title, content, t.maxResultChars), nil
 }
 
-// run 在全新 Agent 中执行子代理任务，独立上下文、独立工具绑定
+// run 在独立的 Session 中执行子代理任务，共享不可变 Runner。
 func (t *SubagentTool) run(ctx context.Context, name, title, prompt string) (string, error) {
 	if t.timeout > 0 {
 		var cancel context.CancelFunc
@@ -196,45 +203,23 @@ func (t *SubagentTool) run(ctx context.Context, name, title, prompt string) (str
 
 	ctx = pkgcontext.WithSubagent(ctx)
 
-	ag := pkgagent.New(pkgagent.Config[struct{}]{
-		MaxRound: t.maxRound,
-		BaseLLM:  t.llm,
-		Options:  t.options,
-		Verbose:  t.verbose,
-	}, struct{}{})
+	session := agentv2.NewStatelessSession()
+	session.System = buildSubagentSystemPrompt(t.systemPrompt, name, title)
+	session.Append(schema.UserMessage(prompt))
 
-	// BindTools 会持有传入的 map，而 NewFinalRoundHook 在最后一轮会 clear 它
-	if err := ag.BindTools(maps.Clone(t.tools)); err != nil {
-		return "", fmt.Errorf("subagent %s bind tools failed: %w", name, err)
-	}
-
-	ag.OnBeforeRound(pkgagent.NewFinalRoundHook(ag, t.maxRound))
-
-	sysMsg := schema.SystemMessage(buildSubagentSystemPrompt(t.systemPrompt, name, title))
-	ag.OnBeforeChat(func(
-		ctx context.Context,
-		state struct{},
-		msgs []*pkgagent.EinoMessage,
-	) ([]*pkgagent.EinoMessage, error) {
-		newMsgs := make([]*pkgagent.EinoMessage, 0, len(msgs)+1)
-		newMsgs = append(newMsgs, sysMsg)
-		newMsgs = append(newMsgs, msgs...)
-		return newMsgs, nil
-	})
-
-	final, err := ag.React(ctx, []*pkgagent.EinoMessage{{
-		Role:    schema.User,
-		Content: prompt,
-	}})
+	res, err := t.runner.Run(ctx, session, agentv2.StatelessRunConfig{})
 	if err != nil {
-		return "", fmt.Errorf("subagent %s react failed: %w", name, err)
+		return "", fmt.Errorf("subagent %s run failed: %w", name, err)
+	}
+	if res.Final == nil {
+		return "", fmt.Errorf("subagent %s returned empty final message", name)
 	}
 
-	return final.Content, nil
+	return res.Final.Content, nil
 }
 
-func resolveSubagentTools(declared map[string]tool.InvokableTool) (map[string]tool.InvokableTool, error) {
-	resolved := make(map[string]tool.InvokableTool, len(declared))
+func resolveSubagentTools(declared map[string]tool.InvokableTool) ([]agentv2.Tool, error) {
+	resolved := make([]agentv2.Tool, 0, len(declared))
 	for name, invokable := range declared {
 		if invokable == nil {
 			return nil, fmt.Errorf("subagent tool %s is nil", name)
@@ -248,11 +233,14 @@ func resolveSubagentTools(declared map[string]tool.InvokableTool) (map[string]to
 		if err != nil {
 			return nil, fmt.Errorf("get subagent tool %s info failed: %w", name, err)
 		}
+		if info == nil {
+			return nil, fmt.Errorf("subagent tool %s info is nil", name)
+		}
 		if info.Name != name {
 			return nil, fmt.Errorf("subagent tool map key %s does not match tool info name %s", name, info.Name)
 		}
 
-		resolved[name] = invokable
+		resolved = append(resolved, invokable)
 	}
 
 	return resolved, nil
@@ -270,18 +258,19 @@ func buildSubagentSystemPrompt(systemPrompt, name, title string) string {
 }
 
 func formatSubagentResult(name, title, content string, maxChars int) string {
-	var builder strings.Builder
-	builder.Grow(len(content) + 96)
-	fmt.Fprintf(&builder, "<subagent_result name=%q title=%q>\n", name, title)
-	builder.WriteString(content)
-	builder.WriteString("\n</subagent_result>")
+	header := fmt.Sprintf("<subagent_result name=%q title=%q>\n", name, title)
 
-	result := builder.String()
+	body := content
 	if maxChars > 0 {
-		if runes := []rune(result); len(runes) > maxChars {
-			result = string(runes[:maxChars]) + "\n... [subagent result truncated]"
+		// 只截断正文，包装标签必须完整闭合。
+		budget := maxChars - utf8.RuneCountInString(header) - utf8.RuneCountInString(subagentResultFooter)
+		if budget <= 0 {
+			body = ""
+		} else if runes := []rune(content); len(runes) > budget {
+			keep := max(0, budget-utf8.RuneCountInString(subagentResultTruncatedMark))
+			body = string(runes[:keep]) + subagentResultTruncatedMark
 		}
 	}
 
-	return result
+	return header + body + subagentResultFooter
 }

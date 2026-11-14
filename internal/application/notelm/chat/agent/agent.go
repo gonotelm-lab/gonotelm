@@ -10,57 +10,32 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
 	"github.com/gonotelm-lab/gonotelm/internal/core/valobj"
 	chatentity "github.com/gonotelm-lab/gonotelm/internal/domain/chat/entity"
+	chatvo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/vo"
 	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	sourceentity "github.com/gonotelm-lab/gonotelm/internal/domain/source/entity"
 	sourcerepo "github.com/gonotelm-lab/gonotelm/internal/domain/source/repository"
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/service/agentize"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
-	pkgagt "github.com/gonotelm-lab/gonotelm/pkg/agent"
+	agentv2 "github.com/gonotelm-lab/gonotelm/pkg/agent/v2"
 	"github.com/gonotelm-lab/gonotelm/pkg/llm"
 
-	"github.com/bytedance/sonic"
-	einotool "github.com/cloudwego/eino/components/tool"
 	einoschema "github.com/cloudwego/eino/schema"
 	"github.com/pkg/errors"
 )
 
-type (
-	ChatMessageStyle        string
-	ChatMessageAnswerLength string
-)
-
 const (
-	ChatMessageStyleDefault ChatMessageStyle = "default"
-	ChatMessageStyleAnalyst ChatMessageStyle = "analyst"
-	ChatMessageStyleGuide   ChatMessageStyle = "guide"
+	agentName = "chat"
 
-	ChatMessageAnswerLengthDefault ChatMessageAnswerLength = "default"
-	ChatMessageAnswerLengthShorter ChatMessageAnswerLength = "shorter"
-	ChatMessageAnswerLengthLonger  ChatMessageAnswerLength = "longer"
+	// finalAnswerPrompt 是阶段二的开场指令：探索已经结束，只输出最终回答。
+	finalAnswerPrompt = "Please output the final answer now."
 )
-
-func (s ChatMessageStyle) IsValid() bool {
-	switch s {
-	case ChatMessageStyleDefault, ChatMessageStyleAnalyst, ChatMessageStyleGuide:
-		return true
-	default:
-		return false
-	}
-}
-
-func (l ChatMessageAnswerLength) IsValid() bool {
-	switch l {
-	case ChatMessageAnswerLengthDefault, ChatMessageAnswerLengthShorter, ChatMessageAnswerLengthLonger:
-		return true
-	default:
-		return false
-	}
-}
 
 // 聊天Agent
 //
 // 实现类似Agentic RAG回答问题
+//
+// 执行层由 Runner 与 Session 组成：Runner 持有模型与工具，Session 持有业务状态、系统提示词与上下文消息。
 type Agent struct {
 	service      *agentize.Service
 	gateway      *chat.Gateway
@@ -89,8 +64,8 @@ type RunRequest struct {
 	ContextMessages []*chatentity.ContextMessage
 	Sources         []*sourceentity.Source
 	EnableThinking  bool
-	Style           ChatMessageStyle
-	AnswerLength    ChatMessageAnswerLength
+	Style           chatvo.Style
+	AnswerLength    chatvo.AnswerLength
 
 	Model         string // model name
 	ModelProvider string // model provider
@@ -101,7 +76,7 @@ type RunRequest struct {
 type (
 	RunResponse struct {
 		SourceDocCitations []valobj.Id
-		FinalMessage       *pkgagt.EinoMessage
+		FinalMessage       *einoschema.Message
 	}
 
 	Phase struct {
@@ -124,7 +99,7 @@ type (
 
 	PhaseMarkHook func(ctx context.Context, phase Phase)
 
-	RoundFinishedHook func(ctx context.Context, newMsgs []*pkgagt.EinoMessage)
+	RoundFinishedHook func(ctx context.Context, newMsgs []*einoschema.Message)
 
 	Hooks struct {
 		ThinkStart        ThinkStartHook
@@ -138,9 +113,14 @@ type (
 	}
 )
 
-type ChatAgent = pkgagt.Agent[*SessionState]
-
-func (a *Agent) prepareRun(req *RunRequest) (*ChatAgent, *SessionState, error) {
+// prepareRun 构造本次运行所需的 Runner 与 Session。
+//
+// Runner 只装模型、工具和轮数上限，可以跨会话复用；Session 承载本次运行的状态、
+// 系统提示词和上下文消息，只允许单 goroutine 持有。
+func (a *Agent) prepareRun(
+	ctx context.Context,
+	req *RunRequest,
+) (*agentv2.Runner[*SessionState], *agentv2.Session[*SessionState], error) {
 	tcm, err := a.gateway.GetChatModel(chat.Provider(req.ModelProvider))
 	if err != nil {
 		return nil, nil, err
@@ -150,161 +130,143 @@ func (a *Agent) prepareRun(req *RunRequest) (*ChatAgent, *SessionState, error) {
 		chat.WithThinking(chat.Provider(req.ModelProvider), req.EnableThinking),
 		chat.WithModel(req.Model),
 	)
-	session := &SessionState{
+
+	state := &SessionState{
 		chat:        req.Chat,
 		notebook:    req.Notebook,
 		sources:     req.Sources,
 		userId:      req.UserId,
 		curRunPhase: runPhase1,
 	}
-	domainAgent := pkgagt.New(pkgagt.Config[*SessionState]{
-		MaxRound: conf.NotelmGlobal().Chat.GetMaxRound(),
-		BaseLLM:  tcm,
-		Options:  options,
-		Verbose:  false,
-	}, session)
+	session := agentv2.NewSession(state)
 
-	sourceIds := make([]valobj.Id, 0, len(req.Sources))
-	for _, source := range req.Sources {
-		sourceIds = append(sourceIds, source.Id)
+	systemPrompt, err := a.buildSystemPrompt(ctx, req)
+	if err != nil {
+		return nil, nil, errors.WithMessage(err, "build system prompt failed")
 	}
+	session.System = systemPrompt
 
-	// 绑定工具
-	sourcePermissionChecker := a.isSourceAllowAccess(sourceIds)
-	sourceDocPermissionChecker := a.isSourceDocAllowAccess(req.Notebook.Id, sourceIds)
-	err = domainAgent.BindTools(map[string]einotool.InvokableTool{
-		tools.GrepSourceToolName:  tools.NewGrepSourceTool(a.service, sourcePermissionChecker),
-		tools.ReadSourceToolName:  tools.NewReadSourceTool(a.service, sourcePermissionChecker),
-		tools.StatSourceToolName:  tools.NewStatSourceTool(a.service, sourcePermissionChecker),
-		tools.QuerySourceToolName: tools.NewQuerySourceTool(a.service, req.Notebook.Id, sourcePermissionChecker),
-		tools.MarkPhaseToolName:   tools.NewMarkPhaseTool(),
-		tools.CiteSourceDocToolName: tools.NewCiteSourceDocTool(
-			sourceDocPermissionChecker,
-			tools.CitationCollectorFunc(func(sourceDocIds []valobj.Id) {
-				session.sourceDocCitations = sourceDocIds
-				session.citationRegistered = true
-			}),
-		),
+	ctxMsgs := make([]*einoschema.Message, 0, len(req.ContextMessages))
+	for _, msg := range req.ContextMessages {
+		if msg == nil || msg.Message == nil {
+			continue
+		}
+		ctxMsgs = append(ctxMsgs, msg.Message)
+	}
+	session.Append(ctxMsgs...)
+
+	runner, err := agentv2.NewRunner[*SessionState](ctx, agentv2.RunnerConfig{
+		Name:     agentName,
+		Model:    tcm,
+		Options:  options,
+		Tools:    a.buildTools(state, req),
+		MaxRound: conf.NotelmGlobal().Chat.GetMaxRound(),
 	})
 	if err != nil {
 		return nil, nil, errors.WithMessage(err, "bind tools failed")
 	}
 
-	return domainAgent, session, nil
+	return runner, session, nil
 }
 
-func (a *Agent) preparePrompt(ctx context.Context, domainAgent *ChatAgent, req *RunRequest) error {
+// buildTools 装配本次运行的工具集，权限检查与引用收集都绑定到本次运行的 state 上。
+func (a *Agent) buildTools(state *SessionState, req *RunRequest) []agentv2.Tool {
+	sourceIds := make([]valobj.Id, 0, len(req.Sources))
+	for _, source := range req.Sources {
+		sourceIds = append(sourceIds, source.Id)
+	}
+
+	sourcePermissionChecker := a.composeSourceAllowAccessTool(sourceIds)
+	sourceDocPermissionChecker := a.composeSourceDocAllowAccessTool(req.Notebook.Id, sourceIds)
+
+	return []agentv2.Tool{
+		tools.NewGrepSourceTool(a.service, sourcePermissionChecker),
+		tools.NewReadSourceTool(a.service, sourcePermissionChecker),
+		tools.NewStatSourceTool(a.service, sourcePermissionChecker),
+		tools.NewQuerySourceTool(a.service, req.Notebook.Id, sourcePermissionChecker),
+		tools.NewMarkPhaseTool(),
+		tools.NewCiteSourceDocTool(sourceDocPermissionChecker, composeCitationCollector(state)),
+	}
+}
+
+func (a *Agent) buildSystemPrompt(ctx context.Context, req *RunRequest) (string, error) {
 	promptVars, err := a.buildPromptVars(req)
 	if err != nil {
-		return errors.WithMessage(err, "build prompt vars failed")
+		return "", errors.WithMessage(err, "build prompt vars failed")
 	}
+
 	systemPrompt, err := renderSystemPrompt(ctx, promptVars)
 	if err != nil {
-		return errors.WithMessage(err, "render system prompt failed")
+		return "", errors.WithMessage(err, "render system prompt failed")
 	}
 
-	// set callbacks
-	domainAgent.OnBeforeChat(func(
-		ctx context.Context,
-		state *SessionState,
-		msgs []*einoschema.Message,
-	) ([]*einoschema.Message, error) {
-		newMsgs := make([]*einoschema.Message, 0, len(msgs)+1)
-		newMsgs = append(newMsgs, systemPrompt)
-		newMsgs = append(newMsgs, msgs...)
-		return newMsgs, nil
-	})
-
-	return nil
+	return systemPrompt.Content, nil
 }
 
-// Run 是底层大模型为纯流式输出 大模型的每个输出都直接反映到设置的回调函数上
-//
-// Deprecated
-func (a *Agent) Run(ctx context.Context, req *RunRequest) (*RunResponse, error) {
-	domainAgent, session, err := a.prepareRun(req)
-	if err != nil {
-		return nil, errors.WithMessagef(err, "prepare run agent failed")
-	}
-
-	err = a.preparePrompt(ctx, domainAgent, req)
-	if err != nil {
-		return nil, errors.WithMessagef(err, "prepare prompt failed")
-	}
-	a.bindHooks(domainAgent, req)
-
-	ctxMsgs := make([]*einoschema.Message, 0, len(req.ContextMessages))
-	for _, msg := range req.ContextMessages {
-		ctxMsgs = append(ctxMsgs, msg.Message)
-	}
-	final, err := domainAgent.ReactStream(ctx, ctxMsgs)
-	if err != nil {
-		return nil, errors.WithMessage(err, "agent react stream failed")
-	}
-
-	return &RunResponse{
-		SourceDocCitations: session.sourceDocCitations,
-		FinalMessage:       final,
-	}, nil
-}
-
-// RunV2 底层不再完全使用大模型流式输出 只在最后的关键节点输出才使用流式输出 其它都是非流式
-// 即RunV2先非流式 再流式
+// RunV2 分两段执行：阶段一非流式探索（工具、阶段标记、引用登记），
+// 阶段二流式输出最终回答，只有阶段二的增量会推送给客户端。
 func (a *Agent) RunV2(ctx context.Context, req *RunRequest) (*RunResponse, error) {
-	domainAgent, session, err := a.prepareRun(req)
+	runner, session, err := a.prepareRun(ctx, req)
 	if err != nil {
-		return nil, errors.WithMessagef(err, "prepare run agent failed")
+		return nil, errors.WithMessage(err, "prepare run agent failed")
 	}
 
-	err = a.preparePrompt(ctx, domainAgent, req)
-	if err != nil {
-		return nil, errors.WithMessagef(err, "prepare prompt failed")
-	}
-	a.bindHooksV2(domainAgent, req)
+	return runChat(ctx, runner, session, &req.Hooks)
+}
 
-	ctxMsgs := make([]*einoschema.Message, 0, len(req.ContextMessages))
-	for _, msg := range req.ContextMessages {
-		ctxMsgs = append(ctxMsgs, msg.Message)
-	}
-	session.enterRunPhase1()
-	phase1FinalMsg, err := domainAgent.React(ctx, ctxMsgs) // 此时只是中间结果
+// runChat 是 RunV2 的实际执行流程，独立于 Agent 便于直接驱动 Runner 做测试。
+func runChat(
+	ctx context.Context,
+	runner *agentv2.Runner[*SessionState],
+	session *agentv2.Session[*SessionState],
+	hooks *Hooks,
+) (*RunResponse, error) {
+	state := session.State
+	state.enterRunPhase1()
+
+	res, err := runner.Run(ctx, session, agentv2.RunConfig[*SessionState]{
+		Hooks: newChatHooks(hooks, false, true), // 阶段一不推送增量
+	})
 	if err != nil {
 		return nil, errors.WithMessage(err, "intermediate agent react failed")
 	}
 
+	phase1FinalMsg := res.Final
 	if phase1FinalMsg != nil &&
 		phase1FinalMsg.ResponseMeta != nil &&
 		phase1FinalMsg.ResponseMeta.FinishReason == llm.FinishReasonStop &&
-		!session.finalPhaseMarked {
+		!state.finalPhaseMarked {
 		// 此处兼容一种情况 如果phase1直接输出了finish_stop 意味着模型没有严格遵守要求直接输出了答案
 		// 那就直接推送 不要浪费token了 手动触发一次hook
 		slog.DebugContext(ctx, "runV2 phase1 directly finish_reason=stop, manual pushing...")
-		a.manualPushFinalMsg(ctx, phase1FinalMsg, &req.Hooks)
+		manualPushFinalMsg(ctx, phase1FinalMsg, hooks)
 		return &RunResponse{
 			FinalMessage:       phase1FinalMsg,
-			SourceDocCitations: session.sourceDocCitations,
+			SourceDocCitations: state.sourceDocCitations,
 		}, nil
 	}
 
 	slog.DebugContext(ctx, "runV2 after phase1 react, now reactStream")
 
 	// 第二个阶段开始流式输出
-	session.enterRunPhase2()
-	finalMsg, err := domainAgent.ReactStream(ctx, []*pkgagt.EinoMessage{{
-		Role:    einoschema.User,
-		Content: "Please output the final answer now.",
-	}})
+	state.enterRunPhase2()
+	session.Append(einoschema.UserMessage(finalAnswerPrompt))
+
+	res, err = runner.RunStream(ctx, session, agentv2.RunConfig[*SessionState]{
+		Hooks: newChatHooks(hooks, true, false), // 阶段二推送增量
+	})
 	if err != nil {
 		return nil, errors.WithMessage(err, "final agent react stream failed")
 	}
 
 	return &RunResponse{
-		FinalMessage:       finalMsg,
-		SourceDocCitations: session.sourceDocCitations,
+		FinalMessage:       res.Final,
+		SourceDocCitations: state.sourceDocCitations,
 	}, nil
 }
 
-func (a *Agent) manualPushFinalMsg(ctx context.Context, msg *pkgagt.EinoMessage, hooks *Hooks) {
+// manualPushFinalMsg 把阶段一直接产出的最终回答按「开始-增量-结束」喂给业务 hooks。
+func manualPushFinalMsg(ctx context.Context, msg *einoschema.Message, hooks *Hooks) {
 	if msg.Content == "" {
 		return
 	}
@@ -322,88 +284,6 @@ func (a *Agent) manualPushFinalMsg(ctx context.Context, msg *pkgagt.EinoMessage,
 	if hooks.ResponseEnd != nil {
 		hooks.ResponseEnd(ctx)
 	}
-}
-
-func (a *Agent) bindBasicHooks(domainAgent *ChatAgent, req *RunRequest) {
-	domainAgent.OnBeforeRound(pkgagt.NewFinalRoundHook(domainAgent, conf.NotelmGlobal().Chat.GetMaxRound()))
-
-	if req.Hooks.RoundFinishedHook != nil {
-		domainAgent.OnMsgAppender(func(ctx context.Context, state *SessionState, newMsgs []*pkgagt.EinoMessage) {
-			req.Hooks.RoundFinishedHook(ctx, newMsgs)
-		})
-	}
-
-	if req.Hooks.ThinkStart != nil {
-		domainAgent.OnReasoningStart(func(ctx context.Context, round int, state *SessionState) error {
-			req.Hooks.ThinkStart(ctx)
-			return nil
-		})
-	}
-	if req.Hooks.ThinkDelta != nil {
-		domainAgent.OnReasoningDelta(func(ctx context.Context, round int, state *SessionState, delta string) error {
-			req.Hooks.ThinkDelta(ctx, delta)
-			return nil
-		})
-	}
-	if req.Hooks.ThinkEnd != nil {
-		domainAgent.OnReasoningEnd(func(ctx context.Context, round int, state *SessionState) error {
-			req.Hooks.ThinkEnd(ctx)
-			return nil
-		})
-	}
-
-	if req.Hooks.ResponseStart != nil {
-		domainAgent.OnContentStart(func(ctx context.Context, round int, state *SessionState) error {
-			req.Hooks.ResponseStart(ctx)
-			return nil
-		})
-	}
-	if req.Hooks.ResponseDelta != nil {
-		domainAgent.OnContentDelta(func(ctx context.Context, round int, state *SessionState, delta string) error {
-			req.Hooks.ResponseDelta(ctx, delta)
-			return nil
-		})
-	}
-	if req.Hooks.ResponseEnd != nil {
-		domainAgent.OnContentEnd(func(ctx context.Context, round int, state *SessionState) error {
-			req.Hooks.ResponseEnd(ctx)
-			return nil
-		})
-	}
-
-	domainAgent.OnAfterToolCall(func(ctx context.Context, state *SessionState, results []*pkgagt.ToolCallResult) {
-		// 额外处理工具调用结果
-		for _, result := range results {
-			switch result.Name {
-			case tools.MarkPhaseToolName:
-				var input tools.MarkPhaseToolInput
-				if err := sonic.Unmarshal([]byte(result.Arguments), &input); err == nil {
-					if req.Hooks.PhaseMarkHook != nil {
-						state.finalPhaseMarked = input.IsFinal
-						req.Hooks.PhaseMarkHook(ctx, Phase{
-							Summary:     input.Summary,
-							Description: input.Description,
-							IsFinal:     input.IsFinal,
-						})
-					}
-				}
-			}
-		}
-	})
-}
-
-func (a *Agent) bindHooks(domainAgent *ChatAgent, req *RunRequest) {
-	a.bindBasicHooks(domainAgent, req)
-}
-
-func (a *Agent) bindHooksV2(domainAgent *ChatAgent, req *RunRequest) {
-	a.bindBasicHooks(domainAgent, req)
-
-	domainAgent.OnAfterRound(func(ctx context.Context, round int, state *SessionState, roundMsg *pkgagt.EinoMessage) (bool, error) {
-		// is_final 已标记且引用已登记时才结束阶段一；仅标记未登记则继续，
-		// 给模型补调 CiteSourceDoc 的机会，避免正文出现 <sup> 却无引用落库。
-		return state.shouldEndPhase1(), nil
-	})
 }
 
 func (a *Agent) buildPromptVars(req *RunRequest) (PromptTemplateVars, error) {
@@ -430,7 +310,7 @@ func (a *Agent) buildPromptVars(req *RunRequest) (PromptTemplateVars, error) {
 }
 
 // 检查sourceIds是否可以被当前Agent访问
-func (a *Agent) isSourceAllowAccess(allowedSourceIds []valobj.Id) tools.SourcePermissionChecker {
+func (a *Agent) composeSourceAllowAccessTool(allowedSourceIds []valobj.Id) tools.SourcePermissionChecker {
 	return tools.SourcePermissionCheckerFunc(func(ctx context.Context, sourceIds []valobj.Id) error {
 		for _, sourceId := range sourceIds {
 			if !slices.Contains(allowedSourceIds, sourceId) {
@@ -443,11 +323,19 @@ func (a *Agent) isSourceAllowAccess(allowedSourceIds []valobj.Id) tools.SourcePe
 }
 
 // 检查sourceDocIds是否可以被当前Agent访问
-func (a *Agent) isSourceDocAllowAccess(
+func (a *Agent) composeSourceDocAllowAccessTool(
 	notebookId valobj.Id,
 	sourceIds []valobj.Id,
 ) tools.SourceDocPermissionChecker {
 	return tools.SourceDocPermissionCheckerFunc(func(ctx context.Context, sourceDocIds []valobj.Id) error {
 		return a.service.CheckSourceDocAllowAccess(ctx, notebookId, sourceIds, sourceDocIds)
+	})
+}
+
+// composeCitationCollector 把 CiteSourceDoc 的登记结果写回本次运行的状态，供落库引用使用。
+func composeCitationCollector(state *SessionState) tools.CitationCollector {
+	return tools.CitationCollectorFunc(func(sourceDocIds []valobj.Id) {
+		state.sourceDocCitations = sourceDocIds
+		state.citationRegistered = true
 	})
 }

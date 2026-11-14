@@ -15,6 +15,7 @@ import (
 	chatentity "github.com/gonotelm-lab/gonotelm/internal/domain/chat/entity"
 	chaterrors "github.com/gonotelm-lab/gonotelm/internal/domain/chat/errors"
 	chatrepo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/repository"
+	chatvo "github.com/gonotelm-lab/gonotelm/internal/domain/chat/vo"
 	notebookentity "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/entity"
 	notebookrepo "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/repository"
 	notebookservice "github.com/gonotelm-lab/gonotelm/internal/domain/notebook/service"
@@ -23,12 +24,13 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/domain/source/service/agentize"
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/eventbus"
 	llmchat "github.com/gonotelm-lab/gonotelm/internal/infrastructure/llm/chat"
-	domainagent "github.com/gonotelm-lab/gonotelm/pkg/agent"
 	pkgcontext "github.com/gonotelm-lab/gonotelm/pkg/context"
 	"github.com/gonotelm-lab/gonotelm/pkg/errors"
 	"github.com/gonotelm-lab/gonotelm/pkg/idgen"
 	"github.com/gonotelm-lab/gonotelm/pkg/safe"
 	"github.com/gonotelm-lab/gonotelm/pkg/uuid"
+
+	einoschema "github.com/cloudwego/eino/schema"
 )
 
 func streamTaskCreateLockKey(userId valobj.Uid, chatId valobj.Id) string {
@@ -97,8 +99,8 @@ type CreateMessageCommand struct {
 	ChatId         valobj.Id
 	Prompt         string
 	SourceIds      []valobj.Id
-	Style          chatagent.ChatMessageStyle
-	AnswerLength   chatagent.ChatMessageAnswerLength
+	Style          chatvo.Style
+	AnswerLength   chatvo.AnswerLength
 	EnableThinking bool
 }
 
@@ -378,7 +380,7 @@ func (h *CreateMessageHandler) finishStreamTask(ctx context.Context, taskId valo
 }
 
 func (h *CreateMessageHandler) onAgentRoundFinished(bundle *streamTaskBundle) chatagent.RoundFinishedHook {
-	return func(ctx context.Context, newMsgs []*domainagent.EinoMessage) {
+	return func(ctx context.Context, newMsgs []*einoschema.Message) {
 		msgs := make([]*chatentity.ContextMessage, 0, len(newMsgs))
 		for _, msg := range newMsgs {
 			msgs = append(msgs, &chatentity.ContextMessage{

@@ -1,5 +1,6 @@
 package vo
 
+// AnswerLength 是回答长度偏好，对应请求里的 answer_length 字段。
 type AnswerLength string
 
 const (

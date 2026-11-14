@@ -1,5 +1,6 @@
 package vo
 
+// Style 是回答风格，对应请求里的 style 字段。
 type Style string
 
 const (

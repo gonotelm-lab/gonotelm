@@ -122,3 +122,27 @@ Middleware ports are published on the host and must match the `GONOTELM_*` addre
 see [deploy/dev/README.md](deploy/dev/README.md) for the full port table, data-volume reuse, and how to
 run alongside an existing local stack.
 
+## OAuth and integration setup
+
+Email + password sign-in works without extra configuration. Third-party login providers only show up once
+their credentials are set.
+
+### GitHub
+
+Create a GitHub OAuth App and use this callback:
+
+```text
+http(s)://YOUR_DOMAIN/api/v1/auth/callback/github
+```
+
+For local development, use `http://127.0.0.1:5173` as the homepage URL. Then set:
+
+```env
+GONOTELM_OAUTH_GITHUB_CLIENT_ID=...
+GONOTELM_OAUTH_GITHUB_CLIENT_SECRET=...
+```
+
+Set `GONOTELM_OAUTH_GITHUB_REDIRECT_URI` only when the callback is not the default above. For the
+step-by-step walkthrough with screenshots, production URLs, and troubleshooting, see
+[docs/oauth-setup/github](docs/oauth-setup/github/README.md).
+

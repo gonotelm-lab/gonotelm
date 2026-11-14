@@ -16,6 +16,8 @@
 [![CI](https://github.com/gonotelm-lab/gonotelm/actions/workflows/ci.yml/badge.svg)](https://github.com/gonotelm-lab/gonotelm/actions/workflows/ci.yml)
 [![codecov](https://img.shields.io/codecov/c/github/gonotelm-lab/gonotelm)](https://codecov.io/gh/gonotelm-lab/gonotelm)
 
+English | [简体中文](README-zh.md)
+
 ## GoNoteLM
 
 GoNoteLM turns a pile of PDFs, links, and notes into real understanding. Upload your sources, ask anything, and watch an AI assistant search, cite, and explain — then generate mind maps, reports, quizzes, podcasts, and videos in seconds. Learn faster. Remember more. All in one place.
@@ -142,7 +144,29 @@ GONOTELM_OAUTH_GITHUB_CLIENT_ID=...
 GONOTELM_OAUTH_GITHUB_CLIENT_SECRET=...
 ```
 
-Set `GONOTELM_OAUTH_GITHUB_REDIRECT_URI` only when the callback is not the default above. For the
-step-by-step walkthrough with screenshots, production URLs, and troubleshooting, see
-[docs/oauth-setup/github](docs/oauth-setup/github/README.md).
+Set `GONOTELM_OAUTH_GITHUB_REDIRECT_URI` only when the callback is not the default local one
+(`http://127.0.0.1:7099/api/v1/auth/callback/github`). For the step-by-step walkthrough with screenshots,
+production URLs, and troubleshooting, see [docs/oauth-setup/github](docs/oauth-setup/github/README.md).
+
+### Google
+
+Create an OAuth client of type **Web application** in the
+[Google Auth Platform](https://console.cloud.google.com/auth/clients?project=YOUR_PROJECT_ID) (replace
+`YOUR_PROJECT_ID`) and use this redirect URI:
+
+```text
+http(s)://YOUR_DOMAIN/api/v1/auth/callback/google
+```
+
+Then set:
+
+```env
+GONOTELM_OAUTH_GOOGLE_CLIENT_ID=...
+GONOTELM_OAUTH_GOOGLE_CLIENT_SECRET=...
+```
+
+Set `GONOTELM_OAUTH_GOOGLE_REDIRECT_URI` to the same value in production; it defaults to the local
+callback `http://127.0.0.1:7099/api/v1/auth/callback/google`. See
+[docs/oauth-setup/google](docs/oauth-setup/google/README.md) for consent screen, production, and
+troubleshooting notes.
 

@@ -1,5 +1,7 @@
 # GitHub
 
+English | [简体中文](README-zh.md)
+
 GoNoteLM signs users in with a GitHub OAuth App. The backend runs the OAuth2 authorization-code flow with PKCE and reads the profile from GitHub's REST API; GitHub is not an OIDC provider here, so there is no `id_token` to verify.
 
 ## 1. Create an OAuth App

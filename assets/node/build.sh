@@ -8,5 +8,4 @@ npx esbuild entry-browser.js \
   --bundle \
   --platform=browser \
   --format=iife \
-  --minify \
   --outfile=../../internal/infrastructure/sandbox/workspace/vendor/gsap.browser.js

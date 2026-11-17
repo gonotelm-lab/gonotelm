@@ -4,6 +4,10 @@ deployEnv = "dev"
 port = 7099
 exitWaitTimeout = "${GONOTELM_API_EXIT_WAIT_TIMEOUT:-30s}"
 
+[grpc]
+port = ${GONOTELM_GRPC_PORT:-7100}
+exitWaitTimeout = "${GONOTELM_GRPC_EXIT_WAIT_TIMEOUT:-30s}"
+
 [cors]
 allowOrigins = ["${GONOTELM_CORS_ALLOW_ORIGINS:-http://127.0.0.1:5173,http://localhost:5173}"]
 

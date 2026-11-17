@@ -52,6 +52,7 @@ func run() error {
 	}
 	defer app.Close()
 
+	app.Grpc.Start()
 	app.Server.Run()
 	return nil
 }

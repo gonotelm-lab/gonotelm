@@ -116,10 +116,12 @@ func (u *User) IsEmailVerified() bool {
 
 func (u *User) Activate() {
 	u.Status = UserStatusActive
+	u.UpdatedAt = valobj.NewTime()
 }
 
 func (u *User) Ban() {
 	u.Status = UserStatusBanned
+	u.UpdatedAt = valobj.NewTime()
 }
 
 func (u *User) IsActive() bool {

@@ -24,6 +24,7 @@ type NotelmConfig struct {
 	DeployEnv string `toml:"deployEnv"`
 
 	Api       ApiConfig            `toml:"api"`
+	Grpc      GrpcConfig           `toml:"grpc"`
 	Cors      CorsConfig           `toml:"cors"`
 	Auth      AuthConfig           `toml:"auth"`
 	Mailer    MailerConfig         `toml:"mailer"`
@@ -151,6 +152,21 @@ func (c *ApiConfig) HostPort() string {
 	return fmt.Sprintf(":%d", c.Port)
 }
 
+type GrpcConfig struct {
+	Port            int           `toml:"port"            validate:"required"`
+	ExitWaitTimeout time.Duration `toml:"exitWaitTimeout"`
+}
+
+func (c *GrpcConfig) HostPort() string {
+	return fmt.Sprintf(":%d", c.Port)
+}
+
+func (c *GrpcConfig) Init() {
+	if c.ExitWaitTimeout <= 0 {
+		c.ExitWaitTimeout = 30 * time.Second
+	}
+}
+
 type CorsConfig struct {
 	AllowOrigins []string `toml:"allowOrigins"`
 }
@@ -270,6 +286,7 @@ func (c *NotelmConfig) init() {
 	c.Logging.Init()
 	c.Flow.Init()
 	c.Cleanup.Init()
+	c.Grpc.Init()
 	c.Cors.Init()
 	c.Auth.Init()
 	c.Mailer.Init()

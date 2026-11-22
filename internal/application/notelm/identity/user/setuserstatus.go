@@ -63,5 +63,10 @@ func (h *SetUserStatusHandler) Handle(ctx context.Context, cmd *SetUserStatusCom
 		return nil, err
 	}
 
-	return toUserView(ctx, h.storeKeyResolver, user), nil
+	agg, err := h.userService.GetAccount(ctx, userId)
+	if err != nil {
+		return nil, err
+	}
+
+	return toUserView(ctx, h.storeKeyResolver, agg), nil
 }

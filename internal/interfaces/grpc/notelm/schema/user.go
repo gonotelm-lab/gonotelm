@@ -24,6 +24,43 @@ func ToProtoUser(view *userapp.UserView) *identityv1.User {
 		Avatar:          view.AvatarURL,
 		CreatedAt:       TimeToProto(view.CreatedAt),
 		UpdatedAt:       TimeToProto(view.UpdatedAt),
+		HasPassword:     view.HasPassword,
+		Identities:      ToProtoIdentities(view.Identities),
+	}
+}
+
+func ToProtoIdentities(views []*userapp.IdentityView) []*identityv1.Identity {
+	if len(views) == 0 {
+		return nil
+	}
+
+	out := make([]*identityv1.Identity, 0, len(views))
+	for _, view := range views {
+		if view == nil {
+			continue
+		}
+		out = append(out, &identityv1.Identity{
+			Id:                    view.Id,
+			Provider:              ToProtoProvider(view.Provider),
+			Subject:               view.Subject,
+			ProviderEmail:         view.ProviderEmail,
+			ProviderEmailVerified: view.ProviderEmailVerified,
+			BoundAt:               TimeToProto(view.BoundAt),
+			LastLoginAt:           TimeToProto(view.LastLoginAt),
+		})
+	}
+
+	return out
+}
+
+func ToProtoProvider(provider entity.ProviderType) identityv1.Identity_Provider {
+	switch provider {
+	case entity.ProviderTypeGithub:
+		return identityv1.Identity_PROVIDER_GITHUB
+	case entity.ProviderTypeGoogle:
+		return identityv1.Identity_PROVIDER_GOOGLE
+	default:
+		return identityv1.Identity_PROVIDER_UNSPECIFIED
 	}
 }
 

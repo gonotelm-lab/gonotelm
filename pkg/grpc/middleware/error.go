@@ -36,8 +36,7 @@ func mapError(err error) error {
 
 	cause := xerror.Cause(err)
 
-	var ie *xerror.InnerError
-	if stderr.As(cause, &ie) {
+	if ie, ok := stderr.AsType[*xerror.InnerError](cause); ok {
 		msg := ie.Json()
 		if ie.ShouldLogError() {
 			return status.Error(codes.Internal, msg)

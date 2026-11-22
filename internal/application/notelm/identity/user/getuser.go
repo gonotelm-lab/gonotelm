@@ -15,6 +15,16 @@ type GetUserQuery struct {
 	UserId string
 }
 
+type IdentityView struct {
+	Id                    string
+	Provider              entity.ProviderType
+	Subject               string
+	ProviderEmail         string
+	ProviderEmailVerified bool
+	BoundAt               valobj.Time
+	LastLoginAt           valobj.Time
+}
+
 type UserView struct {
 	Id              string
 	Nickname        string
@@ -23,6 +33,8 @@ type UserView struct {
 	AvatarURL       string
 	CreatedAt       valobj.Time
 	UpdatedAt       valobj.Time
+	HasPassword     bool
+	Identities      []*IdentityView
 }
 
 type GetUserHandler struct {
@@ -46,15 +58,31 @@ func (h *GetUserHandler) Handle(ctx context.Context, query *GetUserQuery) (*User
 		return nil, pkgerrors.ErrParams.Msg("invalid user id")
 	}
 
-	user, err := h.userService.GetUser(ctx, userId)
+	// GetAccount 带出密码标记与已绑定的三方身份
+	agg, err := h.userService.GetAccount(ctx, userId)
 	if err != nil {
 		return nil, err
 	}
 
-	return toUserView(ctx, h.storeKeyResolver, user), nil
+	return toUserView(ctx, h.storeKeyResolver, agg), nil
 }
 
-func toUserView(ctx context.Context, resolver *storekey.Resolver, user *entity.User) *UserView {
+func toUserView(ctx context.Context, resolver *storekey.Resolver, agg *entity.UserAggregate) *UserView {
+	user := agg.User()
+	identities := agg.Identities()
+	views := make([]*IdentityView, 0, len(identities))
+	for _, identity := range identities {
+		views = append(views, &IdentityView{
+			Id:                    identity.Id.String(),
+			Provider:              identity.Provider,
+			Subject:               identity.Subject,
+			ProviderEmail:         identity.ProviderEmail,
+			ProviderEmailVerified: identity.ProviderEmailVerified,
+			BoundAt:               identity.CreatedAt,
+			LastLoginAt:           identity.LastLoginAt,
+		})
+	}
+
 	return &UserView{
 		Id:              user.Id.String(),
 		Nickname:        user.Nickname,
@@ -63,5 +91,7 @@ func toUserView(ctx context.Context, resolver *storekey.Resolver, user *entity.U
 		AvatarURL:       resolver.ResolvePublic(ctx, user.Avatar),
 		CreatedAt:       user.CreatedAt,
 		UpdatedAt:       user.UpdatedAt,
+		HasPassword:     agg.HasPassword(),
+		Identities:      views,
 	}
 }

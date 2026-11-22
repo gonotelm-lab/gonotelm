@@ -63,10 +63,10 @@ run-notelm:
 run-initjob:
 	@set -a && . ./.env && set +a && go run ./cmd/initjob/main.go
 
-# goose 迁移：建库（不存在时）+ 执行未应用的迁移；-baseline 兼容引入 goose 前的旧库
+# 按 database.type 迁移：建库（不存在时）+ 执行未应用的迁移
 .PHONY: migrate
 migrate:
-	@set -a && . ./.env && set +a && go run ./cmd/migrate -baseline
+	@set -a && . ./.env && set +a && go run ./cmd/migrate
 
 # deploy/dev 中间件（app 用上面的 run-* 跑在宿主机）：dev-up / dev-up-notrace / dev-up-all /
 # dev-down / dev-down-v / dev-ps / dev-logs / dev-migrate；变量取 ./.env（ENV_FILE=... 可换），

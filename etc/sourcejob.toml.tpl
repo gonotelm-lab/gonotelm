@@ -1,7 +1,7 @@
 deployEnv = "dev"
 
 [database]
-type = "postgres"
+type = "${GONOTELM_DB_TYPE:-postgres}"
 host = "${GONOTELM_DB_HOST:-127.0.0.1}"
 port = ${GONOTELM_DB_PORT:-5432}
 user = "${GONOTELM_DB_USER:-postgres}"

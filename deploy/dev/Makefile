@@ -43,10 +43,18 @@ config:
 migrate: migrate-postgres migrate-clickhouse migrate-milvus
 
 migrate-postgres:
-	@$(LOAD_ENV) && cd ../.. && go run ./cmd/migrate -baseline
+	@echo ""
+	@echo "========================================================================"
+	@echo "  [1/3] POSTGRES: create database + goose migrations (cmd/migrate)"
+	@echo "========================================================================"
+	@$(LOAD_ENV) && cd ../.. && go run ./cmd/migrate
 
 # 0001.up.sql 的建表语句不带库名，必须先把默认库指定成 GONOTELM_OLAP_DB_NAME
 migrate-clickhouse:
+	@echo ""
+	@echo "========================================================================"
+	@echo "  [2/3] CLICKHOUSE: create database + 0001.up.sql"
+	@echo "========================================================================"
 	@$(LOAD_ENV) && db="$${GONOTELM_OLAP_DB_NAME:-gonotelm}" && \
 		$(COMPOSE) $(COMPOSE_ENV) exec -T clickhouse \
 			clickhouse-client --query "CREATE DATABASE IF NOT EXISTS $$db" && \
@@ -56,7 +64,11 @@ migrate-clickhouse:
 
 # milvus 脚本用 curl 访问宿主端口，凭证取自 .env
 migrate-milvus:
+	@echo ""
+	@echo "========================================================================"
+	@echo "  [3/3] MILVUS: collection bootstrap scripts"
+	@echo "========================================================================"
 	@$(LOAD_ENV) && for f in ../../migration/db/milvus/milvus-*.sh; do \
-		echo "==> $$f"; \
+		echo "  -> $$f"; \
 		sh "$$f" || exit 1; \
 	done

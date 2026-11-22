@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/gonotelm-lab/gonotelm/migration/db/clickhouse"
 	"github.com/gonotelm-lab/gonotelm/migration/db/postgres18"
 	pkgsql "github.com/gonotelm-lab/gonotelm/pkg/sql"
 )
@@ -17,7 +18,8 @@ type UpFunc func(ctx context.Context, cfg *pkgsql.Config) error
 
 // drivers 按 database.type 注册迁移实现。
 var drivers = map[string]UpFunc{
-	"postgres": postgres18.Up,
+	"clickhouse": clickhouse.Up,
+	"postgres":   postgres18.Up,
 }
 
 // typeAliases 把常见写法归一化到 drivers 的键。

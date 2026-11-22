@@ -1,5 +1,4 @@
-CREATE DATABASE IF NOT EXISTS gonotelm;
-
+-- +goose Up
 CREATE TABLE IF NOT EXISTS llm_logs (
 	`id` String,
 	`group_id` String,

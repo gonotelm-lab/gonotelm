@@ -8,8 +8,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSupported_ContainsPostgres(t *testing.T) {
+func TestSupported_ContainsBuiltinEngines(t *testing.T) {
 	assert.Contains(t, Supported(), "postgres")
+	assert.Contains(t, Supported(), "clickhouse")
 }
 
 func TestLookup_IsCaseInsensitive(t *testing.T) {

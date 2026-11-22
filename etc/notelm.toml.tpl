@@ -40,7 +40,7 @@ password = "${GONOTELM_DB_PASSWORD:-postgres}"
 dbName = "${GONOTELM_DB_NAME:-gonotelm}"
 
 [databaseOlap]
-type = "clickhouse"
+type = "${GONOTELM_OLAP_DB_TYPE:-clickhouse}"
 host = "${GONOTELM_OLAP_DB_HOST:-127.0.0.1}"
 port = ${GONOTELM_OLAP_DB_PORT:-9000}
 user = "${GONOTELM_OLAP_DB_USER:-clickhouse}"

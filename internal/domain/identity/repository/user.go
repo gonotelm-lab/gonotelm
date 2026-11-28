@@ -20,6 +20,7 @@ type UserRepository interface {
 	GetPasswordHash(ctx context.Context, id valobj.Uid) (string, error)
 	UpdateProfile(ctx context.Context, user *entity.User) error
 	UpdateAvatar(ctx context.Context, user *entity.User) error
+	UpdateStatus(ctx context.Context, user *entity.User) error
 	UpdatePasswordHash(ctx context.Context, id valobj.Uid, hash string) error
 }
 

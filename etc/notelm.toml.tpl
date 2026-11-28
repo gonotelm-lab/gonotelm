@@ -4,6 +4,10 @@ deployEnv = "dev"
 port = 7099
 exitWaitTimeout = "${GONOTELM_API_EXIT_WAIT_TIMEOUT:-30s}"
 
+[grpc]
+port = ${GONOTELM_GRPC_PORT:-7100}
+exitWaitTimeout = "${GONOTELM_GRPC_EXIT_WAIT_TIMEOUT:-30s}"
+
 [cors]
 allowOrigins = ["${GONOTELM_CORS_ALLOW_ORIGINS:-http://127.0.0.1:5173,http://localhost:5173}"]
 
@@ -28,7 +32,7 @@ apiKey = "${GONOTELM_MAILER_RESEND_API_KEY:-}"
 from   = "${GONOTELM_MAILER_RESEND_FROM:-onboarding@resend.dev}"
 
 [database]
-type = "postgres"
+type = "${GONOTELM_DB_TYPE:-postgres}"
 host = "${GONOTELM_DB_HOST:-127.0.0.1}"
 port = ${GONOTELM_DB_PORT:-5432}
 user = "${GONOTELM_DB_USER:-postgres}"
@@ -36,7 +40,7 @@ password = "${GONOTELM_DB_PASSWORD:-postgres}"
 dbName = "${GONOTELM_DB_NAME:-gonotelm}"
 
 [databaseOlap]
-type = "clickhouse"
+type = "${GONOTELM_OLAP_DB_TYPE:-clickhouse}"
 host = "${GONOTELM_OLAP_DB_HOST:-127.0.0.1}"
 port = ${GONOTELM_OLAP_DB_PORT:-9000}
 user = "${GONOTELM_OLAP_DB_USER:-clickhouse}"

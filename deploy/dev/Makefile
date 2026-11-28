@@ -12,7 +12,7 @@ COMPOSE_UP := $(COMPOSE) $(COMPOSE_ENV) --profile trace --profile ui
 COMPOSE_ALL := $(COMPOSE) $(COMPOSE_ENV) --profile full
 LOAD_ENV = set -a && . $(ENV_FILE) && set +a
 
-.PHONY: up up-notrace up-all down down-v ps logs config migrate migrate-postgres migrate-clickhouse migrate-milvus
+.PHONY: up up-notrace up-all down down-v ps logs config migrate migrate-db migrate-milvus
 
 up:
 	$(COMPOSE_UP) up -d
@@ -39,24 +39,24 @@ logs:
 config:
 	$(COMPOSE) $(COMPOSE_ENV) config
 
-# clickhouse / milvus 只在全新数据卷上跑一次，脚本非幂等；postgres 走 goose，可重复执行。
-migrate: migrate-postgres migrate-clickhouse migrate-milvus
+# postgres / clickhouse 由 cmd/migrate 按 database.type / databaseOlap.type 迁移，可重复执行；
+# milvus 只在全新数据卷上跑一次，脚本非幂等。
+migrate: migrate-db migrate-milvus
 
-migrate-postgres:
-	@$(LOAD_ENV) && cd ../.. && go run ./cmd/migrate -baseline
-
-# 0001.up.sql 的建表语句不带库名，必须先把默认库指定成 GONOTELM_OLAP_DB_NAME
-migrate-clickhouse:
-	@$(LOAD_ENV) && db="$${GONOTELM_OLAP_DB_NAME:-gonotelm}" && \
-		$(COMPOSE) $(COMPOSE_ENV) exec -T clickhouse \
-			clickhouse-client --query "CREATE DATABASE IF NOT EXISTS $$db" && \
-		$(COMPOSE) $(COMPOSE_ENV) exec -T clickhouse \
-			clickhouse-client --database "$$db" --multiquery \
-			< ../../migration/db/clickhouse/unclustered/0001.up.sql
+migrate-db:
+	@echo ""
+	@echo "========================================================================"
+	@echo "  DATABASES: postgres + clickhouse (goose via cmd/migrate)"
+	@echo "========================================================================"
+	@$(LOAD_ENV) && cd ../.. && go run ./cmd/migrate
 
 # milvus 脚本用 curl 访问宿主端口，凭证取自 .env
 migrate-milvus:
+	@echo ""
+	@echo "========================================================================"
+	@echo "  MILVUS: collection bootstrap scripts"
+	@echo "========================================================================"
 	@$(LOAD_ENV) && for f in ../../migration/db/milvus/milvus-*.sh; do \
-		echo "==> $$f"; \
+		echo "  -> $$f"; \
 		sh "$$f" || exit 1; \
 	done

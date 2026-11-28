@@ -9,6 +9,7 @@ import (
 
 	artifactsyncer "github.com/gonotelm-lab/gonotelm/internal/application/notelm/artifact/syncer"
 	chatsuggest "github.com/gonotelm-lab/gonotelm/internal/application/notelm/chat/suggestion"
+	userapp "github.com/gonotelm-lab/gonotelm/internal/application/notelm/identity/user"
 	"github.com/gonotelm-lab/gonotelm/internal/application/shared/cleanup"
 	bootshared "github.com/gonotelm-lab/gonotelm/internal/bootstrap/shared"
 	"github.com/gonotelm-lab/gonotelm/internal/conf"
@@ -23,6 +24,7 @@ import (
 	"github.com/gonotelm-lab/gonotelm/internal/infrastructure/repository"
 	notelmapi "github.com/gonotelm-lab/gonotelm/internal/interfaces/api/notelm"
 	eventnotelm "github.com/gonotelm-lab/gonotelm/internal/interfaces/event/notelm"
+	notelmrpc "github.com/gonotelm-lab/gonotelm/internal/interfaces/grpc/notelm"
 	"github.com/gonotelm-lab/gonotelm/pkg/httpclient"
 	"github.com/gonotelm-lab/gonotelm/pkg/mail"
 	maillog "github.com/gonotelm-lab/gonotelm/pkg/mail/log"
@@ -35,6 +37,7 @@ type Notelm struct {
 	closers []io.Closer
 	wg      *sync.WaitGroup
 	Server  *notelmapi.Server
+	Grpc    *notelmrpc.Server
 }
 
 func (a *Notelm) Close() error {
@@ -302,10 +305,23 @@ func NewNotelm(rootCtx context.Context, cfg *conf.NotelmConfig) (_ *Notelm, outE
 		},
 	)
 
+	// ── 10. gRPC Server ──
+	getUserHandler := userapp.NewGetUserHandler(userService, infra.ObjectStore)
+	setUserStatusHandler := userapp.NewSetUserStatusHandler(userService, userRepo, infra.ObjectStore)
+	grpcServer, err := notelmrpc.NewServer(cfg.Grpc, notelmrpc.Deps{
+		GetUser:       getUserHandler,
+		SetUserStatus: setUserStatusHandler,
+	})
+	if err != nil {
+		return nil, err
+	}
+	addCloser(grpcServer)
+
 	return &Notelm{
 		closers: closers,
 		wg:      wg,
 		Server:  svr,
+		Grpc:    grpcServer,
 		rootCtx: rootCtx,
 	}, nil
 }

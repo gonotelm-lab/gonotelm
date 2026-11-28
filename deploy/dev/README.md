@@ -120,14 +120,12 @@ app 日志里表现为提交任务失败，而不是启动失败。
 make dev-migrate
 ```
 
-* postgres：`go run ./cmd/migrate`（建 `gonotelm` 库 + goose 增量迁移 `migration/db/postgres18`，
-  可重复执行）。`-baseline` 兼容引入 goose 之前用 psql 建的旧库：会把已存在的旧 schema
-  标记为迁移 0001 已应用，不会重复建表。
-* clickhouse / milvus：`migration/db/clickhouse/unclustered/0001.up.sql`、`migration/db/milvus/milvus-*.sh`，
-  **脚本非幂等，只在全新数据卷上跑一次**。
+* postgres / clickhouse：`go run ./cmd/migrate`（按 `database.type` / `databaseOlap.type` 选择迁移，
+  建库 + goose 增量迁移，可重复执行）。迁移假定库是 goose 从零建的，不兼容引入 goose 之前的旧 schema。
+* milvus：`migration/db/milvus/milvus-*.sh`，**脚本非幂等，只在全新数据卷上跑一次**。
 
 `flowdb` 由 flow-server 的 `FLOW_DB_AUTO_INIT` 自己创建。
-**接上已有数据目录时**，postgres 可以直接跑（会自动 baseline），clickhouse/milvus 的脚本不要重复执行。
+**接上已有数据目录时**，postgres / clickhouse 可以直接跑（goose 只补未应用的迁移），milvus 的脚本不要重复执行。
 
 ## 接上已有的本地数据目录
 

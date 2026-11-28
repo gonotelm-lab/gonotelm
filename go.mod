@@ -3,6 +3,7 @@ module github.com/gonotelm-lab/gonotelm
 go 1.26.0
 
 require (
+	buf.build/go/protovalidate v1.2.0
 	github.com/BurntSushi/toml v1.6.0
 	github.com/ClickHouse/clickhouse-go/v2 v2.48.0
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.2
@@ -35,10 +36,12 @@ require (
 	github.com/go-playground/validator/v10 v10.30.2
 	github.com/go-redsync/redsync/v4 v4.16.0
 	github.com/golang/snappy v1.0.0
+	github.com/gonotelm-lab/apis-go-client v0.0.2
 	github.com/gonotelm-lab/flow/api v0.4.0-beta.2
 	github.com/gonotelm-lab/flow/client v0.4.0-beta.2
 	github.com/gonotelm-lab/multimodal v0.2.5
 	github.com/google/uuid v1.6.0
+	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3
 	github.com/hertz-contrib/logger/slog v1.0.0
 	github.com/klippa-app/go-pdfium v1.17.3
 	github.com/meguminnnnnnnnn/go-openai v0.1.2
@@ -75,6 +78,7 @@ require (
 	golang.org/x/sync v0.24.0
 	google.golang.org/genai v1.54.0
 	google.golang.org/grpc v1.81.1
+	google.golang.org/protobuf v1.36.12
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/gorm v1.31.1
@@ -82,7 +86,8 @@ require (
 )
 
 require (
-	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.11-20260415201107-50325440f8f2.1 // indirect
+	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.12-20260825204119-511051f7f437.2 // indirect
+	cel.dev/expr v0.25.1 // indirect
 	cloud.google.com/go v0.118.3 // indirect
 	cloud.google.com/go/auth v0.15.0 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
@@ -90,6 +95,7 @@ require (
 	github.com/ClickHouse/ch-go v0.74.0 // indirect
 	github.com/JohannesKaufmann/dom v0.3.1 // indirect
 	github.com/andybalholm/brotli v1.2.2 // indirect
+	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/baidubce/bce-qianfan-sdk/go/qianfan v0.0.14 // indirect
 	github.com/baidubce/bce-sdk-go v0.9.164 // indirect
@@ -139,6 +145,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/btree v1.1.2 // indirect
+	github.com/google/cel-go v0.28.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.5 // indirect
@@ -269,7 +276,6 @@ require (
 	google.golang.org/genproto v0.0.0-20250303144028-a0af3efb3deb // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260615183401-62b3387ff324 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260618152121-87f3d3e198d3 // indirect
-	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect

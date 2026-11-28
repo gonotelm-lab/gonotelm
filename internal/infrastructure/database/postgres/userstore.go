@@ -99,6 +99,13 @@ func (s *UserStoreImpl) UpdateAvatar(ctx context.Context, params *schema.UserUpd
 	})
 }
 
+func (s *UserStoreImpl) UpdateStatus(ctx context.Context, params *schema.UserUpdateStatusParams) error {
+	return s.update(ctx, params.Id, map[string]any{
+		"status":     params.Status,
+		"updated_at": params.UpdatedAt,
+	})
+}
+
 func (s *UserStoreImpl) UpdatePasswordHash(ctx context.Context, params *schema.UserUpdatePasswordParams) error {
 	return s.update(ctx, params.Id, map[string]any{
 		"password_hash": params.PasswordHash,

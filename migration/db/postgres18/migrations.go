@@ -1,5 +1,5 @@
 // Package postgres18 提供 PostgreSQL 18 的 schema 迁移文件，并用 goose 执行迁移。
-// 迁移文件与单测、cmd/migrate 共用，建库由调用方负责。
+// 迁移文件与单测、cmd/migrate 共用；建库与连接由 Up 负责。
 package postgres18
 
 import (
@@ -39,6 +39,7 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 		return fmt.Errorf("migrate: apply migrations: %w", err)
 	}
 	if len(results) == 0 {
+		slog.InfoContext(ctx, "no pending database migrations")
 		return nil
 	}
 

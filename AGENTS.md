@@ -145,5 +145,5 @@ Commands live in `Makefile` and `README.md`; the common ones:
 
 - `make gofmt` to format; `go build ./...` to compile everything.
 - `make test` for unit tests. Note it **only runs the packages listed in `TEST_PKGS` in the `Makefile`** (postgres / redis / olap / repository / pkg/initjob / migration). Tests under `domain` and `application` reach CI only after being added to `TEST_PKGS`.
-- `make migrate` (equivalent to `cmd/migrate -baseline`) migrates the schema; `make dev-migrate` migrates the dev middleware stack.
+- `make migrate` (equivalent to `cmd/migrate`) migrates the schema, picking each engine by `database.type` / `databaseOlap.type` (`GONOTELM_DB_TYPE`, `GONOTELM_OLAP_DB_TYPE`, default `postgres` + `clickhouse`); `make dev-migrate` migrates the dev middleware stack.
 - Lint matches CI: golangci-lint, version pinned in `.github/workflows/ci.yml`.

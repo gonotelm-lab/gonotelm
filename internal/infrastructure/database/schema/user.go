@@ -30,6 +30,12 @@ type UserUpdateAvatarParams struct {
 	UpdatedAt int64
 }
 
+type UserUpdateStatusParams struct {
+	Id        valobj.Uid
+	Status    string
+	UpdatedAt int64
+}
+
 type UserUpdatePasswordParams struct {
 	Id           valobj.Uid
 	PasswordHash string

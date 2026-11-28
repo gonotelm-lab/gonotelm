@@ -182,6 +182,21 @@ func (r *UserRepositoryImpl) UpdateAvatar(ctx context.Context, user *identityent
 	return nil
 }
 
+func (r *UserRepositoryImpl) UpdateStatus(ctx context.Context, user *identityentity.User) error {
+	err := r.userStore.UpdateStatus(ctx, &schema.UserUpdateStatusParams{
+		Id:        user.Id,
+		Status:    string(user.Status),
+		UpdatedAt: user.UpdatedAt.Value(),
+	})
+	if err != nil {
+		return errors.WithMessage(err, "failed to update user status")
+	}
+
+	r.deleteCache(ctx, user.Id.String())
+
+	return nil
+}
+
 func (r *UserRepositoryImpl) UpdatePasswordHash(ctx context.Context, id valobj.Uid, hash string) error {
 	err := r.userStore.UpdatePasswordHash(ctx, &schema.UserUpdatePasswordParams{
 		Id:           id,

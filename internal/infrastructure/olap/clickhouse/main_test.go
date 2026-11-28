@@ -17,7 +17,7 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	const migrationFilePath = "../../../../migration/db/clickhouse/unclustered/0001.up.sql"
+	const migrationFilePath = "../../../../migration/db/clickhouse/unclustered/0001_init.sql"
 
 	var err error
 	testDB, err = chtestsuite.NewTestDBFromEnv()

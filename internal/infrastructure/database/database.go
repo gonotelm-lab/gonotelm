@@ -172,6 +172,7 @@ type UserStore interface {
 	GetPasswordHash(ctx context.Context, id valobj.Uid) (string, error)
 	UpdateProfile(ctx context.Context, params *schema.UserUpdateProfileParams) error
 	UpdateAvatar(ctx context.Context, params *schema.UserUpdateAvatarParams) error
+	UpdateStatus(ctx context.Context, params *schema.UserUpdateStatusParams) error
 	UpdatePasswordHash(ctx context.Context, params *schema.UserUpdatePasswordParams) error
 }
 

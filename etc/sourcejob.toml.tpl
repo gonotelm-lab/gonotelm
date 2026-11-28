@@ -1,7 +1,7 @@
 deployEnv = "dev"
 
 [database]
-type = "postgres"
+type = "${GONOTELM_DB_TYPE:-postgres}"
 host = "${GONOTELM_DB_HOST:-127.0.0.1}"
 port = ${GONOTELM_DB_PORT:-5432}
 user = "${GONOTELM_DB_USER:-postgres}"
@@ -9,7 +9,7 @@ password = "${GONOTELM_DB_PASSWORD:-postgres}"
 dbName = "${GONOTELM_DB_NAME:-gonotelm}"
 
 [databaseOlap]
-type = "clickhouse"
+type = "${GONOTELM_OLAP_DB_TYPE:-clickhouse}"
 host = "${GONOTELM_OLAP_DB_HOST:-127.0.0.1}"
 port = ${GONOTELM_OLAP_DB_PORT:-9000}
 user = "${GONOTELM_OLAP_DB_USER:-clickhouse}"

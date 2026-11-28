@@ -114,6 +114,15 @@ func TestUserStoreNarrowUpdates(t *testing.T) {
 		So(err, ShouldBeNil)
 		So(got.Avatar, ShouldEqual, "stkv1-new-avatar")
 
+		So(testUserStore.UpdateStatus(ctx, &schema.UserUpdateStatusParams{
+			Id: user.Id, Status: "banned", UpdatedAt: now,
+		}), ShouldBeNil)
+		got, err = testUserStore.GetById(ctx, user.Id)
+		So(err, ShouldBeNil)
+		So(got.Status, ShouldEqual, "banned")
+		So(got.Nickname, ShouldEqual, "renamed")
+		So(got.Avatar, ShouldEqual, "stkv1-new-avatar")
+
 		So(testUserStore.UpdatePasswordHash(ctx, &schema.UserUpdatePasswordParams{
 			Id: user.Id, PasswordHash: "bcrypt-hash", UpdatedAt: now,
 		}), ShouldBeNil)
@@ -141,6 +150,10 @@ func TestUserStoreUpdateDatabaseErrors(t *testing.T) {
 
 		So(pkgerrors.Is(testUserStore.UpdateAvatar(ctx, &schema.UserUpdateAvatarParams{
 			Id: id, Avatar: "stkv1-avatar", UpdatedAt: now,
+		}), pkgerrors.ErrDatabase), ShouldBeTrue)
+
+		So(pkgerrors.Is(testUserStore.UpdateStatus(ctx, &schema.UserUpdateStatusParams{
+			Id: id, Status: "banned", UpdatedAt: now,
 		}), pkgerrors.ErrDatabase), ShouldBeTrue)
 
 		So(pkgerrors.Is(testUserStore.UpdatePasswordHash(ctx, &schema.UserUpdatePasswordParams{

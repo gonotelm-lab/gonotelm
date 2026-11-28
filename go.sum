@@ -303,8 +303,8 @@ github.com/golang/snappy v1.0.0/go.mod h1:/XxbfmMg8lxefKM7IXC3fBNl/7bRcc72aCRzEW
 github.com/gomodule/redigo v1.7.1-0.20190724094224-574c33c3df38/go.mod h1:B4C85qUVwatsJoIUNIfCRsp7qO0iAmpGFZ4EELWSbC4=
 github.com/gomodule/redigo v1.9.3 h1:dNPSXeXv6HCq2jdyWfjgmhBdqnR6PRO3m/G05nvpPC8=
 github.com/gomodule/redigo v1.9.3/go.mod h1:KsU3hiK/Ay8U42qpaJk+kuNa3C+spxapWpM+ywhcgtw=
-github.com/gonotelm-lab/apis-go-client v0.0.2-0.20261121041822-11fa050d7cba h1:rmYM6HUxWAk0vQIAaaysV/qIYi9ebFKQN0eR69Fxrf8=
-github.com/gonotelm-lab/apis-go-client v0.0.2-0.20261121041822-11fa050d7cba/go.mod h1:EcS3XBeeyUvP6pvPo5EJsc3mtqK+YitFdql6edo9dU8=
+github.com/gonotelm-lab/apis-go-client v0.0.2 h1:nu64NWGi6fimot/hXCxdqzGunRYZ9TRvBMb1Kx0yrtU=
+github.com/gonotelm-lab/apis-go-client v0.0.2/go.mod h1:EcS3XBeeyUvP6pvPo5EJsc3mtqK+YitFdql6edo9dU8=
 github.com/gonotelm-lab/flow/api v0.4.0-beta.2 h1:B9kiKJZj1Xjfnq9Hd54z4C7kviX886gi1nJ5doY1S/o=
 github.com/gonotelm-lab/flow/api v0.4.0-beta.2/go.mod h1:S9jc/IJ0EV8E3RVTC4CPoM2FlV07e6fPtqX1URIw2Jk=
 github.com/gonotelm-lab/flow/client v0.4.0-beta.2 h1:YJ1Q12A1n7cfqBlWcASDSFVXpeCQdu6IV5m7wOP70BU=

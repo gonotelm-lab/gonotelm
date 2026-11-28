@@ -36,7 +36,7 @@ require (
 	github.com/go-playground/validator/v10 v10.30.2
 	github.com/go-redsync/redsync/v4 v4.16.0
 	github.com/golang/snappy v1.0.0
-	github.com/gonotelm-lab/apis-go-client v0.0.2-0.20261121041822-11fa050d7cba
+	github.com/gonotelm-lab/apis-go-client v0.0.2
 	github.com/gonotelm-lab/flow/api v0.4.0-beta.2
 	github.com/gonotelm-lab/flow/client v0.4.0-beta.2
 	github.com/gonotelm-lab/multimodal v0.2.5
